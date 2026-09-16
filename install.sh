@@ -114,6 +114,10 @@ PACKAGES=(
     noto-fonts-cjk
     noto-fonts-emoji
     zram-generator
+    dolphin
+    xdg-desktop-portal
+    xdg-desktop-portal-hyprland
+    xdg-desktop-portal-kde
 )
 
 # Pacotes adicionais de GPU
@@ -161,7 +165,7 @@ echo -e "\n${BOLD}[5/5] Instalando Configurações do Rice...${NC}"
 
 # Backup de segurança
 mkdir -p "$BACKUP_DIR"
-for dir in hypr quickshell kitty wallust; do
+for dir in hypr quickshell kitty wallust xdg-desktop-portal; do
     if [ -d "$HOME/.config/$dir" ]; then
         echo -e "  • Criando backup de ~/.config/$dir -> $BACKUP_DIR/"
         cp -a "$HOME/.config/$dir" "$BACKUP_DIR/" 2>/dev/null || true
@@ -174,8 +178,10 @@ cp -a "$SCRIPT_DIR/dots/hypr" "$HOME/.config/"
 cp -a "$SCRIPT_DIR/dots/quickshell" "$HOME/.config/"
 cp -a "$SCRIPT_DIR/dots/kitty" "$HOME/.config/"
 [ -d "$SCRIPT_DIR/dots/wallust" ] && cp -a "$SCRIPT_DIR/dots/wallust" "$HOME/.config/"
+[ -d "$SCRIPT_DIR/dots/xdg-desktop-portal" ] && cp -a "$SCRIPT_DIR/dots/xdg-desktop-portal" "$HOME/.config/"
 cp -a "$SCRIPT_DIR/dots/bin/"* "$HOME/.local/bin/"
 chmod +x "$HOME/.local/bin/"*
+systemctl --user restart xdg-desktop-portal 2>/dev/null || true
 
 # Garantir ~/.local/bin no PATH
 if ! echo "$PATH" | grep -q "$HOME/.local/bin"; then

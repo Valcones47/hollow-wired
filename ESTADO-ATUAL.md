@@ -59,6 +59,7 @@ Todos os elementos de interface gráfica do desktop são gerenciados pelo Quicks
 - **Correção Automática do Mod2 / NumLock no XWayland:** Utilitário `~/.local/bin/rice-fix-xwayland-numlock` disparado no autostart do `hyprland.lua` desvincula o `Num_Lock` do modificador `Mod2` no XWayland, eliminando bugs onde o Discord, Steam ou jogos capturam `NumLock` fantasma em atalhos ou push-to-talk.
 - **Portabilidade Universal e Desacoplamento:** O Quickshell e o Hyprland foram 100% desacoplados de caminhos de usuário (`$HOME` / `Quickshell.env("HOME")`), a leitura de GPU (`SysStats.gpuName`) detecta dinamicamente modelos NVIDIA, AMD ou Intel, a leitura térmica suporta tanto Intel quanto AMD Ryzen (`Tctl`), e o card de bateria se adapta dinamicamente para computadores desktop.
 - **Novo Utilitário de Perfil (`rice-set-avatar`):** Permite trocar foto ou GIF de perfil com 1 clique diretamente pelo Dashboard ou atalho gráfico (`zenity`/`kdialog`).
+- **Seletor de Arquivos Integrado (KDE / Dolphin FileChooser Portal):** Configurado via `~/.config/xdg-desktop-portal/portals.conf` e `hyprland-portals.conf` definindo `org.freedesktop.impl.portal.FileChooser=kde`. Quando qualquer navegador (Zen, Chrome), aplicativo (Discord) ou jogo solicita abrir/salvar arquivos, invoca nativamente a interface do Dolphin/KDE com tema escuro consistente (Breeze Dark), atalhos laterais de pastas e miniaturas, substituindo o seletor genérico em branco do GTK.
 
 ---
 
