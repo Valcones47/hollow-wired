@@ -9,6 +9,8 @@ import "."
 Item {
     id: root
 
+    property bool showCacheExplanation: false
+
     function severity(frac) {
         if (frac >= 0.9)
             return Theme.critical;
@@ -129,6 +131,50 @@ Item {
                         onClicked: cleanProc.running = true
                     }
                 }
+
+                // Botão explicativo "Não necessário"
+                Rectangle {
+                    id: whyBtn
+                    Layout.alignment: Qt.AlignHCenter
+                    implicitWidth: whyRow.implicitWidth + 16
+                    implicitHeight: 22
+                    radius: 11
+                    color: whyArea.containsMouse ? Theme.withAlpha(Theme.primary, 0.15) : "transparent"
+                    border.color: whyArea.containsMouse ? Theme.primary : Theme.withAlpha(Theme.subtext, 0.3)
+                    border.width: 1
+
+                    Behavior on color { ColorAnimation { duration: 150 } }
+                    Behavior on border.color { ColorAnimation { duration: 150 } }
+
+                    Row {
+                        id: whyRow
+                        anchors.centerIn: parent
+                        spacing: 5
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: Theme.icons.info
+                            font.family: Theme.iconFontFamily
+                            font.pixelSize: 11
+                            color: whyArea.containsMouse ? Theme.primary : Theme.subtext
+                        }
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "Não necessário"
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 10
+                            font.weight: Font.Medium
+                            color: whyArea.containsMouse ? Theme.textColor : Theme.subtext
+                        }
+                    }
+
+                    MouseArea {
+                        id: whyArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.showCacheExplanation = true
+                    }
+                }
             }
 
             Item { Layout.fillWidth: true }
@@ -174,6 +220,179 @@ Item {
                             font.family: Theme.fontFamily
                             font.pixelSize: 11
                             color: Theme.textColor
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // ---------- Modal Explicativo: Por que limpar cache não é necessário ----------
+    Rectangle {
+        id: explanationOverlay
+        anchors.fill: parent
+        visible: opacity > 0
+        opacity: root.showCacheExplanation ? 1 : 0
+        color: Qt.rgba(0, 0, 0, 0.72)
+        radius: Theme.radius
+
+        Behavior on opacity { NumberAnimation { duration: 180 } }
+
+        MouseArea {
+            anchors.fill: parent
+            onClicked: root.showCacheExplanation = false
+        }
+
+        Rectangle {
+            id: modalBox
+            width: Math.min(parent.width - 40, 520)
+            implicitHeight: modalCol.implicitHeight + 36
+            anchors.centerIn: parent
+            radius: 16
+            color: Theme.tile
+            border.width: 1
+            border.color: Theme.withAlpha(Theme.primary, 0.4)
+
+            // Engole cliques dentro do card
+            MouseArea { anchors.fill: parent }
+
+            ColumnLayout {
+                id: modalCol
+                anchors.fill: parent
+                anchors.margins: 18
+                spacing: 12
+
+                // Cabeçalho
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 10
+
+                    Rectangle {
+                        width: 32
+                        height: 32
+                        radius: 16
+                        color: Theme.withAlpha(Theme.primary, 0.2)
+                        Text {
+                            anchors.centerIn: parent
+                            text: Theme.icons.info
+                            font.family: Theme.iconFontFamily
+                            font.pixelSize: 16
+                            color: Theme.primary
+                        }
+                    }
+
+                    Text {
+                        Layout.fillWidth: true
+                        text: "Por que limpar cache não é necessário?"
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 13
+                        font.weight: Font.Bold
+                        color: Theme.textColor
+                    }
+
+                    Rectangle {
+                        width: 26
+                        height: 26
+                        radius: 13
+                        color: closeArea.containsMouse ? Theme.withAlpha(Theme.critical, 0.25) : Theme.tileHigh
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: Theme.icons.close
+                            font.family: Theme.iconFontFamily
+                            font.pixelSize: 12
+                            color: closeArea.containsMouse ? Theme.critical : Theme.subtext
+                        }
+
+                        MouseArea {
+                            id: closeArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.showCacheExplanation = false
+                        }
+                    }
+                }
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    height: 1
+                    color: Theme.withAlpha(Theme.outline, 0.2)
+                }
+
+                // Conteúdo explicativo
+                Text {
+                    Layout.fillWidth: true
+                    text: "Essa RAM \"usada\" é <b>cache de página do kernel</b> — arquivos que já foram lidos do disco e ficaram guardados na memória pra não precisar ler de novo. Não é memória alocada por nenhum processo, é <b>RAM livre sendo reaproveitada</b>."
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 11
+                    lineHeight: 1.35
+                    wrapMode: Text.Wrap
+                    textFormat: Text.RichText
+                    color: Theme.textColor
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    text: "Quando algum programa pede mais memória, o kernel libera esse cache <b>automaticamente e na hora</b>, antes de precisar usar swap. Não tem cenário onde limpar isso manualmente ajuda — só descarta o cache e força o próximo acesso a disco de novo, o que deixa as coisas mais lentas, não mais rápidas."
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 11
+                    lineHeight: 1.35
+                    wrapMode: Text.Wrap
+                    textFormat: Text.RichText
+                    color: Theme.textColor
+                }
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    implicitHeight: noteText.implicitHeight + 16
+                    radius: 8
+                    color: Theme.withAlpha(Theme.primary, 0.08)
+                    border.width: 1
+                    border.color: Theme.withAlpha(Theme.primary, 0.25)
+
+                    Text {
+                        id: noteText
+                        anchors.fill: parent
+                        anchors.margins: 10
+                        text: "O botão fica disponível mesmo assim para testes, mas não faz o que o nome sugere."
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 10
+                        font.italic: true
+                        wrapMode: Text.Wrap
+                        color: Theme.subtext
+                    }
+                }
+
+                // Rodapé com botão Entendi
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.topMargin: 2
+                    Item { Layout.fillWidth: true }
+
+                    Rectangle {
+                        implicitWidth: 84
+                        implicitHeight: 28
+                        radius: 14
+                        color: okArea.containsMouse ? Theme.primary : Theme.tileHigh
+                        border.width: 1
+                        border.color: Theme.withAlpha(Theme.primary, 0.4)
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: "Entendi"
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 11
+                            font.weight: Font.DemiBold
+                            color: okArea.containsMouse ? Theme.background : Theme.textColor
+                        }
+
+                        MouseArea {
+                            id: okArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.showCacheExplanation = false
                         }
                     }
                 }
