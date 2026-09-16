@@ -1,0 +1,27 @@
+{
+  "1": [
+    {
+      "id": "media-main",
+      "type": "media",
+      "x": 1560,
+      "y": 860,
+      "scale": 1.2,
+      "style": "borderless",
+      "opacity": 0.85,
+      "accent": "#00f0ff"
+    },
+    {
+      "id": "clock-1789585354626",
+      "type": "clock",
+      "x": 20,
+      "y": 920,
+      "scale": 1,
+      "style": "glass",
+      "opacity": 0.85,
+      "accent": "",
+      "noteText": ""
+    }
+  ],
+  "2": [],
+  "3": []
+}

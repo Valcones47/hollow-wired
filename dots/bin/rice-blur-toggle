@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# rice-blur-toggle
+# Alterna ou define o estado de blur (desfoque) do Hyprland.
+# Compatível com hyprland.lua (usa `hyprctl eval` em vez do comando legado `keyword`).
+# Mantém o arquivo de estado em $XDG_RUNTIME_DIR/rice-blur-disabled para
+# sincronizar com blur-fullscreen-toggle.sh e com a sidebar do Quickshell.
+
+set -euo pipefail
+
+run="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+state="$run/rice-blur-disabled"
+
+# Garante HYPRLAND_INSTANCE_SIGNATURE mesmo fora do terminal interativo
+if [ -z "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]; then
+    HYPRLAND_INSTANCE_SIGNATURE=$(ls -t "$run/hypr" 2>/dev/null | head -1 || true)
+    export HYPRLAND_INSTANCE_SIGNATURE
+fi
+
+get_status() {
+    local val
+    val=$(hyprctl getoption decoration:blur:enabled -j 2>/dev/null | jq -r '.bool' 2>/dev/null || true)
+    if [ "$val" = "true" ]; then
+        echo 1
+    elif [ "$val" = "false" ]; then
+        echo 0
+    elif [ -f "$state" ]; then
+        echo 0
+    else
+        echo 1
+    fi
+}
+
+set_blur() {
+    local target="$1" # 1 = on, 0 = off
+    if [ "$target" -eq 1 ]; then
+        rm -f "$state"
+        hyprctl eval "hl.config({ decoration = { blur = { enabled = true } } })" &>/dev/null
+        notify-send -a "Hyprland" -r 91192 -t 1500 "Blur ativado" "Desfoque de janelas e camadas ligado"
+    else
+        touch "$state"
+        hyprctl eval "hl.config({ decoration = { blur = { enabled = false } } })" &>/dev/null
+        notify-send -a "Hyprland" -r 91192 -t 1500 "Blur desativado" "Desfoque desligado para economizar GPU"
+    fi
+}
+
+cmd="${1:-toggle}"
+
+case "$cmd" in
+    status)
+        get_status
+        ;;
+    on|enable|true|1)
+        set_blur 1
+        ;;
+    off|disable|false|0)
+        set_blur 0
+        ;;
+    toggle)
+        cur=$(get_status)
+        if [ "$cur" -eq 1 ]; then
+            set_blur 0
+        else
+            set_blur 1
+        fi
+        ;;
+    *)
+        echo "Uso: $(basename "$0") [toggle|on|off|status]" >&2
+        exit 1
+        ;;
+esac

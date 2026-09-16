@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Roda um jogo na GPU dedicada (RTX 3050) com DLSS disponível.
+#   OpenGL: variáveis do prime-run (render offload da NVIDIA)
+#   Vulkan: o __VK_LAYER_NV_optimus sozinho NÃO filtra neste driver (a Intel
+#           continuava como 1ª placa); a camada device_select do Mesa com
+#           FORCE_DEFAULT_DEVICE deixa só a NVIDIA visível.
+#   DLSS:   PROTON_ENABLE_NVAPI=1 → Proton liga DXVK-NVAPI e copia nvngx.dll.
+#           Jogos sem DLSS só ignoram. Se algum jogo bugar, nas opções dele:
+#           PROTON_DISABLE_NVAPI=1 %command%
+# Uso: game-run <comando>   (Steam/Heroic já recebem essas variáveis direto)
+export __NV_PRIME_RENDER_OFFLOAD=1
+export __VK_LAYER_NV_optimus=NVIDIA_only
+export __GLX_VENDOR_LIBRARY_NAME=nvidia
+export MESA_VK_DEVICE_SELECT=10de:25a2
+export MESA_VK_DEVICE_SELECT_FORCE_DEFAULT_DEVICE=1
+export PROTON_ENABLE_NVAPI=1
+exec "$@"

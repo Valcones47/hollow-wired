@@ -1,0 +1,34 @@
+# wallust v4 — gera a paleta do sistema a partir do wallpaper atual do
+# waywallen. Documentação: man wallust.5 / man wallust.
+#
+# Ajustado pro estilo do usuário: wallpapers escuros com detalhes em
+# azul/ciano neon ("raio"). backend=full + palette=salience com
+# sampling=high/intensity=vibrant evita que esses acentos raros e vívidos
+# sejam diluídos numa média sem graça (o que aconteceria com backends que
+# fazem resize/thumb antes de amostrar).
+
+backend = "full"
+palette = "salience"
+style = "dark"
+
+salience = { sampling = "high", intensity = "vibrant" }
+
+use16cols = true
+check_contrast = true
+saturation = 65
+
+[templates]
+hyprland   = { template = 'hyprland-colors.conf', target = '~/.config/hypr/colors.conf' }
+waybar     = { template = 'waybar-colors.css',    target = '~/.cache/wallust/colors-waybar.css' }
+kitty      = { template = 'kitty-colors.conf',    target = '~/.config/kitty/colors-wallust.conf' }
+mako       = { template = 'mako-colors',          target = '~/.config/mako/colors' }
+# O hub em Quickshell lê esse JSON direto via FileView (watchChanges: true) —
+# não precisa de hook de reload aqui, o próprio QML recarrega sozinho quando
+# o arquivo muda.
+quickshell = { template = 'quickshell-colors.json', target = '~/.cache/wallust/colors-quickshell.json' }
+
+[hooks]
+# Recarrega cada programa pra pegar a paleta nova sem precisar reiniciar.
+waybar = "pkill -SIGUSR2 waybar"
+kitty  = "pkill -SIGUSR1 kitty"
+mako   = "makoctl reload"

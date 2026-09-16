@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# rice-perf-mode
+# Alterna entre Modo Visual e Modo Ultra-Desempenho (Zero overhead na iGPU Intel).
+set -euo pipefail
+
+run="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+state="$run/rice-perf-mode"
+
+if [ -z "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]; then
+    HYPRLAND_INSTANCE_SIGNATURE=$(ls -t "$run/hypr" 2>/dev/null | head -1 || true)
+    export HYPRLAND_INSTANCE_SIGNATURE
+fi
+
+get_status() {
+    if [ -f "$state" ]; then
+        echo 1
+    else
+        echo 0
+    fi
+}
+
+set_mode() {
+    local target="$1"
+    if [ "$target" -eq 1 ]; then
+        touch "$state"
+        hyprctl eval "hl.config({ decoration = { blur = { enabled = false } }, animations = { enabled = false } })" &>/dev/null
+        notify-send -a "Desempenho" -i speed-meter -r 91195 -t 2000 "Modo Ultra-Desempenho" "Blur e animações desligados · iGPU 100% liberada"
+    else
+        rm -f "$state"
+        hyprctl eval "hl.config({ decoration = { blur = { enabled = true } }, animations = { enabled = true } })" &>/dev/null
+        notify-send -a "Desempenho" -i preferences-desktop-display -r 91195 -t 2000 "Modo Visual Restaurado" "Blur e animações ativados"
+    fi
+}
+
+cmd="${1:-toggle}"
+
+case "$cmd" in
+    status)
+        get_status
+        ;;
+    on|enable|1)
+        set_mode 1
+        ;;
+    off|disable|0)
+        set_mode 0
+        ;;
+    toggle)
+        if [ "$(get_status)" -eq 1 ]; then
+            set_mode 0
+        else
+            set_mode 1
+        fi
+        ;;
+    *)
+        echo "Uso: $(basename "$0") [toggle|on|off|status]" >&2
+        exit 1
+        ;;
+esac

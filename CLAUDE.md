@@ -1,0 +1,1 @@
+/home/val47/projetos/hyprland-setup/AGENTS.md

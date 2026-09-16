@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+CLEARED=$(cat ~/.cache/quickshell/notif-cleared 2>/dev/null)
+[ -z "$CLEARED" ] && CLEARED=0
+
+ACT=$(makoctl list -j 2>/dev/null)
+[ -z "$ACT" ] && ACT="[]"
+
+HIST=$(makoctl history -j 2>/dev/null)
+[ -z "$HIST" ] && HIST="[]"
+
+DND=$(makoctl mode 2>/dev/null | grep -q 'do-not-disturb' && echo "true" || echo "false")
+
+echo "$ACT" "$HIST" | jq -s -c --argjson c "$CLEARED" --argjson dnd "$DND" '
+  (.[0] + .[1]) | unique_by(.id) as $all |
+  {
+    dnd: $dnd,
+    count: ($all | [.[] | select(.id > $c)] | length),
+    maxId: ([0] + [$all[].id] | max)
+  }
+'

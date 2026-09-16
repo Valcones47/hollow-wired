@@ -1,0 +1,167 @@
+#!/usr/bin/env bash
+# rice-hypr-prefs
+# Gerencia e persiste preferências de aparência e efeitos do Hyprland em tempo real.
+# Lê e salva em ~/.config/hypr/user-prefs.json e aplica via `hyprctl eval`.
+
+set -euo pipefail
+
+PREFS_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/user-prefs.json"
+
+ensure_prefs_file() {
+    if [ ! -f "$PREFS_FILE" ]; then
+        mkdir -p "$(dirname "$PREFS_FILE")"
+        cat <<'JSON' > "$PREFS_FILE"
+{
+  "rounding": 6,
+  "border_size": 2,
+  "gaps_in": 4,
+  "gaps_out": 8,
+  "inactive_opacity": 1.0,
+  "dim_inactive": false,
+  "dim_strength": 0.2,
+  "anim_enabled": true,
+  "anim_preset": "smooth"
+}
+JSON
+    fi
+}
+
+get_instance() {
+    local run="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+    if [ -z "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]; then
+        HYPRLAND_INSTANCE_SIGNATURE=$(ls -t "$run/hypr" 2>/dev/null | head -1 || true)
+        export HYPRLAND_INSTANCE_SIGNATURE
+    fi
+}
+
+apply_all() {
+    ensure_prefs_file
+    get_instance
+
+    local rounding border_size gaps_in gaps_out inactive_opacity dim_inactive dim_strength anim_enabled anim_preset
+    rounding=$(jq -r '.rounding // 6' "$PREFS_FILE")
+    border_size=$(jq -r '.border_size // 2' "$PREFS_FILE")
+    gaps_in=$(jq -r '.gaps_in // 4' "$PREFS_FILE")
+    gaps_out=$(jq -r '.gaps_out // 8' "$PREFS_FILE")
+    inactive_opacity=$(jq -r '.inactive_opacity // 1.0' "$PREFS_FILE")
+    dim_inactive=$(jq -r '.dim_inactive // false' "$PREFS_FILE")
+    dim_strength=$(jq -r '.dim_strength // 0.2' "$PREFS_FILE")
+    anim_enabled=$(jq -r '.anim_enabled // true' "$PREFS_FILE")
+    anim_preset=$(jq -r '.anim_preset // "smooth"' "$PREFS_FILE")
+
+    local gaps_out_sides=$(( gaps_out + 10 ))
+
+    hyprctl eval "
+hl.config({
+    general = {
+        border_size = $border_size,
+        gaps_in = $gaps_in,
+        gaps_out = { top = $gaps_out, right = $gaps_out_sides, bottom = $gaps_out_sides, left = $gaps_out_sides }
+    },
+    decoration = {
+        rounding = $rounding,
+        inactive_opacity = $inactive_opacity,
+        dim_inactive = $dim_inactive,
+        dim_strength = $dim_strength
+    },
+    animations = {
+        enabled = $anim_enabled
+    }
+})
+" &>/dev/null
+
+    apply_anim_preset "$anim_preset"
+}
+
+apply_anim_preset() {
+    local preset="$1"
+    get_instance
+
+    case "$preset" in
+        snappy)
+            hyprctl eval '
+hl.animation({ leaf = "windows", enabled = true, speed = 2.5, bezier = "wallustSnap", style = "popin 80%" })
+hl.animation({ leaf = "windowsOut", enabled = true, speed = 2, bezier = "wallustSnap", style = "popin 80%" })
+hl.animation({ leaf = "windowsMove", enabled = true, speed = 3, bezier = "wallustSnap" })
+hl.animation({ leaf = "fade", enabled = true, speed = 3, bezier = "wallustSnap" })
+hl.animation({ leaf = "workspaces", enabled = true, speed = 3, bezier = "wallustSnap", style = "slidefade 10%" })
+' &>/dev/null
+            ;;
+        bouncy)
+            hyprctl eval '
+hl.animation({ leaf = "windows", enabled = true, speed = 5.5, bezier = "wallustOvershoot", style = "popin 75%" })
+hl.animation({ leaf = "windowsOut", enabled = true, speed = 4, bezier = "wallustOvershoot", style = "popin 80%" })
+hl.animation({ leaf = "windowsMove", enabled = true, speed = 5, bezier = "wallustOvershoot" })
+hl.animation({ leaf = "fade", enabled = true, speed = 4, bezier = "wallustSmooth" })
+hl.animation({ leaf = "workspaces", enabled = true, speed = 6, bezier = "wallustOvershoot", style = "slidefade 20%" })
+' &>/dev/null
+            ;;
+        smooth|*)
+            hyprctl eval '
+hl.animation({ leaf = "windows", enabled = true, speed = 4, bezier = "wallustOvershoot", style = "popin 85%" })
+hl.animation({ leaf = "windowsOut", enabled = true, speed = 3, bezier = "wallustSnap", style = "popin 85%" })
+hl.animation({ leaf = "windowsMove", enabled = true, speed = 4, bezier = "wallustSmooth" })
+hl.animation({ leaf = "fade", enabled = true, speed = 4, bezier = "wallustSmooth" })
+hl.animation({ leaf = "workspaces", enabled = true, speed = 5, bezier = "wallustSmooth", style = "slidefade 15%" })
+' &>/dev/null
+            ;;
+    esac
+}
+
+cmd="${1:-get}"
+
+case "$cmd" in
+    get|status)
+        ensure_prefs_file
+        cat "$PREFS_FILE"
+        ;;
+    apply)
+        apply_all
+        ;;
+    set)
+        key="${2:-}"
+        val="${3:-}"
+        if [ -z "$key" ] || [ -z "$val" ]; then
+            echo "Uso: $(basename "$0") set <chave> <valor>" >&2
+            exit 1
+        fi
+        ensure_prefs_file
+        if [[ "$val" =~ ^(true|false|[0-9]+(\.[0-9]+)?)$ ]]; then
+            tmp=$(jq --arg k "$key" --argjson v "$val" '.[$k] = $v' "$PREFS_FILE")
+        else
+            tmp=$(jq --arg k "$key" --arg v "$val" '.[$k] = $v' "$PREFS_FILE")
+        fi
+        echo "$tmp" > "$PREFS_FILE"
+        apply_all
+        ;;
+    preset)
+        p="${2:-smooth}"
+        ensure_prefs_file
+        tmp=$(jq --arg p "$p" '.anim_preset = $p' "$PREFS_FILE")
+        echo "$tmp" > "$PREFS_FILE"
+        apply_all
+        notify-send -a "Hyprland" -i preferences-desktop-theme -r 91196 -t 2000 "Estilo de Animação: $p" "Curvas e velocidade atualizadas"
+        ;;
+    reset)
+        ensure_prefs_file
+        cat <<'JSON' > "$PREFS_FILE"
+{
+  "rounding": 6,
+  "border_size": 2,
+  "gaps_in": 4,
+  "gaps_out": 8,
+  "inactive_opacity": 1.0,
+  "dim_inactive": false,
+  "dim_strength": 0.2,
+  "anim_enabled": true,
+  "anim_preset": "smooth"
+}
+JSON
+        apply_all
+        notify-send -a "Hyprland" -i view-refresh -r 91196 -t 2000 "Aparência Redefinida" "Padrões do rice restaurados"
+        ;;
+    *)
+        echo "Uso: $(basename "$0") [get|set <key> <val>|apply|preset <name>|reset]" >&2
+        exit 1
+        ;;
+esac

@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Terminal drop-down estilo Quake: um kitty (class dropterm) que mora no
+# workspace especial "dropterm". Primeira vez abre o kitty; depois só
+# mostra/esconde o workspace especial.
+if ! hyprctl clients -j | jq -e '.[] | select(.class == "dropterm")' >/dev/null; then
+    kitty --class dropterm >/dev/null 2>&1 &
+    disown
+else
+    hyprctl dispatch 'hl.dsp.workspace.toggle_special("dropterm")' >/dev/null
+fi

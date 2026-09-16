@@ -1,0 +1,30 @@
+singleton Theme 1.0 Theme.qml
+singleton SysStats 1.0 SysStats.qml
+Dashboard 1.0 Dashboard.qml
+Media 1.0 Media.qml
+Monitoring 1.0 Monitoring.qml
+Workspaces 1.0 Workspaces.qml
+Gauge 1.0 Gauge.qml
+EnergySidebar 1.0 EnergySidebar.qml
+TrayMenu 1.0 TrayMenu.qml
+Frame 1.0 Frame.qml
+PopTitle 1.0 PopTitle.qml
+PopText 1.0 PopText.qml
+PopAction 1.0 PopAction.qml
+PopSlider 1.0 PopSlider.qml
+TopBar 1.0 TopBar.qml
+SystemInfo 1.0 SystemInfo.qml
+Snapshots 1.0 Snapshots.qml
+Recording 1.0 Recording.qml
+Notifications 1.0 Notifications.qml
+Dock 1.0 Dock.qml
+singleton DockConfig 1.0 DockConfig.qml
+Launcher 1.0 Launcher.qml
+AltTab 1.0 AltTab.qml
+singleton GameMode 1.0 GameMode.qml
+Appearance 1.0 Appearance.qml
+OSD 1.0 OSD.qml
+Cheatsheet 1.0 Cheatsheet.qml
+Clipboard 1.0 Clipboard.qml
+DesktopWidgets 1.0 DesktopWidgets.qml
+singleton NotifService 1.0 NotifService.qml

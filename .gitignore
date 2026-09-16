@@ -1,0 +1,21 @@
+# Logs & depuração
+*.log
+*.tmp
+*.bak*
+.bak*
+__pycache__/
+*.pyc
+
+# Arquivos de estado pessoal / sessões
+*.db
+*.db-wal
+*.db-shm
+*.tar.zst
+*.tar.gz
+*.tar.xz
+.user_uploaded/
+.tempmediaStorage/
+test-backup/
+
+# Configurações com estado pessoal salvo
+dots/quickshell/desktop-widgets.json.bak*

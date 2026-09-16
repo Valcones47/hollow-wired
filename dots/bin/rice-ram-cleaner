@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# rice-ram-cleaner: Otimiza uso de RAM, finaliza daemons órfãos do KDE e libera caches de disco do Linux
+
+# 1. Finaliza daemons órfãos do KDE que iniciam via D-Bus sem necessidade no Hyprland
+for proc in kactivitymanagerd kded6 kded5 baloo_file; do
+    pkill -9 -f "/usr/(lib|bin)/$proc" 2>/dev/null || true
+    pkill -9 -f "$proc" 2>/dev/null || true
+done
+
+# 2. Sincroniza dados em disco pendentes
+sync
+
+# 3. Tenta limpar pagecache, dentries e inodes via pkexec ou sudo
+cleaned_cache=0
+if pkexec sh -c "echo 3 > /proc/sys/vm/drop_caches" 2>/dev/null; then
+    cleaned_cache=1
+elif sudo -n sh -c "echo 3 > /proc/sys/vm/drop_caches" 2>/dev/null; then
+    cleaned_cache=1
+fi
+
+# 4. Notificação informativa
+if [ "$cleaned_cache" -eq 1 ]; then
+    notify-send -a "Otimizador de RAM" -i "dialog-information" "Memória Otimizada" "Caches de disco liberados e daemons órfãos finalizados."
+else
+    notify-send -a "Otimizador de RAM" -i "dialog-information" "Memória Otimizada" "Processos órfãos finalizados com sucesso."
+fi

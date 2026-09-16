@@ -1,0 +1,13 @@
+/* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
+/* Gerado automaticamente pelo wallust a partir do wallpaper atual.          */
+/* NAO EDITE ESTE ARQUIVO A MAO — sobrescrito a cada `wallust run`.          */
+/* Editar o template em: ~/.config/wallust/templates/waybar-colors.css      */
+/* ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
+
+@define-color wallust_background {{background}};
+@define-color wallust_foreground {{foreground}};
+@define-color wallust_accent1    {{color4}};
+@define-color wallust_accent2    {{color6}};
+@define-color wallust_inactive   {{color8}};
+@define-color wallust_warning    {{color3}};
+@define-color wallust_critical   {{color11}};

@@ -1,0 +1,338 @@
+#!/usr/bin/env bash
+# rice-record v2
+# Backend avançado de gravação de tela para Hyprland / Quickshell
+# Suporta: Tela Inteira, Janela/App, Região, Áudio Desktop, Microfone, Mixagem PipeWire.
+
+set -e
+
+DIR="$HOME/Vídeos/Gravações"
+RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$UID}"
+PIDFILE="$RUNTIME_DIR/rice-record.pid"
+INFOFILE="$RUNTIME_DIR/rice-record.info"
+
+mkdir -p "$DIR"
+
+get_active_sink() {
+    local s
+    s=$(pactl list short sinks 2>/dev/null | awk '$4 == "RUNNING" && $2 !~ /CallApp/ {print $2}' | head -1)
+    if [ -n "$s" ]; then echo "$s"; return; fi
+    s=$(pactl list short sinks 2>/dev/null | awk '$2 ~ /alsa_output/ {print $2}' | head -1)
+    if [ -n "$s" ]; then echo "$s"; return; fi
+    s=$(pactl get-default-sink 2>/dev/null || true)
+    if [ -n "$s" ] && [[ "$s" != *"CallApp"* ]]; then echo "$s"; return; fi
+    pactl list short sinks 2>/dev/null | awk '{print $2}' | head -1
+}
+
+get_active_mic() {
+    local m
+    m=$(pactl list short sources 2>/dev/null | awk '$2 ~ /alsa_input/ {print $2}' | head -1)
+    if [ -n "$m" ]; then echo "$m"; return; fi
+    pactl get-default-source 2>/dev/null || echo "default"
+}
+
+cleanup_audio_modules() {
+    if [ -f "$INFOFILE" ]; then
+        local mod_sink mod_l1 mod_l2
+        mod_sink=$(jq -r '.audio_mods.sink // empty' "$INFOFILE" 2>/dev/null || true)
+        mod_l1=$(jq -r '.audio_mods.l1 // empty' "$INFOFILE" 2>/dev/null || true)
+        mod_l2=$(jq -r '.audio_mods.l2 // empty' "$INFOFILE" 2>/dev/null || true)
+
+        [ -n "$mod_l1" ] && pactl unload-module "$mod_l1" 2>/dev/null || true
+        [ -n "$mod_l2" ] && pactl unload-module "$mod_l2" 2>/dev/null || true
+        [ -n "$mod_sink" ] && pactl unload-module "$mod_sink" 2>/dev/null || true
+    fi
+}
+
+do_stop() {
+    if [ -f "$PIDFILE" ]; then
+        local pid
+        pid=$(cat "$PIDFILE" 2>/dev/null || true)
+        if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+            kill -INT "$pid" 2>/dev/null || true
+            # Aguarda o ffmpeg/wf-recorder finalizar o arquivo mp4
+            local i=0
+            while kill -0 "$pid" 2>/dev/null && [ "$i" -lt 30 ]; do
+                sleep 0.1
+                i=$((i + 1))
+            done
+            if kill -0 "$pid" 2>/dev/null; then
+                kill -9 "$pid" 2>/dev/null || true
+            fi
+        fi
+        rm -f "$PIDFILE"
+    fi
+
+    local rec_file=""
+    if [ -f "$INFOFILE" ]; then
+        rec_file=$(jq -r '.file // empty' "$INFOFILE" 2>/dev/null || true)
+        cleanup_audio_modules
+        rm -f "$INFOFILE"
+    fi
+
+    local last_file
+    last_file=$(ls -t "$DIR"/*.mp4 2>/dev/null | head -1 || true)
+    local display_file="${rec_file:-$last_file}"
+    local filename
+    filename=$(basename "${display_file:-gravacao.mp4}")
+
+    notify-send -a "Gravação" -i media-record "Gravação concluída" "$filename salva em Vídeos/Gravações" 2>/dev/null || true
+    echo "{\"status\": \"stopped\", \"file\": \"$display_file\"}"
+    exit 0
+}
+
+do_status() {
+    if [ -f "$PIDFILE" ]; then
+        local pid
+        pid=$(cat "$PIDFILE" 2>/dev/null || true)
+        if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+            local start_time file mode audio_desk audio_mic now elapsed size_human
+            now=$(date +%s)
+            start_time=$(jq -r '.start_time // 0' "$INFOFILE" 2>/dev/null || echo "$now")
+            file=$(jq -r '.file // ""' "$INFOFILE" 2>/dev/null || echo "")
+            mode=$(jq -r '.mode // "screen"' "$INFOFILE" 2>/dev/null || echo "screen")
+            audio_desk=$(jq -r '.audio_desktop // false' "$INFOFILE" 2>/dev/null || echo "false")
+            audio_mic=$(jq -r '.audio_mic // false' "$INFOFILE" 2>/dev/null || echo "false")
+            elapsed=$((now - start_time))
+            if [ "$elapsed" -lt 0 ]; then elapsed=0; fi
+
+            size_human="0 B"
+            if [ -f "$file" ]; then
+                size_human=$(ls -lh "$file" 2>/dev/null | awk '{print $5}')
+            fi
+
+            cat <<EOF
+{
+  "recording": true,
+  "pid": $pid,
+  "start_time": $start_time,
+  "elapsed": $elapsed,
+  "file": "$file",
+  "size": "$size_human",
+  "mode": "$mode",
+  "audio_desktop": $audio_desk,
+  "audio_mic": $audio_mic
+}
+EOF
+            return 0
+        fi
+    fi
+
+    # Não está gravando
+    rm -f "$PIDFILE" "$INFOFILE" 2>/dev/null || true
+    cat <<EOF
+{
+  "recording": false,
+  "pid": 0,
+  "elapsed": 0,
+  "file": "",
+  "size": "0 B"
+}
+EOF
+}
+
+do_list() {
+    local files_json="[]"
+    if compgen -G "$DIR/*.mp4" > /dev/null; then
+        files_json=$(ls -t "$DIR"/*.mp4 2>/dev/null | head -20 | while read -r f; do
+            local name size date_str
+            name=$(basename "$f")
+            size=$(ls -lh "$f" 2>/dev/null | awk '{print $5}')
+            date_str=$(date -r "$f" "+%d/%m %H:%M" 2>/dev/null || echo "")
+            jq -n \
+                --arg n "$name" \
+                --arg p "$f" \
+                --arg s "$size" \
+                --arg d "$date_str" \
+                '{name: $n, path: $p, size: $s, date: $d}'
+        done | jq -s '.')
+    fi
+    echo "$files_json"
+}
+
+do_list_windows() {
+    hyprctl clients -j 2>/dev/null | jq '[.[] | select(.mapped == true and .size[0] > 50 and .size[1] > 50) | {
+        class: .class,
+        title: (.title | if length > 40 then .[0:37] + "..." else . end),
+        geom: "\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1])",
+        workspace: .workspace.name
+    }]' 2>/dev/null || echo "[]"
+}
+
+do_select_geom() {
+    slurp 2>/dev/null || true
+}
+
+do_start() {
+    # Se já estiver gravando, para
+    if [ -f "$PIDFILE" ]; then
+        local old_pid
+        old_pid=$(cat "$PIDFILE" 2>/dev/null || true)
+        if [ -n "$old_pid" ] && kill -0 "$old_pid" 2>/dev/null; then
+            do_stop
+            return 0
+        fi
+    fi
+
+    local mode="screen"
+    local geom=""
+    local audio_desktop="1"
+    local audio_mic="0"
+    local fps="60"
+    local codec="h264_nvenc"
+
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --mode) mode="$2"; shift 2 ;;
+            --geom) geom="$2"; shift 2 ;;
+            --audio-desktop) audio_desktop="$2"; shift 2 ;;
+            --audio-mic) audio_mic="$2"; shift 2 ;;
+            --fps) fps="$2"; shift 2 ;;
+            --codec) codec="$2"; shift 2 ;;
+            full) mode="screen"; shift ;;
+            *) shift ;;
+        esac
+    done
+
+    local wf_args=()
+
+    # Codec de Vídeo (padrão: NVIDIA RTX 3050 NVENC para gravação acelerada por hardware na dGPU)
+    if [ -n "$codec" ]; then
+        wf_args+=(-c "$codec")
+    fi
+
+    # Configuração de Geometria/Vídeo
+    if [ "$mode" = "region" ]; then
+        if [ -z "$geom" ]; then
+            geom=$(slurp) || exit 1
+        fi
+        wf_args+=(-g "$geom")
+    elif [ "$mode" = "window" ]; then
+        if [ -z "$geom" ]; then
+            geom=$(slurp) || exit 1
+        fi
+        wf_args+=(-g "$geom")
+    else
+        # Screen: padrão sem -g ou com display ativo
+        :
+    fi
+
+    # Configuração de Taxa de Quadros
+    if [ -n "$fps" ]; then
+        wf_args+=(-r "$fps")
+    fi
+
+    # Configuração de Áudio
+    local mod_sink="" mod_l1="" mod_l2=""
+    local active_sink active_mic
+    active_sink=$(get_active_sink)
+    active_mic=$(get_active_mic)
+
+    if [ "$audio_desktop" = "1" ] && [ "$audio_mic" = "1" ]; then
+        # Mixagem estéreo via módulo nulo PipeWire
+        local mix_name="rec_mix_$$"
+        mod_sink=$(pactl load-module module-null-sink sink_name="$mix_name" sink_properties=device.description=RecordMix 2>/dev/null || true)
+        if [ -n "$active_sink" ]; then
+            mod_l1=$(pactl load-module module-loopback source="${active_sink}.monitor" sink="$mix_name" latency_msec=20 2>/dev/null || true)
+        fi
+        if [ -n "$active_mic" ]; then
+            mod_l2=$(pactl load-module module-loopback source="$active_mic" sink="$mix_name" latency_msec=20 2>/dev/null || true)
+        fi
+        wf_args+=("--audio=${mix_name}.monitor")
+    elif [ "$audio_desktop" = "1" ]; then
+        if [ -n "$active_sink" ]; then
+            wf_args+=("--audio=${active_sink}.monitor")
+        fi
+    elif [ "$audio_mic" = "1" ]; then
+        if [ -n "$active_mic" ]; then
+            wf_args+=("--audio=$active_mic")
+        fi
+    fi
+
+    local timestamp
+    timestamp=$(date +%Y-%m-%d_%H-%M-%S)
+    local outfile="$DIR/${timestamp}.mp4"
+    wf_args+=(-f "$outfile")
+
+    # Inicia wf-recorder
+    wf-recorder "${wf_args[@]}" >/dev/null 2>&1 &
+    local rec_pid=$!
+    echo "$rec_pid" > "$PIDFILE"
+
+    local start_epoch
+    start_epoch=$(date +%s)
+    cat <<EOF > "$INFOFILE"
+{
+  "start_time": $start_epoch,
+  "file": "$outfile",
+  "mode": "$mode",
+  "audio_desktop": $([ "$audio_desktop" = "1" ] && echo true || echo false),
+  "audio_mic": $([ "$audio_mic" = "1" ] && echo true || echo false),
+  "audio_mods": {
+    "sink": "$mod_sink",
+    "l1": "$mod_l1",
+    "l2": "$mod_l2"
+  }
+}
+EOF
+
+    notify-send -a "Gravação" -i media-record -t 2500 "Gravando tela…" "Modo: $mode | Clique em Parar no Hub ou use Super+Shift+R" 2>/dev/null || true
+    echo "{\"status\": \"started\", \"pid\": $rec_pid, \"file\": \"$outfile\"}"
+}
+
+# --- Roteamento de Subcomandos ---
+case "${1:-toggle}" in
+    start)
+        shift
+        do_start "$@"
+        ;;
+    stop)
+        do_stop
+        ;;
+    status)
+        do_status
+        ;;
+    list)
+        do_list
+        ;;
+    list-windows)
+        do_list_windows
+        ;;
+    select-geom)
+        do_select_geom
+        ;;
+    open-folder)
+        xdg-open "$DIR" >/dev/null 2>&1 &
+        ;;
+    play)
+        shift
+        if [ -n "$1" ] && [ -f "$1" ]; then
+            xdg-open "$1" >/dev/null 2>&1 &
+        fi
+        ;;
+    delete)
+        shift
+        if [ -n "$1" ] && [ -f "$1" ]; then
+            rm -f "$1"
+            echo "{\"status\": \"deleted\"}"
+        fi
+        ;;
+    toggle)
+        shift
+        if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE" 2>/dev/null)" 2>/dev/null; then
+            do_stop
+        else
+            do_start "$@"
+        fi
+        ;;
+    full)
+        if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE" 2>/dev/null)" 2>/dev/null; then
+            do_stop
+        else
+            do_start --mode screen
+        fi
+        ;;
+    *)
+        echo "Uso: rice-record {start|stop|status|list|list-windows|select-geom|open-folder|play <file>|delete <file>|toggle}"
+        exit 1
+        ;;
+esac

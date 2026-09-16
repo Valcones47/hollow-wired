@@ -1,0 +1,9 @@
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Gerado automaticamente pelo wallust a partir do wallpaper atual.
+# NAO EDITE ESTE ARQUIVO A MAO — sobrescrito a cada `wallust run`.
+# Editar o template em: ~/.config/wallust/templates/mako-colors
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+background-color={{background}}cc
+text-color={{foreground}}
+border-color={{color4}}

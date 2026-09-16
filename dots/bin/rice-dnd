@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# rice-dnd: Alterna modo Não Perturbe (DND) no mako e notifica quickshell
+if makoctl mode 2>/dev/null | grep -q 'do-not-disturb'; then
+    makoctl mode -r do-not-disturb
+    notify-send -a "Sistema" -i "notifications" "Não Perturbe Desativado" "Notificações normais restauradas"
+else
+    notify-send -a "Sistema" -i "notifications-disabled" "Não Perturbe Ativado" "Notificações em silêncio"
+    sleep 0.5
+    makoctl mode -a do-not-disturb
+fi
+quickshell ipc call notif refresh 2>/dev/null || true

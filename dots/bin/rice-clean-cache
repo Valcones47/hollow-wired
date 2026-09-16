@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Limpa cache de pacotes (aberto num kitty pela sidebar).
+# - paccache -rk2: mantém só as 2 últimas versões de cada pacote instalado
+# - paccache -ruk0: remove todas as versões de pacotes já desinstalados
+# - yay -Sc: limpa cache do AUR (pergunta antes)
+set -u
+echo "Cache antes:"; du -sh /var/cache/pacman/pkg ~/.cache/yay 2>/dev/null; echo
+sudo paccache -rk2 && sudo paccache -ruk0
+echo; yay -Sc
+echo; echo "Cache depois:"; du -sh /var/cache/pacman/pkg ~/.cache/yay 2>/dev/null
+echo; read -rp "Enter para fechar"

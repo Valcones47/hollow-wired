@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# rice-desktop-widgets: Backend de persistência dos widgets de desktop por workspace
+
+CONFIG_FILE="$HOME/.config/quickshell/desktop-widgets.json"
+
+case "$1" in
+    save)
+        if [ -n "$2" ]; then
+            printf '%s' "$2" > "$CONFIG_FILE.tmp"
+        else
+            cat > "$CONFIG_FILE.tmp"
+        fi
+        mv "$CONFIG_FILE.tmp" "$CONFIG_FILE"
+        ;;
+    load)
+        if [ ! -f "$CONFIG_FILE" ]; then
+            cat << 'EOF' > "$CONFIG_FILE"
+{
+  "1": [
+    { "id": "clock-1", "type": "clock", "x": 80, "y": 80 },
+    { "id": "sysinfo-1", "type": "sysinfo", "x": 80, "y": 270 }
+  ]
+}
+EOF
+        fi
+        cat "$CONFIG_FILE"
+        ;;
+    *)
+        echo "Uso: rice-desktop-widgets {save|load}"
+        exit 1
+        ;;
+esac

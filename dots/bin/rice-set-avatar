@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# rice-set-avatar: Define e atualiza facilmente a foto/GIF de perfil do usuário
+# ==============================================================================
+set -euo pipefail
+
+TARGET_FILE="${1:-}"
+
+# Se nenhum arquivo foi passado, abre o seletor gráfico de arquivos
+if [ -z "$TARGET_FILE" ]; then
+    if command -v zenity >/dev/null 2>&1; then
+        TARGET_FILE=$(zenity --file-selection --title="Escolha sua foto ou GIF de perfil" \
+            --file-filter="Imagens e GIFs (*.png *.jpg *.jpeg *.webp *.gif) | *.png *.jpg *.jpeg *.webp *.gif *.PNG *.JPG *.JPEG *.WEBP *.GIF" \
+            2>/dev/null || true)
+    elif command -v kdialog >/dev/null 2>&1; then
+        TARGET_FILE=$(kdialog --getopenfilename "$HOME" "Imagens (*.png *.jpg *.jpeg *.webp *.gif)" 2>/dev/null || true)
+    fi
+fi
+
+if [ -z "$TARGET_FILE" ] || [ ! -f "$TARGET_FILE" ]; then
+    echo "Nenhum arquivo selecionado ou arquivo inválido." >&2
+    exit 0
+fi
+
+FACE_DIR="$HOME"
+STATIC_FACE="$FACE_DIR/.face"
+ANIM_FACE="$FACE_DIR/.face.webp"
+
+# Detecta a extensão / formato
+MIME=$(file -b --mime-type "$TARGET_FILE")
+
+echo "Processando imagem ($MIME): $TARGET_FILE"
+
+# Processamento com ffmpeg / imagemagick
+if [[ "$MIME" == *"gif"* ]] || [[ "$MIME" == *"webp"* ]]; then
+    # É animado ou webp: gera o .face.webp animado/otimizado e o .face estático (1º quadro)
+    if command -v ffmpeg >/dev/null 2>&1; then
+        # Copia ou converte para webp animado de alta qualidade limitado a 256x256
+        ffmpeg -y -i "$TARGET_FILE" -vcodec libwebp -filter:v "fps=fps=20,scale=w=256:h=256:force_original_aspect_ratio=decrease" -lossless 0 -compression_level 4 -q:v 75 -loop 0 "$ANIM_FACE" 2>/dev/null || cp "$TARGET_FILE" "$ANIM_FACE"
+        # Extrai primeiro quadro estático para .face
+        ffmpeg -y -i "$TARGET_FILE" -vframes 1 -vf "scale=256:256:force_original_aspect_ratio=decrease" "$STATIC_FACE" 2>/dev/null || true
+    else
+        cp "$TARGET_FILE" "$ANIM_FACE"
+        cp "$TARGET_FILE" "$STATIC_FACE"
+    fi
+else
+    # É imagem estática (PNG, JPG, etc.)
+    if command -v ffmpeg >/dev/null 2>&1; then
+        ffmpeg -y -i "$TARGET_FILE" -vf "scale=256:256:force_original_aspect_ratio=decrease" "$STATIC_FACE" 2>/dev/null || cp "$TARGET_FILE" "$STATIC_FACE"
+        ffmpeg -y -i "$TARGET_FILE" -vf "scale=256:256:force_original_aspect_ratio=decrease" "$ANIM_FACE" 2>/dev/null || cp "$TARGET_FILE" "$ANIM_FACE"
+    else
+        cp "$TARGET_FILE" "$STATIC_FACE"
+        cp "$TARGET_FILE" "$ANIM_FACE"
+    fi
+fi
+
+# Notificação visual
+if command -v notify-send >/dev/null 2>&1; then
+    notify-send -i "$STATIC_FACE" -a "Quickshell" "Perfil Atualizado" "Sua foto de perfil foi alterada com sucesso!"
+fi
+
+# Notifica Quickshell via IPC ou touch
+touch "$HOME/.config/quickshell/Dashboard.qml" 2>/dev/null || true
+
+echo "Foto de perfil atualizada em: $ANIM_FACE e $STATIC_FACE"

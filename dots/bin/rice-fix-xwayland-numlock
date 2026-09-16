@@ -1,0 +1,25 @@
+#!/bin/bash
+# rice-fix-xwayland-numlock
+# Remove o modificador Mod2 vinculado a Num_Lock no servidor XWayland.
+# Evita que Discord (Electron), Wine e emuladores detectem phantom NumLock
+# em todos os eventos de tecla ou fiquem travados ao gravar atalhos/push-to-talk.
+
+set -e
+
+if [ -z "$DISPLAY" ]; then
+    exit 0
+fi
+
+if ! command -v xkbcomp >/dev/null 2>&1; then
+    exit 0
+fi
+
+tmp_xkb=$(mktemp --suffix=.xkb)
+trap 'rm -f "$tmp_xkb"' EXIT
+
+if xkbcomp -xkb "$DISPLAY" "$tmp_xkb" 2>/dev/null; then
+    if grep -q "modifier_map Mod2 { <NMLK> };" "$tmp_xkb"; then
+        sed -i 's/modifier_map Mod2 { <NMLK> };/\/\/ modifier_map Mod2 { <NMLK> };/' "$tmp_xkb"
+        xkbcomp -w 0 "$tmp_xkb" "$DISPLAY" 2>/dev/null
+    fi
+fi

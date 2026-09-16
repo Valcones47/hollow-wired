@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Imprime o motivo se um reboot é necessário (nada = não precisa).
+# - kernel em execução não tem mais módulos instalados (kernel atualizado)
+# - driver NVIDIA carregado difere do instalado (nvidia-utils atualizado)
+reasons=()
+[ -d "/usr/lib/modules/$(uname -r)" ] || reasons+=("kernel atualizado")
+if [ -r /sys/module/nvidia/version ]; then
+    loaded=$(cat /sys/module/nvidia/version)
+    installed=$(pacman -Q nvidia-utils 2>/dev/null | awk '{print $2}' | cut -d- -f1)
+    [ -n "$installed" ] && [ "$loaded" != "$installed" ] && reasons+=("driver NVIDIA $loaded → $installed")
+fi
+[ ${#reasons[@]} -gt 0 ] && (IFS=';'; echo "${reasons[*]}")
+exit 0

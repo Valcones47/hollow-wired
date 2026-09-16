@@ -1,0 +1,610 @@
+#!/usr/bin/env python3
+"""Carousel wallpaper switcher for waywallen (Wallpaper Engine on Linux).
+
+Bind to Super+S. Scroll or Left/Right moves the carousel, Enter or clicking
+the center card applies it, clicking a side card brings it to the center,
+Escape (or Super+S again) closes without changing anything.
+"""
+import math
+import os
+import sqlite3
+import subprocess
+import sys
+import tomllib
+import warnings
+from concurrent.futures import ThreadPoolExecutor
+
+# gtk4-layer-shell must be loaded before libwayland-client; under PyGObject
+# that only happens if it's preloaded, so re-exec once with LD_PRELOAD set.
+_LAYER_SHELL_SO = "/usr/lib/libgtk4-layer-shell.so"
+if os.environ.get("_WWS_RELAUNCHED") != "1" and os.path.exists(_LAYER_SHELL_SO):
+    env = dict(os.environ)
+    preload = env.get("LD_PRELOAD", "")
+    env["LD_PRELOAD"] = f"{_LAYER_SHELL_SO}:{preload}" if preload else _LAYER_SHELL_SO
+    env["_WWS_RELAUNCHED"] = "1"
+    os.execvpe(sys.executable, [sys.executable, __file__, *sys.argv[1:]], env)
+
+import gi
+
+gi.require_version("Gtk", "4.0")
+gi.require_version("Gdk", "4.0")
+gi.require_version("GdkPixbuf", "2.0")
+gi.require_version("Gsk", "4.0")
+gi.require_version("Graphene", "1.0")
+gi.require_version("Gtk4LayerShell", "1.0")
+from gi.repository import (  # noqa: E402
+    Gdk,
+    GdkPixbuf,
+    Gio,
+    GLib,
+    Graphene,
+    Gsk,
+    Gtk,
+    Gtk4LayerShell,
+)
+
+# GdkPixbuf's animation API is deprecated but is the only GIF decoder here
+# that works; Gtk.Picture loads GIF previews as blank cards.
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+
+APP_ID = "org.val47.waywallen-switcher"
+# waywallen is installed as a flatpak, so its live data is under ~/.var/app;
+# ~/.local/share/waywallen is a stale copy from an old non-flatpak install.
+FLATPAK_ROOT = os.path.expanduser("~/.var/app/org.waywallen.waywallen")
+DB_PATH = os.path.join(FLATPAK_ROOT, "data/waywallen/waywallen-v2.db")
+CONFIG_PATH = os.path.join(FLATPAK_ROOT, "config/waywallen/config.toml")
+BUS_NAME = "org.waywallen.waywallen.Daemon"
+OBJ_PATH = "/org/waywallen/waywallen/Daemon"
+IFACE = "org.waywallen.waywallen.Daemon1"
+
+VISIBLE = 5
+CARD_W = 236  # size of the centered card; side cards are scaled down
+CARD_H = 148
+SLOT = 250  # distance between card centers
+STAGE_PAD_X = 20
+STAGE_W = VISIBLE * SLOT + 2 * STAGE_PAD_X
+STAGE_H = CARD_H + 36  # room for the selection glow
+SHADOW = 24  # transparent margin around the panel for its drop shadow
+BOTTOM_GAP = 18  # visible gap between the panel and the screen edge
+FOLLOW_RATE = 16.0  # higher = carousel catches up to the target faster
+APPEAR_S = 0.18
+DISAPPEAR_S = 0.13
+APPEAR_RISE = 10  # px the panel rises while fading in
+GIF_DELAY_MS = 180  # wait for the carousel to settle before decoding a GIF
+
+CSS = b"""
+window.switcher {
+    background: transparent;
+}
+.panel {
+    background-color: rgba(18, 18, 24, 0.84);
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+.card {
+    border-radius: 12px;
+    background-color: rgba(255, 255, 255, 0.05);
+    border: 2px solid rgba(255, 255, 255, 0.06);
+    transition: border-color 180ms ease-out, box-shadow 180ms ease-out;
+}
+.card.selected {
+    border-color: rgba(138, 180, 255, 0.95);
+    box-shadow: 0 0 14px rgba(138, 180, 255, 0.35);
+}
+.title {
+    color: white;
+    font-size: 15px;
+    font-weight: 600;
+}
+.hint {
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 11px;
+}
+"""
+
+
+def fetch_wallpapers():
+    conn = sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True)
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute(
+        """
+        SELECT item.id, item.display_name, item.preview_path,
+               library.path AS lib_path
+        FROM item
+        JOIN library ON library.id = item.library_id
+        JOIN source_plugin ON source_plugin.id = item.plugin_id
+        WHERE source_plugin.name = 'wallpaper_engine'
+        ORDER BY item.display_name COLLATE NOCASE
+        """
+    ).fetchall()
+    conn.close()
+    wallpapers = []
+    for r in rows:
+        preview = None
+        if r["preview_path"]:
+            preview = os.path.join(r["lib_path"].rstrip("/"), r["preview_path"])
+            if not os.path.isfile(preview):
+                preview = None
+        wallpapers.append(
+            {
+                "id": str(r["id"]),
+                "name": r["display_name"] or f"#{r['id']}",
+                "preview": preview,
+                "animated": bool(preview) and preview.lower().endswith(".gif"),
+            }
+        )
+    return wallpapers
+
+
+def daemon_proxy():
+    bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+    return Gio.DBusProxy.new_sync(
+        bus, Gio.DBusProxyFlags.NONE, None, BUS_NAME, OBJ_PATH, IFACE, None
+    )
+
+
+def get_current_id(proxy):
+    v = proxy.get_cached_property("CurrentWallpaperId")
+    if v is not None and v.unpack():
+        return v.unpack()
+    try:
+        with open(CONFIG_PATH, "rb") as f:
+            return str(tomllib.load(f).get("global", {}).get("last_wallpaper", ""))
+    except (OSError, tomllib.TOMLDecodeError):
+        return None
+
+
+def ease_out_cubic(t):
+    return 1 - (1 - t) ** 3
+
+
+def clamp01(x):
+    return max(0.0, min(1.0, x))
+
+
+class Card:
+    def __init__(self, wp):
+        self.wp = wp
+        self.static_texture = None
+        self.loading = False
+        self.widget = Gtk.Box()
+        self.widget.add_css_class("card")
+        self.widget.set_overflow(Gtk.Overflow.HIDDEN)
+        self.picture = Gtk.Picture()
+        self.picture.set_content_fit(Gtk.ContentFit.COVER)
+        self.picture.set_hexpand(True)
+        self.picture.set_vexpand(True)
+        self.widget.append(self.picture)
+
+
+class GifPlayer:
+    """Plays an already-decoded GIF into a card's Gtk.Picture."""
+
+    def __init__(self, card, anim):
+        self.card = card
+        self.iter = anim.get_iter(None)
+        self.timer = None
+        self._show_frame()
+
+    def _show_frame(self):
+        self.card.picture.set_paintable(Gdk.Texture.new_for_pixbuf(self.iter.get_pixbuf()))
+        delay = self.iter.get_delay_time()
+        self.timer = GLib.timeout_add(max(20, delay if delay > 0 else 100), self._advance)
+
+    def _advance(self):
+        self.timer = None
+        self.iter.advance(None)
+        self._show_frame()
+        return False
+
+    def stop(self):
+        if self.timer is not None:
+            GLib.source_remove(self.timer)
+            self.timer = None
+        if self.card.static_texture is not None:
+            self.card.picture.set_paintable(self.card.static_texture)
+
+
+class Stage(Gtk.Widget):
+    """Fixed-size carousel. Cards are placed with allocation transforms so
+    animating them never changes the measured size (Gtk.Fixed grows to fit
+    transformed children, which re-laid-out the whole window every frame
+    and pushed the carousel off center)."""
+
+    def __init__(self, cards):
+        super().__init__()
+        self.cards = cards
+        self.position = 0.0
+        self.set_overflow(Gtk.Overflow.HIDDEN)
+        for card in cards:
+            card.widget.set_parent(self)
+
+    def do_measure(self, orientation, _for_size):
+        size = STAGE_W if orientation == Gtk.Orientation.HORIZONTAL else STAGE_H
+        return size, size, -1, -1
+
+    def do_size_allocate(self, width, height, _baseline):
+        cx, cy = width / 2, height / 2
+        edge = (VISIBLE - 1) / 2  # distance of the outermost fully shown card
+        for i, card in enumerate(self.cards):
+            d = i - self.position
+            dist = abs(d)
+            shown = dist < edge + 1
+            card.widget.set_child_visible(shown)
+            if not shown:
+                continue
+            scale = 1.0 - 0.12 * clamp01(dist) - 0.10 * clamp01(dist - 1)
+            opacity = 1.0 - 0.22 * clamp01(dist) - 0.25 * clamp01(dist - 1)
+            opacity *= clamp01((edge + 1 - dist) / 0.9)
+            card.widget.set_opacity(opacity)
+            transform = (
+                Gsk.Transform.new()
+                .translate(Graphene.Point().init(cx + d * SLOT, cy))
+                .scale(scale, scale)
+                .translate(Graphene.Point().init(-CARD_W / 2, -CARD_H / 2))
+            )
+            card.widget.allocate(CARD_W, CARD_H, -1, transform)
+
+    def do_snapshot(self, snapshot):
+        # farthest first so the centered card is drawn on top
+        order = sorted(
+            (c for c in self.cards if c.widget.get_child_visible()),
+            key=lambda c: -abs(self.cards.index(c) - self.position),
+        )
+        for card in order:
+            self.snapshot_child(card.widget, snapshot)
+
+
+class RiseBin(Gtk.Widget):
+    """Single-child container that offsets its child vertically without
+    affecting layout, for the open/close animation."""
+
+    def __init__(self, child):
+        super().__init__()
+        self.child = child
+        self.offset = 0.0
+        child.set_parent(self)
+
+    def do_measure(self, orientation, for_size):
+        return self.child.measure(orientation, for_size)
+
+    def do_size_allocate(self, width, height, baseline):
+        transform = Gsk.Transform.new().translate(Graphene.Point().init(0, self.offset))
+        self.child.allocate(width, height, baseline, transform)
+
+    def do_snapshot(self, snapshot):
+        self.snapshot_child(self.child, snapshot)
+
+
+class SwitcherWindow(Gtk.ApplicationWindow):
+    def __init__(self, app, proxy, wallpapers, current_id):
+        super().__init__(application=app)
+        self.add_css_class("switcher")
+        self.proxy = proxy
+        self.wallpapers = wallpapers
+        self.closing = False
+        self._scroll_accum = 0.0
+        self.pool = ThreadPoolExecutor(max_workers=2)
+
+        self.selected = next(
+            (i for i, wp in enumerate(wallpapers) if wp["id"] == current_id), 0
+        )
+        self._tick_id = None
+        self._last_frame = None
+        self.appear = 0.0
+        self._anim_start = None
+        self._on_disappeared = None
+        self._gif = None
+        self._gif_timer = None
+        self._gif_token = 0
+
+        Gtk4LayerShell.init_for_window(self)
+        Gtk4LayerShell.set_layer(self, Gtk4LayerShell.Layer.OVERLAY)
+        Gtk4LayerShell.set_keyboard_mode(self, Gtk4LayerShell.KeyboardMode.EXCLUSIVE)
+        Gtk4LayerShell.set_anchor(self, Gtk4LayerShell.Edge.BOTTOM, True)
+        Gtk4LayerShell.set_margin(self, Gtk4LayerShell.Edge.BOTTOM, BOTTOM_GAP - SHADOW)
+        Gtk4LayerShell.set_exclusive_zone(self, -1)
+
+        self.cards = [Card(wp) for wp in wallpapers]
+        for idx, card in enumerate(self.cards):
+            click = Gtk.GestureClick()
+            click.connect("released", lambda *_a, i=idx: self.on_card_clicked(i))
+            card.widget.add_controller(click)
+
+        self.stage = Stage(self.cards)
+        self.stage.position = float(self.selected)
+        self.stage.set_margin_top(8)
+
+        self.title_stack = Gtk.Stack()
+        self.title_stack.set_transition_type(Gtk.StackTransitionType.CROSSFADE)
+        self.title_stack.set_transition_duration(150)
+        self._title_labels = []
+        for name in ("a", "b"):
+            label = Gtk.Label()
+            label.add_css_class("title")
+            label.set_ellipsize(3)
+            label.set_max_width_chars(1)
+            label.set_hexpand(True)
+            self.title_stack.add_named(label, name)
+            self._title_labels.append(label)
+        self._title_slot = 0
+
+        hint = Gtk.Label(label="←/→ ou scroll: navegar  ·  Enter/clique: aplicar  ·  Esc: fechar")
+        hint.add_css_class("hint")
+        hint.set_margin_top(2)
+        hint.set_margin_bottom(12)
+
+        self.panel = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.panel.add_css_class("panel")
+        self.panel.append(self.stage)
+        self.panel.append(self.title_stack)
+        self.panel.append(hint)
+        for setter in ("set_margin_top", "set_margin_bottom", "set_margin_start", "set_margin_end"):
+            getattr(self.panel, setter)(SHADOW)
+
+        self.rise = RiseBin(self.panel)
+        self.set_child(self.rise)
+
+        key_ctrl = Gtk.EventControllerKey()
+        key_ctrl.connect("key-pressed", self.on_key)
+        self.add_controller(key_ctrl)
+
+        scroll_ctrl = Gtk.EventControllerScroll(
+            flags=Gtk.EventControllerScrollFlags.BOTH_AXES
+        )
+        scroll_ctrl.connect("scroll", self.on_scroll)
+        self.add_controller(scroll_ctrl)
+
+        self.update_selected_class()
+        self.set_title_text(immediate=True)
+        self.apply_appear()
+        self.request_thumbnails()
+        self.schedule_gif()
+        self.ensure_ticking()
+
+    # --- preview loading (decoding happens off the UI thread) --------------
+
+    def request_thumbnails(self):
+        order = sorted(range(len(self.cards)), key=lambda i: abs(i - self.selected))
+        for i in order:
+            card = self.cards[i]
+            if card.static_texture is None and not card.loading and card.wp["preview"]:
+                card.loading = True
+                self.pool.submit(self._decode_thumbnail, card)
+
+    def _decode_thumbnail(self, card):
+        try:
+            pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(
+                card.wp["preview"], CARD_W * 2, CARD_H * 2, True
+            )
+        except GLib.Error:
+            return
+        GLib.idle_add(self._set_thumbnail, card, pixbuf)
+
+    def _set_thumbnail(self, card, pixbuf):
+        card.static_texture = Gdk.Texture.new_for_pixbuf(pixbuf)
+        if self._gif is None or self._gif.card is not card:
+            card.picture.set_paintable(card.static_texture)
+        return False
+
+    def schedule_gif(self):
+        if self._gif_timer is not None:
+            GLib.source_remove(self._gif_timer)
+        self._gif_timer = GLib.timeout_add(GIF_DELAY_MS, self._start_gif)
+
+    def _start_gif(self):
+        self._gif_timer = None
+        card = self.cards[self.selected]
+        if self._gif is not None and self._gif.card is card:
+            return False
+        self._stop_gif()
+        if card.wp["animated"]:
+            self._gif_token += 1
+            self.pool.submit(self._decode_gif, card, self._gif_token)
+        return False
+
+    def _stop_gif(self):
+        self._gif_token += 1
+        if self._gif is not None:
+            self._gif.stop()
+            self._gif = None
+
+    def _decode_gif(self, card, token):
+        try:
+            anim = GdkPixbuf.PixbufAnimation.new_from_file(card.wp["preview"])
+        except GLib.Error:
+            return
+        if not anim.is_static_image():
+            GLib.idle_add(self._play_gif, card, anim, token)
+
+    def _play_gif(self, card, anim, token):
+        if token == self._gif_token and not self.closing and card is self.cards[self.selected]:
+            self._gif = GifPlayer(card, anim)
+        return False
+
+    # --- animation --------------------------------------------------------
+
+    def ensure_ticking(self):
+        if self._tick_id is None:
+            self._last_frame = None
+            self._tick_id = self.add_tick_callback(self.on_tick)
+
+    def on_tick(self, _widget, clock):
+        now = clock.get_frame_time() / 1_000_000
+        dt = 0.0 if self._last_frame is None else min(now - self._last_frame, 1 / 30)
+        self._last_frame = now
+        busy = False
+
+        diff = self.selected - self.stage.position
+        if abs(diff) > 0.001:
+            self.stage.position += diff * (1 - math.exp(-dt * FOLLOW_RATE))
+            busy = True
+        else:
+            self.stage.position = float(self.selected)
+        self.stage.queue_allocate()
+
+        if self._anim_start is None:
+            self._anim_start = now
+        elapsed = now - self._anim_start
+        if self.closing:
+            t = clamp01(elapsed / DISAPPEAR_S)
+            self.appear = 1 - ease_out_cubic(t)
+            self.apply_appear()
+            if t >= 1.0:
+                self._tick_id = None
+                callback, self._on_disappeared = self._on_disappeared, None
+                if callback:
+                    GLib.idle_add(callback)
+                return GLib.SOURCE_REMOVE
+            busy = True
+        elif self.appear < 1.0:
+            self.appear = ease_out_cubic(clamp01(elapsed / APPEAR_S))
+            self.apply_appear()
+            busy = True
+
+        if busy:
+            return GLib.SOURCE_CONTINUE
+        self._tick_id = None
+        return GLib.SOURCE_REMOVE
+
+    def apply_appear(self):
+        self.rise.set_opacity(self.appear)
+        self.rise.offset = (1 - self.appear) * APPEAR_RISE
+        self.rise.queue_allocate()
+
+    # --- selection ----------------------------------------------------------
+
+    def update_selected_class(self):
+        for i, card in enumerate(self.cards):
+            if i == self.selected:
+                card.widget.add_css_class("selected")
+            else:
+                card.widget.remove_css_class("selected")
+
+    def set_title_text(self, immediate=False):
+        self._title_slot ^= 1
+        self._title_labels[self._title_slot].set_text(self.wallpapers[self.selected]["name"])
+        self.title_stack.set_visible_child_full(
+            "ab"[self._title_slot],
+            Gtk.StackTransitionType.NONE if immediate else Gtk.StackTransitionType.CROSSFADE,
+        )
+
+    def select(self, idx):
+        idx = max(0, min(len(self.cards) - 1, idx))
+        if idx == self.selected or self.closing:
+            return
+        self.selected = idx
+        self.update_selected_class()
+        self.set_title_text()
+        self.schedule_gif()
+        self.ensure_ticking()
+
+    def on_card_clicked(self, idx):
+        if idx == self.selected:
+            self.apply()
+        else:
+            self.select(idx)
+
+    def apply(self):
+        if self.closing:
+            return
+        wallpaper = self.wallpapers[self.selected]
+        try:
+            self.proxy.call_sync(
+                "ApplyById",
+                GLib.Variant("(s)", (wallpaper["id"],)),
+                Gio.DBusCallFlags.NONE,
+                -1,
+                None,
+            )
+        except GLib.Error as e:
+            print(f"Falha ao aplicar wallpaper: {e}", file=sys.stderr)
+        else:
+            # Regenera a paleta do sistema (hypr/waybar/kitty/mako) a partir
+            # do preview do wallpaper recém-aplicado. Ver ~/.config/wallust/.
+            if wallpaper["preview"]:
+                subprocess.Popen(
+                    ["wallust", "run", wallpaper["preview"]],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+        self.close_animated()
+
+    def close_animated(self):
+        if self.closing:
+            return
+        self.closing = True
+        self._stop_gif()
+        self._anim_start = None
+        self._on_disappeared = self._quit
+        self.ensure_ticking()
+
+    def _quit(self):
+        self.pool.shutdown(wait=False, cancel_futures=True)
+        self.get_application().quit()
+        return False
+
+    def on_key(self, _ctrl, keyval, _keycode, _state):
+        name = Gdk.keyval_name(keyval)
+        if name in ("Right", "Down"):
+            self.select(self.selected + 1)
+        elif name in ("Left", "Up"):
+            self.select(self.selected - 1)
+        elif name == "Home":
+            self.select(0)
+        elif name == "End":
+            self.select(len(self.cards) - 1)
+        elif name in ("Return", "KP_Enter", "space"):
+            self.apply()
+        elif name == "Escape":
+            self.close_animated()
+        else:
+            return False
+        return True
+
+    def on_scroll(self, _ctrl, dx, dy):
+        self._scroll_accum += dy if abs(dy) >= abs(dx) else dx
+        steps = int(self._scroll_accum)
+        if steps:
+            self._scroll_accum -= steps
+            self.select(self.selected + steps)
+        return True
+
+
+class SwitcherApp(Gtk.Application):
+    def __init__(self):
+        super().__init__(application_id=APP_ID)
+        self.window = None
+
+    def do_activate(self):
+        if self.window is not None:
+            self.window.close_animated()
+            return
+
+        wallpapers = fetch_wallpapers()
+        if not wallpapers:
+            print("Nenhum wallpaper do Wallpaper Engine encontrado no waywallen.", file=sys.stderr)
+            self.quit()
+            return
+
+        try:
+            proxy = daemon_proxy()
+        except GLib.Error as e:
+            print(f"Não foi possível falar com o daemon do waywallen: {e}", file=sys.stderr)
+            self.quit()
+            return
+
+        provider = Gtk.CssProvider()
+        provider.load_from_data(CSS)
+        Gtk.StyleContext.add_provider_for_display(
+            Gdk.Display.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
+
+        self.window = SwitcherWindow(self, proxy, wallpapers, get_current_id(proxy))
+        self.window.present()
+
+
+if __name__ == "__main__":
+    app = SwitcherApp()
+    sys.exit(app.run(sys.argv))

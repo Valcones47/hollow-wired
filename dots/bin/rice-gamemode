@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# Modo jogo do rice. Chamado pelo gamemode (~/.config/gamemode.ini [custom]
+# start/end) — que por sua vez é ativado pelo gamemoderun dos jogos da Steam
+# ou pelo Quickshell (GameMode.qml) pra jogos sem gamemoderun / botão manual.
+#   on  → perfil Desempenho (se não estiver) + notificação
+#   off → volta o perfil anterior (se foi alterado) + notificação
+# Não mexe na aparência do Hyprland (pedido do usuário).
+# Estado em $XDG_RUNTIME_DIR/rice-gamemode (o Quickshell observa esse arquivo).
+set -u
+run="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+state="$run/rice-gamemode"
+# o gamemoded roda como serviço do usuário e pode não herdar o ambiente da
+# sessão gráfica: descobre a instância do Hyprland sozinho.
+if [ -z "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]; then
+    HYPRLAND_INSTANCE_SIGNATURE=$(ls -t "$run/hypr" 2>/dev/null | head -1)
+    export HYPRLAND_INSTANCE_SIGNATURE
+fi
+
+case "${1:-}" in
+on)
+    [ -f "$state" ] && exit 0
+    prev=$(powerprofilesctl get 2>/dev/null)
+    changed=0
+    if [ "$prev" != "performance" ]; then
+        powerprofilesctl set performance 2>/dev/null && changed=1
+    fi
+    printf '%s %s\n' "$prev" "$changed" > "$state"
+    notify-send -a "Modo jogo" -i input-gaming -t 2500 "Modo jogo ligado" "Perfil Desempenho · jogo na NVIDIA"
+    ;;
+off)
+    [ -f "$state" ] || exit 0
+    read -r prev changed < "$state"
+    rm -f "$state"
+    if [ "$changed" = "1" ] && [ -n "$prev" ]; then
+        powerprofilesctl set "$prev" 2>/dev/null
+    fi
+    notify-send -a "Modo jogo" -i input-gaming -t 2500 "Modo jogo desligado" "Perfil de energia restaurado"
+    ;;
+*)
+    echo "uso: rice-gamemode on|off" >&2
+    exit 1
+    ;;
+esac
