@@ -57,6 +57,18 @@ Todos os elementos de interface gráfica do desktop são gerenciados pelo Quicks
 - **Jogos e Apps 3D:** Executados via wrapper `~/.local/bin/game-run`, isolando a RTX 3050 via camada `MESA_VK_DEVICE_SELECT=10de:25a2` e ativando DLSS via `PROTON_ENABLE_NVAPI=1`.
 - **Limpeza de Memória e Background:** Aba de Performance do Hub conta com medidor de RAM Real (AnonPages puro sem inflar com cache) e botão "Limpar Caches & Otimizar" que executa o `rice-ram-cleaner` (expurga drop_caches de forma segura e finaliza processos zumbis/órfãos do KDE).
 - **Correção Automática do Mod2 / NumLock no XWayland:** Utilitário `~/.local/bin/rice-fix-xwayland-numlock` disparado no autostart do `hyprland.lua` desvincula o `Num_Lock` do modificador `Mod2` no XWayland, eliminando bugs onde o Discord, Steam ou jogos capturam `NumLock` fantasma em atalhos ou push-to-talk.
+- **Portabilidade Universal e Desacoplamento:** O Quickshell e o Hyprland foram 100% desacoplados de caminhos de usuário (`$HOME` / `Quickshell.env("HOME")`), a leitura de GPU (`SysStats.gpuName`) detecta dinamicamente modelos NVIDIA, AMD ou Intel, a leitura térmica suporta tanto Intel quanto AMD Ryzen (`Tctl`), e o card de bateria se adapta dinamicamente para computadores desktop.
+- **Novo Utilitário de Perfil (`rice-set-avatar`):** Permite trocar foto ou GIF de perfil com 1 clique diretamente pelo Dashboard ou atalho gráfico (`zenity`/`kdialog`).
+
+---
+
+## 4. Repositórios e Estratégia de Backup em Nuvem
+
+| Camada | Destino | Descrição |
+|---|---|---|
+| **Repositório Público Universal** | [`Valcones47/hyprland-setup`](https://github.com/Valcones47/hyprland-setup) | Código-fonte completo do rice, dotfiles limpos e instalador automatizado (`install.sh`) com detecção de GPU/CPU e configuração de zRAM. Pronto para compartilhar com amigos (como o Raul) ou instalar em qualquer PC. |
+| **Repositório Privado Pessoal** | [`Valcones47/cachyos-dotfiles`](https://github.com/Valcones47/cachyos-dotfiles) | Totalmente migrado do antigo setup de KDE Plasma para o **Hyprland + Quickshell**. Contém scripts de restauração em 1 comando (`restore-personal.sh`), atalhos de layout de widgets, avatar pessoal da Rem e preferências do usuário. |
+| **Google Drive (Assets Pesados)** | `gdrive:Linuxconfig/` via `rclone` | Armazenamento dos arquivos pesados (>100 MB): pasta `Wallpapers-Waywallen/` (680 MB em cenas do Wallpaper Engine), pasta `Videos/` (gravações de demonstração) e pasta `Backups/` (tarball completo de 1.9 GB das sessões do Zen Browser, Discord e Steam). |
 
 ---
 
