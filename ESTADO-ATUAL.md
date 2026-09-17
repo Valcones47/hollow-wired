@@ -121,7 +121,7 @@ Todos os elementos de interface gráfica do desktop são gerenciados pelo Quicks
 | `Super + Ctrl + R` | Reinício de emergência do Quickshell (`rice-restart`) |
 | `XF86Audio*` | Controle de volume (+ / - / mute) com feedback visual no OSD flutuante |
 | `XF86MonBrightness*` | Controle de brilho de tela (+ / -) com feedback visual no OSD flutuante |
-| `Num_Lock` | Mute de microfone no PipeWire com feedback visual no OSD flutuante |
+| `XF86AudioMicMute` | Mute de microfone no PipeWire com feedback visual no OSD flutuante |
 | `XF86AudioPlay` / `XF86AudioPrev` / `XF86AudioNext` | Botões de mídia do teclado (play/pause, anterior, próximo) via `playerctl`, controlando o player MPRIS ativo |
 
 ---

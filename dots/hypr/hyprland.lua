@@ -380,8 +380,8 @@ hl.bind("XF86AudioRaiseVolume", hl.dsp.exec_cmd("quickshell ipc call osd volumeU
 hl.bind("XF86AudioLowerVolume", hl.dsp.exec_cmd("quickshell ipc call osd volumeDown"), { locked = true, repeating = true })
 hl.bind("XF86AudioMute",        hl.dsp.exec_cmd("quickshell ipc call osd volumeMute"), { locked = true, repeating = true })
 
--- Toggle de mute do microfone via Num Lock (mostra OSD do microfone)
-hl.bind("Num_Lock", hl.dsp.exec_cmd("quickshell ipc call osd micMute"), { locked = true, repeating = true })
+-- Toggle de mute do microfone via tecla multimídia (mostra OSD do microfone)
+hl.bind("XF86AudioMicMute", hl.dsp.exec_cmd("quickshell ipc call osd micMute"), { locked = true, repeating = true })
 
 -- OSD de brilho via Quickshell
 hl.bind("XF86MonBrightnessUp",   hl.dsp.exec_cmd("quickshell ipc call osd brightnessUp"),   { locked = true, repeating = true })
