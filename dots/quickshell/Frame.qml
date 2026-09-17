@@ -63,5 +63,10 @@ Scope {
                 function onBackgroundChanged() { canvas.requestPaint(); }
             }
         }
+
+        IpcHandler {
+            target: "frame"
+            function setVisible(v: bool): void { frame.visible = v; }
+        }
     }
 }
