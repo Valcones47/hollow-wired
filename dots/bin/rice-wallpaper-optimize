@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 rice-wallpaper-optimize
-Otimizador de Wallpapers Scene (.pkg) do Wallpaper Engine para 1080p / 60-144 FPS.
-Converte texturas 4K/6K para 1080p nativo e reduz passes de shader pesados.
+Otimizador Automático Universal de Wallpapers (Scene .pkg e Vídeos 4K) para 1080p / 144 FPS.
+Suporta todos os wallpapers da Oficina Steam do Wallpaper Engine.
 """
 
 import os
@@ -11,6 +11,7 @@ import io
 import struct
 import json
 import shutil
+import subprocess
 from pathlib import Path
 
 try:
@@ -19,18 +20,66 @@ except ImportError:
     print("Erro: Pillow não instalado. Instale com: sudo pacman -S python-pillow")
     sys.exit(1)
 
-def find_pkg(target_path):
-    p = Path(target_path).expanduser().resolve()
-    if p.is_file() and p.name.endswith(".pkg"):
-        return p
-    if p.is_dir():
-        cand = p / "scene.pkg"
-        if cand.exists():
-            return cand
-    return None
+DEFAULT_WORKSHOP_DIR = Path.home() / ".local/share/Steam/steamapps/workshop/content/431960"
+
+def get_video_info(video_path):
+    cmd = [
+        "ffprobe", "-v", "error", "-select_streams", "v:0",
+        "-show_entries", "stream=width,height", "-of", "json", str(video_path)
+    ]
+    try:
+        res = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        data = json.loads(res.stdout)
+        stream = data["streams"][0]
+        return stream["width"], stream["height"]
+    except Exception:
+        return None, None
+
+def optimize_video(video_path, target_w=1920, target_h=1080):
+    w, h = get_video_info(video_path)
+    if not w or not h:
+        return False
+
+    if w <= target_w and h <= target_h:
+        print(f"  ✓ Vídeo já está em resolução adequada: {w}x{h}")
+        return False
+
+    bak_path = video_path.with_name(video_path.name + ".original")
+    if not bak_path.exists():
+        print(f"  💾 Criando backup do vídeo original: {bak_path.name}")
+        shutil.copy2(video_path, bak_path)
+    else:
+        print(f"  ℹ️  Backup existente encontrado: {bak_path.name}")
+
+    print(f"  🎬 Transcodificando vídeo {w}x{h} -> {target_w}x{target_h} (FFmpeg CRF 18)...")
+    tmp_out = video_path.with_name("tmp_" + video_path.name)
+    
+    # Preserva proporção exata e garante números pares para o encoder
+    scale_filter = f"scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,scale=trunc(iw/2)*2:trunc(ih/2)*2"
+    
+    cmd = [
+        "ffmpeg", "-y", "-i", str(bak_path),
+        "-vf", scale_filter,
+        "-c:v", "libx264", "-crf", "18", "-preset", "fast",
+        "-c:a", "copy",
+        str(tmp_out)
+    ]
+    
+    res = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+    if res.returncode != 0 or not tmp_out.exists():
+        print(f"  ❌ Erro ao transcodificar vídeo: {res.stderr[-200:]}")
+        if tmp_out.exists():
+            tmp_out.unlink()
+        return False
+
+    orig_mb = bak_path.stat().st_size / (1024 * 1024)
+    new_mb = tmp_out.stat().st_size / (1024 * 1024)
+    tmp_out.replace(video_path)
+    print(f"  ✅ Vídeo otimizado com sucesso: {orig_mb:.1f} MB -> {new_mb:.1f} MB ({target_w}x{target_h})")
+    return True
 
 def inspect_pkg(pkg_path):
-    print(f"\n📦 Inspecionando: {pkg_path}")
+    print(f"\n📦 Inspecionando Scene: {pkg_path.parent.name} ({pkg_path.name})")
     with open(pkg_path, "rb") as f:
         magic_len = struct.unpack("<I", f.read(4))[0]
         magic = f.read(magic_len)
@@ -58,7 +107,7 @@ def inspect_pkg(pkg_path):
                     print(f"  • Resolução da Cena (Orthogonal): {w}x{h}")
                     if bloom:
                         print(f"  • Iterações de Bloom HDR: {bloom}")
-                except Exception as e:
+                except Exception:
                     pass
             elif name.endswith(".tex"):
                 f.seek(data_start + offset)
@@ -67,19 +116,12 @@ def inspect_pkg(pkg_path):
                 if png_pos != -1:
                     try:
                         f.seek(data_start + offset + png_pos)
-                        img = Image.open(io.BytesIO(f.read(min(length - png_pos, 2048))))
-                        print(f"  • Textura: {name} -> {img.size[0]}x{img.size[1]} ({length/1024/1024:.2f} MB)")
+                        img = Image.open(io.BytesIO(f.read(min(length - png_pos, 4096))))
+                        print(f"  • Textura PNG: {name} -> {img.size[0]}x{img.size[1]} ({length/1024/1024:.2f} MB)")
                     except Exception:
                         pass
 
 def optimize_pkg(pkg_path, target_w=1920, target_h=1080):
-    bak_path = pkg_path.with_suffix(".pkg.original")
-    if not bak_path.exists():
-        print(f"💾 Criando backup original em: {bak_path.name}")
-        shutil.copy2(pkg_path, bak_path)
-    else:
-        print(f"ℹ️  Backup existente encontrado: {bak_path.name}")
-
     with open(pkg_path, "rb") as f:
         magic_len = struct.unpack("<I", f.read(4))[0]
         magic = f.read(magic_len)
@@ -111,10 +153,9 @@ def optimize_pkg(pkg_path, target_w=1920, target_h=1080):
                     img = Image.open(io.BytesIO(png_bytes))
                     orig_w, orig_h = img.size
                     if orig_w > target_w or orig_h > target_h:
-                        # Mantém proporção
                         ratio = min(target_w / orig_w, target_h / orig_h)
-                        new_w = int(orig_w * ratio)
-                        new_h = int(orig_h * ratio)
+                        new_w = max(2, int(orig_w * ratio))
+                        new_h = max(2, int(orig_h * ratio))
                         print(f"  🔄 Redimensionando {name}: {orig_w}x{orig_h} -> {new_w}x{new_h}...")
                         resized = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
                         out_io = io.BytesIO()
@@ -134,10 +175,10 @@ def optimize_pkg(pkg_path, target_w=1920, target_h=1080):
                     print(f"  ⚠️  Falha ao processar textura {name}: {e}")
 
     # Otimiza scene.json
+    changed_js = False
     if "scene.json" in files:
         try:
             js = json.loads(files["scene.json"].decode("utf-8", errors="ignore"))
-            changed_js = False
             if "general" in js and "bloomhdriterations" in js["general"]:
                 if js["general"]["bloomhdriterations"] > 4:
                     print(f"  ⚡ Limitando Bloom HDR de {js['general']['bloomhdriterations']} para 4 iterações...")
@@ -147,6 +188,15 @@ def optimize_pkg(pkg_path, target_w=1920, target_h=1080):
                 files["scene.json"] = json.dumps(js, indent=2).encode("utf-8")
         except Exception as e:
             print(f"  ⚠️  Falha ao otimizar scene.json: {e}")
+
+    if optimized_count == 0 and not changed_js:
+        print(f"  ✓ Scene {pkg_path.parent.name} já está otimizada (sem texturas >1080p ou bloom excessivo).")
+        return False
+
+    bak_path = pkg_path.with_suffix(".pkg.original")
+    if not bak_path.exists():
+        print(f"  💾 Criando backup original em: {bak_path.name}")
+        shutil.copy2(pkg_path, bak_path)
 
     # Reempacota
     out_io = io.BytesIO()
@@ -180,47 +230,88 @@ def optimize_pkg(pkg_path, target_w=1920, target_h=1080):
         f.write(new_pkg_bytes)
     temp_out.replace(pkg_path)
 
-    print(f"\n✅ Otimização concluída com sucesso!")
-    print(f"  • Tamanho do arquivo: {orig_size_mb:.2f} MB -> {new_size_mb:.2f} MB")
-    print(f"  • Texturas redimensionadas: {optimized_count}")
-    print(f"  • O papel de parede agora rodará nativo em 1080p com zero lag!")
+    print(f"  ✅ Scene otimizada com sucesso!")
+    print(f"     • Tamanho: {orig_size_mb:.2f} MB -> {new_size_mb:.2f} MB")
+    print(f"     • Texturas redimensionadas: {optimized_count}")
+    return True
 
-def restore_pkg(pkg_path):
-    bak = pkg_path.with_suffix(".pkg.original")
-    if not bak.exists():
-        print(f"❌ Nenhum backup original encontrado para {pkg_path.name}")
+def restore_item(folder_path):
+    folder = Path(folder_path).resolve()
+    restored = False
+    pkg_bak = folder / "scene.pkg.original"
+    if pkg_bak.exists():
+        shutil.copy2(pkg_bak, folder / "scene.pkg")
+        print(f"  ✓ Restaurado scene.pkg original em {folder.name}")
+        restored = True
+
+    for f in folder.glob("*.original"):
+        if f.name != "scene.pkg.original":
+            target = folder / f.stem
+            shutil.copy2(f, target)
+            print(f"  ✓ Restaurado vídeo original {target.name} em {folder.name}")
+            restored = True
+            
+    if not restored:
+        print(f"  - Nenhum backup encontrado em {folder.name}")
+
+def optimize_folder(folder_path):
+    folder = Path(folder_path).resolve()
+    if not folder.is_dir():
         return
-    shutil.copy2(bak, pkg_path)
-    print(f"✅ Arquivo restaurado para a versão original de alta resolução!")
+
+    pj = folder / "project.json"
+    title = folder.name
+    if pj.exists():
+        try:
+            data = json.loads(pj.read_text())
+            title = data.get("title", folder.name)
+        except Exception:
+            pass
+
+    print(f"\n🔍 Verificando: {title} ({folder.name})")
+
+    pkg = folder / "scene.pkg"
+    if pkg.exists():
+        optimize_pkg(pkg)
+
+    for vid in folder.glob("*"):
+        if vid.suffix.lower() in [".mp4", ".webm", ".mkv"] and not vid.name.endswith(".original") and not vid.name.startswith("tmp_"):
+            optimize_video(vid)
 
 def main():
     if len(sys.argv) < 2:
         print("Uso:")
-        print("  rice-wallpaper-optimize <caminho_ou_pasta>          # Otimiza para 1080p")
+        print("  rice-wallpaper-optimize --all                       # Otimiza TODOS os wallpapers da Steam")
+        print("  rice-wallpaper-optimize <caminho_ou_pasta>          # Otimiza wallpaper específico")
         print("  rice-wallpaper-optimize --info <caminho_ou_pasta>   # Mostra detalhes")
-        print("  rice-wallpaper-optimize --restore <caminho_ou_pasta># Restaura original")
+        print("  rice-wallpaper-optimize --restore <pasta>           # Restaura wallpaper específico")
+        print("  rice-wallpaper-optimize --restore-all               # Restaura todos os backups")
         sys.exit(1)
 
     cmd = sys.argv[1]
-    if cmd == "--info" and len(sys.argv) >= 3:
-        pkg = find_pkg(sys.argv[2])
-        if not pkg:
-            print("Erro: scene.pkg não encontrado no caminho especificado.")
-            sys.exit(1)
-        inspect_pkg(pkg)
+
+    if cmd == "--all":
+        print(f"🚀 Iniciando otimização em lote de todos os wallpapers em:\n   {DEFAULT_WORKSHOP_DIR}")
+        for folder in sorted(DEFAULT_WORKSHOP_DIR.iterdir()):
+            if folder.is_dir():
+                optimize_folder(folder)
+        print("\n🎉 Todos os wallpapers da sua biblioteca foram verificados e otimizados para 1080p!")
+    elif cmd == "--restore-all":
+        print(f"🔄 Restaurando todos os backups originais em:\n   {DEFAULT_WORKSHOP_DIR}")
+        for folder in sorted(DEFAULT_WORKSHOP_DIR.iterdir()):
+            if folder.is_dir():
+                restore_item(folder)
+        print("\n✅ Restauração concluída!")
+    elif cmd == "--info" and len(sys.argv) >= 3:
+        target = Path(sys.argv[2]).resolve()
+        pkg = target / "scene.pkg" if target.is_dir() else target
+        if pkg.exists():
+            inspect_pkg(pkg)
     elif cmd == "--restore" and len(sys.argv) >= 3:
-        pkg = find_pkg(sys.argv[2])
-        if not pkg:
-            print("Erro: scene.pkg não encontrado no caminho especificado.")
-            sys.exit(1)
-        restore_pkg(pkg)
+        restore_item(sys.argv[2])
     else:
-        path_arg = sys.argv[1] if not cmd.startswith("--") else sys.argv[2]
-        pkg = find_pkg(path_arg)
-        if not pkg:
-            print("Erro: scene.pkg não encontrado no caminho especificado.")
-            sys.exit(1)
-        optimize_pkg(pkg)
+        target = Path(sys.argv[1]).resolve()
+        optimize_folder(target)
 
 if __name__ == "__main__":
     main()
