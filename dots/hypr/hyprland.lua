@@ -384,14 +384,17 @@ hl.bind("XF86AudioMute",        hl.dsp.exec_cmd("quickshell ipc call osd volumeM
 hl.bind("XF86AudioMicMute", hl.dsp.exec_cmd("quickshell ipc call osd micMute"), { locked = true, repeating = true })
 
 -- Num_Lock: Desativa/ativa o áudio (Deafen) do Discord nativamente em segundo plano com debounce e liberação segura de teclas
-local last_discord_deafen_time = 0
+local discord_deafen_ready = true
 local function toggle_discord_deafen()
-    local now = os.clock()
-    -- Debounce de 400ms: elimina duplo acionamento e repetição involuntária do Num_Lock
-    if (now - last_discord_deafen_time) < 0.4 then
+    if not discord_deafen_ready then
         return
     end
-    last_discord_deafen_time = now
+    discord_deafen_ready = false
+
+    -- Reativa instantaneamente após 200ms (tempo real via timer do compositor)
+    hl.timer(function()
+        discord_deafen_ready = true
+    end, { timeout = 200, type = "oneshot" })
 
     -- Envia Ctrl + Shift + d (minúsculo) para o Discord / Vesktop
     hl.dispatch(hl.dsp.send_shortcut({ mods = "CTRL SHIFT", key = "d", window = "class:^(discord|vesktop)$" }))
