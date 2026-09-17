@@ -1,6 +1,6 @@
 [Desktop Entry]
 Name=Configurações Visuais do Rice
-Comment=Ajustar Fastfetch, Kitty Terminal, Notificações Mako e Efeitos
+Comment=Ajustar Fastfetch, Kitty, Notificações, Monitores 144Hz, Mouse, Cores e Auto-Reparo
 Exec=quickshell ipc call visualconfig toggle
 Icon=preferences-desktop-theme
 Terminal=false

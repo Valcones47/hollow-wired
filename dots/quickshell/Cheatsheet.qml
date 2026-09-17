@@ -220,6 +220,7 @@ PanelWindow {
                         {
                             category: "Ricing & Customização",
                             items: [
+                                { keys: ["Super", "I"], desc: "Painel de Configurações do Rice" },
                                 { keys: ["Super", "F1"], desc: "Cheatsheet de atalhos" },
                                 { keys: ["Super", "W"], desc: "Editor de Widgets de Desktop" },
                                 { keys: ["Super", "N"], desc: "Painel de Notificações" },

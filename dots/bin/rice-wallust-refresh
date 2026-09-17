@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# rice-wallust-refresh: Regenera as cores do Wallust a partir do wallpaper atual do Waywallen.
+
+set -euo pipefail
+
+preview=$(python3 -c '
+import sqlite3, os, tomllib
+cfg_file = os.path.expanduser("~/.var/app/org.waywallen.waywallen/config/waywallen/config.toml")
+db_file = os.path.expanduser("~/.var/app/org.waywallen.waywallen/data/waywallen/waywallen-v2.db")
+last_id = None
+try:
+    with open(cfg_file, "rb") as f:
+        last_id = tomllib.load(f).get("global", {}).get("last_wallpaper")
+except Exception:
+    pass
+if not last_id:
+    last_id = "12"
+try:
+    conn = sqlite3.connect(f"file:{db_file}?mode=ro", uri=True)
+    conn.row_factory = sqlite3.Row
+    r = conn.execute("SELECT item.preview_path, library.path AS lib_path FROM item JOIN library ON library.id = item.library_id WHERE item.id = ?", (last_id,)).fetchone()
+    if r and r["preview_path"]:
+        print(os.path.join(r["lib_path"], r["preview_path"]))
+except Exception:
+    pass
+' 2>/dev/null || true)
+
+if [ -n "$preview" ] && [ -f "$preview" ]; then
+    wallust run "$preview" >/dev/null 2>&1
+    notify-send -a "Wallust" -i preferences-desktop-color -r 91199 -t 2500 "Paleta de Cores Atualizada" "Cores sincronizadas com o wallpaper ativo"
+    echo "[✓] Wallust atualizado com: $preview"
+else
+    echo "[-] Wallpaper atual não encontrado"
+    exit 1
+fi

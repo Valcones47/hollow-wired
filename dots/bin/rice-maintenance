@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# rice-maintenance: Utilitários rápidos de manutenção e auto-reparo para o rice.
+
+set -euo pipefail
+
+cmd="${1:-status}"
+
+case "$cmd" in
+    audio)
+        systemctl --user restart pipewire wireplumber pipewire-pulse
+        notify-send -a "Sistema" -i audio-volume-high -r 91195 -t 2500 "Áudio Reiniciado" "PipeWire, WirePlumber e Pulse reiniciados com sucesso"
+        echo "[✓] Áudio reiniciado com sucesso"
+        ;;
+    cleancache)
+        # Limpa cache do pacman mantendo os 2 pacotes mais recentes
+        if command -v paccache &>/dev/null; then
+            paccache -rk2 >/dev/null 2>&1 || true
+        fi
+        # Limpa thumbnails com mais de 30 dias
+        find "${XDG_CACHE_HOME:-$HOME/.cache}/thumbnails" -type f -atime +30 -delete 2>/dev/null || true
+        notify-send -a "Sistema" -i drive-harddisk -r 91195 -t 2500 "Cache Limpo" "Pacotes antigos e miniaturas expiradas foram removidos"
+        echo "[✓] Limpeza de cache concluída"
+        ;;
+    unlockpacman)
+        if pgrep -x pacman &>/dev/null || pgrep -x pamac &>/dev/null || pgrep -x yay &>/dev/null; then
+            notify-send -a "Sistema" -i dialog-warning -r 91195 -t 3000 "Pacman em Execução" "Existe um instalador rodando no momento. Não remova a trava agora."
+            echo "[-] Pacman em execução"
+            exit 1
+        fi
+        if [ -f "/var/lib/pacman/db.lck" ]; then
+            pkexec rm -f /var/lib/pacman/db.lck
+            notify-send -a "Sistema" -i security-high -r 91195 -t 2500 "Pacman Destravado" "O arquivo de trava db.lck foi removido com sucesso"
+            echo "[✓] db.lck removido"
+        else
+            notify-send -a "Sistema" -i dialog-information -r 91195 -t 2500 "Pacman Livre" "Nenhuma trava pendente encontrada"
+            echo "[✓] Nenhuma trava pendente"
+        fi
+        ;;
+    doctor)
+        kitty --title "Rice Doctor" bash -c "~/.local/bin/rice-doctor" &
+        ;;
+    status)
+        echo "Uso: $(basename "$0") [audio|cleancache|unlockpacman|doctor]"
+        ;;
+esac

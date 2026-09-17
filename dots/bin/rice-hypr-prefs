@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # rice-hypr-prefs
-# Gerencia e persiste preferências de aparência e efeitos do Hyprland em tempo real.
+# Gerencia e persiste preferências de aparência, tela e periféricos do Hyprland em tempo real.
 # Lê e salva em ~/.config/hypr/user-prefs.json e aplica via `hyprctl eval`.
 
 set -euo pipefail
@@ -12,15 +12,22 @@ ensure_prefs_file() {
         mkdir -p "$(dirname "$PREFS_FILE")"
         cat <<'JSON' > "$PREFS_FILE"
 {
-  "rounding": 6,
+  "rounding": 8,
   "border_size": 2,
-  "gaps_in": 4,
-  "gaps_out": 8,
+  "gaps_in": 6,
+  "gaps_out": 9,
   "inactive_opacity": 1.0,
   "dim_inactive": false,
   "dim_strength": 0.2,
   "anim_enabled": true,
-  "anim_preset": "smooth"
+  "anim_preset": "smooth",
+  "kb_layout": "br",
+  "kb_variant": "",
+  "mouse_sensitivity": 0.0,
+  "mouse_accel": "flat",
+  "numlock": true,
+  "vrr": 1,
+  "monitor_hz": 144
 }
 JSON
     fi
@@ -39,18 +46,29 @@ apply_all() {
     get_instance
 
     local rounding border_size gaps_in gaps_out inactive_opacity dim_inactive dim_strength anim_enabled anim_preset
-    rounding=$(jq -r '.rounding // 6' "$PREFS_FILE")
+    local kb_layout kb_variant mouse_sensitivity mouse_accel numlock vrr monitor_hz
+
+    rounding=$(jq -r '.rounding // 8' "$PREFS_FILE")
     border_size=$(jq -r '.border_size // 2' "$PREFS_FILE")
-    gaps_in=$(jq -r '.gaps_in // 4' "$PREFS_FILE")
-    gaps_out=$(jq -r '.gaps_out // 8' "$PREFS_FILE")
+    gaps_in=$(jq -r '.gaps_in // 6' "$PREFS_FILE")
+    gaps_out=$(jq -r '.gaps_out // 9' "$PREFS_FILE")
     inactive_opacity=$(jq -r '.inactive_opacity // 1.0' "$PREFS_FILE")
     dim_inactive=$(jq -r '.dim_inactive // false' "$PREFS_FILE")
     dim_strength=$(jq -r '.dim_strength // 0.2' "$PREFS_FILE")
     anim_enabled=$(jq -r '.anim_enabled // true' "$PREFS_FILE")
     anim_preset=$(jq -r '.anim_preset // "smooth"' "$PREFS_FILE")
 
+    kb_layout=$(jq -r '.kb_layout // "br"' "$PREFS_FILE")
+    kb_variant=$(jq -r '.kb_variant // ""' "$PREFS_FILE")
+    mouse_sensitivity=$(jq -r '.mouse_sensitivity // 0.0' "$PREFS_FILE")
+    mouse_accel=$(jq -r '.mouse_accel // "flat"' "$PREFS_FILE")
+    numlock=$(jq -r '.numlock // true' "$PREFS_FILE")
+    vrr=$(jq -r '.vrr // 1' "$PREFS_FILE")
+    monitor_hz=$(jq -r '.monitor_hz // 144' "$PREFS_FILE")
+
     local gaps_out_sides=$(( gaps_out + 10 ))
 
+    # 1. Configurações gerais de janelas, decoração, animações, VRR e input
     hyprctl eval "
 hl.config({
     general = {
@@ -66,10 +84,37 @@ hl.config({
     },
     animations = {
         enabled = $anim_enabled
+    },
+    misc = {
+        vrr = $vrr
+    },
+    input = {
+        kb_layout = '$kb_layout',
+        kb_variant = '$kb_variant',
+        numlock_by_default = $numlock,
+        accel_profile = '$mouse_accel',
+        sensitivity = $mouse_sensitivity
     }
 })
 " &>/dev/null
 
+    # 2. Configurações para dispositivos de mouse conhecidos
+    hyprctl eval "
+hl.device({
+    name = 'usb-gaming-mouse',
+    accel_profile = '$mouse_accel',
+    sensitivity = $mouse_sensitivity
+})
+" &>/dev/null
+
+    # 3. Monitor e taxa de atualização
+    local mode_str="1920x1080@${monitor_hz}.03Hz"
+    if [ "$monitor_hz" = "60" ]; then
+        mode_str="1920x1080@60.02Hz"
+    fi
+    hyprctl eval "hl.monitor({ output = 'eDP-1', mode = '$mode_str', position = '0x0', scale = '1' })" &>/dev/null || true
+
+    # 4. Preset de animação
     apply_anim_preset "$anim_preset"
 }
 
@@ -146,15 +191,22 @@ case "$cmd" in
         ensure_prefs_file
         cat <<'JSON' > "$PREFS_FILE"
 {
-  "rounding": 6,
+  "rounding": 8,
   "border_size": 2,
-  "gaps_in": 4,
-  "gaps_out": 8,
+  "gaps_in": 6,
+  "gaps_out": 9,
   "inactive_opacity": 1.0,
   "dim_inactive": false,
   "dim_strength": 0.2,
   "anim_enabled": true,
-  "anim_preset": "smooth"
+  "anim_preset": "smooth",
+  "kb_layout": "br",
+  "kb_variant": "",
+  "mouse_sensitivity": 0.0,
+  "mouse_accel": "flat",
+  "numlock": true,
+  "vrr": 1,
+  "monitor_hz": 144
 }
 JSON
         apply_all
