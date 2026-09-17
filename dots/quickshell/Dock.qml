@@ -32,7 +32,7 @@ PanelWindow {
     focusable: false
 
     WlrLayershell.namespace: "quickshell-dock"
-    WlrLayershell.layer: (launcherOpen && hasFullscreen) ? WlrLayer.Overlay : WlrLayer.Top
+    WlrLayershell.layer: launcherOpen ? WlrLayer.Overlay : WlrLayer.Top
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
     readonly property int dockH: 64

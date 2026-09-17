@@ -33,7 +33,7 @@ PanelWindow {
     implicitWidth: Theme.frameThickness + Theme.sidebarWidth + Theme.popoutMaxWidth + 40
 
     WlrLayershell.namespace: "quickshell-sidebar"
-    WlrLayershell.layer: WlrLayer.Overlay
+    WlrLayershell.layer: launcherOpen ? WlrLayer.Overlay : WlrLayer.Top
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
     exclusionMode: ExclusionMode.Ignore
 

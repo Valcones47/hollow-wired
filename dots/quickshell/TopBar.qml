@@ -37,7 +37,7 @@ PanelWindow {
     readonly property bool hasFullscreen: (Hyprland.focusedWorkspace && Hyprland.focusedWorkspace.hasFullscreen) || false
 
     WlrLayershell.namespace: "quickshell-bar"
-    WlrLayershell.layer: (launcherOpen && hasFullscreen) ? WlrLayer.Overlay : WlrLayer.Top
+    WlrLayershell.layer: launcherOpen ? WlrLayer.Overlay : WlrLayer.Top
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
     readonly property int barH: Theme.waybarHeight

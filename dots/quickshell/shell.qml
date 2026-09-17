@@ -43,7 +43,12 @@ ShellRoot {
     DesktopWidgets { id: dw }
     Frame {}
 
+    Launcher {
+        id: launcher
+    }
+
     TopBar {
+        id: topbar
         launcherOpen: shellRoot.launcherOpen
         recording: sidebar.recording
         onClockClicked: hub.open = !hub.open
@@ -64,20 +69,18 @@ ShellRoot {
         }
     }
 
+    Dock {
+        id: dock
+        launcherOpen: shellRoot.launcherOpen
+    }
+
+
     SystemInfo {
         id: sysinfo
     }
 
     VisualConfigPanel {
         id: visualConfig
-    }
-
-    Launcher {
-        id: launcher
-    }
-
-    Dock {
-        launcherOpen: shellRoot.launcherOpen
     }
 
     AltTab {}
