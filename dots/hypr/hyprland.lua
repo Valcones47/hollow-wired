@@ -267,11 +267,11 @@ hl.config({
         disable_hyprland_logo   = true,
         disable_splash_rendering = true,
         background_color        = "rgba(000000ff)",
-        vrr                     = 1, -- VRR adaptativo para o monitor 144Hz (elimina stutter)
+        vrr                     = 0, -- VRR desativado (elimina flickering/piscamento na tela quando ocioso)
     },
 
     render = {
-        direct_scanout = 1, -- Bypassa composição da iGPU em jogos fullscreen, entregando buffer direto ao KMS
+        direct_scanout = 0, -- Desativado para evitar instabilidades e flickering com layer-shell/quickshell
     },
 
     xwayland = {

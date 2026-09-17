@@ -299,6 +299,13 @@ PanelWindow {
                     disarm.restart();
                 }
             }
+            onDoubleClicked: {
+                if (btn.needsConfirm) {
+                    disarm.stop();
+                    btn.armed = false;
+                    btn.activated();
+                }
+            }
         }
     }
 
@@ -618,7 +625,10 @@ PanelWindow {
                     kind: "logout"
                     icon: Theme.icons.logout
                     needsConfirm: true
-                    onActivated: logoutProc.running = true
+                    onActivated: {
+                        sidebar.open = false;
+                        Quickshell.execDetached(["rice-session-action", "logout"]);
+                    }
                 }
                 SideButton {
                     id: rebootBtn
@@ -626,7 +636,10 @@ PanelWindow {
                     icon: Theme.icons.restart
                     tint: sidebar.rebootReason !== "" ? Theme.primary : Theme.textColor
                     needsConfirm: true
-                    onActivated: rebootProc.running = true
+                    onActivated: {
+                        sidebar.open = false;
+                        Quickshell.execDetached(["rice-session-action", "reboot"]);
+                    }
 
                     Rectangle {
                         visible: sidebar.rebootReason !== ""
@@ -646,7 +659,10 @@ PanelWindow {
                     icon: Theme.icons.power
                     tint: Theme.primary
                     needsConfirm: true
-                    onActivated: powerProc.running = true
+                    onActivated: {
+                        sidebar.open = false;
+                        Quickshell.execDetached(["rice-session-action", "poweroff"]);
+                    }
                 }
             }
         }
@@ -779,7 +795,7 @@ PanelWindow {
                 ColumnLayout {
                     id: powerPop
                     visible: popContent.current === powerPop
-                    spacing: 2
+                    spacing: 6
                     readonly property var btn: sidebar.pop === "logout" ? logoutBtn : sidebar.pop === "reboot" ? rebootBtn : powerBtn
                     PopTitle {
                         text: sidebar.pop === "logout" ? "Sair da sessão" : sidebar.pop === "reboot" ? "Reiniciar" : "Desligar"
@@ -790,8 +806,36 @@ PanelWindow {
                         color: Theme.primary
                     }
                     PopText {
-                        text: powerPop.btn.armed ? "Clique de novo para confirmar" : "Clique duas vezes para confirmar"
+                        text: powerPop.btn.armed ? "Clique de novo ou confirme abaixo:" : "Clique duas vezes ou confirme abaixo:"
                         color: powerPop.btn.armed ? Theme.primary : Theme.subtext
+                    }
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 28
+                        radius: 6
+                        color: powerPop.btn && powerPop.btn.armed ? Theme.critical : Theme.tile
+                        border.color: powerPop.btn && powerPop.btn.armed ? Theme.critical : Theme.outline
+                        border.width: 1
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: sidebar.pop === "logout" ? "Confirmar Saída" : sidebar.pop === "reboot" ? "Confirmar Reinício" : "Confirmar Desligar"
+                            color: powerPop.btn && powerPop.btn.armed ? "#ffffff" : Theme.primary
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 11
+                            font.weight: Font.DemiBold
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                if (powerPop.btn) {
+                                    powerPop.btn.armed = false;
+                                    powerPop.btn.activated();
+                                }
+                            }
+                        }
                     }
                 }
 

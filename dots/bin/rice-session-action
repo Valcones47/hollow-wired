@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# Gerenciador de Ações de Sessão do Rice
+# ==============================================================================
+ACTION="${1:-}"
+
+case "$ACTION" in
+    logout)
+        # 1. Tenta sair graciosamente pelo Hyprland
+        if command -v hyprctl >/dev/null 2>&1; then
+            hyprctl dispatch exit
+        fi
+        # 2. Se a sessão ainda persistir, finaliza via loginctl
+        sleep 0.5
+        loginctl terminate-session "${XDG_SESSION_ID:-self}" 2>/dev/null || loginctl terminate-user "$USER" 2>/dev/null || true
+        ;;
+    reboot)
+        systemctl reboot
+        ;;
+    poweroff|shutdown)
+        systemctl poweroff
+        ;;
+    lock)
+        if command -v hyprlock >/dev/null 2>&1; then
+            hyprlock &
+        fi
+        ;;
+    *)
+        echo "Uso: rice-session-action [logout|reboot|poweroff|lock]"
+        exit 1
+        ;;
+esac

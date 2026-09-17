@@ -40,7 +40,7 @@ Todos os elementos de interface gráfica do desktop são gerenciados pelo Quicks
 | **Aparência & Customizer** | `Appearance.qml`, `rice-hypr-prefs` | Aba de personalização ao vivo do Hyprland no Hub central (inspirada no Noctalia/Caelestia). Permite ajustar em tempo real: arredondamento das janelas (0 a 24px), espessura das bordas (0 a 4px), gaps internos e externos, opacidade de janelas inativas, escurecimento (dim) e curvas de animação (**Rápido/Snap**, **Suave/Padrão**, **Elástico/Caelestia**). Persiste em `~/.config/hypr/user-prefs.json`. |
 | **Launcher de Apps** | `Launcher.qml` | Abre com `Super + R` ou tecla `Super` isolada. Lista vertical alfabética (A → Z) de cima para baixo com scrollbar sutil de 4px, sensibilidade de rolagem rápida, pesquisa instantânea, menu de contexto com botão direito (fixar na dock, adicionar aos jogos). |
 | **Dock Inferior** | `Dock.qml`, `DockConfig.qml` | Retrátil com auto-hide (revela ao encostar o mouse na borda inferior). Exibe os apps fixados e abertos com badges do workspace atual (`1·3` ou `✦`), reordenação por arrasto e popup de Jogos sincronizados em `~/.config/quickshell/dock.json`. |
-| **Barra de Energia** | `EnergySidebar.qml` | Barra retrátil na borda lateral direita (gatilho no hover). Contém avatar animado, contagem de atualizações de pacotes, atalhos de luz noturna e status da dGPU NVIDIA, system trays integrados e controles de energia com confirmação em duas etapas. |
+| **Barra de Energia** | `EnergySidebar.qml`, `rice-session-action` | Barra retrátil na borda lateral direita (gatilho no hover). Contém avatar animado, contagem de atualizações de pacotes, atalhos de luz noturna e status da dGPU NVIDIA, system trays integrados e controles de energia (bloqueio, logout, reboot e desligar) com confirmação via duplo clique ou botão interativo de confirmação no popup card, acionando o utilitário `rice-session-action`. |
 | **Alternador Alt+Tab** | `AltTab.qml` | Switcher central com miniaturas ao vivo (`ScreencopyView`) ordenadas pelo histórico de foco do Hyprland. Permite navegar com Tab/setas e fechar janelas com `Q`. |
 | **Moldura de Tela** | `Frame.qml` | Borda estética de 10px nas laterais e base com cantos internos arredondados (raio 20). |
 
@@ -49,10 +49,10 @@ Todos os elementos de interface gráfica do desktop são gerenciados pelo Quicks
 ## 3. Gestão de Gráficos e Otimizações de Latência/Frametime
 
 - **Compositor e Desktop:** Forçados a rodar na iGPU Intel via Mesa (`__NV_PRIME_RENDER_OFFLOAD=0`, `__GLX_VENDOR_LIBRARY_NAME=mesa`).
-- **Direct Scanout Ativo (`render:direct_scanout = 1`):** Em jogos fullscreen na dGPU NVIDIA, o Hyprland entrega o buffer diretamente ao KMS/display controller da Intel, **bypasando a composição 3D da iGPU** e eliminando latência.
+- **Direct Scanout Desativado (`render:direct_scanout = 0`):** Desativado para evitar oscilações de sincronização e flickering visual com as camadas do Quickshell/layer-shell.
 - **Zero Blur no Layer de Widgets (`namespace = "quickshell-desktop-widgets"`):** Regra `blur = false` no `hyprland.lua`, impedindo que o Hyprland execute passadas de blur de 1920x1080 em tela cheia na Intel UHD sob os widgets do desktop. Economiza 15-25% de taxa de preenchimento a 144Hz.
 - **Otimizações de Render & XWayland:** `misc:disable_splash_rendering = true` (elimina alocação de splash) e `xwayland:force_zero_scaling = true` (elimina passadas bilineares de reescalonamento em apps legados).
-- **VRR Habilitado (`misc:vrr = 1`):** Sincronização de taxa de atualização variável ativa no monitor 144Hz.
+- **VRR Desativado no Desktop (`misc:vrr = 0`):** Desativa o refresh rate adaptativo no desktop. Elimina 100% o bug de flickering/piscamento de tela e aplicativos do notebook (painel AU Optronics 144Hz) que ocorria quando o cursor do mouse ficava parado/ocioso.
 - **Tearing Imediato Opcional (`general:allow_tearing = true`):** Destrava o triple-buffering forçado do Wayland para jogos com foco em latência de entrada.
 - **Sombras Desativadas (`decoration:shadow:enabled = false`):** Alivia a taxa de preenchimento (fillrate) da iGPU Intel a 144Hz.
 - **Jogos e Apps 3D:** Executados via wrapper `prime-run` oficial da NVIDIA (`/usr/bin/prime-run`), direcionando a renderização para a RTX 3050 Laptop GPU.
