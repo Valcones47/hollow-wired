@@ -31,6 +31,18 @@ PanelWindow {
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: open ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
+    // Libera a TopBar (topo), Sidebar (direita) e Dock (base) para receberem mouse normalmente
+    mask: launcher.open ? activeMask : emptyMask
+
+    Region { id: emptyMask }
+    Region {
+        id: activeMask
+        x: 0
+        y: Theme.waybarHeight
+        width: launcher.width - Theme.frameThickness
+        height: launcher.height - Theme.waybarHeight - Theme.frameThickness
+    }
+
     readonly property int panelW: 660
     readonly property int rowH: 54
     readonly property int maxRows: 8
@@ -124,6 +136,9 @@ PanelWindow {
     // ================= fundo (clique fora fecha) =================
     MouseArea {
         anchors.fill: parent
+        anchors.topMargin: Theme.waybarHeight
+        anchors.rightMargin: Theme.frameThickness
+        anchors.bottomMargin: Theme.frameThickness
         onClicked: launcher.open = false
     }
 

@@ -3,9 +3,13 @@ import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
+import Quickshell.Hyprland
 import "."
 
 ShellRoot {
+    id: shellRoot
+    readonly property bool hasFullscreen: (Hyprland.focusedWorkspace && Hyprland.focusedWorkspace.hasFullscreen) || false
+    readonly property bool launcherOpen: launcher.open
     // Pollers de CPU/GPU/RAM/disco só rodam com o hub aberto ou quando o workspace ativo possui widget de stats.
     Binding {
         target: SysStats
@@ -40,6 +44,7 @@ ShellRoot {
     Frame {}
 
     TopBar {
+        launcherOpen: shellRoot.launcherOpen
         recording: sidebar.recording
         onClockClicked: hub.open = !hub.open
         onNotifClicked: {
@@ -52,6 +57,7 @@ ShellRoot {
 
     EnergySidebar {
         id: sidebar
+        launcherOpen: shellRoot.launcherOpen
         onAvatarClicked: {
             sidebar.open = false;
             sysinfo.open = true;
@@ -71,7 +77,7 @@ ShellRoot {
     }
 
     Dock {
-        suppressed: launcher.open
+        launcherOpen: shellRoot.launcherOpen
     }
 
     AltTab {}

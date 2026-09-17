@@ -32,7 +32,7 @@ PanelWindow {
     focusable: false
 
     WlrLayershell.namespace: "quickshell-dock"
-    WlrLayershell.layer: WlrLayer.Top
+    WlrLayershell.layer: (launcherOpen && hasFullscreen) ? WlrLayer.Overlay : WlrLayer.Top
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
     readonly property int dockH: 64
@@ -41,21 +41,39 @@ PanelWindow {
 
     // ================= visibilidade =================
     property bool hovered: false
-    property bool suppressed: false          // launcher aberto
+    property bool launcherOpen: false
+    readonly property bool hasFullscreen: (Hyprland.focusedWorkspace && Hyprland.focusedWorkspace.hasFullscreen) || false
+    readonly property bool allowHover: !hasFullscreen || launcherOpen
     property bool gamesEdit: false
     property int dragFrom: -1
     property int dragTo: -1
     readonly property bool workspaceEmpty: Hyprland.focusedWorkspace !== null
         && Hyprland.focusedWorkspace.toplevels.values.length === 0
-    // Só aparece com o mouse (antes também aparecia sozinha em workspace
-    // vazio — o usuário preferiu que suma sempre ao tirar o mouse).
-    readonly property bool shown: !suppressed && (hovered || pop !== "" || dragFrom >= 0)
+    // Só aparece com o mouse
+    readonly property bool shown: allowHover && (hovered || pop !== "" || dragFrom >= 0)
     onPopChanged: if (pop !== "games") gamesEdit = false
 
     Timer { id: hideDelay; interval: 450; onTriggered: dock.hovered = false }
     Timer { id: showDelay; interval: 80; onTriggered: dock.hovered = true }
 
-    mask: Region {
+    onHasFullscreenChanged: {
+        if (hasFullscreen && !launcherOpen) {
+            showDelay.stop();
+            dock.hovered = false;
+        }
+    }
+    onLauncherOpenChanged: {
+        if (hasFullscreen && !launcherOpen) {
+            showDelay.stop();
+            dock.hovered = false;
+        }
+    }
+
+    mask: (allowHover || dock.shown) ? fullMask : emptyMask
+
+    Region { id: emptyMask }
+    Region {
+        id: fullMask
         // gatilho: faixa central da moldura de baixo (largura da dock + folga)
         x: (dock.width - Math.max(root.dockTargetW, 300)) / 2 - 60
         y: dock.edgeY
@@ -139,7 +157,9 @@ PanelWindow {
         anchors.fill: parent
 
         HoverHandler {
+            enabled: dock.allowHover
             onHoveredChanged: {
+                if (!enabled) return;
                 if (hovered) {
                     hideDelay.stop();
                     showDelay.restart();
@@ -766,8 +786,8 @@ PanelWindow {
         function hide(): void { dock.pop = ""; dock.hovered = false; }
         function state(): string {
             return "shown=" + dock.shown + " hovered=" + dock.hovered + " workspaceEmpty=" + dock.workspaceEmpty
-                + " pop=" + dock.pop + " dragFrom=" + dock.dragFrom + " suppressed=" + dock.suppressed
-                + " ws=" + (Hyprland.focusedWorkspace ? Hyprland.focusedWorkspace.id + " toplevels=" + Hyprland.focusedWorkspace.toplevels.values.length : "null");
+                + " pop=" + dock.pop + " dragFrom=" + dock.dragFrom + " launcherOpen=" + dock.launcherOpen
+                + " ws=" + (Hyprland.focusedWorkspace ? Hyprland.focusedWorkspace.id + " hasFullscreen=" + Hyprland.focusedWorkspace.hasFullscreen + " toplevels=" + Hyprland.focusedWorkspace.toplevels.values.length : "null");
         }
         function debug(): string {
             return "appsLoaded=" + dock._appsLoaded + " pinsCount=" + DockConfig.pins.length + " gamesCount=" + DockConfig.games.length

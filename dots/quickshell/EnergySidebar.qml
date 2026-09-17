@@ -5,6 +5,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Widgets
 import Quickshell.Services.SystemTray
+import Quickshell.Hyprland
 import "."
 
 // Barra lateral direita: avatar, updates, trays e energia.
@@ -40,6 +41,23 @@ PanelWindow {
 
     // ================= estado =================
     property bool open: false
+    property bool launcherOpen: false
+    readonly property bool hasFullscreen: (Hyprland.focusedWorkspace && Hyprland.focusedWorkspace.hasFullscreen) || false
+    readonly property bool allowHover: !hasFullscreen || launcherOpen
+
+    onHasFullscreenChanged: {
+        if (hasFullscreen && !launcherOpen && open) {
+            openDelay.stop();
+            sidebar.open = false;
+        }
+    }
+    onLauncherOpenChanged: {
+        if (hasFullscreen && !launcherOpen && open) {
+            openDelay.stop();
+            sidebar.open = false;
+        }
+    }
+
     property string pop: ""          // "" | avatar | update | logout | reboot | power | tray
     property var popTray: null       // SystemTrayItem do popup de tray
     property real popAnchorY: 0      // centro do ícone que abriu o popup
@@ -48,7 +66,12 @@ PanelWindow {
 
     // Região que recebe mouse: sempre a faixa da moldura; aberta, também
     // barra e popup. O resto da janela (transparente) deixa o clique passar.
-    mask: Region {
+    // Em tela cheia sem launcher, a máscara fica vazia para não roubar cliques de jogos/vídeos.
+    mask: (allowHover || sidebar.open) ? fullMask : emptyMask
+
+    Region { id: emptyMask }
+    Region {
+        id: fullMask
         x: sidebar.edgeX
         y: 0
         width: Theme.frameThickness
@@ -324,7 +347,9 @@ PanelWindow {
         anchors.fill: parent
 
         HoverHandler {
+            enabled: sidebar.allowHover
             onHoveredChanged: {
+                if (!enabled) return;
                 if (hovered) {
                     closeDelay.stop();
                     if (!sidebar.open)
