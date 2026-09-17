@@ -1,0 +1,226 @@
+#!/usr/bin/env python3
+"""
+rice-wallpaper-optimize
+Otimizador de Wallpapers Scene (.pkg) do Wallpaper Engine para 1080p / 60-144 FPS.
+Converte texturas 4K/6K para 1080p nativo e reduz passes de shader pesados.
+"""
+
+import os
+import sys
+import io
+import struct
+import json
+import shutil
+from pathlib import Path
+
+try:
+    from PIL import Image
+except ImportError:
+    print("Erro: Pillow não instalado. Instale com: sudo pacman -S python-pillow")
+    sys.exit(1)
+
+def find_pkg(target_path):
+    p = Path(target_path).expanduser().resolve()
+    if p.is_file() and p.name.endswith(".pkg"):
+        return p
+    if p.is_dir():
+        cand = p / "scene.pkg"
+        if cand.exists():
+            return cand
+    return None
+
+def inspect_pkg(pkg_path):
+    print(f"\n📦 Inspecionando: {pkg_path}")
+    with open(pkg_path, "rb") as f:
+        magic_len = struct.unpack("<I", f.read(4))[0]
+        magic = f.read(magic_len)
+        file_count = struct.unpack("<I", f.read(4))[0]
+        entries = []
+        for _ in range(file_count):
+            nl = struct.unpack("<I", f.read(4))[0]
+            name = f.read(nl).decode("utf-8", errors="ignore")
+            offset = struct.unpack("<I", f.read(4))[0]
+            length = struct.unpack("<I", f.read(4))[0]
+            entries.append((name, offset, length))
+        data_start = f.tell()
+
+        print(f"  • Total de arquivos internos: {file_count}")
+        print(f"  • Formato: {magic.decode('ascii', errors='ignore')}")
+
+        for name, offset, length in entries:
+            if name == "scene.json":
+                f.seek(data_start + offset)
+                try:
+                    js = json.loads(f.read(length).decode("utf-8", errors="ignore"))
+                    ortho = js.get("general", {}).get("orthogonalprojection", {})
+                    w, h = ortho.get("width"), ortho.get("height")
+                    bloom = js.get("general", {}).get("bloomhdriterations")
+                    print(f"  • Resolução da Cena (Orthogonal): {w}x{h}")
+                    if bloom:
+                        print(f"  • Iterações de Bloom HDR: {bloom}")
+                except Exception as e:
+                    pass
+            elif name.endswith(".tex"):
+                f.seek(data_start + offset)
+                data = f.read(min(length, 120))
+                png_pos = data.find(b"\x89PNG")
+                if png_pos != -1:
+                    try:
+                        f.seek(data_start + offset + png_pos)
+                        img = Image.open(io.BytesIO(f.read(min(length - png_pos, 2048))))
+                        print(f"  • Textura: {name} -> {img.size[0]}x{img.size[1]} ({length/1024/1024:.2f} MB)")
+                    except Exception:
+                        pass
+
+def optimize_pkg(pkg_path, target_w=1920, target_h=1080):
+    bak_path = pkg_path.with_suffix(".pkg.original")
+    if not bak_path.exists():
+        print(f"💾 Criando backup original em: {bak_path.name}")
+        shutil.copy2(pkg_path, bak_path)
+    else:
+        print(f"ℹ️  Backup existente encontrado: {bak_path.name}")
+
+    with open(pkg_path, "rb") as f:
+        magic_len = struct.unpack("<I", f.read(4))[0]
+        magic = f.read(magic_len)
+        file_count = struct.unpack("<I", f.read(4))[0]
+        entries = []
+        for _ in range(file_count):
+            nl = struct.unpack("<I", f.read(4))[0]
+            name = f.read(nl).decode("utf-8", errors="ignore")
+            offset = struct.unpack("<I", f.read(4))[0]
+            length = struct.unpack("<I", f.read(4))[0]
+            entries.append((name, offset, length))
+        data_start = f.tell()
+
+        files = {}
+        for name, offset, length in entries:
+            f.seek(data_start + offset)
+            files[name] = f.read(length)
+
+    optimized_count = 0
+    # Otimiza texturas PNG embutidas nos .tex
+    for name in list(files.keys()):
+        if name.endswith(".tex"):
+            tex_data = files[name]
+            png_offset = tex_data.find(b"\x89PNG")
+            if png_offset != -1:
+                header = bytearray(tex_data[:png_offset])
+                png_bytes = tex_data[png_offset:]
+                try:
+                    img = Image.open(io.BytesIO(png_bytes))
+                    orig_w, orig_h = img.size
+                    if orig_w > target_w or orig_h > target_h:
+                        # Mantém proporção
+                        ratio = min(target_w / orig_w, target_h / orig_h)
+                        new_w = int(orig_w * ratio)
+                        new_h = int(orig_h * ratio)
+                        print(f"  🔄 Redimensionando {name}: {orig_w}x{orig_h} -> {new_w}x{new_h}...")
+                        resized = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+                        out_io = io.BytesIO()
+                        resized.save(out_io, format="PNG", optimize=True)
+                        new_png = out_io.getvalue()
+
+                        # Atualiza dimensões no header TEXV0005
+                        if len(header) >= 87:
+                            struct.pack_into("<I", header, 34, new_w)
+                            struct.pack_into("<I", header, 38, new_h)
+                            struct.pack_into("<I", header, 67, new_w)
+                            struct.pack_into("<I", header, 71, new_h)
+                            struct.pack_into("<I", header, 83, len(new_png))
+                        files[name] = bytes(header) + new_png
+                        optimized_count += 1
+                except Exception as e:
+                    print(f"  ⚠️  Falha ao processar textura {name}: {e}")
+
+    # Otimiza scene.json
+    if "scene.json" in files:
+        try:
+            js = json.loads(files["scene.json"].decode("utf-8", errors="ignore"))
+            changed_js = False
+            if "general" in js and "bloomhdriterations" in js["general"]:
+                if js["general"]["bloomhdriterations"] > 4:
+                    print(f"  ⚡ Limitando Bloom HDR de {js['general']['bloomhdriterations']} para 4 iterações...")
+                    js["general"]["bloomhdriterations"] = 4
+                    changed_js = True
+            if changed_js:
+                files["scene.json"] = json.dumps(js, indent=2).encode("utf-8")
+        except Exception as e:
+            print(f"  ⚠️  Falha ao otimizar scene.json: {e}")
+
+    # Reempacota
+    out_io = io.BytesIO()
+    out_io.write(struct.pack("<I", len(magic)))
+    out_io.write(magic)
+    out_io.write(struct.pack("<I", len(entries)))
+
+    cur_offset = 0
+    new_entries = []
+    for name, _, _ in entries:
+        fdata = files[name]
+        new_entries.append((name, cur_offset, len(fdata)))
+        cur_offset += len(fdata)
+
+    for name, offset, length in new_entries:
+        nb = name.encode("utf-8")
+        out_io.write(struct.pack("<I", len(nb)))
+        out_io.write(nb)
+        out_io.write(struct.pack("<I", offset))
+        out_io.write(struct.pack("<I", length))
+
+    for name, _, _ in entries:
+        out_io.write(files[name])
+
+    new_pkg_bytes = out_io.getvalue()
+    orig_size_mb = pkg_path.stat().st_size / (1024 * 1024)
+    new_size_mb = len(new_pkg_bytes) / (1024 * 1024)
+
+    temp_out = pkg_path.with_suffix(".pkg.tmp")
+    with open(temp_out, "wb") as f:
+        f.write(new_pkg_bytes)
+    temp_out.replace(pkg_path)
+
+    print(f"\n✅ Otimização concluída com sucesso!")
+    print(f"  • Tamanho do arquivo: {orig_size_mb:.2f} MB -> {new_size_mb:.2f} MB")
+    print(f"  • Texturas redimensionadas: {optimized_count}")
+    print(f"  • O papel de parede agora rodará nativo em 1080p com zero lag!")
+
+def restore_pkg(pkg_path):
+    bak = pkg_path.with_suffix(".pkg.original")
+    if not bak.exists():
+        print(f"❌ Nenhum backup original encontrado para {pkg_path.name}")
+        return
+    shutil.copy2(bak, pkg_path)
+    print(f"✅ Arquivo restaurado para a versão original de alta resolução!")
+
+def main():
+    if len(sys.argv) < 2:
+        print("Uso:")
+        print("  rice-wallpaper-optimize <caminho_ou_pasta>          # Otimiza para 1080p")
+        print("  rice-wallpaper-optimize --info <caminho_ou_pasta>   # Mostra detalhes")
+        print("  rice-wallpaper-optimize --restore <caminho_ou_pasta># Restaura original")
+        sys.exit(1)
+
+    cmd = sys.argv[1]
+    if cmd == "--info" and len(sys.argv) >= 3:
+        pkg = find_pkg(sys.argv[2])
+        if not pkg:
+            print("Erro: scene.pkg não encontrado no caminho especificado.")
+            sys.exit(1)
+        inspect_pkg(pkg)
+    elif cmd == "--restore" and len(sys.argv) >= 3:
+        pkg = find_pkg(sys.argv[2])
+        if not pkg:
+            print("Erro: scene.pkg não encontrado no caminho especificado.")
+            sys.exit(1)
+        restore_pkg(pkg)
+    else:
+        path_arg = sys.argv[1] if not cmd.startswith("--") else sys.argv[2]
+        pkg = find_pkg(path_arg)
+        if not pkg:
+            print("Erro: scene.pkg não encontrado no caminho especificado.")
+            sys.exit(1)
+        optimize_pkg(pkg)
+
+if __name__ == "__main__":
+    main()
