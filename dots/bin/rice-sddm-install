@@ -1,0 +1,27 @@
+#!/bin/bash
+set -e
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+DOTS_DIR="$REPO_ROOT/dots"
+
+THEME_DIR="/usr/share/sddm/themes/SilentSDDM"
+if [ ! -d "$THEME_DIR" ]; then
+  echo "AVISO: $THEME_DIR não encontrado. Se necessário, clone ou instale o SilentSDDM primeiro."
+  exit 1
+fi
+
+echo "==> Instalando componentes customizados no SilentSDDM..."
+cp -r "$DOTS_DIR/sddm/components/"* "$THEME_DIR/components/"
+cp -r "$DOTS_DIR/sddm/configs/"* "$THEME_DIR/configs/"
+cp -r "$DOTS_DIR/sddm/icons/"* "$THEME_DIR/icons/"
+
+echo "==> Instalando scripts e templates..."
+cp "$DOTS_DIR/bin/rice-sddm-sync-wallpaper" ~/.local/bin/rice-sddm-sync-wallpaper
+chmod +x ~/.local/bin/rice-sddm-sync-wallpaper
+mkdir -p ~/.config/wallust/templates
+cp "$DOTS_DIR/wallust/templates/sddm-theme.conf" ~/.config/wallust/templates/
+
+echo "==> Sincronizando wallpaper do SDDM..."
+~/.local/bin/rice-sddm-sync-wallpaper || true
+
+echo "==> SDDM configurado com sucesso!"

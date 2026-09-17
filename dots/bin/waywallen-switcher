@@ -529,6 +529,13 @@ class SwitcherWindow(Gtk.ApplicationWindow):
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                 )
+                sddm_sync = os.path.expanduser("~/.local/bin/rice-sddm-sync-wallpaper")
+                if os.path.isfile(sddm_sync):
+                    subprocess.Popen(
+                        [sddm_sync],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
         self.close_animated()
 
     def close_animated(self):

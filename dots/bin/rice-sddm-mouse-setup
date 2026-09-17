@@ -1,0 +1,6 @@
+#!/bin/bash
+set -e
+echo "==> Instalando calibração de mouse do SDDM (flat profile, sensibilidade 0)..."
+sudo mkdir -p /etc/X11/xorg.conf.d
+sudo cp /home/val47/projetos/hyprland-setup/dots/etc/X11/xorg.conf.d/50-mouse.conf /etc/X11/xorg.conf.d/50-mouse.conf
+echo "==> Sucesso! Sensibilidade do mouse no SDDM agora é idêntica ao Hyprland."

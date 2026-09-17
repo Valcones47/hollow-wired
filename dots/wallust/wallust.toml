@@ -26,6 +26,7 @@ mako       = { template = 'mako-colors',          target = '~/.config/mako/color
 # não precisa de hook de reload aqui, o próprio QML recarrega sozinho quando
 # o arquivo muda.
 quickshell = { template = 'quickshell-colors.json', target = '~/.cache/wallust/colors-quickshell.json' }
+sddm       = { template = 'sddm-theme.conf', target = '/usr/share/sddm/themes/SilentSDDM/configs/default-left.conf' }
 
 [hooks]
 # Recarrega cada programa pra pegar a paleta nova sem precisar reiniciar.

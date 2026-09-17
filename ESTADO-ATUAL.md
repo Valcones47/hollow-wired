@@ -60,6 +60,16 @@ Todos os elementos de interface gráfica do desktop são gerenciados pelo Quicks
 - **Portabilidade Universal e Desacoplamento:** O Quickshell e o Hyprland foram 100% desacoplados de caminhos de usuário (`$HOME` / `Quickshell.env("HOME")`), a leitura de GPU (`SysStats.gpuName`) detecta dinamicamente modelos NVIDIA, AMD ou Intel, a leitura térmica suporta tanto Intel quanto AMD Ryzen (`Tctl`), e o card de bateria se adapta dinamicamente para computadores desktop.
 - **Novo Utilitário de Perfil (`rice-set-avatar`):** Permite trocar foto ou GIF de perfil com 1 clique diretamente pelo Dashboard ou atalho gráfico (`zenity`/`kdialog`).
 - **Seletor de Arquivos Integrado (KDE / Dolphin FileChooser Portal):** Configurado via `~/.config/xdg-desktop-portal/portals.conf` e `hyprland-portals.conf` definindo `org.freedesktop.impl.portal.FileChooser=kde`. Quando qualquer navegador (Zen, Chrome), aplicativo (Discord) ou jogo solicita abrir/salvar arquivos, invoca nativamente a interface do Dolphin/KDE com tema escuro consistente (Breeze Dark), atalhos laterais de pastas e miniaturas, substituindo o seletor genérico em branco do GTK.
+- **Tela de Login SDDM (SilentSDDM + Wallust + Waywallen):**
+  - **Wallpaper Dinâmico Pausado:** Script `rice-sddm-sync-wallpaper` captura automaticamente um frame limpo em 1080p (`grim`) na troca de wallpaper no `waywallen-switcher` (ocultando TopBar e mudando para workspace vazia temporariamente) e grava em `/usr/share/sddm/themes/SilentSDDM/backgrounds/current.png`.
+  - **Paleta Wallust em Tempo Real:** Template `~/.config/wallust/templates/sddm-theme.conf` integrado ao `wallust.toml` aplica as cores dinâmicas no tema do SDDM a cada troca de papel de parede.
+  - **Seletor de Sessão / WM Modernizado:** Redesenhado com botão largo (220px), indicador `▾`, ícones dedicados (Hyprland, Plasma KDE, Sway, Gamescope), marcação visual de sessão ativa com checkmark e atalho de teclado `F2`.
+  - **Avatar do Usuário:** Carregamento automático da foto de perfil (`~/.face` da Rem) em máscara circular com borda de destaque na cor acentuada do tema.
+  - **Data e Hora em Português:** Data formatada em português brasileiro com inicial maiúscula (ex: *"Quarta-feira, 16 de setembro"*).
+  - **Calibração de Mouse 1:1:** Drop-in `/etc/X11/xorg.conf.d/50-mouse.conf` com `Option "AccelProfile" "flat"` e `Option "AccelSpeed" "0"`, eliminando a aceleração estranha e deixando o ponteiro do SDDM idêntico ao do Hyprland.
+- **Bootloader Limine Personalizado:**
+  - Script utilitário `rice-limine-theme` (`~/.local/bin/rice-limine-theme`) para aplicar no `/boot/limine.conf`: resolução nativa 1920x1080, cópia do wallpaper estático ativo para `/boot/limine-wallpaper.png`, transparência escura no terminal (`term_background = 90170D0C`), paleta Wallust completa, branding estilizado (`CachyOS // Hyprland`) e timeout de 5 segundos.
+
 
 ---
 

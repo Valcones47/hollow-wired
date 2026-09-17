@@ -1016,5 +1016,6 @@ PanelWindow {
             if (m) bar.showPopNow(kind, m);
         }
         function hide(): void { bar.pop = ""; }
+        function setBarVisible(v: bool): void { bar.visible = v; }
     }
 }

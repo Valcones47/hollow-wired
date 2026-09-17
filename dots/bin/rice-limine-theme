@@ -1,0 +1,84 @@
+#!/bin/bash
+set -e
+
+if [ "$EUID" -ne 0 ]; then
+  echo "==> Este script precisa ser executado com sudo:"
+  echo "    sudo rice-limine-theme"
+  exit 1
+fi
+
+LIMINE_CONF=""
+for p in /boot/limine.conf /boot/limine/limine.conf; do
+  if [ -f "$p" ]; then
+    LIMINE_CONF="$p"
+    break
+  fi
+done
+
+if [ -z "$LIMINE_CONF" ]; then
+  echo "ERRO: Arquivo limine.conf não encontrado em /boot/limine.conf nem /boot/limine/limine.conf."
+  exit 1
+fi
+
+WALLPAPER_SRC="/usr/share/sddm/themes/SilentSDDM/backgrounds/current.png"
+if [ ! -f "$WALLPAPER_SRC" ]; then
+  WALLPAPER_SRC="/home/val47/.config/quickshell/wallpaper.png"
+fi
+
+if [ -f "$WALLPAPER_SRC" ]; then
+  echo "==> Copiando wallpaper estático para /boot/limine-wallpaper.png..."
+  cp "$WALLPAPER_SRC" /boot/limine-wallpaper.png
+  chmod 644 /boot/limine-wallpaper.png
+else
+  echo "AVISO: Wallpaper não encontrado em $WALLPAPER_SRC. Continuando sem sobrescrever imagem..."
+fi
+
+echo "==> Fazendo backup de $LIMINE_CONF para ${LIMINE_CONF}.bak..."
+cp "$LIMINE_CONF" "${LIMINE_CONF}.bak"
+
+echo "==> Aplicando tema e cores Wallust no $LIMINE_CONF..."
+python3 - <<PY
+import re
+
+conf_path = "$LIMINE_CONF"
+with open(conf_path, "r", encoding="utf-8") as f:
+    content = f.read()
+
+theme_block = """### RICE THEME START ###
+timeout: 5
+interface_resolution: 1920x1080
+wallpaper: boot():/limine-wallpaper.png
+wallpaper_style: stretched
+interface_branding: CachyOS // Hyprland
+interface_branding_colour: A62727
+interface_help_colour: AA8F8E
+interface_help_colour_bright: A62727
+term_background: 90170D0C
+term_foreground: C2A6A5
+term_foreground_bright: A62727
+term_palette: 170D0C;A62727;4CAF50;FFA000;2196F3;E91E63;00BCD4;C2A6A5
+term_palette_bright: 775F5E;FF5252;69F0AE;FFD740;448AFF;FF4081;18FFFF;FFFFFF
+term_margin: 80
+term_margin_gradient: 6
+remember_last_entry: yes
+### RICE THEME END ###"""
+
+pattern = r"### RICE THEME START ###.*?### RICE THEME END ###\n?"
+if re.search(pattern, content, flags=re.DOTALL):
+    new_content = re.sub(pattern, theme_block + "\n", content, flags=re.DOTALL)
+else:
+    # Insere no topo ou antes da primeira entrada que começa com '/'
+    first_entry = re.search(r"^/[^\n]+", content, flags=re.MULTILINE)
+    if first_entry:
+        idx = first_entry.start()
+        new_content = content[:idx] + theme_block + "\n\n" + content[idx:]
+    else:
+        new_content = theme_block + "\n\n" + content
+
+with open(conf_path, "w", encoding="utf-8") as f:
+    f.write(new_content)
+
+print("==> Configuração aplicada com sucesso!")
+PY
+
+echo "==> Limine customizado com sucesso!"
