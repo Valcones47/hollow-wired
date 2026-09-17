@@ -383,8 +383,8 @@ hl.bind("XF86AudioMute",        hl.dsp.exec_cmd("quickshell ipc call osd volumeM
 -- Toggle de mute do microfone via tecla multimídia (mostra OSD do microfone no PipeWire)
 hl.bind("XF86AudioMicMute", hl.dsp.exec_cmd("quickshell ipc call osd micMute"), { locked = true, repeating = true })
 
--- Num_Lock: Muta e desmuta o Discord nativamente em segundo plano (emite o som do Discord)
-hl.bind("Num_Lock", hl.dsp.send_shortcut({ mods = "CTRL SHIFT", key = "M", window = "class:^(discord)$" }), { locked = true })
+-- Num_Lock: Desativa/ativa o áudio (Deafen) do Discord nativamente em segundo plano
+hl.bind("Num_Lock", hl.dsp.send_shortcut({ mods = "CTRL SHIFT", key = "D", window = "class:^(discord|vesktop)$" }), { locked = true })
 
 -- OSD de brilho via Quickshell
 hl.bind("XF86MonBrightnessUp",   hl.dsp.exec_cmd("quickshell ipc call osd brightnessUp"),   { locked = true, repeating = true })
