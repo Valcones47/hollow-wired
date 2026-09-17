@@ -1,0 +1,162 @@
+#!/usr/bin/env python3
+"""
+rice-bluetooth: Gerenciamento CLI e JSON de dispositivos Bluetooth para o Rice Hyprland / Quickshell
+Uso:
+  rice-bluetooth status
+  rice-bluetooth toggle-power
+  rice-bluetooth scan
+  rice-bluetooth connect <MAC>
+  rice-bluetooth disconnect <MAC>
+  rice-bluetooth pair <MAC>
+  rice-bluetooth remove <MAC>
+"""
+
+import sys
+import subprocess
+import json
+import re
+
+def notify(msg, title="Bluetooth", icon="bluetooth"):
+    try:
+        subprocess.run(["notify-send", "-a", "Bluetooth", "-i", icon, "-t", "2500", title, msg], check=False)
+    except Exception:
+        pass
+
+def get_status():
+    powered = False
+    discovering = False
+    try:
+        show_out = subprocess.check_output(["bluetoothctl", "show"], text=True, stderr=subprocess.DEVNULL)
+        powered = "Powered: yes" in show_out
+        discovering = "Discovering: yes" in show_out
+    except Exception:
+        pass
+
+    devices = []
+    if powered:
+        try:
+            devs_out = subprocess.check_output(["bluetoothctl", "devices"], text=True, stderr=subprocess.DEVNULL)
+            seen_macs = set()
+            for line in devs_out.strip().split("\n"):
+                if not line.strip():
+                    continue
+                parts = line.strip().split(" ", 2)
+                if len(parts) >= 3 and parts[0] == "Device":
+                    mac = parts[1]
+                    name = parts[2]
+                    if mac in seen_macs:
+                        continue
+                    seen_macs.add(mac)
+
+                    info_out = ""
+                    try:
+                        info_out = subprocess.check_output(["bluetoothctl", "info", mac], text=True, stderr=subprocess.DEVNULL)
+                    except Exception:
+                        pass
+
+                    connected = "Connected: yes" in info_out
+                    paired = "Paired: yes" in info_out
+                    trusted = "Trusted: yes" in info_out
+
+                    icon_match = re.search(r"Icon:\s+([^\n]+)", info_out)
+                    raw_icon = icon_match.group(1).strip() if icon_match else ""
+
+                    # Map icon to friendly category
+                    low_name = name.lower()
+                    if "controller" in low_name or "xbox" in low_name or "dualsense" in low_name or raw_icon == "input-gaming":
+                        icon = "gamepad"
+                    elif "headset" in low_name or "fone" in low_name or "buds" in low_name or "pod" in low_name or "audio" in raw_icon:
+                        icon = "headset"
+                    elif "mouse" in low_name or raw_icon == "input-mouse":
+                        icon = "mouse"
+                    elif "keyboard" in low_name or raw_icon == "input-keyboard":
+                        icon = "keyboard"
+                    elif "phone" in low_name or raw_icon == "phone":
+                        icon = "phone"
+                    else:
+                        icon = "bluetooth"
+
+                    battery = None
+                    bat_match = re.search(r"Battery Percentage:\s+0x[0-9a-fA-F]+\s+\((\d+)\)", info_out)
+                    if bat_match:
+                        battery = int(bat_match.group(1))
+                    else:
+                        bat_match2 = re.search(r"Battery Percentage:\s+(\d+)", info_out)
+                        if bat_match2:
+                            battery = int(bat_match2.group(1))
+
+                    devices.append({
+                        "mac": mac,
+                        "name": name,
+                        "connected": connected,
+                        "paired": paired,
+                        "trusted": trusted,
+                        "icon": icon,
+                        "battery": battery
+                    })
+        except Exception:
+            pass
+
+    # Sort connected first, then paired, then name
+    devices.sort(key=lambda d: (not d["connected"], not d["paired"], d["name"].lower()))
+    return {"powered": powered, "discovering": discovering, "devices": devices}
+
+def main():
+    cmd = sys.argv[1] if len(sys.argv) > 1 else "status"
+
+    if cmd == "status":
+        print(json.dumps(get_status(), indent=2))
+        return
+
+    if cmd == "toggle-power":
+        curr = get_status()
+        new_state = "off" if curr["powered"] else "on"
+        subprocess.run(["bluetoothctl", "power", new_state], check=False)
+        notify(f"Bluetooth {'Ligado' if new_state == 'on' else 'Desligado'}", "Bluetooth")
+        print(json.dumps({"powered": new_state == "on"}))
+        return
+
+    if cmd == "scan":
+        notify("Buscando dispositivos próximos...", "Bluetooth")
+        subprocess.Popen(["bash", "-c", "bluetoothctl --timeout 10 scan on >/dev/null 2>&1"])
+        print(json.dumps({"status": "scanning"}))
+        return
+
+    if cmd == "connect" and len(sys.argv) > 2:
+        mac = sys.argv[2]
+        notify(f"Conectando a {mac}...", "Bluetooth")
+        res = subprocess.run(["bluetoothctl", "connect", mac], capture_output=True, text=True)
+        if "successful" in res.stdout.lower() or res.returncode == 0:
+            notify(f"Conectado com sucesso a {mac}", "Bluetooth")
+            print(json.dumps({"success": True}))
+        else:
+            notify(f"Falha ao conectar: {res.stdout.strip()[:60]}", "Erro Bluetooth")
+            print(json.dumps({"success": False, "error": res.stdout.strip()}))
+        return
+
+    if cmd == "disconnect" and len(sys.argv) > 2:
+        mac = sys.argv[2]
+        subprocess.run(["bluetoothctl", "disconnect", mac], check=False)
+        notify(f"Desconectado de {mac}", "Bluetooth")
+        print(json.dumps({"success": True}))
+        return
+
+    if cmd == "pair" and len(sys.argv) > 2:
+        mac = sys.argv[2]
+        notify(f"Pareando com {mac}...", "Bluetooth")
+        subprocess.run(["bluetoothctl", "trust", mac], check=False)
+        res = subprocess.run(["bluetoothctl", "pair", mac], capture_output=True, text=True)
+        print(json.dumps({"output": res.stdout}))
+        return
+
+    if cmd == "remove" and len(sys.argv) > 2:
+        mac = sys.argv[2]
+        subprocess.run(["bluetoothctl", "remove", mac], check=False)
+        notify(f"Dispositivo {mac} esquecido", "Bluetooth")
+        print(json.dumps({"success": True}))
+        return
+
+    print("Uso: rice-bluetooth [status|toggle-power|scan|connect <MAC>|disconnect <MAC>|pair <MAC>|remove <MAC>]")
+
+if __name__ == "__main__":
+    main()

@@ -6,15 +6,18 @@ import Quickshell.Wayland
 import Quickshell.Widgets
 import "."
 
-// Painel de Configurações Visuais do Rice:
-// - Fastfetch (Logos em ~/Imagens/FastFetch, dimensões, módulos, preview no terminal)
-// - Kitty Terminal (Opacidade, fonte, padding, blur, cursor, áudio)
-// - Mako Notificações (Posição 3x2, timeout, bordas, raio, teste)
-// - Tela & Monitor (Detecção eDP-1, 144Hz vs 60Hz, VRR FreeSync, slider de brilho)
-// - Teclado & Mouse (ABNT2 vs US Intl, sensibilidade, aceleração Flat vs Adaptativa, NumLock)
-// - Cores & Wallust (Paleta completa de 16 cores com cópia HEX, regenerar cores, switcher)
-// - Efeitos & Janelas (Luz noturna, dim inativo, arredondamento, gaps, animações, SDDM/Limine)
-// - Sistema & Reparo (Reiniciar PipeWire, destravar pacman db.lck, limpar cache, Rice Doctor)
+// Painel de Configurações Visuais do Rice (Rice Control Center):
+// - 0. Fastfetch (Logos em ~/Imagens/FastFetch, dimensões, módulos, preview no terminal)
+// - 1. Kitty Terminal (Opacidade, fonte, padding, blur, cursor, áudio)
+// - 2. Mako Notificações (Posição 3x2, timeout, bordas, raio, teste)
+// - 3. Tela & Monitores (Detecção eDP-1, 144Hz vs 60Hz, VRR FreeSync, slider de brilho)
+// - 4. Áudio & Som (Saída padrão, microfone padrão, volume, teste de som estéreo E/D)
+// - 5. Teclado & Mouse (ABNT2 vs US Intl, sensibilidade, aceleração Flat vs Adaptativa, NumLock)
+// - 6. Energia & Bateria (Perfis Desempenho/Equilíbrio/Economia, saúde da bateria %, ciclos)
+// - 7. Inicialização / Autostart (Gerenciador de apps no boot com toggles e adicionar apps)
+// - 8. Cores & Wallust (Paleta completa de 16 cores com cópia HEX, regenerar cores, switcher)
+// - 9. Efeitos & Janelas (Luz noturna, dim inativo, arredondamento, gaps, animações, SDDM/Limine)
+// - 10. Sistema & Restauração (Snapshots Btrfs com 1 clique, reiniciar áudio, destravar pacman, Doctor)
 PanelWindow {
     id: win
 
@@ -41,7 +44,7 @@ PanelWindow {
     Timer { id: closeTimer; interval: 220; onTriggered: win.visible = false }
 
     // ================= DADOS & ESTADO =================
-    property int currentTab: 0 // 0..7
+    property int currentTab: 0 // 0..10
 
     // Fastfetch
     property var ffConfig: ({})
@@ -73,11 +76,21 @@ PanelWindow {
     property bool vrrEnabled: true
     property int screenBrightness: 40
 
+    // Áudio
+    property var audioData: ({ sinks: [], sources: [], sink_volume: 100, source_volume: 80, sink_muted: false, source_muted: false })
+
     // Teclado & Mouse
     property string kbLayout: "br"
     property real mouseSensitivity: 0.0
     property string mouseAccel: "flat"
     property bool numlock: true
+
+    // Energia & Bateria
+    property var powerData: ({ has_battery: true, percent: 100, status: "AC Conectado", health: 100, cycles: 0, profile: "performance" })
+
+    // Autostart
+    property var autostartEntries: []
+    property var availableApps: []
 
     // Cores & Wallust
     property var wallustColors: ({})
@@ -91,7 +104,42 @@ PanelWindow {
     property int gapsIn: 6
     property string animPreset: "smooth"
 
-    // Toast de notificação interna (ex: "Copiado para o clipboard")
+    // Snapshots Btrfs
+    property var snapshotsData: ({ snapshots: [] })
+
+    // Bluetooth
+    property var btData: ({ powered: true, discovering: false, devices: [] })
+
+    // Rede & Wi-Fi
+    property var netData: ({ wifi_enabled: true, connected_ssid: "", signal: 0, security: "", ip: "", gateway: "", is_5g: false })
+    property var netScanData: []
+    property var pingMs: null
+    property string netPassInput: ""
+    property string netSelectedSsid: ""
+
+    // Aplicativos Padrão
+    property var defaultAppsData: ({ browser: {}, filemanager: {}, editor: {}, video: {}, image: {} })
+
+    // Jogos & GPU
+    property var gamingData: ({ gpu: { name: "", temp: 0, vram_used: 0, vram_total: 4096, util: 0, available: false }, gamemode_active: false })
+
+    // Armazenamento
+    property var storageData: ({ root_total: "", root_used: "", root_avail: "", root_pct: 0, pacman_cache: "", thumbnails: "", trash: "", user_cache: "" })
+
+    // Guia de Atalhos
+    property string bindsFilter: ""
+
+    // Central de Softwares & Atualizações
+    property var softwareUpdatesData: ({ count: 0, packages: [], checked_at: "" })
+    property var softwareCatalogData: []
+    property string softwareCatFilter: "all"
+    property string softwareSearchQuery: ""
+
+    // Perfis de Estilo & Backups
+    property var presetsData: []
+    property var backupsData: []
+
+    // Toast de notificação interna
     property string toastMsg: ""
     Timer {
         id: toastTimer
@@ -247,6 +295,199 @@ PanelWindow {
         }
     }
 
+    Process {
+        id: loadAudioProc
+        command: ["rice-audio", "status"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    win.audioData = JSON.parse(text);
+                } catch (e) {}
+            }
+        }
+    }
+
+    Process {
+        id: loadPowerProc
+        command: ["rice-power", "status"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    win.powerData = JSON.parse(text);
+                } catch (e) {}
+            }
+        }
+    }
+
+    Process {
+        id: loadAutostartProc
+        command: ["rice-autostart", "status"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    win.autostartEntries = JSON.parse(text) || [];
+                } catch (e) {}
+            }
+        }
+    }
+
+    Process {
+        id: loadAvailableAppsProc
+        command: ["rice-autostart", "available"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    win.availableApps = JSON.parse(text) || [];
+                } catch (e) {}
+            }
+        }
+    }
+
+    Process {
+        id: loadSnapshotsProc
+        command: ["rice-snapshots", "list", "6"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    win.snapshotsData = JSON.parse(text) || { snapshots: [] };
+                } catch (e) {}
+            }
+        }
+    }
+
+    Process {
+        id: loadBtProc
+        command: ["rice-bluetooth", "status"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    win.btData = JSON.parse(text);
+                } catch (e) {}
+            }
+        }
+    }
+
+    Process {
+        id: loadNetProc
+        command: ["rice-network", "status"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    win.netData = JSON.parse(text);
+                } catch (e) {}
+            }
+        }
+    }
+
+    Process {
+        id: loadNetScanProc
+        command: ["rice-network", "scan"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    win.netScanData = JSON.parse(text) || [];
+                } catch (e) {}
+            }
+        }
+    }
+
+    Process {
+        id: loadPingProc
+        command: ["rice-network", "ping"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const d = JSON.parse(text);
+                    win.pingMs = d.ping_ms;
+                } catch (e) {}
+            }
+        }
+    }
+
+    Process {
+        id: loadDefaultAppsProc
+        command: ["rice-default-apps", "get"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    win.defaultAppsData = JSON.parse(text);
+                } catch (e) {}
+            }
+        }
+    }
+
+    Process {
+        id: loadGamingProc
+        command: ["rice-gaming", "status"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    win.gamingData = JSON.parse(text);
+                } catch (e) {}
+            }
+        }
+    }
+
+    Process {
+        id: loadStorageProc
+        command: ["rice-storage", "status"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    win.storageData = JSON.parse(text);
+                } catch (e) {}
+            }
+        }
+    }
+
+    Process {
+        id: loadSoftwareUpdatesProc
+        command: ["rice-software", "updates"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    win.softwareUpdatesData = JSON.parse(text);
+                } catch (e) {}
+            }
+        }
+    }
+
+    Process {
+        id: loadSoftwareAppsProc
+        command: ["rice-software", "apps"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    win.softwareCatalogData = JSON.parse(text);
+                } catch (e) {}
+            }
+        }
+    }
+
+    Process {
+        id: loadPresetsProc
+        command: ["rice-presets", "list"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    win.presetsData = JSON.parse(text);
+                } catch (e) {}
+            }
+        }
+    }
+
+    Process {
+        id: loadBackupsProc
+        command: ["rice-presets", "backup-list"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    win.backupsData = JSON.parse(text);
+                } catch (e) {}
+            }
+        }
+    }
+
     function refreshAll() {
         loadFFProc.running = true;
         listImagesProc.running = true;
@@ -257,6 +498,22 @@ PanelWindow {
         loadMonitorsProc.running = true;
         loadBrightnessProc.running = true;
         loadWallustColorsProc.running = true;
+        loadAudioProc.running = true;
+        loadPowerProc.running = true;
+        loadAutostartProc.running = true;
+        loadAvailableAppsProc.running = true;
+        loadSnapshotsProc.running = true;
+        loadBtProc.running = true;
+        loadNetProc.running = true;
+        loadNetScanProc.running = true;
+        loadPingProc.running = true;
+        loadDefaultAppsProc.running = true;
+        loadGamingProc.running = true;
+        loadStorageProc.running = true;
+        loadSoftwareUpdatesProc.running = true;
+        loadSoftwareAppsProc.running = true;
+        loadPresetsProc.running = true;
+        loadBackupsProc.running = true;
     }
 
     // Debounce genérico para sliders
@@ -413,6 +670,31 @@ PanelWindow {
         }
     }
 
+    component SwitchToggle: Rectangle {
+        id: swt
+        property bool checked: false
+        signal toggled(bool nextVal)
+
+        implicitWidth: 38
+        implicitHeight: 20
+        radius: 10
+        color: swt.checked ? Theme.primary : Theme.tileHigh
+
+        Rectangle {
+            width: 14; height: 14; radius: 7
+            anchors.verticalCenter: parent.verticalCenter
+            x: swt.checked ? parent.width - width - 3 : 3
+            color: Theme.textColor
+            Behavior on x { NumberAnimation { duration: 140 } }
+        }
+
+        MouseArea {
+            anchors.fill: parent
+            cursorShape: Qt.PointingHandCursor
+            onClicked: swt.toggled(!swt.checked)
+        }
+    }
+
     component SectionHeader: ColumnLayout {
         property string title: ""
         property string subtitle: ""
@@ -494,8 +776,8 @@ PanelWindow {
     // ================= CARTÃO PRINCIPAL (SIDEBAR + CONTEÚDO) =================
     Rectangle {
         id: card
-        width: 960
-        height: 630
+        width: 980
+        height: 640
         anchors.centerIn: parent
         radius: 22
         color: Theme.surface
@@ -517,7 +799,7 @@ PanelWindow {
 
             // ==================== LADO ESQUERDO: BARRA LATERAL ====================
             Rectangle {
-                Layout.preferredWidth: 230
+                Layout.preferredWidth: 240
                 Layout.fillHeight: true
                 topLeftRadius: 22
                 bottomLeftRadius: 22
@@ -526,7 +808,7 @@ PanelWindow {
                 ColumnLayout {
                     anchors.fill: parent
                     anchors.margins: 14
-                    spacing: 12
+                    spacing: 10
 
                     // Cabeçalho do Painel
                     RowLayout {
@@ -559,7 +841,7 @@ PanelWindow {
                                 color: Theme.textColor
                             }
                             Text {
-                                text: "Configurações Gráficas"
+                                text: "Central de Controle Gráfica"
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 10
                                 color: Theme.subtext
@@ -592,10 +874,21 @@ PanelWindow {
                                 { name: "Kitty Terminal", icon: Theme.icons.console, desc: "Fonte & Opacidade" },
                                 { name: "Notificações", icon: Theme.icons.bell, desc: "Posição & Estilo" },
                                 { name: "Tela & Monitores", icon: Theme.icons.monitor, desc: "144Hz & Brilho" },
+                                { name: "Áudio & Som", icon: Theme.icons.volHigh, desc: "Saída & Microfone" },
                                 { name: "Teclado & Mouse", icon: Theme.icons.tune, desc: "Layout & Sensibilidade" },
+                                { name: "Energia & Bateria", icon: Theme.icons.bat, desc: "Perfis & Saúde" },
+                                { name: "Inicialização (Boot)", icon: Theme.icons.speed, desc: "Apps ao Iniciar" },
                                 { name: "Cores & Wallust", icon: Theme.icons.palette, desc: "Paleta Dinâmica" },
                                 { name: "Efeitos & Janelas", icon: Theme.icons.laptop, desc: "Bordas & SDDM" },
-                                { name: "Sistema & Reparo", icon: Theme.icons.health, desc: "Auto-reparo & Áudio" }
+                                { name: "Bluetooth", icon: Theme.icons.bt, desc: "Controles & Fones" },
+                                { name: "Rede & Wi-Fi", icon: Theme.icons.wifi4, desc: "Conexões & Latência" },
+                                { name: "Aplicativos Padrão", icon: Theme.icons.dashboard, desc: "Navegador, Pastas & Vídeo" },
+                                { name: "Jogos & GPU", icon: Theme.icons.gamepad, desc: "NVIDIA, GameMode & Steam" },
+                                { name: "Armazenamento", icon: Theme.icons.disk, desc: "Limpeza Segura de Disco" },
+                                { name: "Guia de Atalhos", icon: Theme.icons.magnify, desc: "Buscar Teclas do Rice" },
+                                { name: "Sistema & Reparo", icon: Theme.icons.health, desc: "Snapshots & Auto-Reparo" },
+                                { name: "Loja & Atualizações", icon: Theme.icons.packages, desc: "Apps & Updates do Sistema" },
+                                { name: "Perfis & Backup", icon: Theme.icons.palette, desc: "Estilos & Restauração" }
                             ]
 
                             Repeater {
@@ -606,7 +899,7 @@ PanelWindow {
                                     required property int index
 
                                     Layout.fillWidth: true
-                                    implicitHeight: 46
+                                    implicitHeight: 44
                                     radius: 10
                                     color: win.currentTab === index
                                         ? Theme.withAlpha(Theme.primary, 0.22)
@@ -625,7 +918,7 @@ PanelWindow {
                                         Text {
                                             text: navDelegate.modelData.icon
                                             font.family: Theme.iconFontFamily
-                                            font.pixelSize: 17
+                                            font.pixelSize: 16
                                             color: win.currentTab === navDelegate.index ? Theme.primary : Theme.subtext
                                         }
 
@@ -636,7 +929,7 @@ PanelWindow {
                                             Text {
                                                 text: navDelegate.modelData.name
                                                 font.family: Theme.fontFamily
-                                                font.pixelSize: 12
+                                                font.pixelSize: 11
                                                 font.weight: win.currentTab === navDelegate.index ? Font.DemiBold : Font.Normal
                                                 color: win.currentTab === navDelegate.index ? Theme.textColor : Theme.textColor
                                             }
@@ -670,7 +963,7 @@ PanelWindow {
                         color: Theme.tile
                         Text {
                             anchors.centerIn: parent
-                            text: "Hyprland Lua · Quickshell"
+                            text: "Super + I · Quickshell"
                             font.family: Theme.monoFamily
                             font.pixelSize: 10
                             color: Theme.subtext
@@ -711,10 +1004,21 @@ PanelWindow {
                                     "Kitty Terminal & Tipografia",
                                     "Mako Notificações",
                                     "Monitores & Exibição",
+                                    "Áudio, Som & Microfone",
                                     "Teclado, Mouse & Entradas",
+                                    "Energia & Bateria",
+                                    "Inicialização Automática (Boot)",
                                     "Cores & Wallust Dinâmico",
                                     "Efeitos Visuais, Bordas & SDDM",
-                                    "Sistema & Manutenção Rápida"
+                                    "Bluetooth & Periféricos sem Fio",
+                                    "Rede, Conexões & Wi-Fi",
+                                    "Aplicativos Padrão do Sistema",
+                                    "Jogos & Gráficos NVIDIA",
+                                    "Armazenamento & Limpeza de Disco",
+                                    "Guia de Teclas & Atalhos",
+                                    "Sistema, Snapshots & Reparo",
+                                    "Central de Aplicativos & Atualizações",
+                                    "Perfis de Estilo & Gerenciador de Backup"
                                 ][win.currentTab] || "Configurações"
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 16
@@ -728,10 +1032,21 @@ PanelWindow {
                                     "Ajuste opacidade, tamanho de texto, espaçamento interno e cursor.",
                                     "Escolha a posição na tela, tempo de exibição e bordas das notificações.",
                                     "Controle taxa de atualização (144Hz/60Hz), FreeSync/VRR e brilho.",
+                                    "Selecione saída de áudio, microfone, volumes e execute teste estéreo.",
                                     "Seletor de layout ABNT2/US, sensibilidade do mouse e perfil de aceleração.",
+                                    "Monitore saúde da bateria, ciclos de carga e escolha perfis de energia.",
+                                    "Gerencie quais programas iniciam automaticamente ao ligar o computador.",
                                     "Visualize a paleta de 16 cores ativas do wallpaper e copie códigos HEX.",
                                     "Luz noturna, transparência inativa, cantos arredondados, animações e login.",
-                                    "Auto-reparo com 1 clique: reiniciar áudio, destravar pacman e limpar caches."
+                                    "Gerencie controles de videogame, fones de ouvido e conexões Bluetooth.",
+                                    "Monitore a velocidade e latência da internet e conecte-se a novas redes Wi-Fi.",
+                                    "Escolha quais programas abrem páginas da web, pastas, códigos, fotos e vídeos.",
+                                    "Monitore a GPU dedicada RTX 3050, GameMode e parâmetros da Steam.",
+                                    "Monitore o uso do SSD e recupere espaço em disco com limpezas seguras.",
+                                    "Consulte e busque todos os atalhos de teclado do Hyprland com 1 clique.",
+                                    "Crie pontos de restauração Btrfs e resolva problemas comuns com 1 clique.",
+                                    "Verifique atualizações pendentes do Arch Linux e instale programas essenciais.",
+                                    "Alterne estilos estéticos do rice e crie cópias de segurança com 1 clique."
                                 ][win.currentTab] || ""
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 11
@@ -1422,7 +1737,6 @@ PanelWindow {
                                     Layout.fillWidth: true
                                     spacing: 12
 
-                                    // Card 144Hz
                                     Rectangle {
                                         Layout.fillWidth: true
                                         implicitHeight: 72
@@ -1473,7 +1787,6 @@ PanelWindow {
                                         }
                                     }
 
-                                    // Card 60Hz
                                     Rectangle {
                                         Layout.fillWidth: true
                                         implicitHeight: 72
@@ -1559,10 +1872,245 @@ PanelWindow {
                             }
                         }
 
-                        // ==================== ABA 4: TECLADO & MOUSE ====================
+                        // ==================== ABA 4: ÁUDIO & SOM ====================
                         Flickable {
                             anchors.fill: parent
                             visible: win.currentTab === 4
+                            contentHeight: audioCol.implicitHeight
+                            clip: true
+                            boundsBehavior: Flickable.StopAtBounds
+
+                            ColumnLayout {
+                                id: audioCol
+                                width: parent.width
+                                spacing: 16
+
+                                SectionHeader {
+                                    title: "Dispositivo de Saída de Áudio (Alto-falantes / Fones)"
+                                    subtitle: "Clique para definir onde o som dos programas deve tocar"
+                                }
+
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 8
+                                    Repeater {
+                                        model: win.audioData.sinks || []
+                                        delegate: Rectangle {
+                                            id: sinkCard
+                                            required property var modelData
+                                            Layout.fillWidth: true
+                                            implicitHeight: 56
+                                            radius: 10
+                                            color: sinkCard.modelData.is_default ? Theme.withAlpha(Theme.primary, 0.22) : (sinkArea.containsMouse ? Theme.tileHigh : Theme.tile)
+                                            border.width: sinkCard.modelData.is_default ? 1.5 : 0
+                                            border.color: Theme.primary
+
+                                            RowLayout {
+                                                anchors.fill: parent
+                                                anchors.margins: 12
+                                                spacing: 12
+
+                                                Text {
+                                                    text: sinkCard.modelData.is_default ? Theme.icons.volHigh : Theme.icons.headphones
+                                                    font.family: Theme.iconFontFamily
+                                                    font.pixelSize: 20
+                                                    color: sinkCard.modelData.is_default ? Theme.primary : Theme.subtext
+                                                }
+
+                                                ColumnLayout {
+                                                    Layout.fillWidth: true
+                                                    spacing: 1
+                                                    Text {
+                                                        text: sinkCard.modelData.description
+                                                        font.family: Theme.fontFamily
+                                                        font.pixelSize: 12
+                                                        font.weight: sinkCard.modelData.is_default ? Font.DemiBold : Font.Normal
+                                                        color: Theme.textColor
+                                                    }
+                                                    Text {
+                                                        text: sinkCard.modelData.is_default ? "Dispositivo Padrão Ativo · " + sinkCard.modelData.volume + "%" : "Clique para selecionar"
+                                                        font.family: Theme.fontFamily
+                                                        font.pixelSize: 10
+                                                        color: sinkCard.modelData.is_default ? Theme.primary : Theme.subtext
+                                                    }
+                                                }
+
+                                                Rectangle {
+                                                    visible: sinkCard.modelData.is_default
+                                                    implicitHeight: 22
+                                                    implicitWidth: 70
+                                                    radius: 11
+                                                    color: Theme.primary
+                                                    Text {
+                                                        anchors.centerIn: parent
+                                                        text: "Ativo"
+                                                        font.family: Theme.fontFamily
+                                                        font.pixelSize: 10
+                                                        font.weight: Font.Bold
+                                                        color: Theme.background
+                                                    }
+                                                }
+                                            }
+
+                                            MouseArea {
+                                                id: sinkArea
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: {
+                                                    Quickshell.execDetached(["rice-audio", "set-sink", sinkCard.modelData.name]);
+                                                    win.showToast("Saída alterada: " + sinkCard.modelData.description);
+                                                    audioRefreshTimer.restart();
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                CfgSlider {
+                                    title: "Volume Geral da Saída Padrão"
+                                    minVal: 0; maxVal: 150; value: win.audioData.sink_volume || 100; unit: "%"
+                                    onChanged: newVal => {
+                                        win.audioData.sink_volume = Math.round(newVal);
+                                        debounceTimer.exec(() => {
+                                            Quickshell.execDetached(["rice-audio", "set-sink-volume", String(win.audioData.sink_volume)]);
+                                        });
+                                    }
+                                }
+
+                                SectionHeader {
+                                    title: "Dispositivo de Entrada de Áudio (Microfone)"
+                                    subtitle: "Selecione o microfone ativo para jogos, Discord e gravações"
+                                }
+
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 8
+                                    Repeater {
+                                        model: win.audioData.sources || []
+                                        delegate: Rectangle {
+                                            id: sourceCard
+                                            required property var modelData
+                                            Layout.fillWidth: true
+                                            implicitHeight: 56
+                                            radius: 10
+                                            color: sourceCard.modelData.is_default ? Theme.withAlpha(Theme.primary, 0.22) : (sourceArea.containsMouse ? Theme.tileHigh : Theme.tile)
+                                            border.width: sourceCard.modelData.is_default ? 1.5 : 0
+                                            border.color: Theme.primary
+
+                                            RowLayout {
+                                                anchors.fill: parent
+                                                anchors.margins: 12
+                                                spacing: 12
+
+                                                Text {
+                                                    text: Theme.icons.mic
+                                                    font.family: Theme.iconFontFamily
+                                                    font.pixelSize: 20
+                                                    color: sourceCard.modelData.is_default ? Theme.primary : Theme.subtext
+                                                }
+
+                                                ColumnLayout {
+                                                    Layout.fillWidth: true
+                                                    spacing: 1
+                                                    Text {
+                                                        text: sourceCard.modelData.description
+                                                        font.family: Theme.fontFamily
+                                                        font.pixelSize: 12
+                                                        font.weight: sourceCard.modelData.is_default ? Font.DemiBold : Font.Normal
+                                                        color: Theme.textColor
+                                                    }
+                                                    Text {
+                                                        text: sourceCard.modelData.is_default ? "Microfone Padrão Ativo · " + sourceCard.modelData.volume + "%" : "Clique para selecionar"
+                                                        font.family: Theme.fontFamily
+                                                        font.pixelSize: 10
+                                                        color: sourceCard.modelData.is_default ? Theme.primary : Theme.subtext
+                                                    }
+                                                }
+
+                                                Rectangle {
+                                                    visible: sourceCard.modelData.is_default
+                                                    implicitHeight: 22
+                                                    implicitWidth: 70
+                                                    radius: 11
+                                                    color: Theme.primary
+                                                    Text {
+                                                        anchors.centerIn: parent
+                                                        text: "Ativo"
+                                                        font.family: Theme.fontFamily
+                                                        font.pixelSize: 10
+                                                        font.weight: Font.Bold
+                                                        color: Theme.background
+                                                    }
+                                                }
+                                            }
+
+                                            MouseArea {
+                                                id: sourceArea
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: {
+                                                    Quickshell.execDetached(["rice-audio", "set-source", sourceCard.modelData.name]);
+                                                    win.showToast("Microfone alterado: " + sourceCard.modelData.description);
+                                                    audioRefreshTimer.restart();
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                CfgSlider {
+                                    title: "Volume / Sensibilidade do Microfone"
+                                    minVal: 0; maxVal: 150; value: win.audioData.source_volume || 80; unit: "%"
+                                    onChanged: newVal => {
+                                        win.audioData.source_volume = Math.round(newVal);
+                                        debounceTimer.exec(() => {
+                                            Quickshell.execDetached(["rice-audio", "set-source-volume", String(win.audioData.source_volume)]);
+                                        });
+                                    }
+                                }
+
+                                SectionHeader {
+                                    title: "Teste & Diagnóstico"
+                                    subtitle: "Verifique se os canais de áudio estão funcionando perfeitamente"
+                                }
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 12
+                                    ActionBtn {
+                                        icon: Theme.icons.speaker
+                                        text: "Testar Alto-falantes (Esquerdo / Direito)"
+                                        primary: true
+                                        onClicked: {
+                                            Quickshell.execDetached(["rice-audio", "test"]);
+                                            win.showToast("Reproduzindo teste estéreo...");
+                                        }
+                                    }
+                                    ActionBtn {
+                                        icon: Theme.icons.refresh
+                                        text: "Reiniciar PipeWire"
+                                        onClicked: {
+                                            Quickshell.execDetached(["rice-maintenance", "audio"]);
+                                            win.showToast("Reiniciando áudio...");
+                                            audioRefreshTimer.restart();
+                                        }
+                                    }
+                                    Item { Layout.fillWidth: true }
+                                }
+                                Timer {
+                                    id: audioRefreshTimer
+                                    interval: 800
+                                    onTriggered: loadAudioProc.running = true
+                                }
+                            }
+                        }
+
+                        // ==================== ABA 5: TECLADO & MOUSE ====================
+                        Flickable {
+                            anchors.fill: parent
+                            visible: win.currentTab === 5
                             contentHeight: inputCol.implicitHeight
                             clip: true
                             boundsBehavior: Flickable.StopAtBounds
@@ -1581,7 +2129,6 @@ PanelWindow {
                                     Layout.fillWidth: true
                                     spacing: 12
 
-                                    // ABNT2
                                     Rectangle {
                                         Layout.fillWidth: true
                                         implicitHeight: 64
@@ -1594,10 +2141,7 @@ PanelWindow {
                                             anchors.fill: parent
                                             anchors.margins: 12
                                             spacing: 12
-                                            Text {
-                                                text: "🇧🇷"
-                                                font.pixelSize: 24
-                                            }
+                                            Text { text: "🇧🇷"; font.pixelSize: 24 }
                                             ColumnLayout {
                                                 Layout.fillWidth: true
                                                 spacing: 1
@@ -1630,7 +2174,6 @@ PanelWindow {
                                         }
                                     }
 
-                                    // US Intl
                                     Rectangle {
                                         Layout.fillWidth: true
                                         implicitHeight: 64
@@ -1643,10 +2186,7 @@ PanelWindow {
                                             anchors.fill: parent
                                             anchors.margins: 12
                                             spacing: 12
-                                            Text {
-                                                text: "🇺🇸"
-                                                font.pixelSize: 24
-                                            }
+                                            Text { text: "🇺🇸"; font.pixelSize: 24 }
                                             ColumnLayout {
                                                 Layout.fillWidth: true
                                                 spacing: 1
@@ -1719,7 +2259,6 @@ PanelWindow {
                                     Layout.fillWidth: true
                                     spacing: 12
 
-                                    // Flat
                                     Rectangle {
                                         Layout.fillWidth: true
                                         implicitHeight: 64
@@ -1770,7 +2309,6 @@ PanelWindow {
                                         }
                                     }
 
-                                    // Adaptive
                                     Rectangle {
                                         Layout.fillWidth: true
                                         implicitHeight: 64
@@ -1840,10 +2378,381 @@ PanelWindow {
                             }
                         }
 
-                        // ==================== ABA 5: CORES & WALLUST ====================
+                        // ==================== ABA 6: ENERGIA & BATERIA ====================
                         Flickable {
                             anchors.fill: parent
-                            visible: win.currentTab === 5
+                            visible: win.currentTab === 6
+                            contentHeight: powerCol.implicitHeight
+                            clip: true
+                            boundsBehavior: Flickable.StopAtBounds
+
+                            ColumnLayout {
+                                id: powerCol
+                                width: parent.width
+                                spacing: 16
+
+                                SectionHeader {
+                                    title: "Perfil de Desempenho & Energia"
+                                    subtitle: "Ajusta o escalonamento do processador e limites térmicos do sistema"
+                                }
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 12
+
+                                    Repeater {
+                                        model: [
+                                            { id: "performance", name: "Desempenho", icon: Theme.icons.perf, desc: "Clocks máximos para jogos e tarefas pesadas" },
+                                            { id: "balanced", name: "Equilibrado", icon: Theme.icons.balanced, desc: "Balanço inteligente entre fluidez e consumo" },
+                                            { id: "power-saver", name: "Economia", icon: Theme.icons.saver, desc: "Prioriza autonomia da bateria e silêncio" }
+                                        ]
+                                        delegate: Rectangle {
+                                            id: pCard
+                                            required property var modelData
+                                            readonly property bool active: win.powerData.profile === pCard.modelData.id
+                                            Layout.fillWidth: true
+                                            implicitHeight: 74
+                                            radius: 12
+                                            color: active ? Theme.withAlpha(Theme.primary, 0.22) : (pCardArea.containsMouse ? Theme.tileHigh : Theme.tile)
+                                            border.width: active ? 1.5 : 0
+                                            border.color: Theme.primary
+
+                                            RowLayout {
+                                                anchors.fill: parent
+                                                anchors.margins: 12
+                                                spacing: 12
+
+                                                Text {
+                                                    text: pCard.modelData.icon
+                                                    font.family: Theme.iconFontFamily
+                                                    font.pixelSize: 22
+                                                    color: pCard.active ? Theme.primary : Theme.subtext
+                                                }
+
+                                                ColumnLayout {
+                                                    Layout.fillWidth: true
+                                                    spacing: 2
+                                                    Text {
+                                                        text: pCard.modelData.name
+                                                        font.family: Theme.fontFamily
+                                                        font.pixelSize: 13
+                                                        font.weight: pCard.active ? Font.DemiBold : Font.Normal
+                                                        color: Theme.textColor
+                                                    }
+                                                    Text {
+                                                        text: pCard.modelData.desc
+                                                        font.family: Theme.fontFamily
+                                                        font.pixelSize: 10
+                                                        color: pCard.active ? Theme.primary : Theme.subtext
+                                                    }
+                                                }
+                                            }
+
+                                            MouseArea {
+                                                id: pCardArea
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: {
+                                                    win.powerData.profile = pCard.modelData.id;
+                                                    Quickshell.execDetached(["rice-power", "set-profile", pCard.modelData.id]);
+                                                    win.showToast("Perfil de energia: " + pCard.modelData.name);
+                                                    powerRefreshTimer.restart();
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                SectionHeader {
+                                    title: "Saúde & Estatísticas da Bateria"
+                                    subtitle: "Dados de integridade física e ciclos de carga do notebook"
+                                }
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 12
+
+                                    Rectangle {
+                                        Layout.fillWidth: true
+                                        implicitHeight: 80
+                                        radius: 12
+                                        color: Theme.tile
+                                        border.width: 1
+                                        border.color: Theme.withAlpha(Theme.outline, 0.2)
+
+                                        RowLayout {
+                                            anchors.fill: parent
+                                            anchors.margins: 14
+                                            spacing: 12
+                                            Text { text: Theme.icons.batHealth; font.family: Theme.iconFontFamily; font.pixelSize: 24; color: Theme.primary }
+                                            ColumnLayout {
+                                                Layout.fillWidth: true
+                                                spacing: 2
+                                                Text { text: "Saúde da Bateria"; font.family: Theme.fontFamily; font.pixelSize: 11; color: Theme.subtext }
+                                                Text { text: win.powerData.health + "% Capacidade"; font.family: Theme.fontFamily; font.pixelSize: 15; font.weight: Font.Bold; color: Theme.textColor }
+                                            }
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        Layout.fillWidth: true
+                                        implicitHeight: 80
+                                        radius: 12
+                                        color: Theme.tile
+                                        border.width: 1
+                                        border.color: Theme.withAlpha(Theme.outline, 0.2)
+
+                                        RowLayout {
+                                            anchors.fill: parent
+                                            anchors.margins: 14
+                                            spacing: 12
+                                            Text { text: Theme.icons.history; font.family: Theme.iconFontFamily; font.pixelSize: 24; color: Theme.secondary }
+                                            ColumnLayout {
+                                                Layout.fillWidth: true
+                                                spacing: 2
+                                                Text { text: "Ciclos de Carga"; font.family: Theme.fontFamily; font.pixelSize: 11; color: Theme.subtext }
+                                                Text { text: win.powerData.cycles + " Ciclos Completos"; font.family: Theme.fontFamily; font.pixelSize: 15; font.weight: Font.Bold; color: Theme.textColor }
+                                            }
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        Layout.fillWidth: true
+                                        implicitHeight: 80
+                                        radius: 12
+                                        color: Theme.tile
+                                        border.width: 1
+                                        border.color: Theme.withAlpha(Theme.outline, 0.2)
+
+                                        RowLayout {
+                                            anchors.fill: parent
+                                            anchors.margins: 14
+                                            spacing: 12
+                                            Text { text: Theme.icons.lightning; font.family: Theme.iconFontFamily; font.pixelSize: 24; color: Theme.primary }
+                                            ColumnLayout {
+                                                Layout.fillWidth: true
+                                                spacing: 2
+                                                Text { text: "Status de Alimentação"; font.family: Theme.fontFamily; font.pixelSize: 11; color: Theme.subtext }
+                                                Text { text: win.powerData.status + " (" + win.powerData.percent + "%)"; font.family: Theme.fontFamily; font.pixelSize: 14; font.weight: Font.Bold; color: Theme.textColor }
+                                            }
+                                        }
+                                    }
+                                }
+                                Timer {
+                                    id: powerRefreshTimer
+                                    interval: 800
+                                    onTriggered: loadPowerProc.running = true
+                                }
+                            }
+                        }
+
+                        // ==================== ABA 7: INICIALIZAÇÃO / AUTOSTART ====================
+                        Flickable {
+                            anchors.fill: parent
+                            visible: win.currentTab === 7
+                            contentHeight: autoCol.implicitHeight
+                            clip: true
+                            boundsBehavior: Flickable.StopAtBounds
+
+                            ColumnLayout {
+                                id: autoCol
+                                width: parent.width
+                                spacing: 16
+
+                                SectionHeader {
+                                    title: "Aplicativos na Inicialização do Sistema"
+                                    subtitle: "Ative ou desative quais programas abrem sozinhos quando você liga o computador"
+                                }
+
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 8
+
+                                    Text {
+                                        visible: win.autostartEntries.length === 0
+                                        text: "Nenhum aplicativo configurado para iniciar automaticamente."
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 12
+                                        color: Theme.subtext
+                                    }
+
+                                    Repeater {
+                                        model: win.autostartEntries
+                                        delegate: Rectangle {
+                                            id: autoCard
+                                            required property var modelData
+                                            Layout.fillWidth: true
+                                            implicitHeight: 56
+                                            radius: 10
+                                            color: Theme.tile
+                                            border.width: 1
+                                            border.color: Theme.withAlpha(Theme.outline, 0.2)
+
+                                            RowLayout {
+                                                anchors.fill: parent
+                                                anchors.margins: 12
+                                                spacing: 12
+
+                                                Rectangle {
+                                                    implicitWidth: 32
+                                                    implicitHeight: 32
+                                                    radius: 8
+                                                    color: Theme.withAlpha(Theme.primary, 0.15)
+                                                    Text {
+                                                        anchors.centerIn: parent
+                                                        text: Theme.icons.speed
+                                                        font.family: Theme.iconFontFamily
+                                                        font.pixelSize: 16
+                                                        color: Theme.primary
+                                                    }
+                                                }
+
+                                                ColumnLayout {
+                                                    Layout.fillWidth: true
+                                                    spacing: 1
+                                                    Text {
+                                                        text: autoCard.modelData.name
+                                                        font.family: Theme.fontFamily
+                                                        font.pixelSize: 12
+                                                        font.weight: Font.DemiBold
+                                                        color: Theme.textColor
+                                                    }
+                                                    Text {
+                                                        text: autoCard.modelData.exec || autoCard.modelData.filename
+                                                        font.family: Theme.monoFamily
+                                                        font.pixelSize: 10
+                                                        color: Theme.subtext
+                                                        elide: Text.ElideMiddle
+                                                    }
+                                                }
+
+                                                // Botão Lixeira
+                                                Rectangle {
+                                                    implicitWidth: 28
+                                                    implicitHeight: 28
+                                                    radius: 14
+                                                    color: delArea.containsMouse ? Theme.withAlpha(Theme.critical, 0.2) : "transparent"
+                                                    Text {
+                                                        anchors.centerIn: parent
+                                                        text: Theme.icons.trash
+                                                        font.family: Theme.iconFontFamily
+                                                        font.pixelSize: 13
+                                                        color: Theme.critical
+                                                    }
+                                                    MouseArea {
+                                                        id: delArea
+                                                        anchors.fill: parent
+                                                        hoverEnabled: true
+                                                        cursorShape: Qt.PointingHandCursor
+                                                        onClicked: {
+                                                            Quickshell.execDetached(["rice-autostart", "remove", autoCard.modelData.filename]);
+                                                            win.showToast("Removido do autostart: " + autoCard.modelData.name);
+                                                            autostartRefreshTimer.restart();
+                                                        }
+                                                    }
+                                                }
+
+                                                // Toggle Ativado
+                                                Rectangle {
+                                                    implicitWidth: 36
+                                                    implicitHeight: 20
+                                                    radius: 10
+                                                    color: autoCard.modelData.enabled ? Theme.primary : Theme.tileHigh
+
+                                                    Rectangle {
+                                                        width: 14; height: 14; radius: 7
+                                                        anchors.verticalCenter: parent.verticalCenter
+                                                        x: autoCard.modelData.enabled ? parent.width - width - 3 : 3
+                                                        color: Theme.textColor
+                                                        Behavior on x { NumberAnimation { duration: 120 } }
+                                                    }
+
+                                                    MouseArea {
+                                                        anchors.fill: parent
+                                                        cursorShape: Qt.PointingHandCursor
+                                                        onClicked: {
+                                                            Quickshell.execDetached(["rice-autostart", "toggle", autoCard.modelData.filename]);
+                                                            autoCard.modelData.enabled = !autoCard.modelData.enabled;
+                                                            win.showToast((autoCard.modelData.enabled ? "Ativado: " : "Desativado: ") + autoCard.modelData.name);
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                SectionHeader {
+                                    title: "Adicionar Aplicativo à Inicialização Rápida"
+                                    subtitle: "Selecione qualquer aplicativo instalado para abrir junto com o Hyprland"
+                                }
+
+                                Flow {
+                                    Layout.fillWidth: true
+                                    spacing: 8
+
+                                    Repeater {
+                                        model: win.availableApps
+                                        delegate: Rectangle {
+                                            id: appChip
+                                            required property var modelData
+                                            implicitHeight: 32
+                                            implicitWidth: appChipRow.implicitWidth + 20
+                                            radius: 8
+                                            color: appChip.modelData.already_added ? Theme.withAlpha(Theme.primary, 0.2) : (appChipArea.containsMouse ? Theme.tileHigh : Theme.tile)
+                                            border.width: appChip.modelData.already_added ? 1 : 0
+                                            border.color: Theme.primary
+
+                                            RowLayout {
+                                                id: appChipRow
+                                                anchors.centerIn: parent
+                                                spacing: 6
+                                                Text {
+                                                    text: appChip.modelData.already_added ? Theme.icons.verified : Theme.icons.plus
+                                                    font.family: Theme.iconFontFamily
+                                                    font.pixelSize: 12
+                                                    color: appChip.modelData.already_added ? Theme.primary : Theme.textColor
+                                                }
+                                                Text {
+                                                    text: appChip.modelData.name
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 11
+                                                    color: Theme.textColor
+                                                }
+                                            }
+
+                                            MouseArea {
+                                                id: appChipArea
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: {
+                                                    if (!appChip.modelData.already_added) {
+                                                        Quickshell.execDetached(["rice-autostart", "add", appChip.modelData.filename]);
+                                                        win.showToast("Adicionado ao autostart: " + appChip.modelData.name);
+                                                        autostartRefreshTimer.restart();
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                Timer {
+                                    id: autostartRefreshTimer
+                                    interval: 600
+                                    onTriggered: {
+                                        loadAutostartProc.running = true;
+                                        loadAvailableAppsProc.running = true;
+                                    }
+                                }
+                            }
+                        }
+
+                        // ==================== ABA 8: CORES & WALLUST ====================
+                        Flickable {
+                            anchors.fill: parent
+                            visible: win.currentTab === 8
                             contentHeight: colorsCol.implicitHeight
                             clip: true
                             boundsBehavior: Flickable.StopAtBounds
@@ -1858,7 +2767,6 @@ PanelWindow {
                                     subtitle: "Todas as cores da interface e terminal são geradas pelo Wallust a partir do papel de parede ativo"
                                 }
 
-                                // Destaques Principais
                                 RowLayout {
                                     Layout.fillWidth: true
                                     spacing: 12
@@ -2022,10 +2930,10 @@ PanelWindow {
                             }
                         }
 
-                        // ==================== ABA 6: EFEITOS VISUAIS & JANELAS ====================
+                        // ==================== ABA 9: EFEITOS VISUAIS & JANELAS ====================
                         Flickable {
                             anchors.fill: parent
-                            visible: win.currentTab === 6
+                            visible: win.currentTab === 9
                             contentHeight: effCol.implicitHeight
                             clip: true
                             boundsBehavior: Flickable.StopAtBounds
@@ -2210,10 +3118,1513 @@ PanelWindow {
                             }
                         }
 
-                        // ==================== ABA 7: SISTEMA & REPARO ====================
+                        // ==================== ABA 10: BLUETOOTH ====================
                         Flickable {
                             anchors.fill: parent
-                            visible: win.currentTab === 7
+                            visible: win.currentTab === 10
+                            contentHeight: btCol.implicitHeight
+                            clip: true
+                            boundsBehavior: Flickable.StopAtBounds
+
+                            ColumnLayout {
+                                id: btCol
+                                width: parent.width
+                                spacing: 16
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    SectionHeader {
+                                        title: "Bluetooth & Dispositivos sem Fio"
+                                        subtitle: "Conecte controles Xbox/PS, fones de ouvido e periféricos sem fio"
+                                    }
+                                    Item { Layout.fillWidth: true }
+                                    ActionBtn {
+                                        icon: Theme.icons.refresh
+                                        text: "Escanear"
+                                        onClicked: {
+                                            Quickshell.execDetached(["rice-bluetooth", "scan"]);
+                                            showToast("Buscando dispositivos próximos...");
+                                        }
+                                    }
+                                }
+
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    implicitHeight: 60
+                                    radius: 12
+                                    color: Theme.tile
+                                    border.width: 1
+                                    border.color: Theme.withAlpha(Theme.outline, 0.2)
+
+                                    RowLayout {
+                                        anchors.fill: parent
+                                        anchors.margins: 14
+                                        spacing: 12
+
+                                        Text {
+                                            text: win.btData && win.btData.powered ? Theme.icons.bt : Theme.icons.btOff
+                                            font.family: Theme.iconFontFamily
+                                            font.pixelSize: 22
+                                            color: win.btData && win.btData.powered ? Theme.primary : Theme.subtext
+                                        }
+
+                                        ColumnLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 2
+                                            Text {
+                                                text: win.btData && win.btData.powered ? "Bluetooth Ativado" : "Bluetooth Desativado"
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: 13
+                                                font.weight: Font.DemiBold
+                                                color: Theme.textColor
+                                            }
+                                            Text {
+                                                text: win.btData && win.btData.powered ? "Pronto para conexões e pareamento automático" : "Ligue o adaptador para conectar periféricos"
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: 11
+                                                color: Theme.subtext
+                                            }
+                                        }
+
+                                        SwitchToggle {
+                                            checked: win.btData && win.btData.powered
+                                            onToggled: {
+                                                Quickshell.execDetached(["rice-bluetooth", "toggle-power"]);
+                                                loadBtProc.running = true;
+                                            }
+                                        }
+                                    }
+                                }
+
+                                SectionHeader {
+                                    title: "Dispositivos Pareados & Conhecidos"
+                                    subtitle: "Clique em Conectar para vincular o controle ou fone instantaneamente"
+                                }
+
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 8
+
+                                    Repeater {
+                                        model: (win.btData && win.btData.devices) ? win.btData.devices : []
+                                        delegate: Rectangle {
+                                            id: btDevCard
+                                            required property var modelData
+                                            Layout.fillWidth: true
+                                            implicitHeight: 64
+                                            radius: 12
+                                            color: btDevCard.modelData.connected ? Theme.withAlpha(Theme.primary, 0.14) : Theme.tile
+                                            border.width: btDevCard.modelData.connected ? 1.5 : 1
+                                            border.color: btDevCard.modelData.connected ? Theme.primary : Theme.withAlpha(Theme.outline, 0.2)
+
+                                            RowLayout {
+                                                anchors.fill: parent
+                                                anchors.margins: 12
+                                                spacing: 12
+
+                                                Rectangle {
+                                                    implicitWidth: 38
+                                                    implicitHeight: 38
+                                                    radius: 10
+                                                    color: btDevCard.modelData.connected ? Theme.withAlpha(Theme.primary, 0.25) : Theme.tileHigh
+
+                                                    Text {
+                                                        anchors.centerIn: parent
+                                                        text: btDevCard.modelData.icon === "gamepad" ? Theme.icons.gamepad
+                                                            : (btDevCard.modelData.icon === "headset" ? Theme.icons.headphones
+                                                            : (btDevCard.modelData.icon === "mouse" ? Theme.icons.cursor
+                                                            : (btDevCard.modelData.icon === "keyboard" ? Theme.icons.tune
+                                                            : Theme.icons.bt)))
+                                                        font.family: Theme.iconFontFamily
+                                                        font.pixelSize: 18
+                                                        color: btDevCard.modelData.connected ? Theme.primary : Theme.textColor
+                                                    }
+                                                }
+
+                                                ColumnLayout {
+                                                    Layout.fillWidth: true
+                                                    spacing: 2
+                                                    RowLayout {
+                                                        spacing: 8
+                                                        Text {
+                                                            text: btDevCard.modelData.name
+                                                            font.family: Theme.fontFamily
+                                                            font.pixelSize: 12
+                                                            font.weight: Font.DemiBold
+                                                            color: Theme.textColor
+                                                        }
+                                                        Rectangle {
+                                                            visible: btDevCard.modelData.connected
+                                                            implicitWidth: 70
+                                                            implicitHeight: 18
+                                                            radius: 9
+                                                            color: Theme.withAlpha(Theme.primary, 0.25)
+                                                            border.width: 1
+                                                            border.color: Theme.primary
+                                                            Text {
+                                                                anchors.centerIn: parent
+                                                                text: "● Conectado"
+                                                                font.family: Theme.fontFamily
+                                                                font.pixelSize: 9
+                                                                font.weight: Font.Bold
+                                                                color: Theme.primary
+                                                            }
+                                                        }
+                                                        Rectangle {
+                                                            visible: btDevCard.modelData.battery !== null
+                                                            implicitWidth: 46
+                                                            implicitHeight: 18
+                                                            radius: 9
+                                                            color: Theme.withAlpha(Theme.foreground, 0.1)
+                                                            Text {
+                                                                anchors.centerIn: parent
+                                                                text: "🔋 " + (btDevCard.modelData.battery || 0) + "%"
+                                                                font.family: Theme.fontFamily
+                                                                font.pixelSize: 9
+                                                                color: Theme.textColor
+                                                            }
+                                                        }
+                                                    }
+                                                    Text {
+                                                        text: btDevCard.modelData.mac
+                                                        font.family: Theme.monoFamily
+                                                        font.pixelSize: 10
+                                                        color: Theme.subtext
+                                                    }
+                                                }
+
+                                                ActionBtn {
+                                                    icon: btDevCard.modelData.connected ? Theme.icons.close : Theme.icons.btConnected
+                                                    text: btDevCard.modelData.connected ? "Desconectar" : "Conectar"
+                                                    primary: !btDevCard.modelData.connected
+                                                    onClicked: {
+                                                        if (btDevCard.modelData.connected) {
+                                                            Quickshell.execDetached(["rice-bluetooth", "disconnect", btDevCard.modelData.mac]);
+                                                        } else {
+                                                            Quickshell.execDetached(["rice-bluetooth", "connect", btDevCard.modelData.mac]);
+                                                        }
+                                                        loadBtProc.running = true;
+                                                    }
+                                                }
+
+                                                Rectangle {
+                                                    implicitWidth: 32
+                                                    implicitHeight: 32
+                                                    radius: 8
+                                                    color: rmBtArea.containsMouse ? Theme.withAlpha("#ff5555", 0.2) : "transparent"
+                                                    Text {
+                                                        anchors.centerIn: parent
+                                                        text: Theme.icons.trash
+                                                        font.family: Theme.iconFontFamily
+                                                        font.pixelSize: 13
+                                                        color: rmBtArea.containsMouse ? "#ff5555" : Theme.subtext
+                                                    }
+                                                    MouseArea {
+                                                        id: rmBtArea
+                                                        anchors.fill: parent
+                                                        hoverEnabled: true
+                                                        cursorShape: Qt.PointingHandCursor
+                                                        onClicked: {
+                                                            Quickshell.execDetached(["rice-bluetooth", "remove", btDevCard.modelData.mac]);
+                                                            loadBtProc.running = true;
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    Text {
+                                        visible: !win.btData || !win.btData.devices || win.btData.devices.length === 0
+                                        text: "Nenhum dispositivo encontrado. Coloque seu controle ou fone em modo de pareamento e clique em 'Escanear'."
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 11
+                                        color: Theme.subtext
+                                    }
+                                }
+                            }
+                        }
+
+                        // ==================== ABA 11: REDE & WI-FI ====================
+                        Flickable {
+                            anchors.fill: parent
+                            visible: win.currentTab === 11
+                            contentHeight: netCol.implicitHeight
+                            clip: true
+                            boundsBehavior: Flickable.StopAtBounds
+
+                            ColumnLayout {
+                                id: netCol
+                                width: parent.width
+                                spacing: 16
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    SectionHeader {
+                                        title: "Rede & Wi-Fi"
+                                        subtitle: "Monitore a conexão de internet e conecte-se a novas redes"
+                                    }
+                                    Item { Layout.fillWidth: true }
+                                    ActionBtn {
+                                        icon: Theme.icons.refresh
+                                        text: "Atualizar Redes"
+                                        onClicked: {
+                                            Quickshell.execDetached(["rice-network", "scan"]);
+                                            loadNetScanProc.running = true;
+                                            showToast("Buscando redes Wi-Fi...");
+                                        }
+                                    }
+                                }
+
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    implicitHeight: 100
+                                    radius: 12
+                                    color: win.netData && win.netData.connected_ssid ? Theme.withAlpha(Theme.primary, 0.15) : Theme.tile
+                                    border.width: 1.5
+                                    border.color: win.netData && win.netData.connected_ssid ? Theme.primary : Theme.withAlpha(Theme.outline, 0.2)
+
+                                    RowLayout {
+                                        anchors.fill: parent
+                                        anchors.margins: 14
+                                        spacing: 16
+
+                                        Rectangle {
+                                            implicitWidth: 46
+                                            implicitHeight: 46
+                                            radius: 12
+                                            color: Theme.withAlpha(Theme.primary, 0.25)
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: win.netData && win.netData.wifi_enabled ? Theme.icons.wifi4 : Theme.icons.wifiOff
+                                                font.family: Theme.iconFontFamily
+                                                font.pixelSize: 24
+                                                color: Theme.primary
+                                            }
+                                        }
+
+                                        ColumnLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 4
+
+                                            RowLayout {
+                                                spacing: 8
+                                                Text {
+                                                    text: win.netData && win.netData.connected_ssid ? win.netData.connected_ssid : "Nenhuma rede conectada"
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 15
+                                                    font.weight: Font.Bold
+                                                    color: Theme.textColor
+                                                }
+                                                Rectangle {
+                                                    visible: win.netData && win.netData.is_5g
+                                                    implicitWidth: 42
+                                                    implicitHeight: 18
+                                                    radius: 9
+                                                    color: Theme.withAlpha(Theme.primary, 0.3)
+                                                    Text {
+                                                        anchors.centerIn: parent
+                                                        text: "5 GHz"
+                                                        font.family: Theme.fontFamily
+                                                        font.pixelSize: 9
+                                                        font.weight: Font.Bold
+                                                        color: Theme.primary
+                                                    }
+                                                }
+                                                Rectangle {
+                                                    visible: win.netData && win.netData.signal > 0
+                                                    implicitWidth: 44
+                                                    implicitHeight: 18
+                                                    radius: 9
+                                                    color: Theme.withAlpha(Theme.foreground, 0.1)
+                                                    Text {
+                                                        anchors.centerIn: parent
+                                                        text: (win.netData ? win.netData.signal : 0) + "%"
+                                                        font.family: Theme.fontFamily
+                                                        font.pixelSize: 9
+                                                        color: Theme.textColor
+                                                    }
+                                                }
+                                            }
+
+                                            RowLayout {
+                                                spacing: 12
+                                                Text {
+                                                    text: "IP: " + (win.netData && win.netData.ip ? win.netData.ip : "---")
+                                                    font.family: Theme.monoFamily
+                                                    font.pixelSize: 11
+                                                    color: Theme.subtext
+                                                }
+                                                Text {
+                                                    text: "Gateway: " + (win.netData && win.netData.gateway ? win.netData.gateway : "---")
+                                                    font.family: Theme.monoFamily
+                                                    font.pixelSize: 11
+                                                    color: Theme.subtext
+                                                }
+                                                Text {
+                                                    text: win.pingMs !== null ? ("Ping: " + win.pingMs + " ms") : ""
+                                                    font.family: Theme.monoFamily
+                                                    font.pixelSize: 11
+                                                    font.weight: Font.Bold
+                                                    color: Theme.primary
+                                                }
+                                            }
+                                        }
+
+                                        ColumnLayout {
+                                            spacing: 6
+                                            ActionBtn {
+                                                icon: Theme.icons.speed
+                                                text: "Testar Ping"
+                                                onClicked: loadPingProc.running = true
+                                            }
+                                            ActionBtn {
+                                                visible: win.netData && !!win.netData.connected_ssid
+                                                icon: Theme.icons.close
+                                                text: "Desconectar"
+                                                onClicked: {
+                                                    Quickshell.execDetached(["rice-network", "disconnect"]);
+                                                    loadNetProc.running = true;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                SectionHeader {
+                                    title: "Redes Wi-Fi Disponíveis"
+                                    subtitle: "Selecione uma rede para conectar"
+                                }
+
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 8
+
+                                    Repeater {
+                                        model: win.netScanData || []
+                                        delegate: Rectangle {
+                                            id: wifiCard
+                                            required property var modelData
+                                            Layout.fillWidth: true
+                                            implicitHeight: isConnecting ? 96 : 50
+                                            radius: 10
+                                            color: wifiCard.modelData.active ? Theme.withAlpha(Theme.primary, 0.15) : Theme.tile
+                                            border.width: 1
+                                            border.color: wifiCard.modelData.active ? Theme.primary : Theme.withAlpha(Theme.outline, 0.2)
+
+                                            property bool isConnecting: win.netSelectedSsid === wifiCard.modelData.ssid
+
+                                            ColumnLayout {
+                                                anchors.fill: parent
+                                                anchors.margins: 10
+                                                spacing: 8
+
+                                                RowLayout {
+                                                    Layout.fillWidth: true
+                                                    spacing: 10
+
+                                                    Text {
+                                                        text: wifiCard.modelData.signal > 70 ? Theme.icons.wifi4
+                                                            : (wifiCard.modelData.signal > 40 ? Theme.icons.wifi3 : Theme.icons.wifi2)
+                                                        font.family: Theme.iconFontFamily
+                                                        font.pixelSize: 16
+                                                        color: wifiCard.modelData.active ? Theme.primary : Theme.subtext
+                                                    }
+
+                                                    Text {
+                                                        Layout.fillWidth: true
+                                                        text: wifiCard.modelData.ssid
+                                                        font.family: Theme.fontFamily
+                                                        font.pixelSize: 12
+                                                        font.weight: wifiCard.modelData.active ? Font.Bold : Font.Normal
+                                                        color: Theme.textColor
+                                                    }
+
+                                                    Text {
+                                                        visible: wifiCard.modelData.protected
+                                                        text: Theme.icons.lock
+                                                        font.family: Theme.iconFontFamily
+                                                        font.pixelSize: 12
+                                                        color: Theme.subtext
+                                                    }
+
+                                                    Rectangle {
+                                                        visible: wifiCard.modelData.is_5g
+                                                        implicitWidth: 34
+                                                        implicitHeight: 18
+                                                        radius: 9
+                                                        color: Theme.withAlpha(Theme.foreground, 0.08)
+                                                        Text {
+                                                            anchors.centerIn: parent
+                                                            text: "5G"
+                                                            font.family: Theme.fontFamily
+                                                            font.pixelSize: 9
+                                                            color: Theme.subtext
+                                                        }
+                                                    }
+
+                                                    Text {
+                                                        text: wifiCard.modelData.signal + "%"
+                                                        font.family: Theme.fontFamily
+                                                        font.pixelSize: 11
+                                                        color: Theme.subtext
+                                                    }
+
+                                                    ActionBtn {
+                                                        visible: !wifiCard.modelData.active && !wifiCard.isConnecting
+                                                        icon: Theme.icons.confirm
+                                                        text: "Conectar"
+                                                        primary: true
+                                                        onClicked: {
+                                                            if (wifiCard.modelData.protected) {
+                                                                win.netSelectedSsid = wifiCard.modelData.ssid;
+                                                                win.netPassInput = "";
+                                                            } else {
+                                                                Quickshell.execDetached(["rice-network", "connect", wifiCard.modelData.ssid]);
+                                                                loadNetProc.running = true;
+                                                            }
+                                                        }
+                                                    }
+
+                                                    Rectangle {
+                                                        visible: wifiCard.modelData.active
+                                                        implicitWidth: 64
+                                                        implicitHeight: 24
+                                                        radius: 12
+                                                        color: Theme.withAlpha(Theme.primary, 0.2)
+                                                        Text {
+                                                            anchors.centerIn: parent
+                                                            text: "Ativa"
+                                                            font.family: Theme.fontFamily
+                                                            font.pixelSize: 10
+                                                            font.weight: Font.Bold
+                                                            color: Theme.primary
+                                                        }
+                                                    }
+                                                }
+
+                                                RowLayout {
+                                                    visible: wifiCard.isConnecting
+                                                    Layout.fillWidth: true
+                                                    spacing: 8
+
+                                                    Rectangle {
+                                                        Layout.fillWidth: true
+                                                        implicitHeight: 32
+                                                        radius: 8
+                                                        color: Theme.background
+                                                        border.width: 1
+                                                        border.color: Theme.primary
+
+                                                        TextInput {
+                                                            id: passInput
+                                                            anchors.fill: parent
+                                                            anchors.margins: 6
+                                                            echoMode: TextInput.Password
+                                                            font.family: Theme.fontFamily
+                                                            font.pixelSize: 12
+                                                            color: Theme.textColor
+                                                            clip: true
+                                                            onTextChanged: win.netPassInput = text
+                                                            Text {
+                                                                visible: !passInput.text
+                                                                text: "Digite a senha do Wi-Fi..."
+                                                                font.family: Theme.fontFamily
+                                                                font.pixelSize: 11
+                                                                color: Theme.subtext
+                                                            }
+                                                        }
+                                                    }
+
+                                                    ActionBtn {
+                                                        icon: Theme.icons.confirm
+                                                        text: "Confirmar"
+                                                        primary: true
+                                                        onClicked: {
+                                                            Quickshell.execDetached(["rice-network", "connect", wifiCard.modelData.ssid, win.netPassInput]);
+                                                            win.netSelectedSsid = "";
+                                                            loadNetProc.running = true;
+                                                        }
+                                                    }
+
+                                                    ActionBtn {
+                                                        icon: Theme.icons.close
+                                                        text: "Cancelar"
+                                                        onClicked: win.netSelectedSsid = ""
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // ==================== ABA 12: APLICATIVOS PADRÃO ====================
+                        Flickable {
+                            anchors.fill: parent
+                            visible: win.currentTab === 12
+                            contentHeight: defCol.implicitHeight
+                            clip: true
+                            boundsBehavior: Flickable.StopAtBounds
+
+                            ColumnLayout {
+                                id: defCol
+                                width: parent.width
+                                spacing: 16
+
+                                SectionHeader {
+                                    title: "Aplicativos Padrão do Sistema"
+                                    subtitle: "Selecione quais programas abrem páginas da web, pastas, códigos, fotos e vídeos"
+                                }
+
+                                Repeater {
+                                    model: [
+                                        { id: "browser", title: "Navegador Web", icon: Theme.icons.dashboard, desc: "Abre links HTTP/HTTPS e arquivos HTML" },
+                                        { id: "filemanager", title: "Gerenciador de Pastas", icon: Theme.icons.laptop, desc: "Abre diretórios e dispositivos" },
+                                        { id: "editor", title: "Editor de Código & Texto", icon: Theme.icons.console, desc: "Abre scripts, código-fonte e notas de texto" },
+                                        { id: "video", title: "Player de Vídeo", icon: Theme.icons.media, desc: "Reproduz filmes, gravações e clipes MP4/MKV" },
+                                        { id: "image", title: "Visualizador de Imagens", icon: Theme.icons.camera, desc: "Abre capturas de tela e fotos PNG/JPG" }
+                                    ]
+                                    delegate: Rectangle {
+                                        id: defCatCard
+                                        required property var modelData
+                                        Layout.fillWidth: true
+                                        implicitHeight: catCol.implicitHeight + 24
+                                        radius: 12
+                                        color: Theme.tile
+                                        border.width: 1
+                                        border.color: Theme.withAlpha(Theme.outline, 0.2)
+
+                                        property var catInfo: (win.defaultAppsData && win.defaultAppsData[defCatCard.modelData.id]) ? win.defaultAppsData[defCatCard.modelData.id] : null
+
+                                        ColumnLayout {
+                                            id: catCol
+                                            anchors.fill: parent
+                                            anchors.margins: 12
+                                            spacing: 10
+
+                                            RowLayout {
+                                                Layout.fillWidth: true
+                                                spacing: 8
+                                                Text {
+                                                    text: defCatCard.modelData.icon
+                                                    font.family: Theme.iconFontFamily
+                                                    font.pixelSize: 16
+                                                    color: Theme.primary
+                                                }
+                                                ColumnLayout {
+                                                    Layout.fillWidth: true
+                                                    spacing: 1
+                                                    Text {
+                                                        text: defCatCard.modelData.title
+                                                        font.family: Theme.fontFamily
+                                                        font.pixelSize: 13
+                                                        font.weight: Font.DemiBold
+                                                        color: Theme.textColor
+                                                    }
+                                                    Text {
+                                                        text: defCatCard.modelData.desc
+                                                        font.family: Theme.fontFamily
+                                                        font.pixelSize: 10
+                                                        color: Theme.subtext
+                                                    }
+                                                }
+                                            }
+
+                                            Flow {
+                                                Layout.fillWidth: true
+                                                spacing: 8
+
+                                                Repeater {
+                                                    model: (defCatCard.catInfo && defCatCard.catInfo.options) ? defCatCard.catInfo.options : []
+                                                    delegate: Rectangle {
+                                                        id: optChip
+                                                        required property var modelData
+                                                        implicitHeight: 32
+                                                        implicitWidth: chipRow.implicitWidth + 20
+                                                        radius: 8
+                                                        color: optChip.modelData.is_current ? Theme.withAlpha(Theme.primary, 0.25) : (chipArea.containsMouse ? Theme.tileHigh : Theme.background)
+                                                        border.width: optChip.modelData.is_current ? 1.5 : 1
+                                                        border.color: optChip.modelData.is_current ? Theme.primary : Theme.withAlpha(Theme.outline, 0.2)
+
+                                                        RowLayout {
+                                                            id: chipRow
+                                                            anchors.centerIn: parent
+                                                            spacing: 6
+
+                                                            Text {
+                                                                visible: optChip.modelData.is_current
+                                                                text: Theme.icons.confirm
+                                                                font.family: Theme.iconFontFamily
+                                                                font.pixelSize: 12
+                                                                color: Theme.primary
+                                                            }
+
+                                                            Text {
+                                                                text: optChip.modelData.name
+                                                                font.family: Theme.fontFamily
+                                                                font.pixelSize: 11
+                                                                font.weight: optChip.modelData.is_current ? Font.Bold : Font.Normal
+                                                                color: optChip.modelData.is_current ? Theme.textColor : Theme.subtext
+                                                            }
+
+                                                            Rectangle {
+                                                                visible: optChip.modelData.is_current
+                                                                implicitWidth: 44
+                                                                implicitHeight: 16
+                                                                radius: 8
+                                                                color: Theme.primary
+                                                                Text {
+                                                                    anchors.centerIn: parent
+                                                                    text: "Padrão"
+                                                                    font.family: Theme.fontFamily
+                                                                    font.pixelSize: 9
+                                                                    font.weight: Font.Bold
+                                                                    color: Theme.background
+                                                                }
+                                                            }
+                                                        }
+
+                                                        MouseArea {
+                                                            id: chipArea
+                                                            anchors.fill: parent
+                                                            hoverEnabled: true
+                                                            cursorShape: Qt.PointingHandCursor
+                                                            onClicked: {
+                                                                Quickshell.execDetached(["rice-default-apps", "set", defCatCard.modelData.id, optChip.modelData.desktop]);
+                                                                loadDefaultAppsProc.running = true;
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // ==================== ABA 13: JOGOS & GPU ====================
+                        Flickable {
+                            anchors.fill: parent
+                            visible: win.currentTab === 13
+                            contentHeight: gamingCol.implicitHeight
+                            clip: true
+                            boundsBehavior: Flickable.StopAtBounds
+
+                            ColumnLayout {
+                                id: gamingCol
+                                width: parent.width
+                                spacing: 16
+
+                                SectionHeader {
+                                    title: "Jogos & Placa Gráfica Dedicada"
+                                    subtitle: "Monitore a NVIDIA GeForce RTX 3050, GameMode e parâmetros da Steam"
+                                }
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 12
+
+                                    Rectangle {
+                                        Layout.fillWidth: true
+                                        implicitHeight: 74
+                                        radius: 12
+                                        color: Theme.tile
+                                        border.width: 1
+                                        border.color: Theme.withAlpha(Theme.outline, 0.2)
+
+                                        RowLayout {
+                                            anchors.fill: parent
+                                            anchors.margins: 12
+                                            spacing: 10
+                                            Rectangle {
+                                                implicitWidth: 38; implicitHeight: 38; radius: 10
+                                                color: Theme.withAlpha("#ff7733", 0.2)
+                                                Text {
+                                                    anchors.centerIn: parent
+                                                    text: "🌡️"
+                                                    font.pixelSize: 16
+                                                }
+                                            }
+                                            ColumnLayout {
+                                                spacing: 2
+                                                Text {
+                                                    text: "Temperatura GPU"
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 10
+                                                    color: Theme.subtext
+                                                }
+                                                Text {
+                                                    text: (win.gamingData && win.gamingData.gpu && win.gamingData.gpu.temp ? win.gamingData.gpu.temp : "--") + " °C"
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 16
+                                                    font.weight: Font.Bold
+                                                    color: Theme.textColor
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        Layout.fillWidth: true
+                                        implicitHeight: 74
+                                        radius: 12
+                                        color: Theme.tile
+                                        border.width: 1
+                                        border.color: Theme.withAlpha(Theme.outline, 0.2)
+
+                                        RowLayout {
+                                            anchors.fill: parent
+                                            anchors.margins: 12
+                                            spacing: 10
+                                            Rectangle {
+                                                implicitWidth: 38; implicitHeight: 38; radius: 10
+                                                color: Theme.withAlpha(Theme.primary, 0.2)
+                                                Text {
+                                                    anchors.centerIn: parent
+                                                    text: Theme.icons.memory
+                                                    font.family: Theme.iconFontFamily
+                                                    font.pixelSize: 16
+                                                    color: Theme.primary
+                                                }
+                                            }
+                                            ColumnLayout {
+                                                spacing: 2
+                                                Text {
+                                                    text: "VRAM Utilizada"
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 10
+                                                    color: Theme.subtext
+                                                }
+                                                Text {
+                                                    text: (win.gamingData && win.gamingData.gpu && win.gamingData.gpu.vram_used ? win.gamingData.gpu.vram_used : 0) + " / " + (win.gamingData && win.gamingData.gpu && win.gamingData.gpu.vram_total ? win.gamingData.gpu.vram_total : 4096) + " MB"
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 13
+                                                    font.weight: Font.Bold
+                                                    color: Theme.textColor
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        Layout.fillWidth: true
+                                        implicitHeight: 74
+                                        radius: 12
+                                        color: Theme.tile
+                                        border.width: 1
+                                        border.color: Theme.withAlpha(Theme.outline, 0.2)
+
+                                        RowLayout {
+                                            anchors.fill: parent
+                                            anchors.margins: 12
+                                            spacing: 10
+                                            Rectangle {
+                                                implicitWidth: 38; implicitHeight: 38; radius: 10
+                                                color: Theme.withAlpha(Theme.primary, 0.2)
+                                                Text {
+                                                    anchors.centerIn: parent
+                                                    text: Theme.icons.gpu
+                                                    font.family: Theme.iconFontFamily
+                                                    font.pixelSize: 16
+                                                    color: Theme.primary
+                                                }
+                                            }
+                                            ColumnLayout {
+                                                spacing: 2
+                                                Text {
+                                                    text: "Driver NVIDIA"
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 10
+                                                    color: Theme.subtext
+                                                }
+                                                Text {
+                                                    text: win.gamingData && win.gamingData.gpu && win.gamingData.gpu.driver ? win.gamingData.gpu.driver : "Ativo"
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 13
+                                                    font.weight: Font.Bold
+                                                    color: Theme.textColor
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    implicitHeight: 64
+                                    radius: 12
+                                    color: Theme.tile
+                                    border.width: 1
+                                    border.color: Theme.withAlpha(Theme.outline, 0.2)
+
+                                    RowLayout {
+                                        anchors.fill: parent
+                                        anchors.margins: 14
+                                        spacing: 12
+
+                                        Text {
+                                            text: Theme.icons.speed
+                                            font.family: Theme.iconFontFamily
+                                            font.pixelSize: 22
+                                            color: win.gamingData && win.gamingData.gamemode_active ? Theme.primary : Theme.subtext
+                                        }
+
+                                        ColumnLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 2
+                                            Text {
+                                                text: "Feral GameMode"
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: 13
+                                                font.weight: Font.DemiBold
+                                                color: Theme.textColor
+                                            }
+                                            Text {
+                                                text: "Otimiza a CPU para priorizar taxas de quadros (FPS) e reduz a latência nos jogos"
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: 11
+                                                color: Theme.subtext
+                                            }
+                                        }
+
+                                        SwitchToggle {
+                                            checked: win.gamingData && win.gamingData.gamemode_active
+                                            onToggled: {
+                                                Quickshell.execDetached(["rice-gaming", "toggle-gamemode"]);
+                                                loadGamingProc.running = true;
+                                            }
+                                        }
+                                    }
+                                }
+
+                                SectionHeader {
+                                    title: "Parâmetros para Jogos da Steam"
+                                    subtitle: "Clique em Copiar e cole nas Propriedades do Jogo -> Opções de Inicialização"
+                                }
+
+                                Repeater {
+                                    model: [
+                                        { id: "nvidia", title: "NVIDIA Dedicada + DLSS (Recomendado)", param: "game-run %command%", desc: "Garante que o jogo rode na RTX 3050 com DLSS ativo via DXVK-NVAPI." },
+                                        { id: "gamemode", title: "NVIDIA + Feral GameMode", param: "gamemoderun game-run %command%", desc: "Combina aceleração máxima da GPU com prioridade de processador." },
+                                        { id: "compat", title: "Compatibilidade (Desativa NVAPI)", param: "PROTON_DISABLE_NVAPI=1 game-run %command%", desc: "Use apenas se algum jogo der tela preta ou erro com DLSS." }
+                                    ]
+                                    delegate: Rectangle {
+                                        id: steamCard
+                                        required property var modelData
+                                        Layout.fillWidth: true
+                                        implicitHeight: 70
+                                        radius: 10
+                                        color: Theme.tile
+                                        border.width: 1
+                                        border.color: Theme.withAlpha(Theme.outline, 0.2)
+
+                                        RowLayout {
+                                            anchors.fill: parent
+                                            anchors.margins: 12
+                                            spacing: 12
+
+                                            ColumnLayout {
+                                                Layout.fillWidth: true
+                                                spacing: 2
+                                                Text {
+                                                    text: steamCard.modelData.title
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 12
+                                                    font.weight: Font.DemiBold
+                                                    color: Theme.textColor
+                                                }
+                                                Text {
+                                                    text: steamCard.modelData.desc
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 10
+                                                    color: Theme.subtext
+                                                }
+                                                Text {
+                                                    text: steamCard.modelData.param
+                                                    font.family: Theme.monoFamily
+                                                    font.pixelSize: 10
+                                                    font.weight: Font.Bold
+                                                    color: Theme.primary
+                                                }
+                                            }
+
+                                            ActionBtn {
+                                                icon: Theme.icons.confirm
+                                                text: "Copiar"
+                                                primary: true
+                                                onClicked: {
+                                                    Quickshell.execDetached(["rice-gaming", "copy-param", steamCard.modelData.id]);
+                                                    showToast("Parâmetro copiado para a área de transferência!");
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 12
+                                    ActionBtn {
+                                        icon: Theme.icons.gamepad
+                                        text: "Abrir Steam"
+                                        onClicked: Quickshell.execDetached(["steam"])
+                                    }
+                                    ActionBtn {
+                                        icon: Theme.icons.speed
+                                        text: "Abrir Heroic Games"
+                                        onClicked: Quickshell.execDetached(["heroic"])
+                                    }
+                                    Item { Layout.fillWidth: true }
+                                }
+                            }
+                        }
+
+                        // ==================== ABA 14: ARMAZENAMENTO ====================
+                        Flickable {
+                            anchors.fill: parent
+                            visible: win.currentTab === 14
+                            contentHeight: storCol.implicitHeight
+                            clip: true
+                            boundsBehavior: Flickable.StopAtBounds
+
+                            ColumnLayout {
+                                id: storCol
+                                width: parent.width
+                                spacing: 16
+
+                                SectionHeader {
+                                    title: "Armazenamento & Limpeza Segura"
+                                    subtitle: "Monitore o SSD e libere gigabytes de caches temporários sem risco"
+                                }
+
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    implicitHeight: 96
+                                    radius: 12
+                                    color: Theme.tile
+                                    border.width: 1
+                                    border.color: Theme.withAlpha(Theme.outline, 0.2)
+
+                                    ColumnLayout {
+                                        anchors.fill: parent
+                                        anchors.margins: 14
+                                        spacing: 8
+
+                                        RowLayout {
+                                            Layout.fillWidth: true
+                                            Text {
+                                                text: "SSD Principal (Partição Btrfs /)"
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: 13
+                                                font.weight: Font.DemiBold
+                                                color: Theme.textColor
+                                            }
+                                            Item { Layout.fillWidth: true }
+                                            Text {
+                                                text: (win.storageData ? win.storageData.root_used : "") + " usado de " + (win.storageData ? win.storageData.root_total : "") + " (" + (win.storageData ? win.storageData.root_avail : "") + " livres)"
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: 11
+                                                color: Theme.subtext
+                                            }
+                                        }
+
+                                        Rectangle {
+                                            Layout.fillWidth: true
+                                            implicitHeight: 12
+                                            radius: 6
+                                            color: Theme.background
+
+                                            Rectangle {
+                                                height: parent.height
+                                                width: parent.width * ((win.storageData && win.storageData.root_pct ? win.storageData.root_pct : 0) / 100.0)
+                                                radius: 6
+                                                color: (win.storageData && win.storageData.root_pct > 85) ? "#ff5555" : Theme.primary
+                                            }
+                                        }
+
+                                        Text {
+                                            text: (win.storageData ? win.storageData.root_pct : 0) + "% do espaço ocupado"
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: 10
+                                            color: Theme.subtext
+                                        }
+                                    }
+                                }
+
+                                SectionHeader {
+                                    title: "Caches & Espaço Recuperável"
+                                    subtitle: "Arquivos que podem ser apagados com segurança para recuperar espaço"
+                                }
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 10
+
+                                    Rectangle {
+                                        Layout.fillWidth: true
+                                        implicitHeight: 80
+                                        radius: 10
+                                        color: Theme.tile
+                                        border.width: 1
+                                        border.color: Theme.withAlpha(Theme.outline, 0.2)
+                                        ColumnLayout {
+                                            anchors.centerIn: parent
+                                            spacing: 2
+                                            Text {
+                                                Layout.alignment: Qt.AlignHCenter
+                                                text: "Cache Pacman"
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: 11
+                                                color: Theme.subtext
+                                            }
+                                            Text {
+                                                Layout.alignment: Qt.AlignHCenter
+                                                text: win.storageData ? win.storageData.pacman_cache : "0 B"
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: 15
+                                                font.weight: Font.Bold
+                                                color: Theme.primary
+                                            }
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        Layout.fillWidth: true
+                                        implicitHeight: 80
+                                        radius: 10
+                                        color: Theme.tile
+                                        border.width: 1
+                                        border.color: Theme.withAlpha(Theme.outline, 0.2)
+                                        ColumnLayout {
+                                            anchors.centerIn: parent
+                                            spacing: 2
+                                            Text {
+                                                Layout.alignment: Qt.AlignHCenter
+                                                text: "Miniaturas"
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: 11
+                                                color: Theme.subtext
+                                            }
+                                            Text {
+                                                Layout.alignment: Qt.AlignHCenter
+                                                text: win.storageData ? win.storageData.thumbnails : "0 B"
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: 15
+                                                font.weight: Font.Bold
+                                                color: Theme.primary
+                                            }
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        Layout.fillWidth: true
+                                        implicitHeight: 80
+                                        radius: 10
+                                        color: Theme.tile
+                                        border.width: 1
+                                        border.color: Theme.withAlpha(Theme.outline, 0.2)
+                                        ColumnLayout {
+                                            anchors.centerIn: parent
+                                            spacing: 2
+                                            Text {
+                                                Layout.alignment: Qt.AlignHCenter
+                                                text: "Lixeira"
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: 11
+                                                color: Theme.subtext
+                                            }
+                                            Text {
+                                                Layout.alignment: Qt.AlignHCenter
+                                                text: win.storageData ? win.storageData.trash : "0 B"
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: 15
+                                                font.weight: Font.Bold
+                                                color: Theme.primary
+                                            }
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        Layout.fillWidth: true
+                                        implicitHeight: 80
+                                        radius: 10
+                                        color: Theme.tile
+                                        border.width: 1
+                                        border.color: Theme.withAlpha(Theme.outline, 0.2)
+                                        ColumnLayout {
+                                            anchors.centerIn: parent
+                                            spacing: 2
+                                            Text {
+                                                Layout.alignment: Qt.AlignHCenter
+                                                text: "Caches de Apps"
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: 11
+                                                color: Theme.subtext
+                                            }
+                                            Text {
+                                                Layout.alignment: Qt.AlignHCenter
+                                                text: win.storageData ? win.storageData.user_cache : "0 B"
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: 15
+                                                font.weight: Font.Bold
+                                                color: Theme.primary
+                                            }
+                                        }
+                                    }
+                                }
+
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 8
+
+                                    Rectangle {
+                                        Layout.fillWidth: true
+                                        implicitHeight: 56
+                                        radius: 10
+                                        color: Theme.tile
+                                        border.width: 1
+                                        border.color: Theme.withAlpha(Theme.outline, 0.2)
+                                        RowLayout {
+                                            anchors.fill: parent
+                                            anchors.margins: 12
+                                            spacing: 12
+                                            Text {
+                                                text: Theme.icons.packages
+                                                font.family: Theme.iconFontFamily
+                                                font.pixelSize: 18
+                                                color: Theme.primary
+                                            }
+                                            ColumnLayout {
+                                                Layout.fillWidth: true
+                                                spacing: 1
+                                                Text {
+                                                    text: "Limpar Pacotes Antigos do Pacman"
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 12
+                                                    font.weight: Font.DemiBold
+                                                    color: Theme.textColor
+                                                }
+                                                Text {
+                                                    text: "Mantém as 2 últimas versões instaladas para rollback seguro e remove o restante."
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 10
+                                                    color: Theme.subtext
+                                                }
+                                            }
+                                            ActionBtn {
+                                                icon: Theme.icons.broom
+                                                text: "Limpar"
+                                                onClicked: {
+                                                    Quickshell.execDetached(["rice-storage", "clean-pacman"]);
+                                                    loadStorageProc.running = true;
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        Layout.fillWidth: true
+                                        implicitHeight: 56
+                                        radius: 10
+                                        color: Theme.tile
+                                        border.width: 1
+                                        border.color: Theme.withAlpha(Theme.outline, 0.2)
+                                        RowLayout {
+                                            anchors.fill: parent
+                                            anchors.margins: 12
+                                            spacing: 12
+                                            Text {
+                                                text: Theme.icons.camera
+                                                font.family: Theme.iconFontFamily
+                                                font.pixelSize: 18
+                                                color: Theme.primary
+                                            }
+                                            ColumnLayout {
+                                                Layout.fillWidth: true
+                                                spacing: 1
+                                                Text {
+                                                    text: "Limpar Miniaturas em Cache"
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 12
+                                                    font.weight: Font.DemiBold
+                                                    color: Theme.textColor
+                                                }
+                                                Text {
+                                                    text: "Remove thumbnails geradas para arquivos e vídeos. Elas serão recriadas se necessário."
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 10
+                                                    color: Theme.subtext
+                                                }
+                                            }
+                                            ActionBtn {
+                                                icon: Theme.icons.broom
+                                                text: "Limpar"
+                                                onClicked: {
+                                                    Quickshell.execDetached(["rice-storage", "clean-thumbnails"]);
+                                                    loadStorageProc.running = true;
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        Layout.fillWidth: true
+                                        implicitHeight: 56
+                                        radius: 10
+                                        color: Theme.tile
+                                        border.width: 1
+                                        border.color: Theme.withAlpha(Theme.outline, 0.2)
+                                        RowLayout {
+                                            anchors.fill: parent
+                                            anchors.margins: 12
+                                            spacing: 12
+                                            Text {
+                                                text: Theme.icons.trash
+                                                font.family: Theme.iconFontFamily
+                                                font.pixelSize: 18
+                                                color: Theme.primary
+                                            }
+                                            ColumnLayout {
+                                                Layout.fillWidth: true
+                                                spacing: 1
+                                                Text {
+                                                    text: "Esvaziar Lixeira do Usuário"
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 12
+                                                    font.weight: Font.DemiBold
+                                                    color: Theme.textColor
+                                                }
+                                                Text {
+                                                    text: "Apaga permanentemente os arquivos descartados em ~/.local/share/Trash."
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 10
+                                                    color: Theme.subtext
+                                                }
+                                            }
+                                            ActionBtn {
+                                                icon: Theme.icons.trash
+                                                text: "Esvaziar"
+                                                onClicked: {
+                                                    Quickshell.execDetached(["rice-storage", "clean-trash"]);
+                                                    loadStorageProc.running = true;
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 12
+                                        ActionBtn {
+                                            icon: Theme.icons.broom
+                                            text: "Executar Limpeza Profunda Completa"
+                                            primary: true
+                                            onClicked: {
+                                                Quickshell.execDetached(["rice-storage", "clean-all"]);
+                                                loadStorageProc.running = true;
+                                                showToast("Limpeza profunda concluída!");
+                                            }
+                                        }
+                                        Item { Layout.fillWidth: true }
+                                    }
+                                }
+                            }
+                        }
+
+                        // ==================== ABA 15: GUIA DE ATALHOS ====================
+                        Flickable {
+                            anchors.fill: parent
+                            visible: win.currentTab === 15
+                            contentHeight: bindsCol.implicitHeight
+                            clip: true
+                            boundsBehavior: Flickable.StopAtBounds
+
+                            ColumnLayout {
+                                id: bindsCol
+                                width: parent.width
+                                spacing: 14
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    SectionHeader {
+                                        title: "Guia de Teclas & Atalhos"
+                                        subtitle: "Atalhos essenciais do Hyprland com busca instantânea"
+                                    }
+                                    Item { Layout.fillWidth: true }
+
+                                    Rectangle {
+                                        implicitWidth: 200
+                                        implicitHeight: 32
+                                        radius: 8
+                                        color: Theme.background
+                                        border.width: 1
+                                        border.color: searchInput.activeFocus ? Theme.primary : Theme.withAlpha(Theme.outline, 0.2)
+
+                                        RowLayout {
+                                            anchors.fill: parent
+                                            anchors.margins: 6
+                                            spacing: 6
+                                            Text {
+                                                text: Theme.icons.magnify
+                                                font.family: Theme.iconFontFamily
+                                                font.pixelSize: 13
+                                                color: Theme.subtext
+                                            }
+                                            TextInput {
+                                                id: searchInput
+                                                Layout.fillWidth: true
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: 11
+                                                color: Theme.textColor
+                                                clip: true
+                                                onTextChanged: win.bindsFilter = text.toLowerCase()
+                                                Text {
+                                                    visible: !searchInput.text
+                                                    text: "Buscar atalho..."
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 11
+                                                    color: Theme.subtext
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Repeater {
+                                    model: [
+                                        {
+                                            cat: "Janelas & Navegação",
+                                            binds: [
+                                                { key: "Super + Q", action: "Abrir Terminal Kitty" },
+                                                { key: "Super + C", action: "Fechar Janela Ativa" },
+                                                { key: "Alt + F4", action: "Fechar Janela Ativa (Padrão Windows)" },
+                                                { key: "Super + F", action: "Alternar Tela Cheia (Fullscreen)" },
+                                                { key: "Super + Shift + V", action: "Alternar Janela Flutuante" },
+                                                { key: "Super + P", action: "Alternar Modo Pseudo-Tiling" },
+                                                { key: "Super + J", action: "Alternar Divisão Horizontal / Vertical" },
+                                                { key: "Super + Setas", action: "Mudar Foco entre Janelas" },
+                                                { key: "Super + 1..9", action: "Mudar para Área de Trabalho (Workspace)" },
+                                                { key: "Super + Shift + 1..9", action: "Mover Janela para Área de Trabalho" },
+                                                { key: "Super + A", action: "Abrir Área Especial (Scratchpad)" }
+                                            ]
+                                        },
+                                        {
+                                            cat: "Aplicativos & Ferramentas do Rice",
+                                            binds: [
+                                                { key: "Super / Super + R", action: "Menu de Aplicativos (Launcher Quickshell)" },
+                                                { key: "Super + E", action: "Gerenciador de Pastas (Dolphin)" },
+                                                { key: "Super + I", action: "Painel de Controle Rice (Esta Central Gráfica)" },
+                                                { key: "Super + S", action: "Trocar Papel de Parede (Waywallen Switcher)" },
+                                                { key: "Super + V", action: "Histórico da Área de Transferência" },
+                                                { key: "Super + W", action: "Editar Widgets da Área de Trabalho" },
+                                                { key: "Super + N", action: "Abrir Central de Notificações" },
+                                                { key: "Super + Shift + N", action: "Alternar Não Perturbe (DND)" },
+                                                { key: "Super + L", action: "Bloquear Tela (Hyprlock)" },
+                                                { key: "Alt + Tab", action: "Alternador de Janelas com Miniaturas" }
+                                            ]
+                                        },
+                                        {
+                                            cat: "Captura & Gravação de Tela",
+                                            binds: [
+                                                { key: "Print / Super+Shift+S", action: "Print de Região com Editor Swappy" },
+                                                { key: "Shift + Print", action: "Print da Tela Inteira" },
+                                                { key: "Ctrl + Print", action: "Print da Janela Ativa" },
+                                                { key: "Super + Shift + R", action: "Gravar Vídeo de Região com Áudio" },
+                                                { key: "Super + Ctrl + Shift + R", action: "Gravar Vídeo da Tela Inteira" }
+                                            ]
+                                        },
+                                        {
+                                            cat: "Áudio & Multimídia",
+                                            binds: [
+                                                { key: "Volume + / -", action: "Aumentar / Diminuir Volume" },
+                                                { key: "Mute", action: "Silenciar / Reativar Som" },
+                                                { key: "NumLock", action: "Silenciar Microfone Instantaneamente" },
+                                                { key: "Brilho + / -", action: "Aumentar / Diminuir Brilho do Monitor" },
+                                                { key: "Play / Pause", action: "Reproduzir / Pausar Música" }
+                                            ]
+                                        }
+                                    ]
+                                    delegate: ColumnLayout {
+                                        id: catBindsCol
+                                        required property var modelData
+                                        Layout.fillWidth: true
+                                        spacing: 8
+
+                                        property var filteredBinds: catBindsCol.modelData.binds.filter(b => {
+                                            if (!win.bindsFilter) return true;
+                                            return b.key.toLowerCase().includes(win.bindsFilter) || b.action.toLowerCase().includes(win.bindsFilter);
+                                        })
+
+                                        visible: filteredBinds.length > 0
+
+                                        Text {
+                                            text: catBindsCol.modelData.cat
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: 12
+                                            font.weight: Font.Bold
+                                            color: Theme.primary
+                                        }
+
+                                        Flow {
+                                            Layout.fillWidth: true
+                                            spacing: 8
+
+                                            Repeater {
+                                                model: catBindsCol.filteredBinds
+                                                delegate: Rectangle {
+                                                    required property var modelData
+                                                    implicitHeight: 34
+                                                    implicitWidth: bindRow.implicitWidth + 20
+                                                    radius: 8
+                                                    color: Theme.tile
+                                                    border.width: 1
+                                                    border.color: Theme.withAlpha(Theme.outline, 0.2)
+
+                                                    RowLayout {
+                                                        id: bindRow
+                                                        anchors.centerIn: parent
+                                                        spacing: 8
+
+                                                        Rectangle {
+                                                            implicitHeight: 22
+                                                            implicitWidth: keyTxt.implicitWidth + 12
+                                                            radius: 6
+                                                            color: Theme.background
+                                                            border.width: 1
+                                                            border.color: Theme.withAlpha(Theme.primary, 0.4)
+                                                            Text {
+                                                                id: keyTxt
+                                                                anchors.centerIn: parent
+                                                                text: parent.parent.parent.modelData.key
+                                                                font.family: Theme.monoFamily
+                                                                font.pixelSize: 10
+                                                                font.weight: Font.Bold
+                                                                color: Theme.primary
+                                                            }
+                                                        }
+
+                                                        Text {
+                                                            text: parent.parent.modelData.action
+                                                            font.family: Theme.fontFamily
+                                                            font.pixelSize: 11
+                                                            color: Theme.textColor
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // ==================== ABA 16: SISTEMA, SNAPSHOTS & REPARO ====================
+                        Flickable {
+                            anchors.fill: parent
+                            visible: win.currentTab === 16
                             contentHeight: sysCol.implicitHeight
                             clip: true
                             boundsBehavior: Flickable.StopAtBounds
@@ -2224,19 +4635,128 @@ PanelWindow {
                                 spacing: 16
 
                                 SectionHeader {
+                                    title: "Pontos de Restauração Btrfs (Snapshots de Segurança)"
+                                    subtitle: "Crie pontos de restauração antes de atualizar o sistema para desfazer qualquer problema pelo Limine"
+                                }
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 12
+                                    ActionBtn {
+                                        icon: Theme.icons.plus
+                                        text: "Criar Ponto de Restauração Agora"
+                                        primary: true
+                                        onClicked: {
+                                            Quickshell.execDetached(["rice-snapshots", "create", "Snapshot Manual do Usuário"]);
+                                            win.showToast("Criando snapshot Btrfs...");
+                                            snapRefreshTimer.restart();
+                                        }
+                                    }
+                                    Item { Layout.fillWidth: true }
+                                }
+
+                                // Lista de Snapshots Recentes
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 6
+
+                                    Repeater {
+                                        model: win.snapshotsData.snapshots || []
+                                        delegate: Rectangle {
+                                            id: snapCard
+                                            required property var modelData
+                                            Layout.fillWidth: true
+                                            implicitHeight: 46
+                                            radius: 8
+                                            color: Theme.tile
+                                            border.width: 1
+                                            border.color: Theme.withAlpha(Theme.outline, 0.15)
+
+                                            RowLayout {
+                                                anchors.fill: parent
+                                                anchors.margins: 10
+                                                spacing: 10
+
+                                                Rectangle {
+                                                    implicitWidth: 26
+                                                    implicitHeight: 26
+                                                    radius: 6
+                                                    color: Theme.withAlpha(Theme.primary, 0.2)
+                                                    Text {
+                                                        anchors.centerIn: parent
+                                                        text: Theme.icons.disk
+                                                        font.family: Theme.iconFontFamily
+                                                        font.pixelSize: 13
+                                                        color: Theme.primary
+                                                    }
+                                                }
+
+                                                ColumnLayout {
+                                                    Layout.fillWidth: true
+                                                    spacing: 1
+                                                    Text {
+                                                        text: "#" + snapCard.modelData.id + " · " + snapCard.modelData.description
+                                                        font.family: Theme.fontFamily
+                                                        font.pixelSize: 11
+                                                        font.weight: Font.DemiBold
+                                                        color: Theme.textColor
+                                                        elide: Text.ElideRight
+                                                    }
+                                                    Text {
+                                                        text: snapCard.modelData.date + " · Tipo: " + snapCard.modelData.type
+                                                        font.family: Theme.fontFamily
+                                                        font.pixelSize: 9
+                                                        color: Theme.subtext
+                                                    }
+                                                }
+
+                                                Rectangle {
+                                                    implicitWidth: 24
+                                                    implicitHeight: 24
+                                                    radius: 12
+                                                    color: snapDelArea.containsMouse ? Theme.withAlpha(Theme.critical, 0.2) : "transparent"
+                                                    Text {
+                                                        anchors.centerIn: parent
+                                                        text: Theme.icons.trash
+                                                        font.family: Theme.iconFontFamily
+                                                        font.pixelSize: 12
+                                                        color: Theme.critical
+                                                    }
+                                                    MouseArea {
+                                                        id: snapDelArea
+                                                        anchors.fill: parent
+                                                        hoverEnabled: true
+                                                        cursorShape: Qt.PointingHandCursor
+                                                        onClicked: {
+                                                            Quickshell.execDetached(["rice-snapshots", "delete", String(snapCard.modelData.id)]);
+                                                            win.showToast("Excluindo snapshot #" + snapCard.modelData.id);
+                                                            snapRefreshTimer.restart();
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                Timer {
+                                    id: snapRefreshTimer
+                                    interval: 800
+                                    onTriggered: loadSnapshotsProc.running = true
+                                }
+
+                                SectionHeader {
                                     title: "Auto-Reparo & Soluções Rápidas de Um Clique"
                                     subtitle: "Ferramentas práticas para resolver problemas comuns sem abrir o terminal ou digitar comandos"
                                 }
 
-                                // 4 Cartões de Solução Rápida
                                 ColumnLayout {
                                     Layout.fillWidth: true
-                                    spacing: 10
+                                    spacing: 8
 
                                     // Card 1: Áudio PipeWire
                                     Rectangle {
                                         Layout.fillWidth: true
-                                        implicitHeight: 68
+                                        implicitHeight: 64
                                         radius: 12
                                         color: Theme.tile
                                         border.width: 1
@@ -2244,19 +4764,19 @@ PanelWindow {
 
                                         RowLayout {
                                             anchors.fill: parent
-                                            anchors.margins: 14
-                                            spacing: 14
+                                            anchors.margins: 12
+                                            spacing: 12
 
                                             Rectangle {
-                                                implicitWidth: 40
-                                                implicitHeight: 40
+                                                implicitWidth: 38
+                                                implicitHeight: 38
                                                 radius: 10
                                                 color: Theme.withAlpha(Theme.primary, 0.2)
                                                 Text {
                                                     anchors.centerIn: parent
                                                     text: Theme.icons.volHigh
                                                     font.family: Theme.iconFontFamily
-                                                    font.pixelSize: 20
+                                                    font.pixelSize: 18
                                                     color: Theme.primary
                                                 }
                                             }
@@ -2267,7 +4787,7 @@ PanelWindow {
                                                 Text {
                                                     text: "Reiniciar Sistema de Áudio (PipeWire)"
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 13
+                                                    font.pixelSize: 12
                                                     font.weight: Font.DemiBold
                                                     color: Theme.textColor
                                                 }
@@ -2294,7 +4814,7 @@ PanelWindow {
                                     // Card 2: Destravar Pacman (db.lck)
                                     Rectangle {
                                         Layout.fillWidth: true
-                                        implicitHeight: 68
+                                        implicitHeight: 64
                                         radius: 12
                                         color: Theme.tile
                                         border.width: 1
@@ -2302,19 +4822,19 @@ PanelWindow {
 
                                         RowLayout {
                                             anchors.fill: parent
-                                            anchors.margins: 14
-                                            spacing: 14
+                                            anchors.margins: 12
+                                            spacing: 12
 
                                             Rectangle {
-                                                implicitWidth: 40
-                                                implicitHeight: 40
+                                                implicitWidth: 38
+                                                implicitHeight: 38
                                                 radius: 10
                                                 color: Theme.withAlpha(Theme.primary, 0.2)
                                                 Text {
                                                     anchors.centerIn: parent
                                                     text: Theme.icons.lock
                                                     font.family: Theme.iconFontFamily
-                                                    font.pixelSize: 20
+                                                    font.pixelSize: 18
                                                     color: Theme.primary
                                                 }
                                             }
@@ -2325,7 +4845,7 @@ PanelWindow {
                                                 Text {
                                                     text: "Destravar Pacman (Remover db.lck)"
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 13
+                                                    font.pixelSize: 12
                                                     font.weight: Font.DemiBold
                                                     color: Theme.textColor
                                                 }
@@ -2350,7 +4870,7 @@ PanelWindow {
                                     // Card 3: Limpeza de Cache & Disco
                                     Rectangle {
                                         Layout.fillWidth: true
-                                        implicitHeight: 68
+                                        implicitHeight: 64
                                         radius: 12
                                         color: Theme.tile
                                         border.width: 1
@@ -2358,19 +4878,19 @@ PanelWindow {
 
                                         RowLayout {
                                             anchors.fill: parent
-                                            anchors.margins: 14
-                                            spacing: 14
+                                            anchors.margins: 12
+                                            spacing: 12
 
                                             Rectangle {
-                                                implicitWidth: 40
-                                                implicitHeight: 40
+                                                implicitWidth: 38
+                                                implicitHeight: 38
                                                 radius: 10
                                                 color: Theme.withAlpha(Theme.primary, 0.2)
                                                 Text {
                                                     anchors.centerIn: parent
                                                     text: Theme.icons.broom
                                                     font.family: Theme.iconFontFamily
-                                                    font.pixelSize: 20
+                                                    font.pixelSize: 18
                                                     color: Theme.primary
                                                 }
                                             }
@@ -2381,7 +4901,7 @@ PanelWindow {
                                                 Text {
                                                     text: "Limpeza de Disco & Caches Antigos"
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 13
+                                                    font.pixelSize: 12
                                                     font.weight: Font.DemiBold
                                                     color: Theme.textColor
                                                 }
@@ -2407,7 +4927,7 @@ PanelWindow {
                                     // Card 4: Rice Doctor
                                     Rectangle {
                                         Layout.fillWidth: true
-                                        implicitHeight: 68
+                                        implicitHeight: 64
                                         radius: 12
                                         color: Theme.tile
                                         border.width: 1
@@ -2415,19 +4935,19 @@ PanelWindow {
 
                                         RowLayout {
                                             anchors.fill: parent
-                                            anchors.margins: 14
-                                            spacing: 14
+                                            anchors.margins: 12
+                                            spacing: 12
 
                                             Rectangle {
-                                                implicitWidth: 40
-                                                implicitHeight: 40
+                                                implicitWidth: 38
+                                                implicitHeight: 38
                                                 radius: 10
                                                 color: Theme.withAlpha(Theme.primary, 0.2)
                                                 Text {
                                                     anchors.centerIn: parent
                                                     text: Theme.icons.health
                                                     font.family: Theme.iconFontFamily
-                                                    font.pixelSize: 20
+                                                    font.pixelSize: 18
                                                     color: Theme.primary
                                                 }
                                             }
@@ -2438,7 +4958,7 @@ PanelWindow {
                                                 Text {
                                                     text: "Assistente de Diagnóstico (Rice Doctor)"
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 13
+                                                    font.pixelSize: 12
                                                     font.weight: Font.DemiBold
                                                     color: Theme.textColor
                                                 }
@@ -2456,6 +4976,704 @@ PanelWindow {
                                                 primary: true
                                                 onClicked: {
                                                     Quickshell.execDetached(["rice-maintenance", "doctor"]);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // ==========================================
+                        // ABA 17: CENTRAL DE APLICATIVOS & ATUALIZAÇÕES
+                        // ==========================================
+                        Item {
+                            Layout.fillWidth: true
+                            implicitHeight: appStoreCol.implicitHeight
+                            visible: win.currentTab === 17
+
+                            ColumnLayout {
+                                id: appStoreCol
+                                width: parent.width
+                                spacing: 18
+
+                                // 1. Banner de Atualizações do Sistema
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    implicitHeight: 110
+                                    radius: 14
+                                    color: Theme.tile
+                                    border.width: 1
+                                    border.color: win.softwareUpdatesData.count > 0 ? Theme.withAlpha("#f59e0b", 0.5) : Theme.withAlpha(Theme.primary, 0.3)
+
+                                    RowLayout {
+                                        anchors.fill: parent
+                                        anchors.margins: 16
+                                        spacing: 16
+
+                                        Rectangle {
+                                            implicitWidth: 54
+                                            implicitHeight: 54
+                                            radius: 27
+                                            color: win.softwareUpdatesData.count > 0
+                                                ? Theme.withAlpha("#f59e0b", 0.2)
+                                                : Theme.withAlpha("#10b981", 0.2)
+
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: win.softwareUpdatesData.count > 0 ? "\u{F002A}" : "\u{F012C}"
+                                                font.family: Theme.iconFontFamily
+                                                font.pixelSize: 26
+                                                color: win.softwareUpdatesData.count > 0 ? "#f59e0b" : "#10b981"
+                                            }
+                                        }
+
+                                        ColumnLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 4
+
+                                            RowLayout {
+                                                spacing: 8
+                                                Text {
+                                                    text: win.softwareUpdatesData.count > 0
+                                                        ? win.softwareUpdatesData.count + " Atualizações Disponíveis"
+                                                        : "Sistema 100% Atualizado (Arch Linux / CachyOS)"
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 15
+                                                    font.weight: Font.Bold
+                                                    color: Theme.textColor
+                                                }
+
+                                                Rectangle {
+                                                    visible: win.softwareUpdatesData.count > 0
+                                                    implicitHeight: 20
+                                                    implicitWidth: updCountText.implicitWidth + 12
+                                                    radius: 10
+                                                    color: Theme.withAlpha("#f59e0b", 0.25)
+                                                    Text {
+                                                        id: updCountText
+                                                        anchors.centerIn: parent
+                                                        text: win.softwareUpdatesData.count + " pacotes"
+                                                        font.family: Theme.fontFamily
+                                                        font.pixelSize: 10
+                                                        font.weight: Font.Bold
+                                                        color: "#f59e0b"
+                                                    }
+                                                }
+                                            }
+
+                                            Text {
+                                                text: win.softwareUpdatesData.count > 0
+                                                    ? "Há novos pacotes do sistema e do repositório AUR prontos para instalar com segurança."
+                                                    : "Todos os pacotes oficiais, kernel e drivers estão na versão mais recente."
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: 11
+                                                color: Theme.subtext
+                                            }
+
+                                            // Chips de pacotes atualizáveis
+                                            Flickable {
+                                                Layout.fillWidth: true
+                                                implicitHeight: 24
+                                                contentWidth: pkgsRow.implicitWidth
+                                                clip: true
+                                                visible: win.softwareUpdatesData.packages && win.softwareUpdatesData.packages.length > 0
+
+                                                Row {
+                                                    id: pkgsRow
+                                                    spacing: 6
+                                                    Repeater {
+                                                        model: win.softwareUpdatesData.packages || []
+                                                        delegate: Rectangle {
+                                                            implicitHeight: 22
+                                                            implicitWidth: pkgNameText.implicitWidth + 14
+                                                            radius: 11
+                                                            color: Theme.tileHigh
+                                                            border.width: 1
+                                                            border.color: Theme.withAlpha(Theme.outline, 0.2)
+                                                            Text {
+                                                                id: pkgNameText
+                                                                anchors.centerIn: parent
+                                                                text: modelData
+                                                                font.family: Theme.monoFamily
+                                                                font.pixelSize: 10
+                                                                color: Theme.textColor
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        ColumnLayout {
+                                            spacing: 8
+                                            ActionBtn {
+                                                icon: Theme.icons.refresh
+                                                text: "Verificar Novamente"
+                                                onClicked: {
+                                                    loadSoftwareUpdatesProc.running = true;
+                                                    loadSoftwareAppsProc.running = true;
+                                                    win.showToast("Verificando atualizações...");
+                                                }
+                                            }
+
+                                            ActionBtn {
+                                                icon: "\u{F002A}"
+                                                text: "Atualizar Tudo Agora"
+                                                primary: true
+                                                visible: win.softwareUpdatesData.count > 0
+                                                onClicked: {
+                                                    Quickshell.execDetached(["rice-software", "update-system"]);
+                                                    win.showToast("Janela de atualização aberta no terminal!");
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // 2. Barra de Filtro de Categorias
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 10
+
+                                    Text {
+                                        text: "CATÁLOGO DE SOFTWARES RECOMENDADOS"
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 12
+                                        font.weight: Font.Bold
+                                        color: Theme.primary
+                                    }
+
+                                    Item { Layout.fillWidth: true }
+
+                                    // Filtros
+                                    RowLayout {
+                                        spacing: 6
+                                        Repeater {
+                                            model: [
+                                                { id: "all", label: "Todos" },
+                                                { id: "comm", label: "Comunicação" },
+                                                { id: "media", label: "Mídia & Streaming" },
+                                                { id: "gaming", label: "Jogos" },
+                                                { id: "prod", label: "Produtividade" },
+                                                { id: "browser", label: "Navegadores" },
+                                                { id: "tools", label: "Utilitários" }
+                                            ]
+                                            delegate: Rectangle {
+                                                required property var modelData
+                                                implicitHeight: 28
+                                                implicitWidth: catBtnText.implicitWidth + 16
+                                                radius: 14
+                                                color: win.softwareCatFilter === modelData.id
+                                                    ? Theme.primary
+                                                    : (catArea.containsMouse ? Theme.tileHigh : Theme.withAlpha(Theme.tile, 0.6))
+                                                border.width: 1
+                                                border.color: win.softwareCatFilter === modelData.id ? Theme.primary : Theme.withAlpha(Theme.outline, 0.2)
+
+                                                Text {
+                                                    id: catBtnText
+                                                    anchors.centerIn: parent
+                                                    text: modelData.label
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 11
+                                                    font.weight: win.softwareCatFilter === modelData.id ? Font.Bold : Font.Normal
+                                                    color: win.softwareCatFilter === modelData.id ? Theme.background : Theme.textColor
+                                                }
+
+                                                MouseArea {
+                                                    id: catArea
+                                                    anchors.fill: parent
+                                                    hoverEnabled: true
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    onClicked: win.softwareCatFilter = modelData.id
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // 3. Grid de Aplicativos
+                                GridLayout {
+                                    Layout.fillWidth: true
+                                    columns: 2
+                                    rowSpacing: 12
+                                    columnSpacing: 12
+
+                                    Repeater {
+                                        model: (win.softwareCatalogData || []).filter(function(app) {
+                                            if (win.softwareCatFilter !== "all" && app.category !== win.softwareCatFilter) return false;
+                                            return true;
+                                        })
+
+                                        delegate: Rectangle {
+                                            id: appCard
+                                            required property var modelData
+                                            Layout.fillWidth: true
+                                            implicitHeight: 88
+                                            radius: 12
+                                            color: Theme.tile
+                                            border.width: 1
+                                            border.color: Theme.withAlpha(Theme.outline, 0.2)
+
+                                            RowLayout {
+                                                anchors.fill: parent
+                                                anchors.margins: 12
+                                                spacing: 12
+
+                                                // Ícone do app
+                                                Rectangle {
+                                                    implicitWidth: 46
+                                                    implicitHeight: 46
+                                                    radius: 10
+                                                    color: appCard.modelData.installed
+                                                        ? Theme.withAlpha(Theme.primary, 0.18)
+                                                        : Theme.withAlpha(Theme.textColor, 0.08)
+                                                    border.width: 1
+                                                    border.color: appCard.modelData.installed ? Theme.withAlpha(Theme.primary, 0.4) : Theme.withAlpha(Theme.outline, 0.15)
+
+                                                    Text {
+                                                        anchors.centerIn: parent
+                                                        text: appCard.modelData.icon || "\u{F01E}"
+                                                        font.family: Theme.iconFontFamily
+                                                        font.pixelSize: 20
+                                                        color: appCard.modelData.installed ? Theme.primary : Theme.subtext
+                                                    }
+                                                }
+
+                                                // Info
+                                                ColumnLayout {
+                                                    Layout.fillWidth: true
+                                                    spacing: 2
+
+                                                    RowLayout {
+                                                        spacing: 8
+                                                        Text {
+                                                            text: appCard.modelData.name
+                                                            font.family: Theme.fontFamily
+                                                            font.pixelSize: 12
+                                                            font.weight: Font.DemiBold
+                                                            color: Theme.textColor
+                                                        }
+
+                                                        Rectangle {
+                                                            implicitHeight: 18
+                                                            implicitWidth: stBadgeText.implicitWidth + 10
+                                                            radius: 9
+                                                            color: appCard.modelData.installed
+                                                                ? Theme.withAlpha("#10b981", 0.18)
+                                                                : Theme.withAlpha(Theme.subtext, 0.12)
+                                                            border.width: 1
+                                                            border.color: appCard.modelData.installed ? "#10b981" : Theme.withAlpha(Theme.outline, 0.2)
+
+                                                            Text {
+                                                                id: stBadgeText
+                                                                anchors.centerIn: parent
+                                                                text: appCard.modelData.installed ? "✓ Instalado" : "Disponível"
+                                                                font.family: Theme.fontFamily
+                                                                font.pixelSize: 9
+                                                                font.weight: Font.Bold
+                                                                color: appCard.modelData.installed ? "#10b981" : Theme.subtext
+                                                            }
+                                                        }
+                                                    }
+
+                                                    Text {
+                                                        Layout.fillWidth: true
+                                                        text: appCard.modelData.desc
+                                                        font.family: Theme.fontFamily
+                                                        font.pixelSize: 10
+                                                        color: Theme.subtext
+                                                        wrapMode: Text.WordWrap
+                                                        maximumLineCount: 2
+                                                        elide: Text.ElideRight
+                                                    }
+                                                }
+
+                                                // Ações
+                                                RowLayout {
+                                                    spacing: 6
+
+                                                    // Se instalado: Botão Abrir e Botão Remover
+                                                    ActionBtn {
+                                                        visible: appCard.modelData.installed
+                                                        icon: "\u{F04B}"
+                                                        text: "Abrir"
+                                                        primary: true
+                                                        onClicked: {
+                                                            Quickshell.execDetached(["rice-software", "launch", appCard.modelData.id]);
+                                                        }
+                                                    }
+
+                                                    Rectangle {
+                                                        visible: appCard.modelData.installed
+                                                        implicitWidth: 32
+                                                        implicitHeight: 32
+                                                        radius: 8
+                                                        color: uninstArea.containsMouse ? Theme.withAlpha("#ef4444", 0.2) : Theme.tileHigh
+                                                        border.width: 1
+                                                        border.color: uninstArea.containsMouse ? "#ef4444" : Theme.withAlpha(Theme.outline, 0.2)
+
+                                                        Text {
+                                                            anchors.centerIn: parent
+                                                            text: Theme.icons.trash
+                                                            font.family: Theme.iconFontFamily
+                                                            font.pixelSize: 13
+                                                            color: uninstArea.containsMouse ? "#ef4444" : Theme.subtext
+                                                        }
+
+                                                        MouseArea {
+                                                            id: uninstArea
+                                                            anchors.fill: parent
+                                                            hoverEnabled: true
+                                                            cursorShape: Qt.PointingHandCursor
+                                                            onClicked: {
+                                                                Quickshell.execDetached(["rice-software", "uninstall", appCard.modelData.id]);
+                                                            }
+                                                        }
+                                                    }
+
+                                                    // Se não instalado: Botão Instalar 1-clique
+                                                    ActionBtn {
+                                                        visible: !appCard.modelData.installed
+                                                        icon: "\u{F01DA}"
+                                                        text: "Instalar"
+                                                        primary: false
+                                                        onClicked: {
+                                                            Quickshell.execDetached(["rice-software", "install", appCard.modelData.id]);
+                                                            win.showToast("Instalando " + appCard.modelData.name + " no terminal!");
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // ==========================================
+                        // ABA 18: PERFIS DE ESTILO & BACKUP DO RICE
+                        // ==========================================
+                        Item {
+                            Layout.fillWidth: true
+                            implicitHeight: presetsCol.implicitHeight
+                            visible: win.currentTab === 18
+
+                            ColumnLayout {
+                                id: presetsCol
+                                width: parent.width
+                                spacing: 20
+
+                                // 1. Seção de Perfis Visuais
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 12
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        Text {
+                                            text: "PERFIS DE ESTILO & PERFORMANCE"
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: 12
+                                            font.weight: Font.Bold
+                                            color: Theme.primary
+                                        }
+                                        Item { Layout.fillWidth: true }
+                                        Text {
+                                            text: "Altera gaps, cantos arredondados, animações e efeitos com 1 clique"
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: 10
+                                            color: Theme.subtext
+                                        }
+                                    }
+
+                                    // Cards dos Perfis
+                                    ColumnLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 10
+
+                                        Repeater {
+                                            model: win.presetsData || []
+                                            delegate: Rectangle {
+                                                id: presetCard
+                                                required property var modelData
+                                                Layout.fillWidth: true
+                                                implicitHeight: 82
+                                                radius: 12
+                                                color: Theme.tile
+                                                border.width: 1
+                                                border.color: prsArea.containsMouse ? presetCard.modelData.accent : Theme.withAlpha(Theme.outline, 0.2)
+
+                                                Behavior on border.color { ColorAnimation { duration: 140 } }
+
+                                                RowLayout {
+                                                    anchors.fill: parent
+                                                    anchors.margins: 14
+                                                    spacing: 14
+
+                                                    Rectangle {
+                                                        implicitWidth: 46
+                                                        implicitHeight: 46
+                                                        radius: 12
+                                                        color: Theme.withAlpha(presetCard.modelData.accent, 0.18)
+                                                        border.width: 1
+                                                        border.color: Theme.withAlpha(presetCard.modelData.accent, 0.5)
+
+                                                        Text {
+                                                            anchors.centerIn: parent
+                                                            text: presetCard.modelData.icon || "\u{F01E}"
+                                                            font.family: Theme.iconFontFamily
+                                                            font.pixelSize: 20
+                                                            color: presetCard.modelData.accent
+                                                        }
+                                                    }
+
+                                                    ColumnLayout {
+                                                        Layout.fillWidth: true
+                                                        spacing: 3
+
+                                                        RowLayout {
+                                                            spacing: 10
+                                                            Text {
+                                                                text: presetCard.modelData.name
+                                                                font.family: Theme.fontFamily
+                                                                font.pixelSize: 13
+                                                                font.weight: Font.Bold
+                                                                color: Theme.textColor
+                                                            }
+
+                                                            // Badges com os parâmetros
+                                                            Rectangle {
+                                                                implicitHeight: 18
+                                                                implicitWidth: gpText.implicitWidth + 10
+                                                                radius: 9
+                                                                color: Theme.tileHigh
+                                                                Text {
+                                                                    id: gpText
+                                                                    anchors.centerIn: parent
+                                                                    text: "Gaps: " + presetCard.modelData.gaps_in + "px"
+                                                                    font.family: Theme.monoFamily
+                                                                    font.pixelSize: 9
+                                                                    color: Theme.subtext
+                                                                }
+                                                            }
+
+                                                            Rectangle {
+                                                                implicitHeight: 18
+                                                                implicitWidth: rdText.implicitWidth + 10
+                                                                radius: 9
+                                                                color: Theme.tileHigh
+                                                                Text {
+                                                                    id: rdText
+                                                                    anchors.centerIn: parent
+                                                                    text: "Cantos: " + presetCard.modelData.rounding + "px"
+                                                                    font.family: Theme.monoFamily
+                                                                    font.pixelSize: 9
+                                                                    color: Theme.subtext
+                                                                }
+                                                            }
+                                                        }
+
+                                                        Text {
+                                                            Layout.fillWidth: true
+                                                            text: presetCard.modelData.desc
+                                                            font.family: Theme.fontFamily
+                                                            font.pixelSize: 11
+                                                            color: Theme.subtext
+                                                        }
+                                                    }
+
+                                                    ActionBtn {
+                                                        icon: "\u{F00C}"
+                                                        text: "Aplicar Perfil"
+                                                        primary: true
+                                                        onClicked: {
+                                                            Quickshell.execDetached(["rice-presets", "apply", presetCard.modelData.id]);
+                                                            win.showToast("Perfil " + presetCard.modelData.name + " aplicado!");
+                                                        }
+                                                    }
+                                                }
+
+                                                MouseArea {
+                                                    id: prsArea
+                                                    anchors.fill: parent
+                                                    hoverEnabled: true
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    z: -1
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // 2. Seção de Backups & Restauração Local
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 12
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        Text {
+                                            text: "PONTOS DE RESTAURAÇÃO DO RICE (BACKUPS)"
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: 12
+                                            font.weight: Font.Bold
+                                            color: Theme.primary
+                                        }
+                                        Item { Layout.fillWidth: true }
+                                        ActionBtn {
+                                            icon: Theme.icons.disk
+                                            text: "Criar Novo Backup Agora"
+                                            primary: true
+                                            onClicked: {
+                                                Quickshell.execDetached(["rice-presets", "backup-create"]);
+                                                win.showToast("Criando backup das configurações...");
+                                                backupReloadTimer.restart();
+                                            }
+                                        }
+                                    }
+
+                                    Timer {
+                                        id: backupReloadTimer
+                                        interval: 1000
+                                        onTriggered: loadBackupsProc.running = true
+                                    }
+
+                                    // Lista de Backups
+                                    ColumnLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 8
+
+                                        Repeater {
+                                            model: win.backupsData || []
+                                            delegate: Rectangle {
+                                                id: bkCard
+                                                required property var modelData
+                                                Layout.fillWidth: true
+                                                implicitHeight: 64
+                                                radius: 12
+                                                color: Theme.tile
+                                                border.width: 1
+                                                border.color: Theme.withAlpha(Theme.outline, 0.2)
+
+                                                RowLayout {
+                                                    anchors.fill: parent
+                                                    anchors.margins: 12
+                                                    spacing: 12
+
+                                                    Rectangle {
+                                                        implicitWidth: 38
+                                                        implicitHeight: 38
+                                                        radius: 10
+                                                        color: Theme.withAlpha(Theme.primary, 0.15)
+                                                        Text {
+                                                            anchors.centerIn: parent
+                                                            text: Theme.icons.disk
+                                                            font.family: Theme.iconFontFamily
+                                                            font.pixelSize: 16
+                                                            color: Theme.primary
+                                                        }
+                                                    }
+
+                                                    ColumnLayout {
+                                                        Layout.fillWidth: true
+                                                        spacing: 2
+                                                        Text {
+                                                            text: bkCard.modelData.name
+                                                            font.family: Theme.monoFamily
+                                                            font.pixelSize: 11
+                                                            font.weight: Font.Medium
+                                                            color: Theme.textColor
+                                                        }
+                                                        RowLayout {
+                                                            spacing: 8
+                                                            Text {
+                                                                text: "Data: " + bkCard.modelData.date
+                                                                font.family: Theme.fontFamily
+                                                                font.pixelSize: 10
+                                                                color: Theme.subtext
+                                                            }
+                                                            Text {
+                                                                text: "•"
+                                                                font.pixelSize: 10
+                                                                color: Theme.subtext
+                                                            }
+                                                            Text {
+                                                                text: "Tamanho: " + bkCard.modelData.size
+                                                                font.family: Theme.monoFamily
+                                                                font.pixelSize: 10
+                                                                color: Theme.subtext
+                                                            }
+                                                        }
+                                                    }
+
+                                                    ActionBtn {
+                                                        icon: Theme.icons.refresh
+                                                        text: "Restaurar"
+                                                        onClicked: {
+                                                            Quickshell.execDetached(["rice-presets", "backup-restore", bkCard.modelData.path]);
+                                                            win.showToast("Restaurando configurações do backup...");
+                                                        }
+                                                    }
+
+                                                    Rectangle {
+                                                        implicitWidth: 32
+                                                        implicitHeight: 32
+                                                        radius: 8
+                                                        color: delBkArea.containsMouse ? Theme.withAlpha("#ef4444", 0.2) : Theme.tileHigh
+                                                        border.width: 1
+                                                        border.color: delBkArea.containsMouse ? "#ef4444" : Theme.withAlpha(Theme.outline, 0.2)
+
+                                                        Text {
+                                                            anchors.centerIn: parent
+                                                            text: Theme.icons.trash
+                                                            font.family: Theme.iconFontFamily
+                                                            font.pixelSize: 13
+                                                            color: delBkArea.containsMouse ? "#ef4444" : Theme.subtext
+                                                        }
+
+                                                        MouseArea {
+                                                            id: delBkArea
+                                                            anchors.fill: parent
+                                                            hoverEnabled: true
+                                                            cursorShape: Qt.PointingHandCursor
+                                                            onClicked: {
+                                                                Quickshell.execDetached(["rice-presets", "backup-delete", bkCard.modelData.path]);
+                                                                backupReloadTimer.restart();
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // Placeholder se vazio
+                                        Rectangle {
+                                            visible: !win.backupsData || win.backupsData.length === 0
+                                            Layout.fillWidth: true
+                                            implicitHeight: 70
+                                            radius: 10
+                                            color: Theme.withAlpha(Theme.tile, 0.5)
+                                            border.width: 1
+                                            border.color: Theme.withAlpha(Theme.outline, 0.15)
+
+                                            ColumnLayout {
+                                                anchors.centerIn: parent
+                                                spacing: 4
+                                                Text {
+                                                    Layout.alignment: Qt.AlignHCenter
+                                                    text: "Nenhum ponto de restauração encontrado."
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 11
+                                                    font.weight: Font.Medium
+                                                    color: Theme.subtext
+                                                }
+                                                Text {
+                                                    Layout.alignment: Qt.AlignHCenter
+                                                    text: "Clique em 'Criar Novo Backup Agora' para gerar uma cópia de segurança completa das suas configs."
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 10
+                                                    color: Theme.withAlpha(Theme.subtext, 0.7)
                                                 }
                                             }
                                         }

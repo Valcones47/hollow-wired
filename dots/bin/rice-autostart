@@ -1,0 +1,192 @@
+#!/usr/bin/env python3
+"""rice-autostart: Gerenciador visual de aplicativos iniciados com o sistema."""
+
+import configparser
+import json
+import os
+import sys
+
+AUTOSTART_DIR = os.path.expanduser("~/.config/autostart")
+APP_DIRS = [
+    os.path.expanduser("~/.local/share/applications"),
+    "/usr/share/applications",
+]
+
+
+def ensure_dir():
+    os.makedirs(AUTOSTART_DIR, exist_ok=True)
+
+
+def parse_desktop_file(filepath):
+    parser = configparser.ConfigParser(interpolation=None)
+    try:
+        parser.read(filepath, encoding="utf-8")
+        if not parser.has_section("Desktop Entry"):
+            return None
+        sec = parser["Desktop Entry"]
+        filename = os.path.basename(filepath)
+        name = sec.get("Name", filename.replace(".desktop", ""))
+        comment = sec.get("Comment", "")
+        exec_cmd = sec.get("Exec", "")
+        icon = sec.get("Icon", "application-x-executable")
+        hidden = sec.getboolean("Hidden", fallback=False)
+        gnome_enabled = sec.getboolean("X-GNOME-Autostart-enabled", fallback=True)
+        enabled = not hidden and gnome_enabled
+
+        return {
+            "filename": filename,
+            "filepath": filepath,
+            "name": name,
+            "comment": comment,
+            "exec": exec_cmd,
+            "icon": icon,
+            "enabled": enabled,
+        }
+    except Exception:
+        return None
+
+
+def get_status():
+    ensure_dir()
+    entries = []
+    for f in sorted(os.listdir(AUTOSTART_DIR)):
+        if f.endswith(".desktop"):
+            path = os.path.join(AUTOSTART_DIR, f)
+            parsed = parse_desktop_file(path)
+            if parsed:
+                entries.append(parsed)
+    return entries
+
+
+def get_available():
+    """Retorna aplicativos populares disponíveis no sistema para adicionar ao autostart."""
+    popular_keys = ["discord", "steam", "spotify", "telegram", "heroic", "obs", "webcord", "vesktop", "zen", "firefox", "brave"]
+    available = []
+    seen = set()
+
+    for d in APP_DIRS:
+        if not os.path.isdir(d):
+            continue
+        for f in os.listdir(d):
+            if f.endswith(".desktop") and f not in seen:
+                seen.add(f)
+                path = os.path.join(d, f)
+                parsed = parse_desktop_file(path)
+                if parsed:
+                    # Checa se é aplicativo interativo e não está já no autostart
+                    in_autostart = os.path.exists(os.path.join(AUTOSTART_DIR, f))
+                    name_lower = parsed["name"].lower()
+                    file_lower = f.lower()
+                    is_popular = any(k in name_lower or k in file_lower for k in popular_keys)
+
+                    available.append({
+                        "filename": f,
+                        "name": parsed["name"],
+                        "comment": parsed["comment"],
+                        "exec": parsed["exec"],
+                        "icon": parsed["icon"],
+                        "popular": is_popular,
+                        "already_added": in_autostart,
+                    })
+
+    # Ordena populares primeiro, depois alfabético
+    available.sort(key=lambda x: (not x["popular"], x["name"].lower()))
+    return available[:24]
+
+
+def toggle_entry(filename, force_state=None):
+    ensure_dir()
+    filepath = os.path.join(AUTOSTART_DIR, filename)
+    if not os.path.exists(filepath):
+        print(f"[-] Arquivo não encontrado: {filepath}", file=sys.stderr)
+        return False
+
+    with open(filepath, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+
+    current_hidden = False
+    for l in lines:
+        if l.strip().startswith("Hidden=true"):
+            current_hidden = True
+            break
+
+    new_hidden = not current_hidden if force_state is None else not force_state
+
+    new_lines = []
+    has_hidden = False
+    for l in lines:
+        if l.strip().startswith("Hidden="):
+            new_lines.append(f"Hidden={'true' if new_hidden else 'false'}\n")
+            has_hidden = True
+        elif l.strip().startswith("X-GNOME-Autostart-enabled="):
+            new_lines.append(f"X-GNOME-Autostart-enabled={'false' if new_hidden else 'true'}\n")
+        else:
+            new_lines.append(l)
+
+    if not has_hidden:
+        new_lines.append(f"Hidden={'true' if new_hidden else 'false'}\n")
+
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.writelines(new_lines)
+
+    status_str = "Desativado" if new_hidden else "Ativado"
+    print(f"[✓] Autostart {status_str}: {filename}")
+    return True
+
+
+def add_entry(app_filename):
+    ensure_dir()
+    for d in APP_DIRS:
+        src = os.path.join(d, app_filename)
+        if os.path.isfile(src):
+            dst = os.path.join(AUTOSTART_DIR, app_filename)
+            with open(src, "r", encoding="utf-8") as f:
+                content = f.read()
+            # Garante que não venha oculto
+            content = content.replace("Hidden=true", "Hidden=false")
+            with open(dst, "w", encoding="utf-8") as f:
+                f.write(content)
+            print(f"[✓] Aplicativo adicionado ao autostart: {app_filename}")
+            return True
+    print(f"[-] Aplicativo não encontrado nos diretórios do sistema: {app_filename}", file=sys.stderr)
+    return False
+
+
+def remove_entry(filename):
+    filepath = os.path.join(AUTOSTART_DIR, filename)
+    if os.path.exists(filepath):
+        os.remove(filepath)
+        print(f"[✓] Removido do autostart: {filename}")
+        return True
+    return False
+
+
+def main():
+    args = sys.argv[1:]
+    cmd = args[0] if args else "status"
+
+    if cmd == "status":
+        print(json.dumps(get_status(), ensure_ascii=False, indent=2))
+    elif cmd == "available":
+        print(json.dumps(get_available(), ensure_ascii=False, indent=2))
+    elif cmd == "toggle":
+        if len(args) > 1:
+            toggle_entry(args[1])
+    elif cmd == "enable":
+        if len(args) > 1:
+            toggle_entry(args[1], force_state=True)
+    elif cmd == "disable":
+        if len(args) > 1:
+            toggle_entry(args[1], force_state=False)
+    elif cmd == "add":
+        if len(args) > 1:
+            add_entry(args[1])
+    elif cmd == "remove":
+        if len(args) > 1:
+            remove_entry(args[1])
+    else:
+        print("Uso: rice-autostart [status|available|toggle <file>|enable <file>|disable <file>|add <file>|remove <file>]")
+
+
+if __name__ == "__main__":
+    main()

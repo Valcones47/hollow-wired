@@ -4,8 +4,8 @@
 pkill -x quickshell
 pkill -x waybar
 sleep 0.5
-hyprctl dispatch 'hl.dsp.exec_cmd("quickshell")' >/dev/null
+nohup quickshell >/dev/null 2>&1 &
 if [ -f "$HOME/.config/waybar/config.jsonc" ] && grep -qE "^[[:space:]]*hl.exec_cmd\(\"waybar\"\)" "$HOME/.config/hypr/hyprland.lua"; then
-    hyprctl dispatch 'hl.dsp.exec_cmd("waybar")' >/dev/null
+    nohup waybar >/dev/null 2>&1 &
 fi
 notify-send -a "Rice" -t 2000 "Interface reiniciada"

@@ -1,0 +1,241 @@
+#!/usr/bin/env bash
+# rice-presets
+# Gerencia perfis visuais de estética/desempenho e sistema de backup/restauração do Rice.
+
+set -euo pipefail
+
+BACKUP_DIR="${HOME}/Backups-Rice"
+
+PRESETS_JSON='[
+  {
+    "id": "cyberpunk",
+    "name": "Cyberpunk Neon",
+    "icon": "\uf754",
+    "accent": "#00f0ff",
+    "desc": "Cores neon vibrantes, blur ativo, gaps amplos e cantos arredondados modernos",
+    "gaps_in": 10,
+    "gaps_out": 14,
+    "rounding": 14,
+    "dim_inactive": true,
+    "dim_strength": 0.35,
+    "anim_preset": "snappy",
+    "kitty_opacity": 0.80
+  },
+  {
+    "id": "tokyonight",
+    "name": "Tokyo Night Clean",
+    "icon": "\uf186",
+    "accent": "#7aa2f7",
+    "desc": "Design minimalista, foco em elegância e produtividade, cantos discretos e limpos",
+    "gaps_in": 6,
+    "gaps_out": 9,
+    "rounding": 8,
+    "dim_inactive": true,
+    "dim_strength": 0.15,
+    "anim_preset": "smooth",
+    "kitty_opacity": 0.88
+  },
+  {
+    "id": "catppuccin",
+    "name": "Catppuccin Mocha",
+    "icon": "\uf0f4",
+    "accent": "#cba6f7",
+    "desc": "Tons aconchegantes, cantos suaves e curvas refinadas inspiradas na paleta Catppuccin",
+    "gaps_in": 8,
+    "gaps_out": 12,
+    "rounding": 12,
+    "dim_inactive": true,
+    "dim_strength": 0.20,
+    "anim_preset": "smooth",
+    "kitty_opacity": 0.85
+  },
+  {
+    "id": "competitive",
+    "name": "Modo E-Sports / Competitivo",
+    "icon": "\uf11b",
+    "accent": "#ef4444",
+    "desc": "Latência zero (0ms overhead), sem blur ou transparências, foco em máximo FPS para jogos",
+    "gaps_in": 0,
+    "gaps_out": 0,
+    "rounding": 0,
+    "dim_inactive": false,
+    "dim_strength": 0.0,
+    "anim_preset": "snappy",
+    "kitty_opacity": 1.0
+  },
+  {
+    "id": "glass",
+    "name": "Glassmorphism Ultra",
+    "icon": "\uf2d0",
+    "accent": "#38bdf8",
+    "desc": "Visual translúcido estilo vidro fosco com blur profundo e janelas flutuantes",
+    "gaps_in": 12,
+    "gaps_out": 16,
+    "rounding": 16,
+    "dim_inactive": true,
+    "dim_strength": 0.25,
+    "anim_preset": "bouncy",
+    "kitty_opacity": 0.65
+  }
+]'
+
+apply_preset() {
+    local pid="$1"
+    local preset
+    preset=$(echo "$PRESETS_JSON" | jq --arg id "$pid" '.[] | select(.id == $id)')
+
+    if [ -z "$preset" ] || [ "$preset" = "null" ]; then
+        echo "Preset não encontrado: $pid" >&2
+        exit 1
+    fi
+
+    local gaps_in gaps_out rounding dim_inactive dim_strength anim_preset kitty_opacity
+    gaps_in=$(echo "$preset" | jq -r '.gaps_in')
+    gaps_out=$(echo "$preset" | jq -r '.gaps_out')
+    rounding=$(echo "$preset" | jq -r '.rounding')
+    dim_inactive=$(echo "$preset" | jq -r '.dim_inactive')
+    dim_strength=$(echo "$preset" | jq -r '.dim_strength')
+    anim_preset=$(echo "$preset" | jq -r '.anim_preset')
+    kitty_opacity=$(echo "$preset" | jq -r '.kitty_opacity')
+
+    rice-hypr-prefs set gaps_in "$gaps_in"
+    rice-hypr-prefs set gaps_out "$gaps_out"
+    rice-hypr-prefs set rounding "$rounding"
+    rice-hypr-prefs set dim_inactive "$dim_inactive"
+    rice-hypr-prefs set dim_strength "$dim_strength"
+    rice-hypr-prefs preset "$anim_preset"
+    rice-kitty-apply opacity "$kitty_opacity"
+
+    if [ "$pid" = "competitive" ]; then
+        # Desativa blur para desempenho maximo
+        rice-blur-toggle off 2>/dev/null || true
+    else
+        rice-blur-toggle on 2>/dev/null || true
+    fi
+
+    local name
+    name=$(echo "$preset" | jq -r '.name')
+    notify-send -a "Perfis do Rice" -i preferences-desktop-theme -r 91199 -t 3000 "Perfil Aplicado: $name" "Parâmetros visuais, gaps e animações reconfigurados com sucesso!"
+    echo "OK"
+}
+
+list_backups() {
+    mkdir -p "$BACKUP_DIR"
+    python3 -c '
+import os, glob, json, time
+
+bdir = "'"$BACKUP_DIR"'"
+files = glob.glob(os.path.join(bdir, "rice-backup-*.tar.gz"))
+files.sort(key=os.path.getmtime, reverse=True)
+
+out = []
+for f in files:
+    stat = os.stat(f)
+    size_mb = round(stat.st_size / (1024 * 1024), 2)
+    dt = time.strftime("%d/%m/%Y %H:%M", time.localtime(stat.st_mtime))
+    out.append({
+        "name": os.path.basename(f),
+        "path": f,
+        "date": dt,
+        "size": f"{size_mb} MB"
+    })
+
+print(json.dumps(out, indent=2))
+'
+}
+
+create_backup() {
+    mkdir -p "$BACKUP_DIR"
+    local timestamp
+    timestamp=$(date +"%Y-%m-%d_%H-%M")
+    local outfile="$BACKUP_DIR/rice-backup-${timestamp}.tar.gz"
+
+    tar -czf "$outfile" \
+        -C "$HOME/.config" \
+        hypr quickshell kitty fastfetch mako wallust 2>/dev/null || true
+
+    local size
+    size=$(du -sh "$outfile" | awk '{print $1}')
+    notify-send -a "Backup do Rice" -i document-save -r 91199 -t 3000 "Backup Criado com Sucesso!" "Arquivo salvo: rice-backup-${timestamp}.tar.gz ($size)"
+    echo "{\"status\": \"created\", \"file\": \"$outfile\", \"size\": \"$size\"}"
+}
+
+restore_backup() {
+    local target="$1"
+    local file=""
+    if [ -f "$target" ]; then
+        file="$target"
+    elif [ -f "$BACKUP_DIR/$target" ]; then
+        file="$BACKUP_DIR/$target"
+    else
+        echo "Arquivo de backup não encontrado: $target" >&2
+        exit 1
+    fi
+
+    tar -xzf "$file" -C "$HOME/.config"
+
+    # Recarrega componentes
+    rice-hypr-prefs apply 2>/dev/null || true
+    hyprctl reload 2>/dev/null || true
+    qs ipc call visualconfig refresh 2>/dev/null || true
+
+    notify-send -a "Restauração do Rice" -i view-refresh -r 91199 -t 3000 "Configurações Restauradas!" "O backup foi restaurado e os componentes foram recarregados."
+    echo "{\"status\": \"restored\"}"
+}
+
+delete_backup() {
+    local target="$1"
+    local file=""
+    if [ -f "$target" ]; then
+        file="$target"
+    elif [ -f "$BACKUP_DIR/$target" ]; then
+        file="$BACKUP_DIR/$target"
+    fi
+
+    if [ -n "$file" ] && [ -f "$file" ]; then
+        rm -f "$file"
+        echo "{\"status\": \"deleted\"}"
+    fi
+}
+
+cmd="${1:-list}"
+
+case "$cmd" in
+    list|presets)
+        echo "$PRESETS_JSON"
+        ;;
+    apply)
+        pid="${2:-}"
+        if [ -z "$pid" ]; then
+            echo "Uso: $(basename "$0") apply <id>" >&2
+            exit 1
+        fi
+        apply_preset "$pid"
+        ;;
+    backup-list)
+        list_backups
+        ;;
+    backup-create)
+        create_backup
+        ;;
+    backup-restore)
+        target="${2:-}"
+        if [ -z "$target" ]; then
+            echo "Uso: $(basename "$0") backup-restore <arquivo>" >&2
+            exit 1
+        fi
+        restore_backup "$target"
+        ;;
+    backup-delete)
+        target="${2:-}"
+        if [ -z "$target" ]; then
+            echo "Uso: $(basename "$0") backup-delete <arquivo>" >&2
+            exit 1
+        fi
+        delete_backup "$target"
+        ;;
+    *)
+        echo "Uso: $(basename "$0") [list|apply <id>|backup-list|backup-create|backup-restore <file>|backup-delete <file>]"
+        exit 1
+        ;;
+esac

@@ -1,0 +1,109 @@
+#!/usr/bin/env python3
+"""
+rice-gaming: Monitoramento e otimizações de jogos / GPU NVIDIA para o Rice Hyprland / Quickshell
+Uso:
+  rice-gaming status
+  rice-gaming toggle-gamemode
+  rice-gaming copy-param <preset>
+"""
+
+import sys
+import os
+import subprocess
+import json
+
+def notify(title, msg="", icon="input-gaming"):
+    try:
+        subprocess.run(["notify-send", "-a", "Jogos & GPU", "-i", icon, "-t", "2500", title, msg], check=False)
+    except Exception:
+        pass
+
+def get_status():
+    gpu_data = {
+        "name": "NVIDIA GPU",
+        "driver": "Desconhecido",
+        "temp": 0,
+        "vram_used": 0,
+        "vram_total": 0,
+        "util": 0,
+        "available": False
+    }
+
+    try:
+        out = subprocess.check_output([
+            "nvidia-smi",
+            "--query-gpu=name,driver_version,temperature.gpu,utilization.gpu,memory.used,memory.total",
+            "--format=csv,noheader,nounits"
+        ], text=True, stderr=subprocess.DEVNULL).strip()
+        parts = [p.strip() for p in out.split(",")]
+        if len(parts) >= 6:
+            gpu_data = {
+                "name": parts[0],
+                "driver": parts[1],
+                "temp": int(parts[2]) if parts[2].isdigit() else 0,
+                "util": int(parts[3]) if parts[3].isdigit() else 0,
+                "vram_used": int(parts[4]) if parts[4].isdigit() else 0,
+                "vram_total": int(parts[5]) if parts[5].isdigit() else 0,
+                "available": True
+            }
+    except Exception:
+        pass
+
+    # Gamemode status
+    gamemode_active = False
+    try:
+        gm_out = subprocess.check_output(["gamemoded", "-s"], text=True, stderr=subprocess.DEVNULL)
+        gamemode_active = "is active" in gm_out
+    except Exception:
+        pass
+
+    steam_installed = os.path.exists("/usr/bin/steam") or os.path.exists(os.path.expanduser("~/.local/share/Steam"))
+    heroic_installed = os.path.exists("/usr/bin/heroic") or os.path.exists("/var/lib/flatpak/app/com.heroicgameslauncher.hgl")
+
+    return {
+        "gpu": gpu_data,
+        "gamemode_active": gamemode_active,
+        "steam_installed": steam_installed,
+        "heroic_installed": heroic_installed
+    }
+
+def toggle_gamemode():
+    st = get_status()
+    new_state = "off" if st["gamemode_active"] else "on"
+    subprocess.run(["rice-gamemode", new_state], check=False)
+    return new_state == "on"
+
+def copy_param(preset):
+    presets = {
+        "nvidia": "game-run %command%",
+        "gamemode": "gamemoderun game-run %command%",
+        "compat": "PROTON_DISABLE_NVAPI=1 game-run %command%"
+    }
+    val = presets.get(preset, "game-run %command%")
+    try:
+        p = subprocess.Popen(["wl-copy"], stdin=subprocess.PIPE, text=True)
+        p.communicate(input=val)
+        notify("Copiado para a Área de Transferência!", f"Parâmetro: {val}\nCole nas Opções de Inicialização da Steam.")
+        return True
+    except Exception:
+        return False
+
+def main():
+    cmd = sys.argv[1] if len(sys.argv) > 1 else "status"
+
+    if cmd == "status":
+        print(json.dumps(get_status(), indent=2))
+        return
+    if cmd == "toggle-gamemode":
+        act = toggle_gamemode()
+        print(json.dumps({"gamemode_active": act}))
+        return
+    if cmd == "copy-param" and len(sys.argv) > 2:
+        ok = copy_param(sys.argv[2])
+        print(json.dumps({"copied": ok}))
+        return
+
+    print("Uso: rice-gaming [status|toggle-gamemode|copy-param <preset>]")
+
+if __name__ == "__main__":
+    main()

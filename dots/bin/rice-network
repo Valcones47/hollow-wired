@@ -1,0 +1,184 @@
+#!/usr/bin/env python3
+"""
+rice-network: Gerenciamento CLI e JSON de Wi-Fi e Rede para o Rice Hyprland / Quickshell
+Uso:
+  rice-network status
+  rice-network scan
+  rice-network toggle-wifi
+  rice-network connect <SSID> [PASSWORD]
+  rice-network disconnect
+  rice-network ping
+"""
+
+import sys
+import subprocess
+import json
+import re
+
+def notify(msg, title="Rede & Wi-Fi", icon="network-wireless"):
+    try:
+        subprocess.run(["notify-send", "-a", "Rede", "-i", icon, "-t", "2500", title, msg], check=False)
+    except Exception:
+        pass
+
+def get_status():
+    wifi_enabled = False
+    try:
+        rad = subprocess.check_output(["nmcli", "radio", "wifi"], text=True, stderr=subprocess.DEVNULL).strip()
+        wifi_enabled = (rad.lower() in ("enabled", "habilitado"))
+    except Exception:
+        pass
+
+    connected_ssid = None
+    signal = 0
+    security = ""
+    freq = ""
+    bars = ""
+    iface = "wlan0"
+
+    try:
+        dev_out = subprocess.check_output(["nmcli", "-t", "-f", "DEVICE,TYPE", "device"], text=True, stderr=subprocess.DEVNULL)
+        for d in dev_out.strip().split("\n"):
+            if ":wifi" in d:
+                iface = d.split(":")[0]
+                break
+    except Exception:
+        pass
+
+    if wifi_enabled:
+        try:
+            lines = subprocess.check_output(["nmcli", "-t", "-f", "ACTIVE,SSID,SIGNAL,SECURITY,BARS,FREQ", "dev", "wifi", "list"], text=True, stderr=subprocess.DEVNULL).split("\n")
+            for l in lines:
+                if not l.strip():
+                    continue
+                parts = l.split(":")
+                if len(parts) >= 6 and parts[0].lower() in ("yes", "sim"):
+                    connected_ssid = parts[1]
+                    signal = int(parts[2]) if parts[2].isdigit() else 0
+                    security = parts[3]
+                    bars = parts[4]
+                    freq = parts[5]
+                    break
+        except Exception:
+            pass
+
+    ip_addr = ""
+    gateway = ""
+    if connected_ssid:
+        try:
+            route_out = subprocess.check_output(["ip", "-j", "-4", "route", "get", "1.1.1.1"], text=True, stderr=subprocess.DEVNULL)
+            route_data = json.loads(route_out)
+            if route_data and len(route_data) > 0:
+                ip_addr = route_data[0].get("prefsrc", "")
+                gateway = route_data[0].get("gateway", "")
+        except Exception:
+            pass
+
+    return {
+        "wifi_enabled": wifi_enabled,
+        "interface": iface,
+        "connected_ssid": connected_ssid,
+        "signal": signal,
+        "security": security,
+        "bars": bars,
+        "freq": freq,
+        "ip": ip_addr,
+        "gateway": gateway,
+        "is_5g": ("5" in freq or "5GHz" in freq) if freq else False
+    }
+
+def get_scan():
+    networks = []
+    seen = set()
+    try:
+        lines = subprocess.check_output(["nmcli", "-t", "-f", "ACTIVE,SSID,SIGNAL,SECURITY,BARS,FREQ", "dev", "wifi", "list", "--rescan", "no"], text=True, stderr=subprocess.DEVNULL).split("\n")
+        for l in lines:
+            if not l.strip():
+                continue
+            parts = l.split(":")
+            if len(parts) >= 6:
+                active = parts[0].lower() in ("yes", "sim")
+                ssid = parts[1].strip()
+                if not ssid or ssid in seen:
+                    continue
+                seen.add(ssid)
+                sig = int(parts[2]) if parts[2].isdigit() else 0
+                sec = parts[3].strip()
+                freq = parts[5].strip()
+                networks.append({
+                    "ssid": ssid,
+                    "signal": sig,
+                    "security": sec,
+                    "protected": bool(sec and sec != "--"),
+                    "active": active,
+                    "is_5g": "5" in freq or (freq.isdigit() and int(freq) > 4000)
+                })
+    except Exception:
+        pass
+    networks.sort(key=lambda x: (not x["active"], -x["signal"]))
+    return networks
+
+def measure_ping():
+    try:
+        out = subprocess.check_output(["env", "LANG=C", "ping", "-c", "1", "-W", "2", "1.1.1.1"], text=True, stderr=subprocess.DEVNULL)
+        match = re.search(r"time=([0-9.]+)\s*ms", out)
+        if match:
+            return round(float(match.group(1)), 1)
+    except Exception:
+        pass
+    return None
+
+def main():
+    cmd = sys.argv[1] if len(sys.argv) > 1 else "status"
+
+    if cmd == "status":
+        print(json.dumps(get_status(), indent=2))
+        return
+
+    if cmd == "scan":
+        print(json.dumps(get_scan(), indent=2))
+        return
+
+    if cmd == "ping":
+        p = measure_ping()
+        print(json.dumps({"ping_ms": p}))
+        return
+
+    if cmd == "toggle-wifi":
+        st = get_status()
+        new_state = "off" if st["wifi_enabled"] else "on"
+        subprocess.run(["nmcli", "radio", "wifi", new_state], check=False)
+        notify(f"Wi-Fi {'Ligado' if new_state == 'on' else 'Desligado'}")
+        print(json.dumps({"wifi_enabled": new_state == "on"}))
+        return
+
+    if cmd == "disconnect":
+        st = get_status()
+        if st["interface"]:
+            subprocess.run(["nmcli", "device", "disconnect", st["interface"]], check=False)
+            notify("Desconectado do Wi-Fi")
+            print(json.dumps({"success": True}))
+        return
+
+    if cmd == "connect" and len(sys.argv) > 2:
+        ssid = sys.argv[2]
+        password = sys.argv[3] if len(sys.argv) > 3 else None
+        notify(f"Conectando a {ssid}...")
+        
+        args = ["nmcli", "device", "wifi", "connect", ssid]
+        if password:
+            args.extend(["password", password])
+            
+        res = subprocess.run(args, capture_output=True, text=True)
+        if res.returncode == 0:
+            notify(f"Conectado com sucesso a {ssid}!")
+            print(json.dumps({"success": True}))
+        else:
+            notify(f"Erro ao conectar a {ssid}: {res.stderr.strip()[:60]}", "Falha de Conexão", icon="dialog-error")
+            print(json.dumps({"success": False, "error": res.stderr.strip()}))
+        return
+
+    print("Uso: rice-network [status|scan|ping|toggle-wifi|connect <SSID> [PASS]|disconnect]")
+
+if __name__ == "__main__":
+    main()

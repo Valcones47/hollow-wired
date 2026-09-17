@@ -1,0 +1,186 @@
+#!/usr/bin/env python3
+"""
+rice-default-apps: Gerenciamento visual de aplicativos padrão para o Rice Hyprland / Quickshell
+Uso:
+  rice-default-apps get
+  rice-default-apps set <category> <desktop_file>
+"""
+
+import sys
+import subprocess
+import os
+import glob
+import json
+import configparser
+
+CATEGORIES = {
+    "browser": {
+        "label": "Navegador Web",
+        "mimes": ["x-scheme-handler/http", "x-scheme-handler/https", "text/html"],
+        "candidates": ["zen.desktop", "brave-browser.desktop", "google-chrome.desktop", "firefox.desktop", "chromium.desktop"]
+    },
+    "filemanager": {
+        "label": "Gerenciador de Arquivos",
+        "mimes": ["inode/directory"],
+        "candidates": ["org.kde.dolphin.desktop", "thunar.desktop", "nautilus.desktop", "nemo.desktop", "pcmanfm.desktop"]
+    },
+    "editor": {
+        "label": "Editor de Código & Texto",
+        "mimes": ["text/plain", "text/x-python", "text/x-shellscript", "text/markdown"],
+        "candidates": ["antigravity.desktop", "code.desktop", "code-oss.desktop", "kate.desktop", "micro.desktop", "mousepad.desktop", "nvim.desktop", "gedit.desktop"]
+    },
+    "video": {
+        "label": "Player de Vídeo",
+        "mimes": ["video/mp4", "video/x-matroska", "video/quicktime", "video/webm", "video/x-msvideo"],
+        "candidates": ["mpv.desktop", "vlc.desktop", "org.kde.haruna.desktop", "celluloid.desktop", "totem.desktop"]
+    },
+    "image": {
+        "label": "Visualizador de Imagens",
+        "mimes": ["image/png", "image/jpeg", "image/webp", "image/gif", "image/svg+xml"],
+        "candidates": ["org.kde.gwenview.desktop", "org.gnome.Loupe.desktop", "imv.desktop", "feh.desktop", "viewnior.desktop", "ristretto.desktop", "chromium.desktop"]
+    }
+}
+
+def notify(msg, title="Aplicativos Padrão", icon="preferences-desktop-default-applications"):
+    try:
+        subprocess.run(["notify-send", "-a", "Rice", "-i", icon, "-t", "2500", title, msg], check=False)
+    except Exception:
+        pass
+
+def parse_desktop_name(desktop_file):
+    paths = [
+        os.path.expanduser(f"~/.local/share/applications/{desktop_file}"),
+        f"/usr/share/applications/{desktop_file}",
+        f"/var/lib/flatpak/exports/share/applications/{desktop_file}",
+        os.path.expanduser(f"~/.local/share/flatpak/exports/share/applications/{desktop_file}")
+    ]
+    for p in paths:
+        if os.path.exists(p):
+            try:
+                cp = configparser.ConfigParser(interpolation=None)
+                cp.read(p, encoding="utf-8", errors="ignore")
+                if "Desktop Entry" in cp:
+                    name = cp["Desktop Entry"].get("Name[pt_BR]") or cp["Desktop Entry"].get("Name")
+                    icon = cp["Desktop Entry"].get("Icon", "application-x-executable")
+                    if name:
+                        return name, icon
+            except Exception:
+                pass
+    clean = desktop_file.replace(".desktop", "").split(".")[-1].capitalize()
+    return clean, "application-x-executable"
+
+def get_installed_desktop_files():
+    all_files = set()
+    dirs = [
+        "/usr/share/applications",
+        os.path.expanduser("~/.local/share/applications"),
+        "/var/lib/flatpak/exports/share/applications",
+        os.path.expanduser("~/.local/share/flatpak/exports/share/applications")
+    ]
+    for d in dirs:
+        if os.path.exists(d):
+            for f in os.listdir(d):
+                if f.endswith(".desktop"):
+                    all_files.add(f)
+    return all_files
+
+def get_data():
+    installed = get_installed_desktop_files()
+    data = {}
+
+    for cat_id, cat_info in CATEGORIES.items():
+        # Get current default
+        curr_desktop = None
+        if cat_id == "browser":
+            try:
+                out = subprocess.check_output(["xdg-settings", "get", "default-web-browser"], text=True, stderr=subprocess.DEVNULL).strip()
+                if out:
+                    curr_desktop = out
+            except Exception:
+                pass
+        
+        if not curr_desktop:
+            primary_mime = cat_info["mimes"][0]
+            try:
+                out = subprocess.check_output(["xdg-mime", "query", "default", primary_mime], text=True, stderr=subprocess.DEVNULL).strip()
+                if out:
+                    curr_desktop = out
+            except Exception:
+                pass
+
+        curr_name, curr_icon = parse_desktop_name(curr_desktop) if curr_desktop else ("Não definido", "application-x-executable")
+
+        # Discover all installed apps matching candidates or current
+        opts = []
+        seen = set()
+        
+        # Always include current if exists
+        if curr_desktop and curr_desktop in installed:
+            opts.append({
+                "desktop": curr_desktop,
+                "name": curr_name,
+                "icon": curr_icon,
+                "is_current": True
+            })
+            seen.add(curr_desktop)
+
+        # Include candidate options installed
+        for cand in cat_info["candidates"]:
+            if cand in installed and cand not in seen:
+                c_name, c_icon = parse_desktop_name(cand)
+                opts.append({
+                    "desktop": cand,
+                    "name": c_name,
+                    "icon": c_icon,
+                    "is_current": (cand == curr_desktop)
+                })
+                seen.add(cand)
+
+        data[cat_id] = {
+            "label": cat_info["label"],
+            "current": curr_desktop,
+            "current_name": curr_name,
+            "options": opts
+        }
+
+    return data
+
+def set_default(cat_id, desktop_file):
+    if cat_id not in CATEGORIES:
+        return False
+
+    cat_info = CATEGORIES[cat_id]
+    if cat_id == "browser":
+        try:
+            subprocess.run(["xdg-settings", "set", "default-web-browser", desktop_file], check=False)
+        except Exception:
+            pass
+
+    for mime in cat_info["mimes"]:
+        try:
+            subprocess.run(["xdg-mime", "default", desktop_file, mime], check=False)
+        except Exception:
+            pass
+
+    name, _ = parse_desktop_name(desktop_file)
+    notify(f"{name} definido como padrão para {cat_info['label']}")
+    return True
+
+def main():
+    cmd = sys.argv[1] if len(sys.argv) > 1 else "get"
+
+    if cmd == "get":
+        print(json.dumps(get_data(), indent=2))
+        return
+
+    if cmd == "set" and len(sys.argv) > 3:
+        cat = sys.argv[2]
+        desktop = sys.argv[3]
+        ok = set_default(cat, desktop)
+        print(json.dumps({"success": ok}))
+        return
+
+    print("Uso: rice-default-apps [get|set <category> <desktop_file>]")
+
+if __name__ == "__main__":
+    main()

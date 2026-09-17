@@ -146,11 +146,10 @@ Item {
 
     // Processo de Ações com Arquivos
     Process { id: openFolderProc; command: ["rice-record", "open-folder"] }
-    Process { id: playProc; property string targetPath: ""; command: ["rice-record", "play", targetPath] }
+    Process { id: playProc; command: ["rice-record", "play"] }
     Process {
         id: deleteProc
-        property string targetPath: ""
-        command: ["rice-record", "delete", targetPath]
+        command: ["rice-record", "delete"]
         onExited: listProc.running = true
     }
 
@@ -888,7 +887,7 @@ Item {
                                     cursorShape: Qt.PointingHandCursor
                                     acceptedButtons: Qt.LeftButton
                                     onDoubleClicked: {
-                                        playProc.targetPath = modelData.path;
+                                        playProc.command = ["rice-record", "play", modelData.path];
                                         playProc.running = true;
                                     }
                                 }
@@ -973,7 +972,7 @@ Item {
                                             hoverEnabled: true
                                             cursorShape: Qt.PointingHandCursor
                                             onClicked: {
-                                                playProc.targetPath = modelData.path;
+                                                playProc.command = ["rice-record", "play", modelData.path];
                                                 playProc.running = true;
                                             }
                                         }
@@ -1001,9 +1000,8 @@ Item {
                                             cursorShape: Qt.PointingHandCursor
                                             onClicked: {
                                                 const pathToDelete = modelData.path;
-                                                root.recentRecordings = root.recentRecordings.filter(item => item.path !== pathToDelete);
-                                                Quickshell.execDetached(["rice-record", "delete", pathToDelete]);
-                                                deleteProc.targetPath = pathToDelete;
+                                                root.recentRecordings = root.recentRecordings.filter(function(item) { return item.path !== pathToDelete; });
+                                                deleteProc.command = ["rice-record", "delete", pathToDelete];
                                                 deleteProc.running = true;
                                             }
                                         }

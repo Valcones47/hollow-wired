@@ -1,0 +1,111 @@
+#!/usr/bin/env python3
+"""rice-power: Gerenciador de perfis de energia, saúde de bateria e consumo."""
+
+import json
+import os
+import subprocess
+import sys
+
+
+def read_sysfs(path, default=""):
+    try:
+        with open(path, "r") as f:
+            return f.read().strip()
+    except Exception:
+        return default
+
+
+def get_status():
+    bat_path = "/sys/class/power_supply/BAT1"
+    if not os.path.exists(bat_path):
+        bat_path = "/sys/class/power_supply/BAT0"
+
+    has_battery = os.path.exists(bat_path)
+    percent = 100
+    status = "AC Conectado"
+    health = 100
+    cycles = 0
+    watts = 0.0
+
+    if has_battery:
+        try:
+            percent = int(read_sysfs(f"{bat_path}/capacity", "100"))
+        except ValueError:
+            pass
+
+        status = read_sysfs(f"{bat_path}/status", "AC Conectado")
+
+        try:
+            full = int(read_sysfs(f"{bat_path}/charge_full", "1"))
+            full_design = int(read_sysfs(f"{bat_path}/charge_full_design", "1"))
+            if full_design > 0:
+                health = round((full / full_design) * 100, 1)
+        except ValueError:
+            pass
+
+        try:
+            cycles = int(read_sysfs(f"{bat_path}/cycle_count", "0"))
+        except ValueError:
+            pass
+
+        try:
+            current_uA = int(read_sysfs(f"{bat_path}/current_now", "0"))
+            voltage_uV = int(read_sysfs(f"{bat_path}/voltage_now", "0"))
+            watts = round((current_uA * voltage_uV) / 1e12, 1)
+        except ValueError:
+            pass
+
+    # Perfil ativo do power-profiles-daemon
+    profile = "performance"
+    try:
+        res = subprocess.run(["powerprofilesctl", "get"], capture_output=True, text=True)
+        if res.returncode == 0:
+            profile = res.stdout.strip()
+    except Exception:
+        pass
+
+    return {
+        "has_battery": has_battery,
+        "percent": percent,
+        "status": status,
+        "health": health,
+        "cycles": cycles,
+        "watts": watts,
+        "profile": profile,
+        "available_profiles": ["performance", "balanced", "power-saver"],
+    }
+
+
+def set_profile(p):
+    if p in ("performance", "balanced", "power-saver"):
+        try:
+            subprocess.run(["powerprofilesctl", "set", p], check=True)
+            labels = {
+                "performance": "Desempenho Máximo",
+                "balanced": "Modo Equilibrado",
+                "power-saver": "Economia de Energia",
+            }
+            lbl = labels.get(p, p)
+            subprocess.run(["notify-send", "-a", "Energia", "-i", "battery-charging", "-r", "91193", "-t", "2000", "Perfil de Energia", lbl], check=False)
+            print(f"[✓] Perfil alterado para: {p}")
+            return True
+        except Exception as e:
+            print(f"[-] Erro ao alterar perfil: {e}", file=sys.stderr)
+    return False
+
+
+def main():
+    args = sys.argv[1:]
+    cmd = args[0] if args else "status"
+
+    if cmd == "status":
+        print(json.dumps(get_status(), ensure_ascii=False, indent=2))
+    elif cmd == "set-profile":
+        if len(args) > 1:
+            set_profile(args[1])
+    else:
+        print("Uso: rice-power [status|set-profile <performance|balanced|power-saver>]")
+
+
+if __name__ == "__main__":
+    main()

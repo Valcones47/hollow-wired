@@ -1,0 +1,142 @@
+#!/usr/bin/env python3
+"""
+rice-storage: Gerenciamento visual de armazenamento e limpeza segura de disco
+Uso:
+  rice-storage status
+  rice-storage clean-pacman
+  rice-storage clean-thumbnails
+  rice-storage clean-trash
+  rice-storage clean-flatpak
+  rice-storage clean-all
+"""
+
+import sys
+import os
+import subprocess
+import shutil
+import json
+
+def notify(title, msg="", icon="drive-harddisk"):
+    try:
+        subprocess.run(["notify-send", "-a", "Armazenamento", "-i", icon, "-t", "2500", title, msg], check=False)
+    except Exception:
+        pass
+
+def get_dir_size(path):
+    if not os.path.exists(path):
+        return "0 B"
+    try:
+        res = subprocess.run(["du", "-sh", path], capture_output=True, text=True)
+        lines = [l for l in res.stdout.strip().split("\n") if l.strip()]
+        if lines:
+            return lines[-1].split()[0]
+    except Exception:
+        pass
+    return "0 B"
+
+def get_status():
+    stat = shutil.disk_usage("/")
+    total_gb = round(stat.total / (1024**3), 1)
+    used_gb = round(stat.used / (1024**3), 1)
+    free_gb = round(stat.free / (1024**3), 1)
+    pct = round((stat.used / stat.total) * 100, 1)
+
+    pacman_cache = get_dir_size("/var/cache/pacman/pkg")
+    thumbnails = get_dir_size(os.path.expanduser("~/.cache/thumbnails"))
+    trash = get_dir_size(os.path.expanduser("~/.local/share/Trash"))
+    user_cache = get_dir_size(os.path.expanduser("~/.cache"))
+
+    return {
+        "root_total": f"{total_gb} GB",
+        "root_used": f"{used_gb} GB",
+        "root_avail": f"{free_gb} GB",
+        "root_pct": pct,
+        "pacman_cache": pacman_cache,
+        "thumbnails": thumbnails,
+        "trash": trash,
+        "user_cache": user_cache
+    }
+
+def clean_pacman():
+    try:
+        subprocess.run(["paccache", "-rk2"], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        notify("Cache do Pacman Limpo", "Versões antigas de pacotes foram removidas.")
+        return True
+    except Exception:
+        return False
+
+def clean_thumbnails():
+    path = os.path.expanduser("~/.cache/thumbnails")
+    if os.path.exists(path):
+        try:
+            for item in os.listdir(path):
+                p = os.path.join(path, item)
+                if os.path.isdir(p):
+                    shutil.rmtree(p, ignore_errors=True)
+                else:
+                    os.remove(p)
+            notify("Miniaturas Limpas", "Cache de miniaturas liberado com sucesso.")
+            return True
+        except Exception:
+            return False
+    return True
+
+def clean_trash():
+    path = os.path.expanduser("~/.local/share/Trash")
+    if os.path.exists(path):
+        try:
+            for item in os.listdir(path):
+                p = os.path.join(path, item)
+                if os.path.isdir(p):
+                    shutil.rmtree(p, ignore_errors=True)
+                else:
+                    os.remove(p)
+            notify("Lixeira Esvaziada", "Arquivos excluídos foram liberados permanentemente.")
+            return True
+        except Exception:
+            return False
+    return True
+
+def clean_flatpak():
+    try:
+        subprocess.run(["flatpak", "uninstall", "--unused", "-y"], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        notify("Runtimes Flatpak Limpos", "Bibliotecas órfãs foram desinstaladas.")
+        return True
+    except Exception:
+        return False
+
+def clean_all():
+    notify("Limpeza Profunda Segura", "Limpando caches, miniaturas e pacotes antigos...")
+    clean_pacman()
+    clean_thumbnails()
+    clean_trash()
+    clean_flatpak()
+    notify("Limpeza Concluída!", "Espaço em disco recuperado com sucesso.")
+    return True
+
+def main():
+    cmd = sys.argv[1] if len(sys.argv) > 1 else "status"
+
+    if cmd == "status":
+        print(json.dumps(get_status(), indent=2))
+        return
+    if cmd == "clean-pacman":
+        print(json.dumps({"success": clean_pacman()}))
+        return
+    if cmd == "clean-thumbnails":
+        print(json.dumps({"success": clean_thumbnails()}))
+        return
+    if cmd == "clean-trash":
+        print(json.dumps({"success": clean_trash()}))
+        return
+    if cmd == "clean-flatpak":
+        print(json.dumps({"success": clean_flatpak()}))
+        return
+    if cmd == "clean-all":
+        print(json.dumps({"success": clean_all()}))
+        return
+
+    print("Uso: rice-storage [status|clean-pacman|clean-thumbnails|clean-trash|clean-flatpak|clean-all]")
+
+if __name__ == "__main__":
+    main()
