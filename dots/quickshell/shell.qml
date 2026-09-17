@@ -46,6 +46,7 @@ ShellRoot {
             card.currentTab = 5;
             hub.open = true;
         }
+        onVisualConfigClicked: visualConfig.open = !visualConfig.open
         onStopRecording: Quickshell.execDetached(["rice-record"])
     }
 
@@ -59,6 +60,10 @@ ShellRoot {
 
     SystemInfo {
         id: sysinfo
+    }
+
+    VisualConfigPanel {
+        id: visualConfig
     }
 
     Launcher {

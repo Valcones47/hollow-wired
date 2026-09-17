@@ -26,9 +26,11 @@ if [ ! -f "$WALLPAPER_SRC" ]; then
 fi
 
 if [ -f "$WALLPAPER_SRC" ]; then
-  echo "==> Copiando wallpaper estático para /boot/limine-wallpaper.png..."
-  cp "$WALLPAPER_SRC" /boot/limine-wallpaper.png
+  echo "==> Gerando wallpaper com blur suave e contraste para o Limine..."
+  ffmpeg -y -i "$WALLPAPER_SRC" -vf "gblur=sigma=12,eq=brightness=-0.12" /tmp/limine_blurred_wallpaper.png 2>/dev/null || cp "$WALLPAPER_SRC" /tmp/limine_blurred_wallpaper.png
+  cp /tmp/limine_blurred_wallpaper.png /boot/limine-wallpaper.png
   chmod 644 /boot/limine-wallpaper.png
+  rm -f /tmp/limine_blurred_wallpaper.png
 else
   echo "AVISO: Wallpaper não encontrado em $WALLPAPER_SRC. Continuando sem sobrescrever imagem..."
 fi

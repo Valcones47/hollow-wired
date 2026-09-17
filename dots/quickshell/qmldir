@@ -28,3 +28,4 @@ Cheatsheet 1.0 Cheatsheet.qml
 Clipboard 1.0 Clipboard.qml
 DesktopWidgets 1.0 DesktopWidgets.qml
 singleton NotifService 1.0 NotifService.qml
+VisualConfigPanel 1.0 VisualConfigPanel.qml

@@ -1,0 +1,82 @@
+#!/usr/bin/env python3
+import sys
+import os
+import re
+import subprocess
+import json
+
+MAKO_CONF = os.path.expanduser("~/.config/mako/config")
+
+def get_settings():
+    if not os.path.isfile(MAKO_CONF):
+        return {}
+    with open(MAKO_CONF, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    def find_val(pattern, default):
+        m = re.search(pattern, content, re.MULTILINE)
+        return m.group(1) if m else default
+
+    anchor = find_val(r'^anchor=([a-zA-Z-]+)', "top-right")
+    timeout = int(find_val(r'^default-timeout=([0-9]+)', "5000"))
+    radius = int(find_val(r'^border-radius=([0-9]+)', "6"))
+    border_size = int(find_val(r'^border-size=([0-9]+)', "1"))
+
+    return {
+        "anchor": anchor,
+        "timeout": timeout // 1000,
+        "radius": radius,
+        "border_size": border_size
+    }
+
+def set_setting(key, value):
+    if not os.path.isfile(MAKO_CONF):
+        return
+    with open(MAKO_CONF, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    if key == "anchor":
+        repl = f"anchor={value}"
+        pat = r'^anchor=.*$'
+    elif key == "timeout":
+        ms = int(value) * 1000
+        repl = f"default-timeout={ms}"
+        pat = r'^default-timeout=.*$'
+    elif key == "radius":
+        repl = f"border-radius={int(value)}"
+        pat = r'^border-radius=.*$'
+    elif key == "border_size":
+        repl = f"border-size={int(value)}"
+        pat = r'^border-size=.*$'
+    else:
+        return
+
+    if re.search(pat, content, re.MULTILINE):
+        content = re.sub(pat, repl, content, flags=re.MULTILINE)
+    else:
+        content += f"\n{repl}\n"
+
+    with open(MAKO_CONF, "w", encoding="utf-8") as f:
+        f.write(content)
+
+    subprocess.run(["makoctl", "reload"], stderr=subprocess.DEVNULL)
+    print("OK")
+
+def test_notification():
+    subprocess.run([
+        "notify-send",
+        "Ajuste Visual Aplicado!",
+        "Esta é uma notificação de teste das suas novas configurações.",
+        "-i", "dialog-information",
+        "-a", "Configurações Visuais"
+    ])
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2 or sys.argv[1] == "get":
+        print(json.dumps(get_settings()))
+    elif sys.argv[1] == "set" and len(sys.argv) >= 4:
+        set_setting(sys.argv[2], sys.argv[3])
+    elif sys.argv[1] == "test":
+        test_notification()
+    else:
+        print("Usage: rice-mako-apply [get|set <key> <val>|test]")

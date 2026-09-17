@@ -23,6 +23,7 @@ PanelWindow {
 
     signal clockClicked()
     signal notifClicked()
+    signal visualConfigClicked()
     property bool recording: false
     signal stopRecording()
 
@@ -476,6 +477,18 @@ PanelWindow {
                             font.weight: Font.Bold
                             color: Theme.background
                         }
+                    }
+                }
+
+                Module {
+                    id: visualConfigMod
+                    kind: ""
+                    onClicked: bar.visualConfigClicked()
+
+                    BarIcon {
+                        text: Theme.icons.tune
+                        color: Theme.textColor
+                        font.pixelSize: 15
                     }
                 }
 

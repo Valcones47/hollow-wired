@@ -1,7 +1,7 @@
 # Estado Atual do Setup (ESTADO-ATUAL.md)
 
 > **Documento de referência primária do rice.**  
-> Atualizado em: **2026-09-16**  
+> Atualizado em: **2026-09-17**  
 > *Regra para agentes e desenvolvedores: Sempre que fizer alterações no rice, atualize este arquivo para refletir o estado vigente.*
 
 ---
@@ -15,7 +15,7 @@
 - **Shell e Widgets:** **Quickshell** (QML nativo com Wayland layer-shell) em [`~/.config/quickshell/`](file:///home/val47/.config/quickshell/).
 - **Wallpaper Engine:** **Waywallen** (Flatpak + helper nativo `~/.local/bin/waywallen-layer-shell`). Pausa automaticamente quando janelas estão em tela cheia.
 - **Cores & Tema:** Dinâmico via **Wallust** lendo o wallpaper atual e gerando `~/.config/hypr/colors.conf`, que é importado pelo `hyprland.lua` e consumido pelos componentes.
-- **Terminal:** Kitty (`~/.config/kitty/kitty.conf`) com blur e opacidade 0.64.
+- **Terminal:** Kitty (`~/.config/kitty/kitty.conf`) com blur e opacidade ajustável ao vivo.
 - **Bloqueio de Tela:** `hyprlock` (`~/.config/hypr/hyprlock.conf`).
 - **Ociosidade:** `hypridle` (`~/.config/hypr/hypridle.conf`).
 - **Documento Dedicado de Revisão & Auditoria:** [`MELHORIAS-E-REVISAO.md`](file:///home/val47/projetos/hyprland-setup/MELHORIAS-E-REVISAO.md).
@@ -28,7 +28,8 @@ Todos os elementos de interface gráfica do desktop são gerenciados pelo Quicks
 
 | Componente | Arquivo Principal | Descrição |
 |---|---|---|
-| **Barra Superior** | `TopBar.qml` | Substitui a antiga Waybar. Workspaces animados em formato pill, título da janela ativa, relógio central que abre o Hub ao clicar, e popups com cantos invertidos para Áudio, Wi-Fi, Bluetooth e Bateria. Na aba de **Bateria**, além dos perfis de energia (`Economia`, `Equilíbrio`, `Desempenho`), inclui 3 toggles rápidos de **Otimizações de GPU & Tela**: **Modo Jogo** (`GameMode.qml`), **Toggle de Blur** (`rice-blur-toggle`) e **Super Desempenho** (`rice-perf-mode` com 0% overhead na iGPU). |
+| **Barra Superior** | `TopBar.qml` | Substitui a antiga Waybar. Workspaces animados em formato pill, título da janela ativa, relógio central que abre o Hub ao clicar, e popups com cantos invertidos para Áudio, Wi-Fi, Bluetooth e Bateria. Na aba de **Bateria**, além dos perfis de energia (`Economia`, `Equilíbrio`, `Desempenho`), inclui 3 toggles rápidos de **Otimizações de GPU & Tela**: **Modo Jogo** (`GameMode.qml`), **Toggle de Blur** (`rice-blur-toggle`) e **Super Desempenho** (`rice-perf-mode` com 0% overhead na iGPU). Contém módulo dedicado para o **Painel de Configurações Visuais** ao lado do sino de notificações. |
+| **Painel de Configurações Visuais** | `VisualConfigPanel.qml`, scripts `rice-*-apply` | Painel gráfico completo aberto pelo ícone de sintonia (`Theme.icons.tune`) ao lado das notificações na TopBar (também acionável via IPC `qs ipc call visualconfig toggle`). Oferece 4 abas completas de ajustes visuais em tempo real: **1. Fastfetch** (galeria visual de logos e GIFs em `~/Imagens/FastFetch` com detecção de ativo, sliders de largura/altura e botões interativos para ativar/ocultar módulos do sistema); **2. Kitty Terminal** (sliders com live-reload para opacidade, tamanho da fonte, window padding, seletor de formato do cursor e toggles de blur e som); **3. Mako Notificações** (seletor matricial 3x2 de posição na tela, sliders de tempo de exibição, arredondamento e borda, com botão de teste imediato); **4. Efeitos & Hyprland** (toggle e slider de temperatura de cor para luz noturna `hyprsunset`, toggle e intensidade de escurecimento de janelas inativas `dim_inactive`, rounding, gaps e presets de animações). |
 | **Hub Central** | `Dashboard.qml` e módulos | Aberto pelo relógio da TopBar. Janela flutuante com abas: Dashboard (visão geral, avatar animado `.face.webp` da Rem, player de áudio/cava), Mídia, **Performance** (`Monitoring.qml` e `SysStats.qml` com medidor de RAM Real deduzindo buffers/cache, chips de disco/swap, botão **Limpar Caches & Otimizar** via `rice-ram-cleaner` e botão/modal explicativo **"Não necessário"** detalhando a arquitetura do page cache do kernel Linux), Workspaces, **Aparência** (`Appearance.qml`), Notificações e **Gravação de Tela** (`Recording.qml`). Fecha ao clicar fora. |
 | **Estúdio de Gravação** | `Recording.qml`, `rice-record` | Aba de gravação de tela estilo OBS no Hub central (substituiu a aba de Snapshots). Utiliza a **dGPU NVIDIA RTX 3050 com NVENC por padrão** (`h264_nvenc`) com 0% de impacto na CPU/iGPU, permitindo alternar também para Intel (VAAPI) ou CPU. Permite gravar **Tela Inteira** (`eDP-1`), **Aplicativo / Janela** específica (com chips interativos das janelas abertas) ou **Região livre** da tela via `slurp`. Suporta toggles independentes de **Áudio do Sistema** e **Microfone** com mixagem automática estéreo via PipeWire (`module-null-sink`). 100% harmonizada com a paleta escura do Wallust (`Theme.tile`). Grava diretamente em `/home/val47/Vídeos/Gravações` com botão rápido "Abrir Pasta", mini-galeria de vídeos recentes, botão de reprodução, exclusão e contador de tempo decorrido ao vivo. |
 | **OSD Flutuante** | `OSD.qml` | Pílula flutuante animada estilo Caelestia / Dynamic Island logo abaixo da TopBar. Substituiu o `swayosd`. Exibe feedback em tempo real para Volume, Mute do Microfone e Brilho. Totalmente click-through (`mask: Region {}`). |
@@ -61,14 +62,15 @@ Todos os elementos de interface gráfica do desktop são gerenciados pelo Quicks
 - **Novo Utilitário de Perfil (`rice-set-avatar`):** Permite trocar foto ou GIF de perfil com 1 clique diretamente pelo Dashboard ou atalho gráfico (`zenity`/`kdialog`).
 - **Seletor de Arquivos Integrado (KDE / Dolphin FileChooser Portal):** Configurado via `~/.config/xdg-desktop-portal/portals.conf` e `hyprland-portals.conf` definindo `org.freedesktop.impl.portal.FileChooser=kde`. Quando qualquer navegador (Zen, Chrome), aplicativo (Discord) ou jogo solicita abrir/salvar arquivos, invoca nativamente a interface do Dolphin/KDE com tema escuro consistente (Breeze Dark), atalhos laterais de pastas e miniaturas, substituindo o seletor genérico em branco do GTK.
 - **Tela de Login SDDM (SilentSDDM + Wallust + Waywallen):**
+  - **Correção de Display Manager (SDDM vs Plasmalogin):** Identificado que o serviço `plasmalogin.service` (do KDE 6) estava ativado como gerenciador principal, impedindo o SDDM de subir no boot. O script `rice-sddm-install` agora desativa automaticamente `plasmalogin.service`, ativa `sddm.service` e configura `/etc/sddm.conf.d/theme.conf.user` com tema `SilentSDDM`.
   - **Wallpaper Dinâmico Pausado:** Script `rice-sddm-sync-wallpaper` captura automaticamente um frame limpo em 1080p (`grim`) na troca de wallpaper no `waywallen-switcher` (ocultando TopBar e mudando para workspace vazia temporariamente) e grava em `/usr/share/sddm/themes/SilentSDDM/backgrounds/current.png`.
   - **Paleta Wallust em Tempo Real:** Template `~/.config/wallust/templates/sddm-theme.conf` integrado ao `wallust.toml` aplica as cores dinâmicas no tema do SDDM a cada troca de papel de parede.
   - **Seletor de Sessão / WM Modernizado:** Redesenhado com botão largo (220px), indicador `▾`, ícones dedicados (Hyprland, Plasma KDE, Sway, Gamescope), marcação visual de sessão ativa com checkmark e atalho de teclado `F2`.
   - **Avatar do Usuário:** Carregamento automático da foto de perfil (`~/.face` da Rem) em máscara circular com borda de destaque na cor acentuada do tema.
   - **Data e Hora em Português:** Data formatada em português brasileiro com inicial maiúscula (ex: *"Quarta-feira, 16 de setembro"*).
   - **Calibração de Mouse 1:1:** Drop-in `/etc/X11/xorg.conf.d/50-mouse.conf` com `Option "AccelProfile" "flat"` e `Option "AccelSpeed" "0"`, eliminando a aceleração estranha e deixando o ponteiro do SDDM idêntico ao do Hyprland.
-- **Bootloader Limine Personalizado:**
-  - Script utilitário `rice-limine-theme` (`~/.local/bin/rice-limine-theme`) para aplicar no `/boot/limine.conf`: resolução nativa 1920x1080, cópia do wallpaper estático ativo para `/boot/limine-wallpaper.png`, transparência escura no terminal (`term_background = 90170D0C`), paleta Wallust completa, branding estilizado (`CachyOS // Hyprland`) e timeout de 5 segundos.
+- **Bootloader Limine Personalizado com Wallpaper Suavizado:**
+  - Script utilitário `rice-limine-theme` (`~/.local/bin/rice-limine-theme`) para aplicar no `/boot/limine.conf`: resolução nativa 1920x1080, processamento de imagem via `ffmpeg` com filtro Gaussian Blur sutil (`gblur=sigma=12,eq=brightness=-0.12`) para `/boot/limine-wallpaper.png` garantindo contraste nítido e legibilidade perfeita do texto das entradas de kernel/snapshots Btrfs, transparência escura no terminal (`term_background = 90170D0C`), paleta Wallust completa, branding estilizado (`CachyOS // Hyprland`) e timeout de 5 segundos.
 
 
 ---

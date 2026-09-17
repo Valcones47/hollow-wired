@@ -1,0 +1,164 @@
+#!/usr/bin/env python3
+import sys
+import os
+import json
+import re
+import subprocess
+
+CONFIG_PATH = os.path.expanduser("~/.config/fastfetch/config.jsonc")
+IMAGES_DIR = os.path.expanduser("~/Imagens/FastFetch")
+
+def strip_jsonc_comments(content):
+    # Remove single-line comments // ... but preserve within quotes
+    lines = []
+    for line in content.splitlines():
+        # simple comment strip
+        cleaned = re.sub(r'^\s*//.*$', '', line)
+        cleaned = re.sub(r'(?<!:)\s*//.*$', '', cleaned)
+        lines.append(cleaned)
+    return "\n".join(lines)
+
+def load_config():
+    if not os.path.isfile(CONFIG_PATH):
+        return {}
+    with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+        raw = f.read()
+    try:
+        # Strip trailing commas if any
+        clean = strip_jsonc_comments(raw)
+        clean = re.sub(r',\s*([\]}])', r'\1', clean)
+        return json.loads(clean)
+    except Exception as e:
+        print(f"Error loading config: {e}", file=sys.stderr)
+        return {}
+
+def save_config(cfg):
+    os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
+    with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+        json.dump(cfg, f, indent=4, ensure_ascii=False)
+
+def list_images():
+    os.makedirs(IMAGES_DIR, exist_ok=True)
+    valid_exts = ('.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp')
+    files = []
+    for entry in sorted(os.listdir(IMAGES_DIR)):
+        if entry.lower().endswith(valid_exts):
+            full_path = os.path.join(IMAGES_DIR, entry)
+            files.append({
+                "name": entry,
+                "path": full_path,
+                "size": os.path.getsize(full_path)
+            })
+    print(json.dumps(files, ensure_ascii=False))
+
+def get_current_info():
+    cfg = load_config()
+    logo = cfg.get("logo", {})
+    source = logo.get("source", "")
+    width = logo.get("width", 32)
+    height = logo.get("height", 14)
+    logo_type = logo.get("type", "kitty")
+    
+    # modules
+    modules = cfg.get("modules", [])
+    active_types = []
+    for m in modules:
+        if isinstance(m, dict):
+            active_types.append(m.get("type", ""))
+        elif isinstance(m, str):
+            active_types.append(m)
+
+    res = {
+        "source": source,
+        "filename": os.path.basename(source) if source else "",
+        "width": width,
+        "height": height,
+        "type": logo_type,
+        "modules": active_types
+    }
+    print(json.dumps(res, ensure_ascii=False))
+
+def set_logo(image_path):
+    cfg = load_config()
+    if "logo" not in cfg:
+        cfg["logo"] = {}
+    cfg["logo"]["source"] = image_path
+    cfg["logo"]["type"] = "kitty"
+    save_config(cfg)
+    print("OK")
+
+def set_size(width, height):
+    cfg = load_config()
+    if "logo" not in cfg:
+        cfg["logo"] = {}
+    cfg["logo"]["width"] = int(width)
+    cfg["logo"]["height"] = int(height)
+    save_config(cfg)
+    print("OK")
+
+def toggle_module(mod_type, enable_str):
+    enable = enable_str.lower() in ("true", "1", "yes")
+    cfg = load_config()
+    modules = cfg.get("modules", [])
+    
+    # Find if module exists
+    found_idx = -1
+    for idx, m in enumerate(modules):
+        t = m.get("type") if isinstance(m, dict) else m
+        if t == mod_type:
+            found_idx = idx
+            break
+            
+    if enable and found_idx == -1:
+        # Default labels
+        labels = {
+            "os": "󰣇 Sistema", "host": "󰌢 Host", "kernel": "󰒋 Kernel",
+            "terminal": "󰆟 Terminal", "uptime": "󰅐 Uptime", "packages": "󰏖 Pacotes",
+            "shell": "󰞷 Shell", "display": "󰍹 Tela", "de": "󰧨 Interface",
+            "cpu": "󰻠 CPU", "gpu": "󰢮 GPU", "memory": "󰑭 RAM", "swap": "󰓡 Swap",
+            "disk": "󰋊 Disco", "weather": "󰕥 Clima", "media": "󰝚 Mídia"
+        }
+        key_label = labels.get(mod_type, mod_type.title())
+        new_mod = {"type": mod_type, "key": key_label}
+        # Insert before colors/break if present
+        insert_pos = len(modules)
+        for i, m in enumerate(modules):
+            t = m.get("type") if isinstance(m, dict) else m
+            if t in ("colors", "break"):
+                insert_pos = i
+                break
+        modules.insert(insert_pos, new_mod)
+    elif not enable and found_idx != -1:
+        modules.pop(found_idx)
+        
+    cfg["modules"] = modules
+    save_config(cfg)
+    print("OK")
+
+def run_fastfetch():
+    try:
+        out = subprocess.check_output(["fastfetch", "--pipe", "false"], stderr=subprocess.STDOUT, text=True, timeout=5)
+        print(out)
+    except Exception as e:
+        print(f"Fastfetch error: {e}")
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        get_current_info()
+        sys.exit(0)
+        
+    cmd = sys.argv[1]
+    if cmd == "list-images":
+        list_images()
+    elif cmd == "get":
+        get_current_info()
+    elif cmd == "set-logo" and len(sys.argv) >= 3:
+        set_logo(sys.argv[2])
+    elif cmd == "set-size" and len(sys.argv) >= 4:
+        set_size(sys.argv[2], sys.argv[3])
+    elif cmd == "toggle-module" and len(sys.argv) >= 4:
+        toggle_module(sys.argv[2], sys.argv[3])
+    elif cmd == "run":
+        run_fastfetch()
+    else:
+        print("Usage: rice-fastfetch-apply [list-images|get|set-logo <path>|set-size <w> <h>|toggle-module <type> <bool>|run]")

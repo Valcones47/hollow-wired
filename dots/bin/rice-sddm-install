@@ -24,4 +24,17 @@ cp "$DOTS_DIR/wallust/templates/sddm-theme.conf" ~/.config/wallust/templates/
 echo "==> Sincronizando wallpaper do SDDM..."
 ~/.local/bin/rice-sddm-sync-wallpaper || true
 
-echo "==> SDDM configurado com sucesso!"
+echo "==> Configurando o SDDM como display-manager do sistema..."
+if [ "$EUID" -eq 0 ]; then
+  SUDO=""
+else
+  SUDO="sudo"
+fi
+
+$SUDO systemctl disable plasmalogin.service 2>/dev/null || true
+$SUDO systemctl enable sddm.service 2>/dev/null || true
+
+$SUDO mkdir -p /etc/sddm.conf.d
+echo -e "[Theme]\nCurrent=SilentSDDM" | $SUDO tee /etc/sddm.conf.d/theme.conf.user > /dev/null
+
+echo "==> SDDM configurado e ativado com sucesso!"

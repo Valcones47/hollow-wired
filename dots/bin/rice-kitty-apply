@@ -1,0 +1,78 @@
+#!/usr/bin/env python3
+import sys
+import os
+import re
+import subprocess
+import json
+
+KITTY_CONF = os.path.expanduser("~/.config/kitty/kitty.conf")
+
+def get_settings():
+    if not os.path.isfile(KITTY_CONF):
+        return {}
+    with open(KITTY_CONF, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    def find_val(pattern, default):
+        m = re.search(pattern, content, re.MULTILINE)
+        return m.group(1) if m else default
+
+    opacity = float(find_val(r'^background_opacity\s+([0-9.]+)', "0.64"))
+    font_size = float(find_val(r'^font_size\s+([0-9.]+)', "10.0"))
+    padding = int(find_val(r'^window_padding_width\s+([0-9]+)', "4"))
+    blur = int(find_val(r'^background_blur\s+([0-9]+)', "0"))
+    cursor = find_val(r'^cursor_shape\s+([a-zA-Z]+)', "block")
+    bell = find_val(r'^enable_audio_bell\s+([a-zA-Z]+)', "no")
+
+    res = {
+        "opacity": opacity,
+        "font_size": font_size,
+        "padding": padding,
+        "blur": blur,
+        "cursor": cursor,
+        "bell": bell == "yes"
+    }
+    return res
+
+def set_setting(key, value):
+    if not os.path.isfile(KITTY_CONF):
+        return
+    with open(KITTY_CONF, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    key_patterns = {
+        "opacity": (r'^background_opacity\s+.*$', f'background_opacity {float(value):.2f}', 'background_opacity 0.64'),
+        "font_size": (r'^font_size\s+.*$', f'font_size {float(value):.1f}', 'font_size 10.0'),
+        "padding": (r'^window_padding_width\s+.*$', f'window_padding_width {int(value)}', 'window_padding_width 4'),
+        "blur": (r'^background_blur\s+.*$', f'background_blur {int(value)}', 'background_blur 1'),
+        "cursor": (r'^cursor_shape\s+.*$', f'cursor_shape {value}', 'cursor_shape block'),
+        "bell": (r'^enable_audio_bell\s+.*$', f'enable_audio_bell {value}', 'enable_audio_bell no')
+    }
+
+    if key not in key_patterns:
+        return
+
+    pat, repl, default_line = key_patterns[key]
+    if re.search(pat, content, re.MULTILINE):
+        content = re.sub(pat, repl, content, flags=re.MULTILINE)
+    else:
+        # Append before include or at the end
+        if "include colors-wallust.conf" in content:
+            content = content.replace("include colors-wallust.conf", f"{repl}\ninclude colors-wallust.conf")
+        else:
+            content += f"\n{repl}\n"
+
+    with open(KITTY_CONF, "w", encoding="utf-8") as f:
+        f.write(content)
+
+    # Reload kitty
+    subprocess.run(["pkill", "-SIGUSR1", "kitty"], stderr=subprocess.DEVNULL)
+    print("OK")
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2 or sys.argv[1] == "get":
+        print(json.dumps(get_settings()))
+    elif sys.argv[1] == "set" and len(sys.argv) >= 4:
+        set_setting(sys.argv[2], sys.argv[3])
+    else:
+        print("Usage: rice-kitty-apply [get|set <key> <val>]")

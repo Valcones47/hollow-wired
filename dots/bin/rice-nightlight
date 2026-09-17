@@ -1,0 +1,54 @@
+#!/bin/bash
+STATE_FILE="/tmp/hyprsunset_temp"
+
+get_temp() {
+    if [ -f "$STATE_FILE" ]; then
+        cat "$STATE_FILE"
+    else
+        echo "4500"
+    fi
+}
+
+is_active() {
+    pgrep -x hyprsunset >/dev/null && echo "true" || echo "false"
+}
+
+case "$1" in
+    status)
+        active=$(is_active)
+        temp=$(get_temp)
+        echo "{\"active\": $active, \"temp\": $temp}"
+        ;;
+    on)
+        temp="${2:-$(get_temp)}"
+        echo "$temp" > "$STATE_FILE"
+        pkill -x hyprsunset 2>/dev/null || true
+        hyprsunset -t "$temp" &>/dev/null &
+        echo "OK"
+        ;;
+    off)
+        pkill -x hyprsunset 2>/dev/null || true
+        echo "OK"
+        ;;
+    toggle)
+        if pgrep -x hyprsunset >/dev/null; then
+            pkill -x hyprsunset 2>/dev/null || true
+        else
+            temp=$(get_temp)
+            hyprsunset -t "$temp" &>/dev/null &
+        fi
+        echo "OK"
+        ;;
+    set)
+        temp="${2:-4500}"
+        echo "$temp" > "$STATE_FILE"
+        if pgrep -x hyprsunset >/dev/null; then
+            pkill -x hyprsunset 2>/dev/null || true
+            hyprsunset -t "$temp" &>/dev/null &
+        fi
+        echo "OK"
+        ;;
+    *)
+        echo "Usage: rice-nightlight [status|on [temp]|off|toggle|set <temp>]"
+        ;;
+esac
