@@ -383,8 +383,24 @@ hl.bind("XF86AudioMute",        hl.dsp.exec_cmd("quickshell ipc call osd volumeM
 -- Toggle de mute do microfone via tecla multimídia (mostra OSD do microfone no PipeWire)
 hl.bind("XF86AudioMicMute", hl.dsp.exec_cmd("quickshell ipc call osd micMute"), { locked = true, repeating = true })
 
--- Num_Lock: Desativa/ativa o áudio (Deafen) do Discord nativamente em segundo plano
-hl.bind("Num_Lock", hl.dsp.send_shortcut({ mods = "CTRL SHIFT", key = "D", window = "class:^(discord|vesktop)$" }), { locked = true })
+-- Num_Lock: Desativa/ativa o áudio (Deafen) do Discord nativamente em segundo plano com debounce e liberação segura de teclas
+local last_discord_deafen_time = 0
+local function toggle_discord_deafen()
+    local now = os.clock()
+    -- Debounce de 400ms: elimina duplo acionamento e repetição involuntária do Num_Lock
+    if (now - last_discord_deafen_time) < 0.4 then
+        return
+    end
+    last_discord_deafen_time = now
+
+    -- Envia Ctrl + Shift + d (minúsculo) para o Discord / Vesktop
+    hl.dispatch(hl.dsp.send_shortcut({ mods = "CTRL SHIFT", key = "d", window = "class:^(discord|vesktop)$" }))
+    -- Força liberação imediata do 'd' e modificadores para nunca travar a tecla repetindo no chat
+    hl.dispatch(hl.dsp.send_key_state({ mods = "", key = "d", state = "up", window = "class:^(discord|vesktop)$" }))
+    hl.dispatch(hl.dsp.send_key_state({ mods = "", key = "Control_L", state = "up", window = "class:^(discord|vesktop)$" }))
+    hl.dispatch(hl.dsp.send_key_state({ mods = "", key = "Shift_L", state = "up", window = "class:^(discord|vesktop)$" }))
+end
+hl.bind("Num_Lock", toggle_discord_deafen, { locked = true })
 
 -- OSD de brilho via Quickshell
 hl.bind("XF86MonBrightnessUp",   hl.dsp.exec_cmd("quickshell ipc call osd brightnessUp"),   { locked = true, repeating = true })
