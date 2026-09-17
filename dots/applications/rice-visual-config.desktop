@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Configurações Visuais do Rice
+Comment=Ajustar Fastfetch, Kitty Terminal, Notificações Mako e Efeitos
+Exec=quickshell ipc call visualconfig toggle
+Icon=preferences-desktop-theme
+Terminal=false
+Type=Application
+Categories=Settings;DesktopSettings;

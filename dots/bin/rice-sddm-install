@@ -1,40 +1,88 @@
 #!/bin/bash
 set -e
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-DOTS_DIR="$REPO_ROOT/dots"
+
+# Detect target real user and HOME (even if run under sudo)
+REAL_USER="${SUDO_USER:-$USER}"
+USER_HOME=$(getent passwd "$REAL_USER" | cut -d: -f6)
+if [ -z "$USER_HOME" ]; then
+  USER_HOME="$HOME"
+fi
+
+echo "========================================================="
+echo "   Configurando SDDM (SilentSDDM + Hyprland + Wallust)   "
+echo "========================================================="
+
+# Locate dots directory robustly
+DOTS_DIR=""
+for candidate in \
+  "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." 2>/dev/null && pwd)/dots" \
+  "$USER_HOME/projetos/hyprland-setup/dots" \
+  "/home/val47/projetos/hyprland-setup/dots"; do
+  if [ -d "$candidate/sddm" ]; then
+    DOTS_DIR="$candidate"
+    break
+  fi
+done
 
 THEME_DIR="/usr/share/sddm/themes/SilentSDDM"
 if [ ! -d "$THEME_DIR" ]; then
-  echo "AVISO: $THEME_DIR não encontrado. Se necessário, clone ou instale o SilentSDDM primeiro."
-  exit 1
+  echo "==> Criando diretório de tema em $THEME_DIR..."
+  mkdir -p "$THEME_DIR"
 fi
 
-echo "==> Instalando componentes customizados no SilentSDDM..."
-cp -r "$DOTS_DIR/sddm/components/"* "$THEME_DIR/components/"
-cp -r "$DOTS_DIR/sddm/configs/"* "$THEME_DIR/configs/"
-cp -r "$DOTS_DIR/sddm/icons/"* "$THEME_DIR/icons/"
-
-echo "==> Instalando scripts e templates..."
-cp "$DOTS_DIR/bin/rice-sddm-sync-wallpaper" ~/.local/bin/rice-sddm-sync-wallpaper
-chmod +x ~/.local/bin/rice-sddm-sync-wallpaper
-mkdir -p ~/.config/wallust/templates
-cp "$DOTS_DIR/wallust/templates/sddm-theme.conf" ~/.config/wallust/templates/
-
-echo "==> Sincronizando wallpaper do SDDM..."
-~/.local/bin/rice-sddm-sync-wallpaper || true
-
-echo "==> Configurando o SDDM como display-manager do sistema..."
-if [ "$EUID" -eq 0 ]; then
-  SUDO=""
-else
-  SUDO="sudo"
+if [ -n "$DOTS_DIR" ] && [ -d "$DOTS_DIR/sddm" ]; then
+  echo "==> Instalando componentes customizados a partir de $DOTS_DIR..."
+  mkdir -p "$THEME_DIR/components" "$THEME_DIR/configs" "$THEME_DIR/icons" "$THEME_DIR/backgrounds"
+  cp -r "$DOTS_DIR/sddm/components/"* "$THEME_DIR/components/" 2>/dev/null || true
+  cp -r "$DOTS_DIR/sddm/configs/"* "$THEME_DIR/configs/" 2>/dev/null || true
+  cp -r "$DOTS_DIR/sddm/icons/"* "$THEME_DIR/icons/" 2>/dev/null || true
+  
+  if [ -f "$DOTS_DIR/bin/rice-sddm-sync-wallpaper" ]; then
+    mkdir -p "$USER_HOME/.local/bin"
+    cp "$DOTS_DIR/bin/rice-sddm-sync-wallpaper" "$USER_HOME/.local/bin/"
+    chmod +x "$USER_HOME/.local/bin/rice-sddm-sync-wallpaper"
+    chown "$REAL_USER:$REAL_USER" "$USER_HOME/.local/bin/rice-sddm-sync-wallpaper" 2>/dev/null || true
+  fi
+  
+  if [ -f "$DOTS_DIR/wallust/templates/sddm-theme.conf" ]; then
+    mkdir -p "$USER_HOME/.config/wallust/templates"
+    cp "$DOTS_DIR/wallust/templates/sddm-theme.conf" "$USER_HOME/.config/wallust/templates/"
+    chown -R "$REAL_USER:$REAL_USER" "$USER_HOME/.config/wallust" 2>/dev/null || true
+  fi
 fi
 
-$SUDO systemctl disable plasmalogin.service 2>/dev/null || true
-$SUDO systemctl enable sddm.service 2>/dev/null || true
+# Ensure backgrounds directory and current.png exist
+mkdir -p "$THEME_DIR/backgrounds"
+if [ ! -f "$THEME_DIR/backgrounds/current.png" ]; then
+  if [ -f "$USER_HOME/.config/quickshell/wallpaper.png" ]; then
+    cp "$USER_HOME/.config/quickshell/wallpaper.png" "$THEME_DIR/backgrounds/current.png"
+  fi
+fi
 
-$SUDO mkdir -p /etc/sddm.conf.d
-echo -e "[Theme]\nCurrent=SilentSDDM" | $SUDO tee /etc/sddm.conf.d/theme.conf.user > /dev/null
+# Switch display-manager service
+echo "==> Desativando plasmalogin.service e habilitando sddm.service com --force..."
+systemctl disable plasmalogin.service 2>/dev/null || true
+systemctl enable --force sddm.service
 
-echo "==> SDDM configurado e ativado com sucesso!"
+# Configure SDDM theme drop-in
+echo "==> Escrevendo /etc/sddm.conf.d/theme.conf.user..."
+mkdir -p /etc/sddm.conf.d
+cat << 'EOF' > /etc/sddm.conf.d/theme.conf.user
+[Theme]
+Current=SilentSDDM
+
+[General]
+InputMethod=
+EOF
+
+# Fix /etc/sddm.conf if Session=plasma was set
+if [ -f /etc/sddm.conf ]; then
+  sed -i 's/Session=plasma/Session=hyprland/g' /etc/sddm.conf 2>/dev/null || true
+fi
+
+echo ""
+echo "========================================================="
+echo "  ✔ SDDM configurado e ativado com sucesso no sistema!   "
+echo "  ✔ Tema SilentSDDM definido como padrão.                "
+echo "  ✔ Próximo boot entrará diretamente na tela do SDDM!   "
+echo "========================================================="

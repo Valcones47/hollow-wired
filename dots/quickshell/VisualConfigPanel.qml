@@ -822,7 +822,7 @@ PanelWindow {
                                 icon: Theme.icons.play
                                 text: "Visualizar Fastfetch no Terminal"
                                 primary: true
-                                onClicked: Quickshell.execDetached(["rice-fastfetch-apply", "run"])
+                                onClicked: Quickshell.execDetached(["kitty", "--title", "Fastfetch Preview", "--hold", "fastfetch"])
                             }
                         }
                     }
@@ -1307,6 +1307,39 @@ PanelWindow {
                                     }
                                 }
                             }
+                        }
+
+                        // Seção de Bootloader e Login
+                        SectionHeader {
+                            title: "Inicialização & Tela de Login (SDDM & Limine)"
+                            subtitle: "Aplica o tema SilentSDDM e wallpaper suavizado no bootloader do sistema"
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 12
+
+                            ActionBtn {
+                                icon: Theme.icons.verified
+                                text: "Aplicar SDDM e Bootloader Limine"
+                                primary: true
+                                onClicked: {
+                                    Quickshell.execDetached([
+                                        "kitty", "--title", "Configuração de Login & Bootloader",
+                                        "bash", "-c", "echo '==> Digite sua senha para configurar o SDDM e Limine:'; sudo /home/val47/.local/bin/rice-apply-boot-login; echo; read -n 1 -s -r -p '✔ Concluído! Pressione qualquer tecla para fechar...'"
+                                    ]);
+                                }
+                            }
+
+                            ActionBtn {
+                                icon: Theme.icons.laptop
+                                text: "Testar Tela do SDDM em Janela"
+                                onClicked: {
+                                    Quickshell.execDetached(["bash", "-c", "sddm-greeter-qt6 --test-mode --theme /usr/share/sddm/themes/SilentSDDM 2>/dev/null || sddm-greeter --test-mode --theme /usr/share/sddm/themes/SilentSDDM"]);
+                                }
+                            }
+
+                            Item { Layout.fillWidth: true }
                         }
                     }
                 }

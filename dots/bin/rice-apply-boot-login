@@ -1,0 +1,41 @@
+#!/bin/bash
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Se não estiver rodando como root, eleva com sudo automaticamente
+if [ "$EUID" -ne 0 ]; then
+  exec sudo "$0" "$@"
+fi
+
+echo "=========================================================="
+echo "    Aplicador de Tema: Bootloader Limine & SDDM Login     "
+echo "=========================================================="
+echo ""
+
+# 1. Configura o SDDM
+if [ -f "$SCRIPT_DIR/rice-sddm-install" ]; then
+  bash "$SCRIPT_DIR/rice-sddm-install"
+elif [ -f "/home/val47/.local/bin/rice-sddm-install" ]; then
+  bash "/home/val47/.local/bin/rice-sddm-install"
+else
+  echo "AVISO: rice-sddm-install não encontrado."
+fi
+
+echo ""
+
+# 2. Configura o Limine com blur no wallpaper
+if [ -f "$SCRIPT_DIR/rice-limine-theme" ]; then
+  bash "$SCRIPT_DIR/rice-limine-theme"
+elif [ -f "/home/val47/.local/bin/rice-limine-theme" ]; then
+  bash "/home/val47/.local/bin/rice-limine-theme"
+else
+  echo "AVISO: rice-limine-theme não encontrado."
+fi
+
+echo ""
+echo "=========================================================="
+echo "  ✔ TUDO PRONTO!                                          "
+echo "  ✔ SDDM ativado e definido como Display Manager padrão.  "
+echo "  ✔ Bootloader Limine configurado com wallpaper suavizado."
+echo "=========================================================="

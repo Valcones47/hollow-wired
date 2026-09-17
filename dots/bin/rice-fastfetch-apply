@@ -96,8 +96,7 @@ def set_size(width, height):
     save_config(cfg)
     print("OK")
 
-def toggle_module(mod_type, enable_str):
-    enable = enable_str.lower() in ("true", "1", "yes")
+def toggle_module(mod_type, enable_str=None):
     cfg = load_config()
     modules = cfg.get("modules", [])
     
@@ -109,6 +108,11 @@ def toggle_module(mod_type, enable_str):
             found_idx = idx
             break
             
+    if enable_str is None:
+        enable = (found_idx == -1)
+    else:
+        enable = enable_str.lower() in ("true", "1", "yes")
+        
     if enable and found_idx == -1:
         # Default labels
         labels = {
@@ -137,8 +141,8 @@ def toggle_module(mod_type, enable_str):
 
 def run_fastfetch():
     try:
-        out = subprocess.check_output(["fastfetch", "--pipe", "false"], stderr=subprocess.STDOUT, text=True, timeout=5)
-        print(out)
+        subprocess.Popen(["kitty", "--title", "Fastfetch Preview", "--hold", "fastfetch"])
+        print("OK")
     except Exception as e:
         print(f"Fastfetch error: {e}")
 
@@ -156,9 +160,9 @@ if __name__ == "__main__":
         set_logo(sys.argv[2])
     elif cmd == "set-size" and len(sys.argv) >= 4:
         set_size(sys.argv[2], sys.argv[3])
-    elif cmd == "toggle-module" and len(sys.argv) >= 4:
-        toggle_module(sys.argv[2], sys.argv[3])
+    elif cmd == "toggle-module" and len(sys.argv) >= 3:
+        toggle_module(sys.argv[2], sys.argv[3] if len(sys.argv) >= 4 else None)
     elif cmd == "run":
         run_fastfetch()
     else:
-        print("Usage: rice-fastfetch-apply [list-images|get|set-logo <path>|set-size <w> <h>|toggle-module <type> <bool>|run]")
+        print("Usage: rice-fastfetch-apply [list-images|get|set-logo <path>|set-size <w> <h>|toggle-module <type> [bool]|run]")

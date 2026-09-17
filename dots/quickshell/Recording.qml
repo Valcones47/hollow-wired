@@ -881,7 +881,20 @@ Item {
                                 border.color: Theme.withAlpha(Theme.outline, 0.25)
                                 border.width: 1
 
+                                MouseArea {
+                                    id: recItemArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    acceptedButtons: Qt.LeftButton
+                                    onDoubleClicked: {
+                                        playProc.targetPath = modelData.path;
+                                        playProc.running = true;
+                                    }
+                                }
+
                                 RowLayout {
+                                    z: 2
                                     anchors.fill: parent
                                     anchors.margins: 8
                                     spacing: 10
@@ -987,22 +1000,13 @@ Item {
                                             hoverEnabled: true
                                             cursorShape: Qt.PointingHandCursor
                                             onClicked: {
-                                                deleteProc.targetPath = modelData.path;
+                                                const pathToDelete = modelData.path;
+                                                root.recentRecordings = root.recentRecordings.filter(item => item.path !== pathToDelete);
+                                                Quickshell.execDetached(["rice-record", "delete", pathToDelete]);
+                                                deleteProc.targetPath = pathToDelete;
                                                 deleteProc.running = true;
                                             }
                                         }
-                                    }
-                                }
-
-                                MouseArea {
-                                    id: recItemArea
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    acceptedButtons: Qt.LeftButton
-                                    onDoubleClicked: {
-                                        playProc.targetPath = modelData.path;
-                                        playProc.running = true;
                                     }
                                 }
                             }

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Reparador do Sistema (Rice Doctor)
+Comment=Diagnosticar e consertar áudio, pacotes, zRAM e shell
+Exec=kitty --title "Rice Doctor" rice-doctor
+Icon=system-software-update
+Terminal=false
+Type=Application
+Categories=System;Utility;

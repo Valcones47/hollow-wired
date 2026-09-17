@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Configurar Login e Boot (SDDM & Limine)
+Comment=Aplicar tema SilentSDDM e wallpaper suavizado no Limine
+Exec=kitty --title "Rice Boot & Login Setup" bash -c "sudo /home/val47/.local/bin/rice-apply-boot-login; echo; read -n 1 -s -r -p 'Pronto! Pressione qualquer tecla para fechar...'"
+Icon=preferences-system-login
+Terminal=false
+Type=Application
+Categories=Settings;System;

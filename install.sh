@@ -173,12 +173,13 @@ for dir in hypr quickshell kitty wallust xdg-desktop-portal; do
 done
 
 # Copiar novas configs
-mkdir -p "$HOME/.config" "$HOME/.local/bin" "$HOME/Vídeos/Gravações" "$HOME/Imagens/Capturas de tela"
+mkdir -p "$HOME/.config" "$HOME/.local/bin" "$HOME/.local/share/applications" "$HOME/Vídeos/Gravações" "$HOME/Imagens/Capturas de tela" "$HOME/Imagens/FastFetch"
 cp -a "$SCRIPT_DIR/dots/hypr" "$HOME/.config/"
 cp -a "$SCRIPT_DIR/dots/quickshell" "$HOME/.config/"
 cp -a "$SCRIPT_DIR/dots/kitty" "$HOME/.config/"
 [ -d "$SCRIPT_DIR/dots/wallust" ] && cp -a "$SCRIPT_DIR/dots/wallust" "$HOME/.config/"
 [ -d "$SCRIPT_DIR/dots/xdg-desktop-portal" ] && cp -a "$SCRIPT_DIR/dots/xdg-desktop-portal" "$HOME/.config/"
+[ -d "$SCRIPT_DIR/dots/applications" ] && cp -a "$SCRIPT_DIR/dots/applications/"* "$HOME/.local/share/applications/" 2>/dev/null || true
 cp -a "$SCRIPT_DIR/dots/bin/"* "$HOME/.local/bin/"
 chmod +x "$HOME/.local/bin/"*
 systemctl --user restart xdg-desktop-portal 2>/dev/null || true
@@ -192,8 +193,15 @@ fi
 # 7. Avatar Inicial se não existir
 if [ ! -f "$HOME/.face.webp" ] && [ ! -f "$HOME/.face" ]; then
     echo -e "${BLUE}[*] Criando avatar padrão inicial...${NC}"
-    # Se houver um ícone ou imagem nos dots, copia, senão cria placeholder
     touch "$HOME/.face"
+fi
+
+# 8. Opcional: Tela de Login SDDM & Bootloader Limine
+echo -e "\n${BOLD}[*] Deseja configurar o SDDM (SilentSDDM) e o Bootloader Limine agora? (S/n)${NC}"
+read -r -p "Opção: " APPLY_BOOT || true
+if [[ "${APPLY_BOOT:-s}" =~ ^[Ss]$ ]]; then
+    echo -e "${CYAN}==> Executando rice-apply-boot-login...${NC}"
+    sudo "$HOME/.local/bin/rice-apply-boot-login" || true
 fi
 
 echo -e "\n${GREEN}${BOLD}══════════════════════════════════════════════════════════════"
