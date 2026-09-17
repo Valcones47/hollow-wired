@@ -83,7 +83,10 @@ def set_logo(image_path):
     if "logo" not in cfg:
         cfg["logo"] = {}
     cfg["logo"]["source"] = image_path
-    cfg["logo"]["type"] = "kitty"
+    if image_path.lower().endswith(".gif"):
+        cfg["logo"]["type"] = "kitty-icat"
+    else:
+        cfg["logo"]["type"] = "kitty"
     save_config(cfg)
     print("OK")
 

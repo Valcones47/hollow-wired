@@ -1,0 +1,108 @@
+{
+    "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
+    "logo": {
+        "type": "kitty-icat",
+        "source": "/home/val47/Imagens/FastFetch/lain5.gif",
+        "width": 32,
+        "height": 14,
+        "padding": {
+            "top": 2,
+            "right": 2
+        }
+    },
+    "display": {
+        "separator": " ❯ ",
+        "color": {
+            "keys": "#22d3ee",
+            "output": "#c9c9c9"
+        },
+        "key": {
+            "width": 13
+        }
+    },
+    "modules": [
+        {
+            "type": "title",
+            "color": {
+                "user": "#22d3ee",
+                "at": "#5c6b70",
+                "host": "#22d3ee"
+            }
+        },
+        "separator",
+        {
+            "type": "host",
+            "key": "󰌢 Laptop"
+        },
+        {
+            "type": "kernel",
+            "key": "󰒋 Kernel"
+        },
+        {
+            "type": "terminal",
+            "key": "󰆟 Terminal"
+        },
+        {
+            "type": "uptime",
+            "key": "󰅐 Uptime"
+        },
+        {
+            "type": "packages",
+            "key": "󰏖 Pacotes"
+        },
+        {
+            "type": "colorscheme",
+            "key": "󰏘 Esquema"
+        },
+        {
+            "type": "shell",
+            "key": "󰞷 Shell"
+        },
+        {
+            "type": "display",
+            "key": "󰍹 Tela"
+        },
+        {
+            "type": "de",
+            "key": "󰧨 Interface"
+        },
+        {
+            "type": "cpu",
+            "key": "󰻠 CPU"
+        },
+        {
+            "type": "gpu",
+            "key": "󰢮 GPU",
+            "format": "{1} {2} ({3})"
+        },
+        {
+            "type": "memory",
+            "key": "󰑭 RAM"
+        },
+        {
+            "type": "swap",
+            "key": "󰓡 Swap"
+        },
+        {
+            "type": "disk",
+            "key": "󰋊 Disco"
+        },
+        {
+            "type": "os",
+            "key": "󰣇 Sistema"
+        },
+        "break",
+        {
+            "type": "colors",
+            "format": "{1}▓▓{2}▓▓{3}▓▓{4}▓▓{5}▓▓{6}▓▓{7}▓▓{8}▓▓",
+            "color1": "#0b0b0b",
+            "color2": "#1a1a1a",
+            "color3": "#2a2a2a",
+            "color4": "#3a3a3a",
+            "color5": "#5c6b70",
+            "color6": "#22d3ee",
+            "color7": "#7fe9ff",
+            "color8": "#ffffff"
+        }
+    ]
+}

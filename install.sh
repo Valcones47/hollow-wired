@@ -165,7 +165,7 @@ echo -e "\n${BOLD}[5/5] Instalando Configurações do Rice...${NC}"
 
 # Backup de segurança
 mkdir -p "$BACKUP_DIR"
-for dir in hypr quickshell kitty wallust xdg-desktop-portal; do
+for dir in hypr quickshell kitty wallust xdg-desktop-portal fastfetch; do
     if [ -d "$HOME/.config/$dir" ]; then
         echo -e "  • Criando backup de ~/.config/$dir -> $BACKUP_DIR/"
         cp -a "$HOME/.config/$dir" "$BACKUP_DIR/" 2>/dev/null || true
@@ -179,6 +179,7 @@ cp -a "$SCRIPT_DIR/dots/quickshell" "$HOME/.config/"
 cp -a "$SCRIPT_DIR/dots/kitty" "$HOME/.config/"
 [ -d "$SCRIPT_DIR/dots/wallust" ] && cp -a "$SCRIPT_DIR/dots/wallust" "$HOME/.config/"
 [ -d "$SCRIPT_DIR/dots/xdg-desktop-portal" ] && cp -a "$SCRIPT_DIR/dots/xdg-desktop-portal" "$HOME/.config/"
+[ -d "$SCRIPT_DIR/dots/fastfetch" ] && cp -a "$SCRIPT_DIR/dots/fastfetch" "$HOME/.config/"
 [ -d "$SCRIPT_DIR/dots/applications" ] && cp -a "$SCRIPT_DIR/dots/applications/"* "$HOME/.local/share/applications/" 2>/dev/null || true
 cp -a "$SCRIPT_DIR/dots/bin/"* "$HOME/.local/bin/"
 chmod +x "$HOME/.local/bin/"*
