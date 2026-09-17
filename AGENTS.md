@@ -32,7 +32,7 @@ Este documento define as regras fundamentais e arquitetura ativa deste projeto. 
 
 ### 4. GPU & Otimização
 - **Interface e Compositor:** Forçados a rodar na iGPU Intel (`Mesa`) para evitar overhead de cópia entre GPUs.
-- **Jogos:** Executados via wrapper `~/.local/bin/game-run` direcionando para a dGPU NVIDIA RTX 3050 com DLSS ativo via DXVK-NVAPI.
+- **Jogos:** Executados via wrapper `prime-run` direcionando para a dGPU NVIDIA RTX 3050.
 
 ---
 

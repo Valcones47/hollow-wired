@@ -96,7 +96,7 @@ hl.env("XDG_SESSION_DESKTOP", "Hyprland")
 -- renderizavam na NVIDIA e cada frame era copiado pra Intel (interface lagada,
 -- erro "does not work across GPUs" no log do Quickshell). Desfeito aqui só pra
 -- sessão Hyprland (não mexe no Plasma). Jogos continuam na NVIDIA pelo
--- ~/.local/bin/game-run / steam.desktop / Heroic.
+-- prime-run / steam.desktop / Heroic.
 hl.env("__NV_PRIME_RENDER_OFFLOAD", "0")
 hl.env("__GLX_VENDOR_LIBRARY_NAME", "mesa")
 

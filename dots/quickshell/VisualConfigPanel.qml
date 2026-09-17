@@ -4007,9 +4007,9 @@ PanelWindow {
 
                                 Repeater {
                                     model: [
-                                        { id: "nvidia", title: "NVIDIA Dedicada + DLSS (Recomendado)", param: "game-run %command%", desc: "Garante que o jogo rode na RTX 3050 com DLSS ativo via DXVK-NVAPI." },
-                                        { id: "gamemode", title: "NVIDIA + Feral GameMode", param: "gamemoderun game-run %command%", desc: "Combina aceleração máxima da GPU com prioridade de processador." },
-                                        { id: "compat", title: "Compatibilidade (Desativa NVAPI)", param: "PROTON_DISABLE_NVAPI=1 game-run %command%", desc: "Use apenas se algum jogo der tela preta ou erro com DLSS." }
+                                        { id: "nvidia", title: "NVIDIA Dedicada (prime-run)", param: "prime-run %command%", desc: "Garante que o jogo rode diretamente na GPU dedicada NVIDIA RTX 3050." },
+                                        { id: "gamemode", title: "NVIDIA + Feral GameMode", param: "gamemoderun prime-run %command%", desc: "Combina aceleração máxima da GPU com prioridade de processador." },
+                                        { id: "compat", title: "Compatibilidade (Desativa NVAPI)", param: "PROTON_DISABLE_NVAPI=1 prime-run %command%", desc: "Use apenas se algum jogo der tela preta ou erro com DLSS." }
                                     ]
                                     delegate: Rectangle {
                                         id: steamCard

@@ -765,7 +765,7 @@ PanelWindow {
                         wrapMode: Text.Wrap
                         Layout.maximumWidth: Theme.popoutMaxWidth - 40
                     }
-                    PopText { text: "Tela desenhada pela Intel · jogos vão pra NVIDIA (game-run)" }
+                    PopText { text: "Tela desenhada pela Intel · jogos vão pra NVIDIA (prime-run)" }
                 }
 
                 ColumnLayout {
