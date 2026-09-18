@@ -196,6 +196,7 @@ chmod +x "$HOME/.local/bin/"*
 systemctl --user restart xdg-desktop-portal 2>/dev/null || true
 
 # Registra o repositório para o auto-atualizador (rice-update)
+echo "$SCRIPT_DIR" > "$HOME/.config/hollow-wired-repo"
 echo "$SCRIPT_DIR" > "$HOME/.config/hyprland-setup-repo"
 
 # Garantir ~/.local/bin no PATH

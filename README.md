@@ -1,144 +1,170 @@
-# Setup Hyprland — Sessão Isolada do Plasma
+<div align="center">
 
-Documentação do ambiente Hyprland no CachyOS. Sessão totalmente isolada da sessão Plasma existente — nenhum arquivo de configuração do KDE foi alterado.
+# hollow-wired
 
-> **Configuração Core:** O compositor utiliza exclusivamente o arquivo [`~/.config/hypr/hyprland.lua`](file:///home/val47/.config/hypr/hyprland.lua) (`configProvider: lua`). O antigo `hyprland.conf` está **deprecado e desativado**.  
-> Para consultar o panorama rápido e atual de componentes do rice, veja [`ESTADO-ATUAL.md`](file:///home/val47/projetos/hyprland-setup/ESTADO-ATUAL.md).
+**A responsive, hardware-accelerated Hyprland desktop environment powered by Quickshell, dynamic Material You theming, and hybrid GPU orchestration.**
 
----
+[![Platform](https://img.shields.io/badge/Platform-Arch%20%7C%20CachyOS-1793D1?style=for-the-badge&logo=arch-linux&logoColor=white)](https://archlinux.org)
+[![Compositor](https://img.shields.io/badge/Compositor-Hyprland%20(Lua)-00A3E0?style=for-the-badge&logo=hyprland&logoColor=white)](https://hyprland.org)
+[![Shell](https://img.shields.io/badge/Shell-Quickshell%20(QML)-41CD52?style=for-the-badge&logo=qt&logoColor=white)](https://quickshell.outfoxxed.me)
+[![Theming](https://img.shields.io/badge/Theme-Wallust%20Dynamic-FF69B4?style=for-the-badge)](https://github.com/InitCool/wallust)
+[![License](https://img.shields.io/badge/License-GPL--3.0-blue?style=for-the-badge)](LICENSE)
 
-## 1. Estado do Sistema e Hardware
+<br />
 
-- **Distro:** CachyOS (base Arch Linux, Kernel Linux 7.2.4-cachyos, FS raiz: **Btrfs**).
-- **GPU Híbrida:** Intel TigerLake-H (i915/UHD Graphics) + NVIDIA GeForce RTX 3050 Mobile (driver `nvidia` 615.71.09).
-  - A tela interna do laptop (eDP-1) é ligada fisicamente à Intel.
-  - O Hyprland e o Quickshell rodam via **Mesa / iGPU Intel** (`__NV_PRIME_RENDER_OFFLOAD=0`, `__GLX_VENDOR_LIBRARY_NAME=mesa`) para eliminar lag de cópia entre GPUs via SHM.
-  - Jogos rodam dedicados na NVIDIA via script wrapper `~/.local/bin/game-run` com `MESA_VK_DEVICE_SELECT=10de:25a2` e DLSS ativo (`PROTON_ENABLE_NVAPI=1`).
-- **Navegador Padrão:** Zen Browser (`zen-browser`, otimizado com aceleração por hardware via `user.js`).
-- **Locale & Teclado:** `pt_BR.UTF-8`, teclado `br` (ABNT2).
-- **Cursor:** `Bibata-Modern-Ice` (tamanho 24).
+<img src="quickshell-progress/etapa-8-dashboard.png" alt="Desktop Overview" width="880" />
+
+</div>
 
 ---
 
-## 2. Backup e Rollback (Btrfs / Snapper / Limine)
+## Overview
 
-O sistema utiliza Btrfs com snapshots automáticos e manuais via **Snapper** (config `root`):
+**hollow-wired** is a modern Linux desktop environment built from the ground up for speed, visual coherence, and ergonomics. It combines the performance of **Hyprland** (configured exclusively with modern Lua) with the power of **Quickshell** for all desktop layer-shell interfaces.
 
-> ⚠️ **Atenção sobre Rollback:** O comando `sudo snapper -c root rollback N` **não funciona diretamente** neste sistema porque o `/etc/fstab` monta `subvol=/@` fixo e o boot é gerenciado pelo Limine com `limine-snapper-sync`.  
-> **Procedimento correto de restauração:**
-> 1. Reiniciar a máquina. No menu do Limine, entrar em **Snapshots** e selecionar o snapshot desejado.
-> 2. Inicializar a sessão dentro do snapshot e executar:
->    ```bash
->    sudo limine-snapper-restore
->    ```
->    *(ou utilizar o botão "Tornar este snapshot permanente" na aba Snapshots do Hub Quickshell).*
-> 3. Reiniciar novamente.
+Legacy tools like Waybar, Rofi, SwayOSD, and Wofi are completely omitted. Every shell element—top bar, docks, dynamic island OSD, app launcher, live task switcher, and interactive desktop widgets—is written as native QML components running directly on Wayland layer-shell protocols.
 
 ---
 
-## 3. Shell e Interface Gráfica (Quickshell)
+## Core Features
 
-Toda a interface gráfica é desenvolvida de forma nativa e integrada em **Quickshell (QML)**, substituindo a antiga Waybar e menus legados:
+<div align="center">
+<table>
+<tr>
+<td width="50%">
+<img src="quickshell-progress/etapa-15-launcher.png" alt="App Launcher" />
+<p align="center"><b>App Launcher & Search</b></p>
+</td>
+<td width="50%">
+<img src="quickshell-progress/etapa-14-dock-jogos.png" alt="Dock and Game Drawer" />
+<p align="center"><b>Smart Dock & Game Drawer</b></p>
+</td>
+</tr>
+<tr>
+<td width="50%">
+<img src="quickshell-progress/etapa-16-alttab.png" alt="Alt+Tab Switcher" />
+<p align="center"><b>Live Screencopy Alt+Tab</b></p>
+</td>
+<td width="50%">
+<img src="quickshell-progress/etapa-28-appearance-tab.png" alt="Appearance Hub" />
+<p align="center"><b>Control Center & Appearance Hub</b></p>
+</td>
+</tr>
+</table>
+</div>
 
-- **TopBar (`TopBar.qml`):** Barra superior de 34px de altura. Contém visualizador animado de workspaces (pill deslizante), título da janela ativa, relógio central (clique abre o Hub) e menus popup com cantos invertidos para controle de Áudio, Bateria, Wi-Fi e Bluetooth.
-- **Hub Central:** Menu flutuante de tamanho fixo com abas integradas:
-  - *Dashboard:* Visão geral, avatar animado da Rem (`~/.face.webp`), visualizador de áudio Cava.
-  - *Media:* Controle de mídia ativo via MPRIS (`playerctl`).
-  - *Monitoring:* Medidores circulares de CPU, RAM, GPU e Disco.
-  - *Workspaces:* Visão geral das janelas abertas por workspace.
-  - *SysInfo:* Informações completas de hardware e sistema.
-  - *Snapshots:* Consulta e restauração de snapshots do Snapper/Limine.
-  - *Notificações:* Histórico de alertas do sistema.
-- **Dock Inferior (`Dock.qml` e `DockConfig.qml`):** Barra retrátil com auto-hide (revela apenas ao posicionar o cursor na borda inferior da tela). Exibe aplicativos fixados e abertos, indicadores de workspace onde cada app está alocado (`1·3` ou `✦`), reordenação por arrasto e gaveta de Jogos com modo de edição.
-- **Launcher de Aplicativos (`Launcher.qml`):** Abre com `Super + R` ou pressionando a tecla `Super` sozinha. Ordenado alfabeticamente (A → Z) do topo para baixo, busca instantânea por digitação, navegação completa por teclado (setas/Tab/Enter/Esc) e menu de contexto no botão direito (fixar na dock, adicionar aos jogos, editar entrada via `kmenuedit`).
-- **EnergySidebar (`EnergySidebar.qml`):** Barra lateral retrátil oculta na borda direita. Contém avatar animado, botão de atualizações pendentes com atalhos de manutenção (abrir cachy-update, limpar cache com `paccache`), ícones de bandeja do sistema (System Tray), botão de **Toggle de Blur** e opções de energia (Logout, Reboot com detecção de kernel pendente, Desligar) com dupla confirmação.
-- **Alt+Tab (`AltTab.qml`):** Alternador de janelas com miniaturas ao vivo em tempo real (`ScreencopyView`) organizadas pelo histórico de foco do Hyprland.
+### Desktop Shell (Quickshell)
+- **TopBar (`TopBar.qml`)**: 34px top bar with animated pill workspace indicators, active window titles, center clock with Hub trigger, and flyout menus with rounded inverted corners for Audio, Wi-Fi, Bluetooth, and Battery management.
+- **Desktop Widgets (`DesktopWidgets.qml`)**: Layer-shell desktop widgets with 20px magnetic snap-to-grid positioning, visual inspector (glass, solid, glow, borderless styles; scalable 80% to 120%), and 13 native widgets:
+  - Real RAM usage (excluding buffers/cache), CPU telemetry, GPU monitor (NVIDIA RTX / AMD / Intel), real-time Network speed monitor, Analog & Digital clocks, MPRIS music player with spinning vinyl animation, Monthly Calendar grid, Battery health, Storage usage, Pomodoro timer, persistent Notepad, Weather, and Daily quote.
+  - Toggle edit mode at any time with `Super + W` or right-clicking empty desktop space.
+- **Application Launcher (`Launcher.qml`)**: Keyboard-first fuzzy search opened via `Super` or `Super + R`. Features keyboard navigation, right-click contextual actions (pin to dock, add to gaming drawer), and instant query matching.
+- **Autohiding Dock (`Dock.qml`)**: Edge-triggered bottom dock with active workspace indicators (`1·3` or `✦`), drag-and-drop reordering, and an expandable gaming shelf.
+- **Dynamic Island OSD (`OSD.qml`)**: Non-intrusive floating capsule below the top bar providing visual feedback for volume levels, microphone mute, and screen brightness.
+- **Energy Sidebar (`EnergySidebar.qml`)**: Slide-out right panel providing system tray icons, update count badges (Repo + AUR + Dotfiles), night light toggle, blur toggle, and two-step power options.
+- **Alt+Tab Task Switcher (`AltTab.qml`)**: Live window thumbnails rendered via Wayland screencopy buffers, sorted by MRU (most recently used) focus history. Quick close windows on the fly with `Q`.
+- **Central Hub & Control Center (`VisualConfigPanel.qml` / `Super + I`)**: 19 comprehensive configuration tabs covering display refresh rates (144Hz/60Hz), FreeSync/VRR, Kitty terminal parameters, Fastfetch animated GIFs, Mako notification placement, system repair actions, and theme presets.
 
----
+### Theming & Dynamic Colors
+- **Wallust Palette Engine**: Dynamic color palette extracted directly from the active wallpaper. Automatically updates Hyprland window borders, Quickshell UI surfaces, and Kitty terminal colors without requiring session restarts.
+- **Waywallen Integration**: Animated Wallpaper Engine scenes via Flatpak and a native layer-shell bridge. Wallpapers automatically pause when any application is in fullscreen to guarantee zero resource waste during games or video playback.
+- **Wallpaper Switcher (`Super + S`)**: Interactive carousel selector to browse and apply installed wallpapers instantly.
 
-## 4. Wallpaper Dinâmico e Cores
-
-- O gerenciamento de wallpaper é feito pelo **Waywallen** (Wallpaper Engine via Flatpak + helper nativo `~/.local/bin/waywallen-layer-shell`).
-- O wallpaper atual roda cenas animadas com aceleração gráfica na GPU.
-- **Carrossel de Wallpapers:** Pressionar `Super + S` abre o `waywallen-switcher` para alternar entre os wallpapers instalados.
-- **Esquema de Cores Dinâmico:** O utilitário **Wallust** analisa o wallpaper selecionado e gera a paleta de cores em `~/.config/hypr/colors.conf`. Esse arquivo é lido diretamente pelo `hyprland.lua` e sincronizado com os componentes do Quickshell e Kitty.
-
----
-
-## 5. Arquivos Criados e Alterados
-
-### Configurações do Hyprland e Sessão
-```
-~/.config/hypr/hyprland.lua          (Principal: configuração ativa completa em Lua)
-~/.config/hypr/hyprland.conf         (Legado: mantido apenas como aviso de deprecação)
-~/.config/hypr/hypridle.conf         (Regras de ociosidade do hypridle)
-~/.config/hypr/hyprlock.conf         (Tela de bloqueio do hyprlock)
-~/.config/hypr/colors.conf           (Paleta de cores gerada pelo wallust a partir do wallpaper)
-~/.config/hypr/scripts/              (Scripts de apoio: blur toggle, etc.)
-```
-
-### Componentes de Interface (Quickshell)
-```
-~/.config/quickshell/shell.qml             (Ponto de entrada do Quickshell)
-~/.config/quickshell/TopBar.qml            (Barra superior)
-~/.config/quickshell/Dock.qml              (Dock inferior com auto-hide)
-~/.config/quickshell/DockConfig.qml        (Singleton de configuração de dock/jogos)
-~/.config/quickshell/dock.json             (Persistência dos apps fixados e jogos)
-~/.config/quickshell/Launcher.qml          (Launcher nativo de aplicativos)
-~/.config/quickshell/EnergySidebar.qml     (Barra lateral de energia, updates e trays)
-~/.config/quickshell/AltTab.qml            (Alternador de janelas com miniaturas ao vivo)
-~/.config/quickshell/Frame.qml             (Moldura e cantos arredondados de tela)
-~/.config/quickshell/Dashboard.qml         (Aba principal do Hub)
-~/.config/quickshell/Media.qml             (Aba de mídia do Hub)
-~/.config/quickshell/Monitoring.qml        (Aba de monitoramento de recursos)
-~/.config/quickshell/SysStats.qml          (Sensores do sistema)
-~/.config/quickshell/SystemInfo.qml        (Aba de especificações do sistema)
-~/.config/quickshell/Snapshots.qml         (Aba de gerenciamento de snapshots)
-~/.config/quickshell/Notifications.qml     (Aba de histórico de notificações)
-~/.config/quickshell/GameMode.qml          (Monitor de estado para modo jogo)
-~/.config/quickshell/Theme.qml             (Definições globais de cores e ícones)
-```
-
-### Utilitários e Scripts (`~/.local/bin/`)
-```
-~/.local/bin/game-run                 (Wrapper para executar jogos na dGPU NVIDIA com DLSS)
-~/.local/bin/rice-blur-toggle         (Alterna o efeito de blur entre ligado e desligado)
-~/.local/bin/rice-gamemode            (Perfil de alto desempenho para jogos)
-~/.local/bin/rice-record              (Gravação de tela/região com wf-recorder)
-~/.local/bin/rice-dropterm            (Terminal suspenso drop-down no workspace especial)
-~/.local/bin/rice-reboot-needed       (Detecta se há atualização de kernel/driver exigindo reboot)
-~/.local/bin/rice-clean-cache         (Limpeza segura do cache de pacotes com paccache/yay)
-~/.local/bin/rice-restart             (Reinício do Quickshell em caso de emergência)
-~/.local/bin/waywallen-switcher       (Carrossel interativo de seleção de wallpapers)
-~/.local/bin/waywallen-layer-shell    (Bridge nativa de layer-shell para o Waywallen Flatpak)
-```
-
-### Aplicativos e Ferramentas Auxiliares
-- **Kitty (`~/.config/kitty/kitty.conf`):** Terminal com fonte Noto Sans Mono, fundo `#0b0b0b` e transparência com blur.
-- **Rofi:** Mantido instalado e configurado **exclusivamente** para o histórico de área de transferência (`cliphist` no `Super + V`). Todo o resto das funções de launcher foi absorvido pelo Quickshell.
-- **Wofi:** Não é mais utilizado.
-- **Waybar:** Não é mais utilizada no autostart.
+### Architecture & GPU Orchestration
+- **Mesa iGPU Compositor**: Hyprland and Quickshell run on the integrated Intel GPU to eliminate inter-GPU copy overhead and maintain rock-solid frametimes at 144Hz.
+- **On-Demand NVIDIA dGPU (`prime-run`)**: Heavy 3D applications and games invoke the dedicated NVIDIA RTX GPU on demand.
+- **Hardware Screen Recording (`Recording.qml`)**: Integrated recording studio leveraging NVENC hardware acceleration (`h264_nvenc`) with independent system audio and microphone capture via PipeWire.
+- **Safe Coexistence**: Completely isolated configuration paths. Runs cleanly alongside KDE Plasma or GNOME without conflicting with existing desktop environments.
 
 ---
 
-## 6. Como Usar e Testar
+## Keybindings
 
-Dentro da sessão Hyprland:
-
-| Atalho / Gesto | O que faz |
+| Shortcut | Description |
 |---|---|
-| `Super` ou `Super + R` | Abre o **Launcher de Aplicativos** próprio do Quickshell |
-| `Super + Q` | Abre o terminal **Kitty** |
-| `Super + E` | Abre o gerenciador de arquivos **Dolphin** |
-| `Super + V` | Abre o histórico de **Clipboard** via Rofi + Cliphist |
-| `Super + B` | Liga/desliga o efeito de **Blur** do compositor |
-| `Super + '` | Abre/fecha o terminal suspenso (**Dropterm**) |
-| `Super + S` | Abre o carrossel seletor de wallpapers do **Waywallen** |
-| `Super + L` | Bloqueia a sessão com o **Hyprlock** |
-| `Super + M` | Encerra a sessão Hyprland |
-| `Alt + Tab` | Abre o alternador de janelas com miniaturas ao vivo |
-| `Super + Shift + S` | Captura interativa de tela com ferramentas de anotação (Swappy) |
-| `Super + Shift + R` | Inicia/para a gravação de tela em vídeo |
-| **Cursor na borda inferior** | Faz surgir a **Dock** de aplicativos e jogos |
-| **Cursor na borda direita** | Faz surgir a **EnergySidebar** de energia, updates e bandejas |
-| **Clique no relógio da barra** | Abre o **Hub Central** (dashboard, métricas, snapshots e notificações) |
+| `Super` or `Super + R` | Toggle Application Launcher |
+| `Super + Q` | Open Kitty Terminal |
+| `Super + E` | Open Dolphin File Manager |
+| `Super + I` | Open Control Center / Settings Hub |
+| `Super + F1` | Keybindings Cheatsheet |
+| `Super + V` | Native Clipboard History |
+| `Super + W` | Toggle Desktop Widgets Edit Mode |
+| `Super + S` | Open Wallpaper Switcher |
+| `Super + B` | Toggle Compositor Blur |
+| `Super + Shift + B` | Toggle Ultra-Performance Mode (Blur & Animations OFF) |
+| `Super + '` | Toggle Dropdown Terminal (*Dropterm*) |
+| `Super + L` | Lock Screen (`hyprlock`) |
+| `Super + M` | Exit Hyprland Session |
+| `Alt + Tab` | Live Window Switcher |
+| `Super + Shift + S` | Interactive Screenshot with Annotation (Swappy) |
+| `Super + Shift + R` | Record Selected Screen Region |
+| `Super + Ctrl + Shift + R` | Record Entire Display |
+| `Super + Shift + C` | Color Picker (`hyprpicker`) |
+| `Super + Shift + X` | Force Kill Unresponsive Window (`hyprctl kill`) |
+| `Super + Ctrl + R` | Emergency Reload Quickshell Shell |
+| `Media Keys` | Volume, Brightness, Microphone Mute, Play/Pause |
+
+---
+
+## Installation
+
+### Requirements
+- **OS:** Arch Linux or CachyOS
+- **GPU:** Intel / AMD / NVIDIA (Hybrid GPU fully supported)
+- **Display Server:** Wayland
+
+### Quick Setup
+Clone the repository and run the automated installer:
+
+```bash
+git clone https://github.com/Valcones47/hollow-wired.git
+cd hollow-wired
+chmod +x install.sh
+./install.sh
+```
+
+The installer verifies all necessary runtime packages, links configuration files, registers local helper binaries, and prompts for optional Wallpaper Engine and SDDM theme configuration.
+
+> **Note for KDE Plasma / GNOME Users:**  
+> Testing `hollow-wired` will **not** modify or break your existing desktop configuration. When prompted to configure SDDM/Limine during installation, simply select **N** (default). Afterward, log out of your current session and choose **Hyprland** from your display manager's session menu.
+
+---
+
+## Dotfiles Updater
+
+`hollow-wired` includes a built-in, non-destructive update system:
+
+```bash
+rice-update
+```
+
+- **Update Detection**: Background checks quietly query the upstream repository for new commits.
+- **UI Notifications**: When updates are available, the update badge in the **Energy Sidebar** and **Control Center** highlights the new commit count.
+- **Automated Backup**: Applying updates creates an automatic timestamped backup in `~/.config/rice-backup-<timestamp>`, pulls changes, syncs configurations, and hot-reloads Quickshell in place without interrupting open windows.
+
+---
+
+## Repository Structure
+
+```
+hollow-wired/
+├── dots/
+│   ├── hypr/                 # Hyprland configuration (hyprland.lua, hyprlock, hypridle)
+│   ├── quickshell/           # Native desktop shell (TopBar, Launcher, Dock, Hub, Widgets)
+│   ├── kitty/                # Kitty terminal configuration
+│   ├── wallust/              # Dynamic palette templates and color schemes
+│   ├── xdg-desktop-portal/   # Wayland portal rules (KDE Breeze Dark file picker)
+│   ├── fastfetch/            # System fetch configuration and custom ASCII/GIFs
+│   ├── applications/         # Desktop shortcut definitions (.desktop)
+│   └── bin/                  # Helper CLI utilities (rice-update, rice-record, etc.)
+├── packaging/                # Turnkey PKGBUILD & AUR installation recipes
+├── quickshell-progress/      # Interface captures and preview media
+├── install.sh                # Interactive automated installer
+└── README.md                 # Project documentation
+```
+
+---
+
+## License
+
+Distributed under the [GPL-3.0 License](LICENSE).

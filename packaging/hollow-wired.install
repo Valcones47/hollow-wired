@@ -1,18 +1,17 @@
 post_install() {
     echo -e "\e[1;32m=================================================================\e[0m"
-    echo -e "\e[1;32m  Hyprland Setup (Quickshell Rice) instalado com sucesso!\e[0m"
+    echo -e "\e[1;32m  hollow-wired (Hyprland + Quickshell) installed successfully!\e[0m"
     echo -e "\e[1;32m=================================================================\e[0m"
-    echo -e "  Para aplicar os arquivos de configuração na sua conta de usuário,"
-    echo -e "  execute o comando a qualquer momento:"
-    echo -e "    \e[1;36mrice-update apply\e[0m  (ou execute /usr/share/hyprland-setup/install.sh)"
+    echo -e "  To deploy dotfiles and scripts to your user account, run:"
+    echo -e "    \e[1;36mrice-update apply\e[0m  (or /usr/share/hollow-wired/install.sh)"
     echo -e "\e[1;32m=================================================================\e[0m"
 }
 
 post_upgrade() {
     echo -e "\e[1;36m=================================================================\e[0m"
-    echo -e "\e[1;36m  Atualização do Hyprland Setup detectada!\e[0m"
+    echo -e "\e[1;36m  hollow-wired update detected!\e[0m"
     echo -e "\e[1;36m=================================================================\e[0m"
-    echo -e "  Para aplicar as novidades e correções no seu usuário:"
+    echo -e "  To apply new changes to your user configuration, run:"
     echo -e "    \e[1;32mrice-update apply\e[0m"
     echo -e "\e[1;36m=================================================================\e[0m"
 }

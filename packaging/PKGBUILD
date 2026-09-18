@@ -1,9 +1,9 @@
 # Maintainer: Valcones47 <https://github.com/Valcones47>
-pkgname=hyprland-setup-git
-_pkgname=hyprland-setup
+pkgname=hollow-wired-git
+_pkgname=hollow-wired
 pkgver=r125.f87d5a8
 pkgrel=1
-pkgdesc="Rice completo e ultra-otimizado para Hyprland e Quickshell no Arch Linux / CachyOS"
+pkgdesc="Responsive, modern Hyprland and Quickshell desktop environment with dynamic Material You theming"
 arch=('x86_64')
 url="https://github.com/Valcones47/hollow-wired"
 license=('GPL-3.0-or-later')
@@ -65,7 +65,7 @@ provides=("$_pkgname")
 conflicts=("$_pkgname")
 source=("git+https://github.com/Valcones47/hollow-wired.git")
 sha256sums=('SKIP')
-install=hyprland-setup.install
+install=hollow-wired.install
 
 pkgver() {
     cd "$srcdir/$_pkgname"
@@ -75,16 +75,16 @@ pkgver() {
 package() {
     cd "$srcdir/$_pkgname"
 
-    # Instala scripts utilitários em /usr/bin
+    # Install utility scripts to /usr/bin
     install -dm755 "$pkgdir/usr/bin"
     for b in dots/bin/*; do
         [ -f "$b" ] && install -m755 "$b" "$pkgdir/usr/bin/"
     done
 
-    # Instala modelos de configuração base em /usr/share/hyprland-setup
-    install -dm755 "$pkgdir/usr/share/hyprland-setup"
-    cp -a dots "$pkgdir/usr/share/hyprland-setup/"
-    install -m755 install.sh "$pkgdir/usr/share/hyprland-setup/"
+    # Install base configuration templates to /usr/share/hollow-wired
+    install -dm755 "$pkgdir/usr/share/hollow-wired"
+    cp -a dots "$pkgdir/usr/share/hollow-wired/"
+    install -m755 install.sh "$pkgdir/usr/share/hollow-wired/"
 
     # Instala entradas de aplicativo .desktop
     if [ -d "dots/applications" ]; then

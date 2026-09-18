@@ -19,3 +19,10 @@ test-backup/
 
 # Configurações com estado pessoal salvo
 dots/quickshell/desktop-widgets.json.bak*
+
+# Documentação interna / desenvolvimento local (mantidos no PC, fora do GitHub)
+AGENTS.md
+CLAUDE.md
+ESTADO-ATUAL.md
+MELHORIAS-E-REVISAO.md
+quickshell-hub-progress.md

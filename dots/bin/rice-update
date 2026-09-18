@@ -5,14 +5,20 @@
 # ==============================================================================
 set -euo pipefail
 
-REPO_FILE="$HOME/.config/hyprland-setup-repo"
+REPO_FILE="$HOME/.config/hollow-wired-repo"
 DEFAULT_REPO="$HOME/projetos/hyprland-setup"
 
 # Determina o diretório do repositório git clonado
 if [ -f "$REPO_FILE" ] && [ -d "$(cat "$REPO_FILE")" ]; then
     REPO_DIR="$(cat "$REPO_FILE")"
+elif [ -f "$HOME/.config/hyprland-setup-repo" ] && [ -d "$(cat "$HOME/.config/hyprland-setup-repo")" ]; then
+    REPO_DIR="$(cat "$HOME/.config/hyprland-setup-repo")"
 elif [ -d "$DEFAULT_REPO/.git" ]; then
     REPO_DIR="$DEFAULT_REPO"
+elif [ -d "$HOME/projetos/hollow-wired/.git" ]; then
+    REPO_DIR="$HOME/projetos/hollow-wired"
+elif [ -d "$HOME/.hollow-wired/.git" ]; then
+    REPO_DIR="$HOME/.hollow-wired"
 elif [ -d "$HOME/.hyprland-setup/.git" ]; then
     REPO_DIR="$HOME/.hyprland-setup"
 else
