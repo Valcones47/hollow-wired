@@ -40,19 +40,32 @@ def set_setting(key, value):
     with open(KITTY_CONF, "r", encoding="utf-8") as f:
         content = f.read()
 
-    key_patterns = {
-        "opacity": (r'^background_opacity\s+.*$', f'background_opacity {float(value):.2f}', 'background_opacity 0.64'),
-        "font_size": (r'^font_size\s+.*$', f'font_size {float(value):.1f}', 'font_size 10.0'),
-        "padding": (r'^window_padding_width\s+.*$', f'window_padding_width {int(value)}', 'window_padding_width 4'),
-        "blur": (r'^background_blur\s+.*$', f'background_blur {int(value)}', 'background_blur 1'),
-        "cursor": (r'^cursor_shape\s+.*$', f'cursor_shape {value}', 'cursor_shape block'),
-        "bell": (r'^enable_audio_bell\s+.*$', f'enable_audio_bell {value}', 'enable_audio_bell no')
-    }
-
-    if key not in key_patterns:
+    if key == "opacity":
+        pat = r'^background_opacity\s+.*$'
+        repl = f'background_opacity {float(value):.2f}'
+        default_line = 'background_opacity 0.64'
+    elif key == "font_size":
+        pat = r'^font_size\s+.*$'
+        repl = f'font_size {float(value):.1f}'
+        default_line = 'font_size 10.0'
+    elif key == "padding":
+        pat = r'^window_padding_width\s+.*$'
+        repl = f'window_padding_width {int(float(value))}'
+        default_line = 'window_padding_width 4'
+    elif key == "blur":
+        pat = r'^background_blur\s+.*$'
+        repl = f'background_blur {int(float(value))}'
+        default_line = 'background_blur 1'
+    elif key == "cursor":
+        pat = r'^cursor_shape\s+.*$'
+        repl = f'cursor_shape {value}'
+        default_line = 'cursor_shape block'
+    elif key == "bell":
+        pat = r'^enable_audio_bell\s+.*$'
+        repl = f'enable_audio_bell {value}'
+        default_line = 'enable_audio_bell no'
+    else:
         return
-
-    pat, repl, default_line = key_patterns[key]
     if re.search(pat, content, re.MULTILINE):
         content = re.sub(pat, repl, content, flags=re.MULTILINE)
     else:

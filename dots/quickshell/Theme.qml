@@ -158,4 +158,71 @@ QtObject {
             console.log("Theme: falha ao carregar colors-quickshell.json:", error);
         }
     }
+
+    // ---------- Internacionalização (i18n) ----------
+    property string locale: "pt-BR"
+    property var translationsPt: ({})
+    property var translationsEn: ({})
+
+    function t(key, fallback) {
+        const currentLoc = root.locale;
+        const dict = (currentLoc === "en") ? root.translationsEn : root.translationsPt;
+        if (dict && dict[key] !== undefined) return dict[key];
+        if (currentLoc === "en" && root.translationsPt && root.translationsPt[key] !== undefined) return root.translationsPt[key];
+        return fallback !== undefined ? fallback : key;
+    }
+
+    function setLocale(newLocale) {
+        if (newLocale === "en" || newLocale === "pt-BR") {
+            root.locale = newLocale;
+            localeConfigFile.setText(JSON.stringify({ "locale": newLocale }, null, 2) + "\n");
+        }
+    }
+
+    property FileView localeConfigFile: FileView {
+        path: Quickshell.env("HOME") + "/.config/quickshell/locale.json"
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: {
+            try {
+                const t = text().trim();
+                if (!t) return;
+                const d = JSON.parse(t);
+                if (d.locale === "en" || d.locale === "pt-BR") {
+                    root.locale = d.locale;
+                }
+            } catch (e) {
+                console.log("Theme: erro ao carregar locale.json:", e);
+            }
+        }
+        onLoadFailed: (error) => {
+            console.log("Theme: falha ao carregar locale.json:", error);
+        }
+    }
+
+    property FileView i18nPtFile: FileView {
+        path: Quickshell.env("HOME") + "/.config/quickshell/i18n/pt-BR.json"
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: {
+            try {
+                root.translationsPt = JSON.parse(text());
+            } catch (e) {
+                console.log("Theme: erro ao carregar pt-BR.json:", e);
+            }
+        }
+    }
+
+    property FileView i18nEnFile: FileView {
+        path: Quickshell.env("HOME") + "/.config/quickshell/i18n/en.json"
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: {
+            try {
+                root.translationsEn = JSON.parse(text());
+            } catch (e) {
+                console.log("Theme: erro ao carregar en.json:", e);
+            }
+        }
+    }
 }

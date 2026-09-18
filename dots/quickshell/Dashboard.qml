@@ -618,19 +618,43 @@ Item {
             ColumnLayout {
                 anchors.centerIn: parent
                 visible: root.player === null
-                spacing: 8
-                Icon {
+                spacing: 10
+
+                Rectangle {
                     Layout.alignment: Qt.AlignHCenter
-                    text: Theme.icons.music
-                    font.pixelSize: 44
-                    color: Theme.withAlpha(Theme.subtext, 0.5)
+                    width: 60
+                    height: 60
+                    radius: 30
+                    color: Theme.withAlpha(Theme.primary, 0.12)
+                    border.width: 1
+                    border.color: Theme.withAlpha(Theme.primary, 0.28)
+
+                    Icon {
+                        anchors.centerIn: parent
+                        text: Theme.icons.music
+                        font.pixelSize: 26
+                        color: Theme.withAlpha(Theme.primary, 0.8)
+                    }
                 }
-                Text {
+
+                ColumnLayout {
                     Layout.alignment: Qt.AlignHCenter
-                    text: "Nada tocando"
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 12
-                    color: Theme.subtext
+                    spacing: 2
+                    Text {
+                        Layout.alignment: Qt.AlignHCenter
+                        text: Theme.t("media.no_media", "Nenhuma mídia ativa")
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 12
+                        font.weight: Font.DemiBold
+                        color: Theme.textColor
+                    }
+                    Text {
+                        Layout.alignment: Qt.AlignHCenter
+                        text: Theme.t("media.no_media_sub", "Player ocioso")
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 10
+                        color: Theme.subtext
+                    }
                 }
             }
         }

@@ -146,11 +146,11 @@ Item {
 
     // Processo de Ações com Arquivos
     Process { id: openFolderProc; command: ["rice-record", "open-folder"] }
-    Process { id: playProc; command: ["rice-record", "play"] }
-    Process {
-        id: deleteProc
-        command: ["rice-record", "delete"]
-        onExited: listProc.running = true
+    Timer {
+        id: recRefreshTimer
+        interval: 500
+        repeat: false
+        onTriggered: listProc.running = true
     }
 
     function toggleRecording() {
@@ -972,8 +972,7 @@ Item {
                                             hoverEnabled: true
                                             cursorShape: Qt.PointingHandCursor
                                             onClicked: {
-                                                playProc.command = ["rice-record", "play", modelData.path];
-                                                playProc.running = true;
+                                                Quickshell.execDetached(["rice-record", "play", modelData.path]);
                                             }
                                         }
                                     }
@@ -1000,9 +999,9 @@ Item {
                                             cursorShape: Qt.PointingHandCursor
                                             onClicked: {
                                                 const pathToDelete = modelData.path;
+                                                Quickshell.execDetached(["rice-record", "delete", pathToDelete]);
                                                 root.recentRecordings = root.recentRecordings.filter(function(item) { return item.path !== pathToDelete; });
-                                                deleteProc.command = ["rice-record", "delete", pathToDelete];
-                                                deleteProc.running = true;
+                                                recRefreshTimer.restart();
                                             }
                                         }
                                     }

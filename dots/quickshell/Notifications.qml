@@ -17,8 +17,9 @@ Item {
     id: root
 
     property var items: []
-    property int clearedUpTo: 0
-    property bool dnd: false
+    property int clearedUpTo: NotifService.clearedUpTo
+    onClearedUpToChanged: root.items = root.items.filter(n => n.id > root.clearedUpTo)
+    property bool dnd: NotifService.dnd
 
     function refresh() {
         histProc.running = true;
@@ -26,13 +27,6 @@ Item {
     }
     onVisibleChanged: if (visible) refresh()
     Timer { interval: 4000; running: root.visible; repeat: true; onTriggered: root.refresh() }
-
-    FileView {
-        id: clearedFile
-        path: Quickshell.env("HOME") + "/.cache/quickshell/notif-cleared"
-        onLoaded: root.clearedUpTo = parseInt(text()) || 0
-        onLoadFailed: root.clearedUpTo = 0
-    }
 
     Process {
         id: histProc
@@ -71,9 +65,9 @@ Item {
     Component.onCompleted: mkdirProc.running = true
 
     function setCleared(id) {
-        clearedUpTo = id;
-        clearedFile.setText(String(id));
+        items = [];
         NotifService.setCleared(id);
+        Quickshell.execDetached(["makoctl", "dismiss", "-a"]);
     }
 
     function iconSource(n) {

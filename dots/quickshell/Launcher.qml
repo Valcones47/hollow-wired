@@ -247,7 +247,7 @@ PanelWindow {
                             Text {
                                 anchors.verticalCenter: parent.verticalCenter
                                 visible: input.text === ""
-                                text: "Buscar apps…"
+                                text: Theme.t("launcher.search_placeholder", "Buscar apps…")
                                 font: input.font
                                 color: Theme.subtext
                             }
@@ -308,7 +308,7 @@ PanelWindow {
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.bottom: searchBox.top
                     anchors.bottomMargin: 14
-                    text: "Nada encontrado pra “" + launcher.query + "”"
+                    text: Theme.t("launcher.no_results", "Nada encontrado") + " (“" + launcher.query + "”)"
                 }
 
                 // ---------- resultados ----------
@@ -516,7 +516,7 @@ PanelWindow {
                     }
                     PopAction {
                         icon: Theme.icons.play
-                        label: "Abrir"
+                        label: Theme.t("common.open", "Abrir")
                         onActivated: launcher.launchEntry(menu.e)
                     }
                     Repeater {
@@ -534,19 +534,19 @@ PanelWindow {
                     PopAction {
                         Layout.topMargin: 4
                         icon: Theme.icons.pin
-                        label: menu.e && DockConfig.isPinned(menu.e.id) ? "Desafixar da dock" : "Fixar na dock"
+                        label: menu.e && DockConfig.isPinned(menu.e.id) ? Theme.t("launcher.unpin_dock", "Desafixar da dock") : Theme.t("launcher.pin_dock", "Fixar na dock")
                         selected: menu.e && DockConfig.isPinned(menu.e.id)
                         onActivated: DockConfig.togglePin(menu.e.id)
                     }
                     PopAction {
                         icon: Theme.icons.gamepad
-                        label: menu.e && DockConfig.isGame(menu.e.id) ? "Remover dos jogos" : "Adicionar aos jogos"
+                        label: menu.e && DockConfig.isGame(menu.e.id) ? Theme.t("launcher.remove_game", "Remover dos jogos") : Theme.t("launcher.add_game", "Adicionar aos jogos")
                         selected: menu.e && DockConfig.isGame(menu.e.id)
                         onActivated: DockConfig.toggleGame(menu.e.id)
                     }
                     PopAction {
                         icon: Theme.icons.pencil
-                        label: "Editar entrada (kmenuedit)"
+                        label: Theme.t("launcher.edit_entry", "Editar entrada (kmenuedit)")
                         onActivated: {
                             kmenuedit.entryId = menu.e.id;
                             kmenuedit.running = true;

@@ -1,0 +1,20 @@
+{
+  "hub": {
+    "style": "glass",
+    "scale": 1.0,
+    "opacity": 0.85,
+    "accent": ""
+  },
+  "sidebar": {
+    "style": "glass",
+    "scale": 1.0,
+    "opacity": 0.85,
+    "accent": ""
+  },
+  "dock": {
+    "style": "glass",
+    "scale": 1.0,
+    "opacity": 0.85,
+    "accent": ""
+  }
+}

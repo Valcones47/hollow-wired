@@ -280,7 +280,8 @@ EOF
 }
 
 # --- Roteamento de Subcomandos ---
-case "${1:-toggle}" in
+cmd="${1:-toggle}"
+case "$cmd" in
     start)
         shift
         do_start "$@"
@@ -311,17 +312,21 @@ case "${1:-toggle}" in
         ;;
     delete)
         shift
-        if [ -n "$1" ] && [ -f "$1" ]; then
+        if [ -n "$1" ]; then
             rm -f "$1"
             echo "{\"status\": \"deleted\"}"
         fi
         ;;
     toggle)
-        shift
+        shift 2>/dev/null || true
         if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE" 2>/dev/null)" 2>/dev/null; then
             do_stop
         else
-            do_start "$@"
+            if [ $# -eq 0 ]; then
+                do_start --mode region
+            else
+                do_start "$@"
+            fi
         fi
         ;;
     full)
@@ -332,7 +337,7 @@ case "${1:-toggle}" in
         fi
         ;;
     *)
-        echo "Uso: rice-record {start|stop|status|list|list-windows|select-geom|open-folder|play <file>|delete <file>|toggle}"
+        echo "Uso: rice-record {start|stop|status|list|list-windows|select-geom|open-folder|play <file>|delete <file>|toggle|full}"
         exit 1
         ;;
 esac

@@ -42,6 +42,7 @@ PanelWindow {
         }
     }
     Timer { id: closeTimer; interval: 220; onTriggered: win.visible = false }
+    Component.onCompleted: win.refreshAll()
 
     // ================= DADOS & ESTADO =================
     property int currentTab: 0 // 0..10
@@ -84,6 +85,10 @@ PanelWindow {
     property real mouseSensitivity: 0.0
     property string mouseAccel: "flat"
     property bool numlock: true
+    property string discordClient: "discord"
+    property bool discordRunning: false
+    property string discordMuteBind: "CTRL + SHIFT + M"
+    property string discordDeafenBind: "Num_Lock"
 
     // Energia & Bateria
     property var powerData: ({ has_battery: true, percent: 100, status: "AC Conectado", health: 100, cycles: 0, profile: "performance" })
@@ -488,6 +493,57 @@ PanelWindow {
         }
     }
 
+    Process {
+        id: loadDiscordProc
+        command: ["rice-discord-binds", "status"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const d = JSON.parse(text);
+                    if (d) {
+                        win.discordClient = d.client || "discord";
+                        win.discordRunning = !!d.running;
+                        win.discordMuteBind = d.mute_bind || "CTRL + SHIFT + M";
+                        win.discordDeafenBind = d.deafen_bind || "Num_Lock";
+                    }
+                } catch (e) {}
+            }
+        }
+    }
+
+    property string recordingDiscordTarget: ""
+    property bool editingManualMute: false
+    property bool editingManualDeafen: false
+
+    Process {
+        id: recordDiscordProc
+        stdout: SplitParser {
+            splitMarker: "\n"
+            onRead: line => {
+                try {
+                    const d = JSON.parse(line.trim());
+                    if (d.status === "ok") {
+                        if (d.target === "mute") {
+                            win.discordMuteBind = d.key;
+                            win.showToast(Theme.t("discord.recorded_mute", "Tecla de Mute gravada: ") + d.key);
+                        } else if (d.target === "deafen") {
+                            win.discordDeafenBind = d.key;
+                            win.showToast(Theme.t("discord.recorded_deafen", "Tecla de Deafen gravada: ") + d.key);
+                        }
+                    } else if (d.status === "cancelled") {
+                        win.showToast(Theme.t("discord.cancel", "Gravação cancelada"));
+                    } else if (d.status === "timeout") {
+                        win.showToast("Tempo esgotado (nenhuma tecla detectada)");
+                    }
+                } catch (e) {}
+                win.recordingDiscordTarget = "";
+            }
+        }
+        onExited: {
+            win.recordingDiscordTarget = "";
+        }
+    }
+
     function refreshAll() {
         loadFFProc.running = true;
         listImagesProc.running = true;
@@ -514,6 +570,7 @@ PanelWindow {
         loadSoftwareAppsProc.running = true;
         loadPresetsProc.running = true;
         loadBackupsProc.running = true;
+        loadDiscordProc.running = true;
     }
 
     // Debounce genérico para sliders
@@ -765,7 +822,7 @@ PanelWindow {
     // ================= FUNDO ESCURECIDO =================
     Rectangle {
         anchors.fill: parent
-        color: Qt.rgba(0, 0, 0, win.open ? 0.45 : 0)
+        color: Qt.rgba(0, 0, 0, win.open ? 0.65 : 0)
         Behavior on color { ColorAnimation { duration: 200 } }
         MouseArea {
             anchors.fill: parent
@@ -776,15 +833,26 @@ PanelWindow {
     // ================= CARTÃO PRINCIPAL (SIDEBAR + CONTEÚDO) =================
     Rectangle {
         id: card
-        width: 980
-        height: 640
+        width: 1040
+        height: 660
         anchors.centerIn: parent
-        radius: 22
-        color: Theme.surface
-        border.width: 1
-        border.color: Theme.withAlpha(Theme.outline, 0.3)
+        radius: 20
+        color: Theme.mix(Theme.background, "#0a0a12", 0.4)
+        border.width: 1.5
+        border.color: Theme.withAlpha(Theme.primary, 0.4)
         focus: win.open
         Keys.onEscapePressed: win.open = false
+
+        // Borda com efeito sutil de profundidade
+        Rectangle {
+            anchors.fill: parent
+            anchors.margins: -2
+            radius: card.radius + 2
+            color: "transparent"
+            border.width: 1
+            border.color: Theme.withAlpha(Theme.primary, 0.15)
+            z: -1
+        }
 
         opacity: win.open ? 1 : 0
         scale: win.open ? 1 : 0.94
@@ -799,11 +867,11 @@ PanelWindow {
 
             // ==================== LADO ESQUERDO: BARRA LATERAL ====================
             Rectangle {
-                Layout.preferredWidth: 240
+                Layout.preferredWidth: 248
                 Layout.fillHeight: true
-                topLeftRadius: 22
-                bottomLeftRadius: 22
-                color: Theme.withAlpha(Theme.background, 0.5)
+                topLeftRadius: 20
+                bottomLeftRadius: 20
+                color: Theme.withAlpha(Theme.mix(Theme.background, "#000000", 0.35), 0.75)
 
                 ColumnLayout {
                     anchors.fill: parent
@@ -834,14 +902,14 @@ PanelWindow {
                             Layout.fillWidth: true
                             spacing: 1
                             Text {
-                                text: "Painel Rice"
+                                text: Theme.t("settings.panel_title", "Painel Rice")
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 15
                                 font.weight: Font.Bold
                                 color: Theme.textColor
                             }
                             Text {
-                                text: "Central de Controle Gráfica"
+                                text: Theme.t("settings.panel_subtitle", "Central de Controle Gráfica")
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 10
                                 color: Theme.subtext
@@ -870,25 +938,26 @@ PanelWindow {
                             spacing: 4
 
                             readonly property var navItems: [
-                                { name: "Fastfetch", icon: Theme.icons.packages, desc: "Logo & Módulos" },
-                                { name: "Kitty Terminal", icon: Theme.icons.console, desc: "Fonte & Opacidade" },
-                                { name: "Notificações", icon: Theme.icons.bell, desc: "Posição & Estilo" },
-                                { name: "Tela & Monitores", icon: Theme.icons.monitor, desc: "144Hz & Brilho" },
-                                { name: "Áudio & Som", icon: Theme.icons.volHigh, desc: "Saída & Microfone" },
-                                { name: "Teclado & Mouse", icon: Theme.icons.tune, desc: "Layout & Sensibilidade" },
-                                { name: "Energia & Bateria", icon: Theme.icons.bat, desc: "Perfis & Saúde" },
-                                { name: "Inicialização (Boot)", icon: Theme.icons.speed, desc: "Apps ao Iniciar" },
-                                { name: "Cores & Wallust", icon: Theme.icons.palette, desc: "Paleta Dinâmica" },
-                                { name: "Efeitos & Janelas", icon: Theme.icons.laptop, desc: "Bordas & SDDM" },
-                                { name: "Bluetooth", icon: Theme.icons.bt, desc: "Controles & Fones" },
-                                { name: "Rede & Wi-Fi", icon: Theme.icons.wifi4, desc: "Conexões & Latência" },
-                                { name: "Aplicativos Padrão", icon: Theme.icons.dashboard, desc: "Navegador, Pastas & Vídeo" },
-                                { name: "Jogos & GPU", icon: Theme.icons.gamepad, desc: "NVIDIA, GameMode & Steam" },
-                                { name: "Armazenamento", icon: Theme.icons.disk, desc: "Limpeza Segura de Disco" },
-                                { name: "Guia de Atalhos", icon: Theme.icons.magnify, desc: "Buscar Teclas do Rice" },
-                                { name: "Sistema & Reparo", icon: Theme.icons.health, desc: "Snapshots & Auto-Reparo" },
-                                { name: "Loja & Atualizações", icon: Theme.icons.packages, desc: "Apps & Updates do Sistema" },
-                                { name: "Perfis & Backup", icon: Theme.icons.palette, desc: "Estilos & Restauração" }
+                                { name: Theme.t("settings.cat_fastfetch", "Fastfetch"), icon: Theme.icons.packages, desc: Theme.t("settings.desc_fastfetch", "Logo & Módulos") },
+                                { name: Theme.t("settings.cat_kitty", "Kitty Terminal"), icon: Theme.icons.console, desc: Theme.t("settings.desc_kitty", "Fonte & Opacidade") },
+                                { name: Theme.t("settings.cat_mako", "Notificações"), icon: Theme.icons.bell, desc: Theme.t("settings.desc_mako", "Posição & Estilo") },
+                                { name: Theme.t("settings.cat_monitors", "Tela & Monitores"), icon: Theme.icons.monitor, desc: Theme.t("settings.desc_monitors", "144Hz & Brilho") },
+                                { name: Theme.t("settings.cat_audio", "Áudio & Som"), icon: Theme.icons.volHigh, desc: Theme.t("settings.desc_audio", "Saída & Microfone") },
+                                { name: Theme.t("settings.cat_input", "Teclado & Mouse"), icon: Theme.icons.tune, desc: Theme.t("settings.desc_input", "Layout & Sensibilidade") },
+                                { name: Theme.t("settings.cat_power", "Energia & Bateria"), icon: Theme.icons.bat, desc: Theme.t("settings.desc_power", "Perfis & Saúde") },
+                                { name: Theme.t("settings.cat_boot", "Inicialização (Boot)"), icon: Theme.icons.speed, desc: Theme.t("settings.desc_boot", "Apps ao Iniciar") },
+                                { name: Theme.t("settings.cat_wallust", "Cores & Wallust"), icon: Theme.icons.palette, desc: Theme.t("settings.desc_wallust", "Paleta Dinâmica") },
+                                { name: Theme.t("settings.cat_effects", "Efeitos & Janelas"), icon: Theme.icons.laptop, desc: Theme.t("settings.desc_effects", "Bordas & SDDM") },
+                                { name: Theme.t("settings.cat_bluetooth", "Bluetooth"), icon: Theme.icons.bt, desc: Theme.t("settings.desc_bluetooth", "Controles & Fones") },
+                                { name: Theme.t("settings.cat_network", "Rede & Wi-Fi"), icon: Theme.icons.wifi4, desc: Theme.t("settings.desc_network", "Conexões & Latência") },
+                                { name: Theme.t("settings.cat_defaults", "Aplicativos Padrão"), icon: Theme.icons.dashboard, desc: Theme.t("settings.desc_defaults", "Navegador, Pastas & Vídeo") },
+                                { name: Theme.t("settings.cat_gaming", "Jogos & GPU"), icon: Theme.icons.gamepad, desc: Theme.t("settings.desc_gaming", "NVIDIA, GameMode & Steam") },
+                                { name: Theme.t("settings.cat_storage", "Armazenamento"), icon: Theme.icons.disk, desc: Theme.t("settings.desc_storage", "Limpeza Segura de Disco") },
+                                { name: Theme.t("settings.cat_shortcuts", "Guia de Atalhos"), icon: Theme.icons.magnify, desc: Theme.t("settings.desc_shortcuts", "Buscar Teclas do Rice") },
+                                { name: Theme.t("settings.cat_system", "Sistema & Reparo"), icon: Theme.icons.health, desc: Theme.t("settings.desc_system", "Snapshots & Auto-Reparo") },
+                                { name: Theme.t("settings.cat_store", "Loja & Atualizações"), icon: Theme.icons.packages, desc: Theme.t("settings.desc_store", "Apps & Updates do Sistema") },
+                                { name: Theme.t("settings.cat_presets", "Perfis & Backup"), icon: Theme.icons.palette, desc: Theme.t("settings.desc_presets", "Estilos & Restauração") },
+                                { name: Theme.t("settings.cat_shell_custom", "Customização do Shell"), icon: Theme.icons.palette, desc: Theme.t("settings.desc_shell_custom", "Hub, Sidebar & Dock") }
                             ]
 
                             Repeater {
@@ -909,9 +978,20 @@ PanelWindow {
 
                                     Behavior on color { ColorAnimation { duration: 120 } }
 
+                                    Rectangle {
+                                        width: 3
+                                        height: 20
+                                        radius: 1.5
+                                        color: Theme.primary
+                                        anchors.left: parent.left
+                                        anchors.leftMargin: 2
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        visible: win.currentTab === index
+                                    }
+
                                     RowLayout {
                                         anchors.fill: parent
-                                        anchors.leftMargin: 10
+                                        anchors.leftMargin: 12
                                         anchors.rightMargin: 10
                                         spacing: 10
 
@@ -919,7 +999,7 @@ PanelWindow {
                                             text: navDelegate.modelData.icon
                                             font.family: Theme.iconFontFamily
                                             font.pixelSize: 16
-                                            color: win.currentTab === navDelegate.index ? Theme.primary : Theme.subtext
+                                            color: win.currentTab === index ? Theme.primary : Theme.subtext
                                         }
 
                                         ColumnLayout {
@@ -929,16 +1009,18 @@ PanelWindow {
                                             Text {
                                                 text: navDelegate.modelData.name
                                                 font.family: Theme.fontFamily
-                                                font.pixelSize: 11
-                                                font.weight: win.currentTab === navDelegate.index ? Font.DemiBold : Font.Normal
-                                                color: win.currentTab === navDelegate.index ? Theme.textColor : Theme.textColor
+                                                font.pixelSize: 12
+                                                font.weight: win.currentTab === index ? Font.Bold : Font.Normal
+                                                color: win.currentTab === index ? Theme.textColor : Theme.subtext
+                                                elide: Text.ElideRight
                                             }
 
                                             Text {
                                                 text: navDelegate.modelData.desc
                                                 font.family: Theme.fontFamily
-                                                font.pixelSize: 9
-                                                color: win.currentTab === navDelegate.index ? Theme.primary : Theme.subtext
+                                                font.pixelSize: 10
+                                                color: Theme.withAlpha(Theme.subtext, 0.6)
+                                                elide: Text.ElideRight
                                             }
                                         }
                                     }
@@ -955,18 +1037,78 @@ PanelWindow {
                         }
                     }
 
-                    // Rodapé da Sidebar
-                    Rectangle {
+                    // Rodapé da Sidebar: Seletor de Idioma e Atalho
+                    ColumnLayout {
                         Layout.fillWidth: true
-                        implicitHeight: 28
-                        radius: 6
-                        color: Theme.tile
-                        Text {
-                            anchors.centerIn: parent
-                            text: "Super + I · Quickshell"
-                            font.family: Theme.monoFamily
-                            font.pixelSize: 10
-                            color: Theme.subtext
+                        spacing: 6
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 6
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                implicitHeight: 28
+                                radius: 6
+                                color: Theme.locale === "pt-BR" ? Theme.primary : Theme.tile
+                                border.color: Theme.locale === "pt-BR" ? Theme.primary : Theme.withAlpha(Theme.outline, 0.2)
+                                border.width: 1
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "Português"
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 10
+                                    font.weight: Theme.locale === "pt-BR" ? Font.Bold : Font.Normal
+                                    color: Theme.locale === "pt-BR" ? Theme.background : Theme.textColor
+                                }
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: Theme.setLocale("pt-BR")
+                                }
+                            }
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                implicitHeight: 28
+                                radius: 6
+                                color: Theme.locale === "en" ? Theme.primary : Theme.tile
+                                border.color: Theme.locale === "en" ? Theme.primary : Theme.withAlpha(Theme.outline, 0.2)
+                                border.width: 1
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "English"
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 10
+                                    font.weight: Theme.locale === "en" ? Font.Bold : Font.Normal
+                                    color: Theme.locale === "en" ? Theme.background : Theme.textColor
+                                }
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: Theme.setLocale("en")
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            Layout.fillWidth: true
+                            implicitHeight: 24
+                            radius: 6
+                            color: Theme.tile
+                            Text {
+                                anchors.centerIn: parent
+                                text: "Super + I · Quickshell"
+                                font.family: Theme.monoFamily
+                                font.pixelSize: 10
+                                color: Theme.subtext
+                            }
                         }
                     }
                 }
@@ -2109,11 +2251,18 @@ PanelWindow {
 
                         // ==================== ABA 5: TECLADO & MOUSE ====================
                         Flickable {
+                            id: inputFlickable
                             anchors.fill: parent
                             visible: win.currentTab === 5
-                            contentHeight: inputCol.implicitHeight
+                            contentHeight: inputCol.implicitHeight + 40
                             clip: true
                             boundsBehavior: Flickable.StopAtBounds
+
+                            WheelHandler {
+                                onWheel: event => {
+                                    inputFlickable.contentY = Math.max(0, Math.min(inputFlickable.contentHeight - inputFlickable.height, inputFlickable.contentY - event.angleDelta.y));
+                                }
+                            }
 
                             ColumnLayout {
                                 id: inputCol
@@ -2373,6 +2522,592 @@ PanelWindow {
                                         win.numlock = nv;
                                         Quickshell.execDetached(["rice-hypr-prefs", "set", "numlock", String(nv)]);
                                         win.showToast(nv ? "NumLock ativado por padrão" : "NumLock desativado por padrão");
+                                    }
+                                }
+
+                                SectionHeader {
+                                    title: Theme.t("settings.discord_binds", "Atalhos Globais do Discord")
+                                    subtitle: "Mute e Deafen globais que funcionam mesmo com Discord ou Vesktop minimizado em segundo plano"
+                                }
+
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    implicitHeight: discordCol.implicitHeight + 28
+                                    radius: 12
+                                    color: Theme.tile
+                                    border.width: 1
+                                    border.color: Theme.withAlpha(Theme.outline, 0.2)
+
+                                    ColumnLayout {
+                                        id: discordCol
+                                        anchors.fill: parent
+                                        anchors.margins: 16
+                                        spacing: 14
+
+                                        // Status do cliente Discord / Vesktop
+                                        RowLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 12
+
+                                            Rectangle {
+                                                width: 36; height: 36; radius: 18
+                                                color: Theme.withAlpha(Theme.primary, 0.2)
+                                                Text {
+                                                    anchors.centerIn: parent
+                                                    text: "󰙯"
+                                                    font.family: Theme.iconFontFamily
+                                                    font.pixelSize: 18
+                                                    color: Theme.primary
+                                                }
+                                            }
+
+                                            ColumnLayout {
+                                                Layout.fillWidth: true
+                                                spacing: 2
+                                                RowLayout {
+                                                    spacing: 6
+                                                    Text {
+                                                        text: win.discordClient === "vesktop" ? "Vesktop (Discord Client)" : "Discord Oficial"
+                                                        font.family: Theme.fontFamily
+                                                        font.pixelSize: 12
+                                                        font.weight: Font.Bold
+                                                        color: Theme.textColor
+                                                    }
+                                                    Rectangle {
+                                                        width: 8; height: 8; radius: 4
+                                                        color: win.discordRunning ? "#10b981" : Theme.withAlpha(Theme.subtext, 0.5)
+                                                    }
+                                                    Text {
+                                                        text: win.discordRunning ? "Em execução" : "Não detectado no momento"
+                                                        font.family: Theme.fontFamily
+                                                        font.pixelSize: 10
+                                                        color: win.discordRunning ? "#10b981" : Theme.subtext
+                                                    }
+                                                }
+                                                Text {
+                                                    text: "Os atalhos gravam diretamente em ~/.config/hypr/hyprland.lua usando hl.bind"
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 10
+                                                    color: Theme.subtext
+                                                }
+                                            }
+
+                                            Rectangle {
+                                                implicitWidth: 80; implicitHeight: 28; radius: 14
+                                                color: checkMouse.pressed ? Theme.tileHigh : Theme.surface
+                                                border.width: 1; border.color: Theme.withAlpha(Theme.outline, 0.25)
+                                                RowLayout {
+                                                    anchors.centerIn: parent
+                                                    spacing: 4
+                                                    Text {
+                                                        text: Theme.icons.refresh
+                                                        font.family: Theme.iconFontFamily
+                                                        font.pixelSize: 11
+                                                        color: Theme.textColor
+                                                    }
+                                                    Text {
+                                                        text: "Verificar"
+                                                        font.family: Theme.fontFamily
+                                                        font.pixelSize: 10
+                                                        color: Theme.textColor
+                                                    }
+                                                }
+                                                MouseArea {
+                                                    id: checkMouse
+                                                    anchors.fill: parent
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    onClicked: loadDiscordProc.running = true
+                                                }
+                                            }
+                                        }
+
+                                        Rectangle { Layout.fillWidth: true; height: 1; color: Theme.withAlpha(Theme.outline, 0.15) }
+
+                                        // Nota explicativa da simulação
+                                        Rectangle {
+                                            Layout.fillWidth: true
+                                            implicitHeight: simNoteRow.implicitHeight + 16
+                                            radius: 8
+                                            color: Theme.withAlpha(Theme.primary, 0.08)
+                                            border.width: 1
+                                            border.color: Theme.withAlpha(Theme.primary, 0.25)
+                                            RowLayout {
+                                                id: simNoteRow
+                                                anchors.fill: parent
+                                                anchors.margins: 10
+                                                spacing: 8
+                                                Text {
+                                                    text: Theme.icons.info
+                                                    font.family: Theme.iconFontFamily
+                                                    font.pixelSize: 14
+                                                    color: Theme.primary
+                                                }
+                                                Text {
+                                                    Layout.fillWidth: true
+                                                    text: Theme.t("discord.sim_note", "O atalho gravado intercepta a tecla no Hyprland e simula o atalho nativo do Discord em segundo plano, liberando as teclas modificadoras automaticamente para não travar em jogos.")
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 10
+                                                    wrapMode: Text.Wrap
+                                                    color: Theme.subtext
+                                                }
+                                            }
+                                        }
+
+                                        // 1. Mute Bind Card
+                                        ColumnLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 8
+
+                                            RowLayout {
+                                                Layout.fillWidth: true
+                                                spacing: 12
+
+                                                ColumnLayout {
+                                                    Layout.fillWidth: true
+                                                    spacing: 2
+                                                    Text {
+                                                        text: Theme.t("discord.mute_title", "Mutar / Desmutar Microfone (Mute)")
+                                                        font.family: Theme.fontFamily
+                                                        font.pixelSize: 11
+                                                        font.weight: Font.Bold
+                                                        color: Theme.textColor
+                                                    }
+                                                    Text {
+                                                        text: Theme.t("discord.mute_desc", "Simula o envio de Ctrl + Shift + M para o Discord/Vesktop")
+                                                        font.family: Theme.fontFamily
+                                                        font.pixelSize: 10
+                                                        color: Theme.subtext
+                                                    }
+                                                }
+
+                                                // Badge de Atalho Ativo
+                                                Rectangle {
+                                                    implicitWidth: mbBadgeRow.implicitWidth + 16
+                                                    implicitHeight: 28; radius: 14
+                                                    color: Theme.withAlpha(Theme.primary, 0.15)
+                                                    border.width: 1; border.color: Theme.primary
+                                                    RowLayout {
+                                                        id: mbBadgeRow
+                                                        anchors.centerIn: parent
+                                                        spacing: 6
+                                                        Text {
+                                                            text: Theme.icons.microphone || ""
+                                                            font.family: Theme.iconFontFamily
+                                                            font.pixelSize: 11
+                                                            color: Theme.primary
+                                                        }
+                                                        Text {
+                                                            text: win.discordMuteBind
+                                                            font.family: Theme.monoFamily
+                                                            font.pixelSize: 11
+                                                            font.weight: Font.Bold
+                                                            color: Theme.primary
+                                                        }
+                                                    }
+                                                }
+
+                                                // Botão Gravar Tecla
+                                                Rectangle {
+                                                    readonly property bool isRec: win.recordingDiscordTarget === "mute"
+                                                    implicitWidth: recMuteRow.implicitWidth + 20
+                                                    implicitHeight: 30; radius: 15
+                                                    color: isRec ? Theme.critical : (recMuteMouse.containsMouse ? Theme.primary : Theme.surface)
+                                                    border.width: 1
+                                                    border.color: isRec ? Theme.critical : (recMuteMouse.containsMouse ? Theme.primary : Theme.withAlpha(Theme.outline, 0.3))
+                                                    Behavior on color { ColorAnimation { duration: 150 } }
+
+                                                    RowLayout {
+                                                        id: recMuteRow
+                                                        anchors.centerIn: parent
+                                                        spacing: 6
+                                                        Text {
+                                                            text: parent.isRec ? "⏹" : "⏺"
+                                                            font.family: Theme.fontFamily
+                                                            font.pixelSize: 11
+                                                            color: parent.isRec || recMuteMouse.containsMouse ? Theme.background : Theme.critical
+                                                        }
+                                                        Text {
+                                                            text: parent.isRec ? Theme.t("discord.recording", "Aperte uma tecla no teclado...") : Theme.t("discord.record_key", "Gravar Tecla")
+                                                            font.family: Theme.fontFamily
+                                                            font.pixelSize: 10
+                                                            font.weight: Font.DemiBold
+                                                            color: parent.isRec || recMuteMouse.containsMouse ? Theme.background : Theme.textColor
+                                                        }
+                                                    }
+                                                    MouseArea {
+                                                        id: recMuteMouse
+                                                        anchors.fill: parent
+                                                        hoverEnabled: true
+                                                        cursorShape: Qt.PointingHandCursor
+                                                        onClicked: {
+                                                            if (parent.isRec) {
+                                                                recordDiscordProc.running = false;
+                                                                win.recordingDiscordTarget = "";
+                                                            } else {
+                                                                win.recordingDiscordTarget = "mute";
+                                                                win.editingManualMute = false;
+                                                                recordDiscordProc.command = ["rice-discord-binds", "record", "--target", "mute", "--timeout", "15"];
+                                                                recordDiscordProc.running = true;
+                                                            }
+                                                        }
+                                                    }
+                                                }
+
+                                                // Botão Digitar Tecla
+                                                Rectangle {
+                                                    implicitWidth: editMuteRow.implicitWidth + 16
+                                                    implicitHeight: 30; radius: 15
+                                                    color: win.editingManualMute ? Theme.tileHigh : (editMuteMouse.containsMouse ? Theme.surface : "transparent")
+                                                    border.width: 1; border.color: win.editingManualMute ? Theme.primary : Theme.withAlpha(Theme.outline, 0.25)
+                                                    RowLayout {
+                                                        id: editMuteRow
+                                                        anchors.centerIn: parent
+                                                        spacing: 4
+                                                        Text {
+                                                            text: Theme.icons.edit || "✎"
+                                                            font.family: Theme.iconFontFamily
+                                                            font.pixelSize: 10
+                                                            color: Theme.textColor
+                                                        }
+                                                        Text {
+                                                            text: Theme.t("discord.edit_manual", "Digitar")
+                                                            font.family: Theme.fontFamily
+                                                            font.pixelSize: 10
+                                                            color: Theme.textColor
+                                                        }
+                                                    }
+                                                    MouseArea {
+                                                        id: editMuteMouse
+                                                        anchors.fill: parent
+                                                        hoverEnabled: true
+                                                        cursorShape: Qt.PointingHandCursor
+                                                        onClicked: win.editingManualMute = !win.editingManualMute
+                                                    }
+                                                }
+                                            }
+
+                                            // Campo de Digitação Manual (se aberto)
+                                            RowLayout {
+                                                Layout.fillWidth: true
+                                                visible: win.editingManualMute
+                                                spacing: 8
+
+                                                Rectangle {
+                                                    Layout.fillWidth: true
+                                                    height: 32; radius: 8
+                                                    color: Theme.surface
+                                                    border.width: 1; border.color: Theme.withAlpha(Theme.outline, 0.3)
+                                                    TextInput {
+                                                        id: manualMuteInput
+                                                        anchors.fill: parent
+                                                        anchors.leftMargin: 10
+                                                        anchors.rightMargin: 10
+                                                        verticalAlignment: TextInput.AlignVCenter
+                                                        text: win.discordMuteBind
+                                                        font.family: Theme.monoFamily
+                                                        font.pixelSize: 11
+                                                        color: Theme.textColor
+                                                        selectByMouse: true
+                                                    }
+                                                }
+
+                                                Rectangle {
+                                                    implicitWidth: 70; height: 32; radius: 8
+                                                    color: Theme.primary
+                                                    Text {
+                                                        anchors.centerIn: parent
+                                                        text: Theme.t("discord.save", "Salvar")
+                                                        font.family: Theme.fontFamily
+                                                        font.pixelSize: 10
+                                                        font.weight: Font.Bold
+                                                        color: Theme.background
+                                                    }
+                                                    MouseArea {
+                                                        anchors.fill: parent
+                                                        cursorShape: Qt.PointingHandCursor
+                                                        onClicked: {
+                                                            const keyVal = manualMuteInput.text.trim();
+                                                            if (keyVal.length > 0) {
+                                                                win.discordMuteBind = keyVal;
+                                                                Quickshell.execDetached(["rice-discord-binds", "set", "--mute", keyVal]);
+                                                                win.showToast(Theme.t("discord.recorded_mute", "Tecla de Mute salva: ") + keyVal);
+                                                                win.editingManualMute = false;
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            // Presets rápidos de teclas de Mute
+                                            RowLayout {
+                                                Layout.fillWidth: true
+                                                spacing: 6
+                                                Text {
+                                                    text: "Sugestões rápidas:"
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 9
+                                                    color: Theme.subtext
+                                                }
+                                                Repeater {
+                                                    model: ["Num_Lock", "F8", "Pause", "Scroll_Lock", "CTRL + SHIFT + M"]
+                                                    delegate: Rectangle {
+                                                        required property string modelData
+                                                        implicitWidth: mbTxt.implicitWidth + 14
+                                                        implicitHeight: 24; radius: 12
+                                                        readonly property bool isCur: win.discordMuteBind === modelData
+                                                        color: isCur ? Theme.primary : Theme.surface
+                                                        border.width: 1; border.color: isCur ? Theme.primary : Theme.withAlpha(Theme.outline, 0.2)
+                                                        Text {
+                                                            id: mbTxt
+                                                            anchors.centerIn: parent
+                                                            text: parent.modelData
+                                                            font.family: Theme.monoFamily
+                                                            font.pixelSize: 9
+                                                            font.weight: Font.Medium
+                                                            color: parent.isCur ? Theme.background : Theme.textColor
+                                                        }
+                                                        MouseArea {
+                                                            anchors.fill: parent
+                                                            cursorShape: Qt.PointingHandCursor
+                                                            onClicked: {
+                                                                win.discordMuteBind = parent.modelData;
+                                                                Quickshell.execDetached(["rice-discord-binds", "set", "--mute", parent.modelData]);
+                                                                win.showToast(Theme.t("discord.recorded_mute", "Tecla de Mute configurada: ") + parent.modelData);
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        Rectangle { Layout.fillWidth: true; height: 1; color: Theme.withAlpha(Theme.outline, 0.15) }
+
+                                        // 2. Deafen Bind Card
+                                        ColumnLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 8
+
+                                            RowLayout {
+                                                Layout.fillWidth: true
+                                                spacing: 12
+
+                                                ColumnLayout {
+                                                    Layout.fillWidth: true
+                                                    spacing: 2
+                                                    Text {
+                                                        text: Theme.t("discord.deafen_title", "Desativar / Ativar Áudio (Deafen)")
+                                                        font.family: Theme.fontFamily
+                                                        font.pixelSize: 11
+                                                        font.weight: Font.Bold
+                                                        color: Theme.textColor
+                                                    }
+                                                    Text {
+                                                        text: Theme.t("discord.deafen_desc", "Simula o envio de Ctrl + Shift + D para o Discord/Vesktop")
+                                                        font.family: Theme.fontFamily
+                                                        font.pixelSize: 10
+                                                        color: Theme.subtext
+                                                    }
+                                                }
+
+                                                // Badge de Atalho Ativo
+                                                Rectangle {
+                                                    implicitWidth: dbBadgeRow.implicitWidth + 16
+                                                    implicitHeight: 28; radius: 14
+                                                    color: Theme.withAlpha(Theme.primary, 0.15)
+                                                    border.width: 1; border.color: Theme.primary
+                                                    RowLayout {
+                                                        id: dbBadgeRow
+                                                        anchors.centerIn: parent
+                                                        spacing: 6
+                                                        Text {
+                                                            text: Theme.icons.headphones || "🎧"
+                                                            font.family: Theme.iconFontFamily
+                                                            font.pixelSize: 11
+                                                            color: Theme.primary
+                                                        }
+                                                        Text {
+                                                            text: win.discordDeafenBind
+                                                            font.family: Theme.monoFamily
+                                                            font.pixelSize: 11
+                                                            font.weight: Font.Bold
+                                                            color: Theme.primary
+                                                        }
+                                                    }
+                                                }
+
+                                                // Botão Gravar Tecla
+                                                Rectangle {
+                                                    readonly property bool isRec: win.recordingDiscordTarget === "deafen"
+                                                    implicitWidth: recDeafenRow.implicitWidth + 20
+                                                    implicitHeight: 30; radius: 15
+                                                    color: isRec ? Theme.critical : (recDeafenMouse.containsMouse ? Theme.primary : Theme.surface)
+                                                    border.width: 1
+                                                    border.color: isRec ? Theme.critical : (recDeafenMouse.containsMouse ? Theme.primary : Theme.withAlpha(Theme.outline, 0.3))
+                                                    Behavior on color { ColorAnimation { duration: 150 } }
+
+                                                    RowLayout {
+                                                        id: recDeafenRow
+                                                        anchors.centerIn: parent
+                                                        spacing: 6
+                                                        Text {
+                                                            text: parent.isRec ? "⏹" : "⏺"
+                                                            font.family: Theme.fontFamily
+                                                            font.pixelSize: 11
+                                                            color: parent.isRec || recDeafenMouse.containsMouse ? Theme.background : Theme.critical
+                                                        }
+                                                        Text {
+                                                            text: parent.isRec ? Theme.t("discord.recording", "Aperte uma tecla no teclado...") : Theme.t("discord.record_key", "Gravar Tecla")
+                                                            font.family: Theme.fontFamily
+                                                            font.pixelSize: 10
+                                                            font.weight: Font.DemiBold
+                                                            color: parent.isRec || recDeafenMouse.containsMouse ? Theme.background : Theme.textColor
+                                                        }
+                                                    }
+                                                    MouseArea {
+                                                        id: recDeafenMouse
+                                                        anchors.fill: parent
+                                                        hoverEnabled: true
+                                                        cursorShape: Qt.PointingHandCursor
+                                                        onClicked: {
+                                                            if (parent.isRec) {
+                                                                recordDiscordProc.running = false;
+                                                                win.recordingDiscordTarget = "";
+                                                            } else {
+                                                                win.recordingDiscordTarget = "deafen";
+                                                                win.editingManualDeafen = false;
+                                                                recordDiscordProc.command = ["rice-discord-binds", "record", "--target", "deafen", "--timeout", "15"];
+                                                                recordDiscordProc.running = true;
+                                                            }
+                                                        }
+                                                    }
+                                                }
+
+                                                // Botão Digitar Tecla
+                                                Rectangle {
+                                                    implicitWidth: editDeafenRow.implicitWidth + 16
+                                                    implicitHeight: 30; radius: 15
+                                                    color: win.editingManualDeafen ? Theme.tileHigh : (editDeafenMouse.containsMouse ? Theme.surface : "transparent")
+                                                    border.width: 1; border.color: win.editingManualDeafen ? Theme.primary : Theme.withAlpha(Theme.outline, 0.25)
+                                                    RowLayout {
+                                                        id: editDeafenRow
+                                                        anchors.centerIn: parent
+                                                        spacing: 4
+                                                        Text {
+                                                            text: Theme.icons.edit || "✎"
+                                                            font.family: Theme.iconFontFamily
+                                                            font.pixelSize: 10
+                                                            color: Theme.textColor
+                                                        }
+                                                        Text {
+                                                            text: Theme.t("discord.edit_manual", "Digitar")
+                                                            font.family: Theme.fontFamily
+                                                            font.pixelSize: 10
+                                                            color: Theme.textColor
+                                                        }
+                                                    }
+                                                    MouseArea {
+                                                        id: editDeafenMouse
+                                                        anchors.fill: parent
+                                                        hoverEnabled: true
+                                                        cursorShape: Qt.PointingHandCursor
+                                                        onClicked: win.editingManualDeafen = !win.editingManualDeafen
+                                                    }
+                                                }
+                                            }
+
+                                            // Campo de Digitação Manual (se aberto)
+                                            RowLayout {
+                                                Layout.fillWidth: true
+                                                visible: win.editingManualDeafen
+                                                spacing: 8
+
+                                                Rectangle {
+                                                    Layout.fillWidth: true
+                                                    height: 32; radius: 8
+                                                    color: Theme.surface
+                                                    border.width: 1; border.color: Theme.withAlpha(Theme.outline, 0.3)
+                                                    TextInput {
+                                                        id: manualDeafenInput
+                                                        anchors.fill: parent
+                                                        anchors.leftMargin: 10
+                                                        anchors.rightMargin: 10
+                                                        verticalAlignment: TextInput.AlignVCenter
+                                                        text: win.discordDeafenBind
+                                                        font.family: Theme.monoFamily
+                                                        font.pixelSize: 11
+                                                        color: Theme.textColor
+                                                        selectByMouse: true
+                                                    }
+                                                }
+
+                                                Rectangle {
+                                                    implicitWidth: 70; height: 32; radius: 8
+                                                    color: Theme.primary
+                                                    Text {
+                                                        anchors.centerIn: parent
+                                                        text: Theme.t("discord.save", "Salvar")
+                                                        font.family: Theme.fontFamily
+                                                        font.pixelSize: 10
+                                                        font.weight: Font.Bold
+                                                        color: Theme.background
+                                                    }
+                                                    MouseArea {
+                                                        anchors.fill: parent
+                                                        cursorShape: Qt.PointingHandCursor
+                                                        onClicked: {
+                                                            const keyVal = manualDeafenInput.text.trim();
+                                                            if (keyVal.length > 0) {
+                                                                win.discordDeafenBind = keyVal;
+                                                                Quickshell.execDetached(["rice-discord-binds", "set", "--deafen", keyVal]);
+                                                                win.showToast(Theme.t("discord.recorded_deafen", "Tecla de Deafen salva: ") + keyVal);
+                                                                win.editingManualDeafen = false;
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            // Presets rápidos de teclas de Deafen
+                                            RowLayout {
+                                                Layout.fillWidth: true
+                                                spacing: 6
+                                                Text {
+                                                    text: "Sugestões rápidas:"
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 9
+                                                    color: Theme.subtext
+                                                }
+                                                Repeater {
+                                                    model: ["Num_Lock", "F9", "Pause", "Scroll_Lock", "CTRL + SHIFT + D"]
+                                                    delegate: Rectangle {
+                                                        required property string modelData
+                                                        implicitWidth: dbTxt.implicitWidth + 14
+                                                        implicitHeight: 24; radius: 12
+                                                        readonly property bool isCur: win.discordDeafenBind === modelData
+                                                        color: isCur ? Theme.primary : Theme.surface
+                                                        border.width: 1; border.color: isCur ? Theme.primary : Theme.withAlpha(Theme.outline, 0.2)
+                                                        Text {
+                                                            id: dbTxt
+                                                            anchors.centerIn: parent
+                                                            text: parent.modelData
+                                                            font.family: Theme.monoFamily
+                                                            font.pixelSize: 9
+                                                            font.weight: Font.Medium
+                                                            color: parent.isCur ? Theme.background : Theme.textColor
+                                                        }
+                                                        MouseArea {
+                                                            anchors.fill: parent
+                                                            cursorShape: Qt.PointingHandCursor
+                                                            onClicked: {
+                                                                win.discordDeafenBind = parent.modelData;
+                                                                Quickshell.execDetached(["rice-discord-binds", "set", "--deafen", parent.modelData]);
+                                                                win.showToast(Theme.t("discord.recorded_deafen", "Tecla de Deafen configurada: ") + parent.modelData);
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -4987,10 +5722,13 @@ PanelWindow {
                         // ==========================================
                         // ABA 17: CENTRAL DE APLICATIVOS & ATUALIZAÇÕES
                         // ==========================================
-                        Item {
-                            Layout.fillWidth: true
-                            implicitHeight: appStoreCol.implicitHeight
+                        Flickable {
+                            anchors.fill: parent
                             visible: win.currentTab === 17
+                            contentHeight: appStoreCol.implicitHeight + 24
+                            contentWidth: width
+                            clip: true
+                            boundsBehavior: Flickable.StopAtBounds
 
                             ColumnLayout {
                                 id: appStoreCol
@@ -5365,10 +6103,13 @@ PanelWindow {
                         // ==========================================
                         // ABA 18: PERFIS DE ESTILO & BACKUP DO RICE
                         // ==========================================
-                        Item {
-                            Layout.fillWidth: true
-                            implicitHeight: presetsCol.implicitHeight
+                        Flickable {
+                            anchors.fill: parent
                             visible: win.currentTab === 18
+                            contentHeight: presetsCol.implicitHeight + 24
+                            contentWidth: width
+                            clip: true
+                            boundsBehavior: Flickable.StopAtBounds
 
                             ColumnLayout {
                                 id: presetsCol
@@ -5692,6 +6433,678 @@ PanelWindow {
                                 }
                             }
                         }
+
+                        // ==========================================
+                        // ABA 19: CUSTOMIZAÇÃO DO SHELL (HUB, SIDEBAR, DOCK)
+                        // ==========================================
+                        Flickable {
+                            id: shellCustomTab
+                            anchors.fill: parent
+                            visible: win.currentTab === 19
+                            contentHeight: shellCustomCol.implicitHeight + 40
+                            contentWidth: width
+                            clip: true
+                            boundsBehavior: Flickable.StopAtBounds
+
+                            property string targetComp: "dock"
+
+                            ColumnLayout {
+                                id: shellCustomCol
+                                width: parent.width
+                                spacing: 18
+
+                                // 1. Cabeçalho e Seletor do Componente
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 12
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        Text {
+                                            text: Theme.t("settings.cat_shell_custom", "CUSTOMIZAÇÃO DO SHELL").toUpperCase()
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: 12
+                                            font.weight: Font.Bold
+                                            color: Theme.primary
+                                        }
+                                        Item { Layout.fillWidth: true }
+                                        Text {
+                                            text: Theme.t("shell_custom.preview_desc", "Configurações sincronizadas em tempo real via ShellCustomization.")
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: 10
+                                            color: Theme.subtext
+                                        }
+                                    }
+
+                                    // Seletor de Componentes: Hub, Sidebar, Dock
+                                    Rectangle {
+                                        Layout.fillWidth: true
+                                        implicitHeight: 48
+                                        radius: 12
+                                        color: Theme.tile
+                                        border.width: 1
+                                        border.color: Theme.withAlpha(Theme.outline, 0.2)
+
+                                        RowLayout {
+                                            anchors.fill: parent
+                                            anchors.margins: 6
+                                            spacing: 8
+
+                                            Repeater {
+                                                model: [
+                                                    { id: "hub", name: Theme.t("shell_custom.hub", "Hub Central"), icon: Theme.icons.dashboard },
+                                                    { id: "sidebar", name: Theme.t("shell_custom.sidebar", "Barra Lateral"), icon: Theme.icons.tune },
+                                                    { id: "dock", name: Theme.t("shell_custom.dock", "Dock Inferior"), icon: Theme.icons.gamepad }
+                                                ]
+                                                delegate: Rectangle {
+                                                    required property var modelData
+                                                    Layout.fillWidth: true
+                                                    Layout.fillHeight: true
+                                                    radius: 8
+                                                    readonly property bool isSelected: shellCustomTab.targetComp === modelData.id
+                                                    color: isSelected ? Theme.primary : (compArea.containsMouse ? Theme.tileHigh : "transparent")
+                                                    border.width: isSelected ? 0 : 1
+                                                    border.color: Theme.withAlpha(Theme.outline, 0.15)
+
+                                                    Behavior on color { ColorAnimation { duration: 100 } }
+
+                                                    RowLayout {
+                                                        anchors.centerIn: parent
+                                                        spacing: 8
+                                                        Text {
+                                                            text: modelData.icon
+                                                            font.family: Theme.iconFontFamily
+                                                            font.pixelSize: 14
+                                                            color: isSelected ? Theme.background : Theme.textColor
+                                                        }
+                                                        Text {
+                                                            text: modelData.name
+                                                            font.family: Theme.fontFamily
+                                                            font.pixelSize: 11
+                                                            font.weight: isSelected ? Font.Bold : Font.Normal
+                                                            color: isSelected ? Theme.background : Theme.textColor
+                                                        }
+                                                    }
+
+                                                    MouseArea {
+                                                        id: compArea
+                                                        anchors.fill: parent
+                                                        hoverEnabled: true
+                                                        cursorShape: Qt.PointingHandCursor
+                                                        onClicked: shellCustomTab.targetComp = modelData.id
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // 2. Live Preview Card
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    implicitHeight: 140
+                                    radius: 12
+                                    color: Theme.withAlpha(Theme.background, 0.6)
+                                    border.width: 1
+                                    border.color: Theme.withAlpha(Theme.outline, 0.25)
+                                    clip: true
+
+                                    ColumnLayout {
+                                        anchors.fill: parent
+                                        anchors.margins: 14
+                                        spacing: 10
+
+                                        RowLayout {
+                                            Layout.fillWidth: true
+                                            Text {
+                                                text: Theme.t("shell_custom.preview_title", "Prévia Visual Dinâmica")
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: 11
+                                                font.weight: Font.Bold
+                                                color: Theme.primary
+                                            }
+                                            Item { Layout.fillWidth: true }
+                                            // Badges de Status Atual
+                                            Row {
+                                                spacing: 6
+                                                Rectangle {
+                                                    implicitWidth: b1.implicitWidth + 10; implicitHeight: 18; radius: 4
+                                                    color: Theme.tile
+                                                    Text { id: b1; anchors.centerIn: parent; text: ShellCustomization.getStyle(shellCustomTab.targetComp).toUpperCase(); font.pixelSize: 9; font.weight: Font.Bold; color: Theme.textColor }
+                                                }
+                                                Rectangle {
+                                                    implicitWidth: b2.implicitWidth + 10; implicitHeight: 18; radius: 4
+                                                    color: Theme.tile
+                                                    Text { id: b2; anchors.centerIn: parent; text: Math.round(ShellCustomization.getScale(shellCustomTab.targetComp) * 100) + "%"; font.pixelSize: 9; font.weight: Font.Bold; color: Theme.textColor }
+                                                }
+                                                Rectangle {
+                                                    implicitWidth: b3.implicitWidth + 10; implicitHeight: 18; radius: 4
+                                                    color: Theme.tile
+                                                    Text { id: b3; anchors.centerIn: parent; text: Math.round(ShellCustomization.getOpacity(shellCustomTab.targetComp) * 100) + "%"; font.pixelSize: 9; font.weight: Font.Bold; color: Theme.textColor }
+                                                }
+                                            }
+                                        }
+
+                                        // Mockup visual do componente
+                                        Item {
+                                            Layout.fillWidth: true
+                                            Layout.fillHeight: true
+
+                                            Rectangle {
+                                                anchors.centerIn: parent
+                                                width: Math.min(parent.width - 20, 360 * ShellCustomization.getScale(shellCustomTab.targetComp))
+                                                height: 56 * ShellCustomization.getScale(shellCustomTab.targetComp)
+                                                radius: 12
+                                                color: ShellCustomization.getBgColor(shellCustomTab.targetComp)
+                                                border.width: ShellCustomization.getBorderWidth(shellCustomTab.targetComp)
+                                                border.color: ShellCustomization.getBorderColor(shellCustomTab.targetComp)
+
+                                                // Glow ring se o estilo for glow
+                                                Rectangle {
+                                                    anchors.fill: parent
+                                                    anchors.margins: -4
+                                                    radius: 16
+                                                    color: "transparent"
+                                                    border.color: ShellCustomization.getAccent(shellCustomTab.targetComp)
+                                                    border.width: 1
+                                                    opacity: ShellCustomization.getStyle(shellCustomTab.targetComp) === "glow" ? 0.4 : 0
+                                                    visible: opacity > 0
+                                                    z: -1
+                                                }
+
+                                                RowLayout {
+                                                    anchors.fill: parent
+                                                    anchors.leftMargin: 16
+                                                    anchors.rightMargin: 16
+                                                    spacing: 12
+
+                                                    Rectangle {
+                                                        width: 28; height: 28; radius: 14
+                                                        color: Theme.withAlpha(ShellCustomization.getAccent(shellCustomTab.targetComp), 0.25)
+                                                        Text {
+                                                            anchors.centerIn: parent
+                                                            text: shellCustomTab.targetComp === "hub" ? Theme.icons.dashboard : (shellCustomTab.targetComp === "sidebar" ? Theme.icons.tune : Theme.icons.gamepad)
+                                                            font.family: Theme.iconFontFamily
+                                                            font.pixelSize: 14
+                                                            color: ShellCustomization.getAccent(shellCustomTab.targetComp)
+                                                        }
+                                                    }
+
+                                                    ColumnLayout {
+                                                        Layout.fillWidth: true
+                                                        spacing: 2
+                                                        Text {
+                                                            text: (shellCustomTab.targetComp === "hub" ? "Rice Central Hub" : (shellCustomTab.targetComp === "sidebar" ? "Energy & Quick Sidebar" : "Hollow-Wired Dock"))
+                                                            font.family: Theme.fontFamily
+                                                            font.pixelSize: 11
+                                                            font.weight: Font.Bold
+                                                            color: Theme.textColor
+                                                        }
+                                                        Text {
+                                                            text: "Style: " + ShellCustomization.getStyle(shellCustomTab.targetComp) + " | Scale: " + Math.round(ShellCustomization.getScale(shellCustomTab.targetComp) * 100) + "%"
+                                                            font.family: Theme.fontFamily
+                                                            font.pixelSize: 9
+                                                            color: Theme.subtext
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // 3. Painel Inspector com 4 Seções (Card unificado)
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    implicitHeight: controlsCol.implicitHeight + 28
+                                    radius: 12
+                                    color: Theme.tile
+                                    border.width: 1
+                                    border.color: Theme.withAlpha(Theme.outline, 0.2)
+
+                                    ColumnLayout {
+                                        id: controlsCol
+                                        anchors.fill: parent
+                                        anchors.margins: 16
+                                        spacing: 16
+
+                                        // Seção 1: Estilo Visual
+                                        ColumnLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 8
+                                            Text {
+                                                text: Theme.t("shell_custom.style", "Estilo Visual")
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: 11
+                                                font.weight: Font.Bold
+                                                color: Theme.subtext
+                                            }
+                                            Row {
+                                                spacing: 8
+                                                readonly property var styles: [
+                                                    { label: Theme.t("shell_custom.style_glass", "Vidro (Glass)"), val: "glass" },
+                                                    { label: Theme.t("shell_custom.style_solid", "Sólido"), val: "solid" },
+                                                    { label: Theme.t("shell_custom.style_glow", "Glow"), val: "glow" },
+                                                    { label: Theme.t("shell_custom.style_borderless", "Livre"), val: "borderless" }
+                                                ]
+                                                Repeater {
+                                                    model: parent.styles
+                                                    delegate: Rectangle {
+                                                        required property var modelData
+                                                        implicitWidth: stText.implicitWidth + 16
+                                                        implicitHeight: 28
+                                                        radius: 14
+                                                        readonly property bool isCurrent: ShellCustomization.getStyle(shellCustomTab.targetComp) === modelData.val
+                                                        color: isCurrent ? Theme.primary : (stMouse.containsMouse ? Theme.tileHigh : Theme.surface)
+                                                        border.width: 1
+                                                        border.color: isCurrent ? Theme.primary : Theme.withAlpha(Theme.outline, 0.2)
+
+                                                        Text {
+                                                            id: stText
+                                                            anchors.centerIn: parent
+                                                            text: parent.modelData.label
+                                                            font.family: Theme.fontFamily
+                                                            font.pixelSize: 10
+                                                            font.weight: Font.Medium
+                                                            color: parent.isCurrent ? Theme.background : Theme.textColor
+                                                        }
+                                                        MouseArea {
+                                                            id: stMouse
+                                                            anchors.fill: parent
+                                                            hoverEnabled: true
+                                                            cursorShape: Qt.PointingHandCursor
+                                                            onClicked: ShellCustomization.setComponentProp(shellCustomTab.targetComp, "style", parent.modelData.val)
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        Rectangle { Layout.fillWidth: true; height: 1; color: Theme.withAlpha(Theme.outline, 0.15) }
+
+                                        // Seção 2: Escala
+                                        ColumnLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 8
+                                            Text {
+                                                text: Theme.t("shell_custom.scale", "Escala de Tamanho")
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: 11
+                                                font.weight: Font.Bold
+                                                color: Theme.subtext
+                                            }
+                                            Row {
+                                                spacing: 8
+                                                readonly property var scales: [
+                                                    { label: "80%", val: 0.8 },
+                                                    { label: "100%", val: 1.0 },
+                                                    { label: "120%", val: 1.2 }
+                                                ]
+                                                Repeater {
+                                                    model: parent.scales
+                                                    delegate: Rectangle {
+                                                        required property var modelData
+                                                        implicitWidth: scText.implicitWidth + 18
+                                                        implicitHeight: 28
+                                                        radius: 14
+                                                        readonly property bool isCurrent: Math.abs(ShellCustomization.getScale(shellCustomTab.targetComp) - modelData.val) < 0.05
+                                                        color: isCurrent ? Theme.primary : (scMouse.containsMouse ? Theme.tileHigh : Theme.surface)
+                                                        border.width: 1
+                                                        border.color: isCurrent ? Theme.primary : Theme.withAlpha(Theme.outline, 0.2)
+
+                                                        Text {
+                                                            id: scText
+                                                            anchors.centerIn: parent
+                                                            text: parent.modelData.label
+                                                            font.family: Theme.fontFamily
+                                                            font.pixelSize: 10
+                                                            font.weight: Font.Medium
+                                                            color: parent.isCurrent ? Theme.background : Theme.textColor
+                                                        }
+                                                        MouseArea {
+                                                            id: scMouse
+                                                            anchors.fill: parent
+                                                            hoverEnabled: true
+                                                            cursorShape: Qt.PointingHandCursor
+                                                            onClicked: ShellCustomization.setComponentProp(shellCustomTab.targetComp, "scale", parent.modelData.val)
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        Rectangle { Layout.fillWidth: true; height: 1; color: Theme.withAlpha(Theme.outline, 0.15) }
+
+                                        // Seção 3: Opacidade do Fundo
+                                        ColumnLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 8
+                                            Text {
+                                                text: Theme.t("shell_custom.opacity", "Opacidade do Fundo")
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: 11
+                                                font.weight: Font.Bold
+                                                color: Theme.subtext
+                                            }
+                                            Row {
+                                                spacing: 8
+                                                readonly property var opacities: [
+                                                    { label: "40%", val: 0.40 },
+                                                    { label: "70%", val: 0.70 },
+                                                    { label: "85%", val: 0.85 },
+                                                    { label: "100%", val: 1.0 }
+                                                ]
+                                                Repeater {
+                                                    model: parent.opacities
+                                                    delegate: Rectangle {
+                                                        required property var modelData
+                                                        implicitWidth: opText.implicitWidth + 16
+                                                        implicitHeight: 28
+                                                        radius: 14
+                                                        readonly property bool isCurrent: Math.abs(ShellCustomization.getOpacity(shellCustomTab.targetComp) - modelData.val) < 0.03
+                                                        color: isCurrent ? Theme.primary : (opMouse.containsMouse ? Theme.tileHigh : Theme.surface)
+                                                        border.width: 1
+                                                        border.color: isCurrent ? Theme.primary : Theme.withAlpha(Theme.outline, 0.2)
+
+                                                        Text {
+                                                            id: opText
+                                                            anchors.centerIn: parent
+                                                            text: parent.modelData.label
+                                                            font.family: Theme.fontFamily
+                                                            font.pixelSize: 10
+                                                            font.weight: Font.Medium
+                                                            color: parent.isCurrent ? Theme.background : Theme.textColor
+                                                        }
+                                                        MouseArea {
+                                                            id: opMouse
+                                                            anchors.fill: parent
+                                                            hoverEnabled: true
+                                                            cursorShape: Qt.PointingHandCursor
+                                                            onClicked: ShellCustomization.setComponentProp(shellCustomTab.targetComp, "opacity", parent.modelData.val)
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        Rectangle { Layout.fillWidth: true; height: 1; color: Theme.withAlpha(Theme.outline, 0.15) }
+
+                                        // Seção 4: Cor de Destaque
+                                        ColumnLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 8
+                                            Text {
+                                                text: Theme.t("shell_custom.accent", "Cor de Destaque")
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: 11
+                                                font.weight: Font.Bold
+                                                color: Theme.subtext
+                                            }
+                                            Row {
+                                                spacing: 12
+                                                readonly property var colors: [
+                                                    { name: Theme.t("shell_custom.accent_default", "Padrão"), hex: "" },
+                                                    { name: Theme.t("shell_custom.accent_cyan", "Ciano"), hex: "#00f0ff" },
+                                                    { name: Theme.t("shell_custom.accent_pink", "Rosa"), hex: "#ff007f" },
+                                                    { name: Theme.t("shell_custom.accent_emerald", "Esmeralda"), hex: "#10b981" },
+                                                    { name: Theme.t("shell_custom.accent_violet", "Violeta"), hex: "#a855f7" },
+                                                    { name: Theme.t("shell_custom.accent_amber", "Âmbar"), hex: "#f59e0b" }
+                                                ]
+                                                Repeater {
+                                                    model: parent.colors
+                                                    delegate: Rectangle {
+                                                        required property var modelData
+                                                        width: 28; height: 28; radius: 14
+                                                        readonly property string curHex: (ShellCustomization.config[shellCustomTab.targetComp] && ShellCustomization.config[shellCustomTab.targetComp].accent) || ""
+                                                        readonly property bool isCurrent: curHex === modelData.hex
+                                                        color: modelData.hex !== "" ? modelData.hex : Theme.primary
+                                                        border.color: isCurrent ? "#ffffff" : Theme.withAlpha(Theme.outline, 0.3)
+                                                        border.width: isCurrent ? 2 : 1
+
+                                                        Text {
+                                                            anchors.centerIn: parent
+                                                            visible: parent.isCurrent
+                                                            text: "✓"
+                                                            font.family: Theme.fontFamily
+                                                            font.pixelSize: 11
+                                                            font.weight: Font.Bold
+                                                            color: "#000000"
+                                                        }
+
+                                                        MouseArea {
+                                                            anchors.fill: parent
+                                                            cursorShape: Qt.PointingHandCursor
+                                                            onClicked: ShellCustomization.setComponentProp(shellCustomTab.targetComp, "accent", parent.modelData.hex)
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Seção Específica da Dock: Ícone do Launcher
+                                Rectangle {
+                                    visible: shellCustomTab.targetComp === "dock"
+                                    Layout.fillWidth: true
+                                    implicitHeight: dockIconCol.implicitHeight + 28
+                                    radius: 12
+                                    color: Theme.tile
+                                    border.width: 1
+                                    border.color: Theme.withAlpha(Theme.outline, 0.2)
+
+                                    ColumnLayout {
+                                        id: dockIconCol
+                                        anchors.fill: parent
+                                        anchors.margins: 16
+                                        spacing: 14
+
+                                        RowLayout {
+                                            Layout.fillWidth: true
+                                            Text {
+                                                text: Theme.t("dock.launcher_icon_title", "Ícone do Launcher da Dock").toUpperCase()
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: 11
+                                                font.weight: Font.Bold
+                                                color: Theme.primary
+                                            }
+                                            Item { Layout.fillWidth: true }
+                                            Text {
+                                                text: "PNG, JPG, SVG, WebP ou GIF"
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: 10
+                                                color: Theme.subtext
+                                            }
+                                        }
+
+                                        RowLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 14
+
+                                            // Mini preview do ícone atual
+                                            Rectangle {
+                                                width: 52; height: 52; radius: 12
+                                                color: Theme.surface
+                                                border.width: 1
+                                                border.color: Theme.withAlpha(Theme.outline, 0.3)
+
+                                                AnimatedImage {
+                                                    anchors.centerIn: parent
+                                                    width: 36; height: 36
+                                                    source: {
+                                                        const p = DockConfig.launcherIcon;
+                                                        if (!p) return "file:///home/val47/Imagens/Ícones/icons8-arch-linux-96(2).png";
+                                                        return p.startsWith("/") ? "file://" + p : p;
+                                                    }
+                                                    fillMode: Image.PreserveAspectFit
+                                                    mipmap: true
+                                                    asynchronous: true
+                                                }
+                                            }
+
+                                            ColumnLayout {
+                                                Layout.fillWidth: true
+                                                spacing: 8
+
+                                                Text {
+                                                    Layout.fillWidth: true
+                                                    text: Theme.t("dock.launcher_icon_desc", "Ícone fixo à esquerda da Dock para abrir o Launcher.")
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 11
+                                                    color: Theme.textColor
+                                                    wrapMode: Text.WordWrap
+                                                }
+
+                                                RowLayout {
+                                                    spacing: 10
+
+                                                    Rectangle {
+                                                        implicitWidth: chooseTxt.implicitWidth + 24
+                                                        implicitHeight: 30
+                                                        radius: 15
+                                                        color: chooseArea.pressed ? Theme.withAlpha(Theme.primary, 0.7) : Theme.primary
+
+                                                        RowLayout {
+                                                            anchors.centerIn: parent
+                                                            spacing: 6
+                                                            Text {
+                                                                text: Theme.icons.palette
+                                                                font.family: Theme.iconFontFamily
+                                                                font.pixelSize: 12
+                                                                color: Theme.background
+                                                            }
+                                                            Text {
+                                                                id: chooseTxt
+                                                                text: Theme.t("dock.choose_icon", "Escolher Imagem / GIF...")
+                                                                font.family: Theme.fontFamily
+                                                                font.pixelSize: 10
+                                                                font.weight: Font.Bold
+                                                                color: Theme.background
+                                                            }
+                                                        }
+
+                                                        MouseArea {
+                                                            id: chooseArea
+                                                            anchors.fill: parent
+                                                            cursorShape: Qt.PointingHandCursor
+                                                            onClicked: {
+                                                                Quickshell.execDetached(["rice-set-dock-icon"]);
+                                                            }
+                                                        }
+                                                    }
+
+                                                    Rectangle {
+                                                        implicitWidth: rstTxt.implicitWidth + 20
+                                                        implicitHeight: 30
+                                                        radius: 15
+                                                        color: rstArea.pressed ? Theme.tileHigh : Theme.surface
+                                                        border.width: 1
+                                                        border.color: Theme.withAlpha(Theme.outline, 0.25)
+
+                                                        Text {
+                                                            id: rstTxt
+                                                            anchors.centerIn: parent
+                                                            text: Theme.t("dock.reset_icon", "Restaurar Padrão Arch")
+                                                            font.family: Theme.fontFamily
+                                                            font.pixelSize: 10
+                                                            font.weight: Font.Medium
+                                                            color: Theme.textColor
+                                                        }
+
+                                                        MouseArea {
+                                                            id: rstArea
+                                                            anchors.fill: parent
+                                                            cursorShape: Qt.PointingHandCursor
+                                                            onClicked: {
+                                                                Quickshell.execDetached(["rice-set-dock-icon", "--reset"]);
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // 4. Ações Globais: Aplicar a Todos e Restaurar Padrões
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 12
+
+                                    Rectangle {
+                                        Layout.fillWidth: true
+                                        implicitHeight: 38
+                                        radius: 10
+                                        color: applyMouse.pressed ? Theme.withAlpha(Theme.primary, 0.8) : Theme.primary
+                                        border.width: 1
+                                        border.color: Theme.primary
+
+                                        RowLayout {
+                                            anchors.centerIn: parent
+                                            spacing: 8
+                                            Text {
+                                                text: Theme.icons.refresh
+                                                font.family: Theme.iconFontFamily
+                                                font.pixelSize: 14
+                                                color: Theme.background
+                                            }
+                                            Text {
+                                                text: Theme.t("shell_custom.apply_all", "Aplicar Estilo a Todos")
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: 11
+                                                font.weight: Font.Bold
+                                                color: Theme.background
+                                            }
+                                        }
+
+                                        MouseArea {
+                                            id: applyMouse
+                                            anchors.fill: parent
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                ShellCustomization.applyToAll(shellCustomTab.targetComp);
+                                            }
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        Layout.fillWidth: true
+                                        implicitHeight: 38
+                                        radius: 10
+                                        color: resetMouse.pressed ? Theme.tileHigh : Theme.tile
+                                        border.width: 1
+                                        border.color: Theme.withAlpha(Theme.outline, 0.3)
+
+                                        RowLayout {
+                                            anchors.centerIn: parent
+                                            spacing: 8
+                                            Text {
+                                                text: Theme.icons.backupRestore
+                                                font.family: Theme.iconFontFamily
+                                                font.pixelSize: 14
+                                                color: Theme.textColor
+                                            }
+                                            Text {
+                                                text: Theme.t("shell_custom.reset", "Restaurar Padrão")
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: 11
+                                                font.weight: Font.Medium
+                                                color: Theme.textColor
+                                            }
+                                        }
+
+                                        MouseArea {
+                                            id: resetMouse
+                                            anchors.fill: parent
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                ShellCustomization.reset(shellCustomTab.targetComp);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -5706,7 +7119,21 @@ PanelWindow {
         function close(): void { win.open = false; }
         function tab(index: string): void {
             win.currentTab = parseInt(index) || 0;
-            win.open = true;
+            if (!win.open) {
+                win.open = true;
+            } else {
+                win.refreshAll();
+            }
+        }
+        function scrollInput(y: string): void {
+            inputFlickable.contentY = Math.max(0, Math.min(inputFlickable.contentHeight - inputFlickable.height, parseFloat(y) || 0));
+        }
+        function refresh(): void {
+            loadStorageProc.running = true;
+            loadSoftwareUpdatesProc.running = true;
+            loadSoftwareAppsProc.running = true;
+            loadPresetsProc.running = true;
+            loadBackupsProc.running = true;
         }
     }
 }

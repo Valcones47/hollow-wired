@@ -594,8 +594,8 @@ PanelWindow {
                     id: recordPop
                     visible: popContent.current === recordPop
                     spacing: 2
-                    PopTitle { text: "Gravando a tela"; color: Theme.critical }
-                    PopText { text: "Clique no ícone para parar (ou Super+Shift+R)" }
+                    PopTitle { text: Theme.t("topbar.recording_active", "Gravando a tela"); color: Theme.critical }
+                    PopText { text: Theme.t("topbar.click_to_stop", "Clique no ícone para parar (ou Super+Shift+R)") }
                 }
 
                 // ---------- áudio ----------
@@ -606,7 +606,7 @@ PanelWindow {
                     spacing: 6
                     readonly property bool dragging: outSlider.dragging || inSlider.dragging
 
-                    PopTitle { text: "Saída" }
+                    PopTitle { text: Theme.t("topbar.output", "Saída") }
                     PopSlider {
                         id: outSlider
                         icon: bar.volIcon(bar.sink)
@@ -627,7 +627,7 @@ PanelWindow {
                         }
                     }
 
-                    PopTitle { text: "Microfone"; Layout.topMargin: 6 }
+                    PopTitle { text: Theme.t("topbar.microphone", "Microfone"); Layout.topMargin: 6 }
                     PopSlider {
                         id: inSlider
                         icon: bar.source && bar.source.audio && bar.source.audio.muted ? Theme.icons.micOff : Theme.icons.mic
@@ -648,7 +648,7 @@ PanelWindow {
                         }
                     }
 
-                    PopTitle { text: "Aplicativos"; Layout.topMargin: 6; visible: bar.streams.length > 0 }
+                    PopTitle { text: Theme.t("topbar.apps", "Aplicativos"); Layout.topMargin: 6; visible: bar.streams.length > 0 }
                     Repeater {
                         model: bar.streams
                         delegate: PopSlider {
@@ -670,7 +670,7 @@ PanelWindow {
                     width: 280
                     spacing: 6
                     readonly property bool dragging: brSlider.dragging
-                    PopTitle { text: "Brilho da tela" }
+                    PopTitle { text: Theme.t("topbar.brightness", "Brilho da tela") }
                     PopSlider {
                         id: brSlider
                         icon: Theme.icons.brightness
@@ -709,15 +709,15 @@ PanelWindow {
                         text: bar.battery ? "Consumo " + Math.abs(bar.battery.changeRate).toFixed(1) + " W" : ""
                     }
 
-                    PopTitle { text: "Perfil de energia"; Layout.topMargin: 8 }
+                    PopTitle { text: Theme.t("topbar.power_profile", "Perfil de energia"); Layout.topMargin: 8 }
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: 6
                         Repeater {
                             model: [
-                                { p: PowerProfile.PowerSaver, icon: Theme.icons.saver, label: "Economia" },
-                                { p: PowerProfile.Balanced, icon: Theme.icons.balanced, label: "Equilíbrio" },
-                                { p: PowerProfile.Performance, icon: Theme.icons.perf, label: "Desempenho" }
+                                { p: PowerProfile.PowerSaver, icon: Theme.icons.saver, label: Theme.t("sidebar.power_saver", "Economia") },
+                                { p: PowerProfile.Balanced, icon: Theme.icons.balanced, label: Theme.t("sidebar.power_balanced", "Equilíbrio") },
+                                { p: PowerProfile.Performance, icon: Theme.icons.perf, label: Theme.t("sidebar.power_perf", "Desempenho") }
                             ]
                             delegate: Rectangle {
                                 id: prof
@@ -757,7 +757,7 @@ PanelWindow {
                         }
                     }
 
-                    PopTitle { text: "Otimizações de GPU & Tela"; Layout.topMargin: 8 }
+                    PopTitle { text: Theme.t("topbar.optimizations", "Otimizações de GPU & Tela"); Layout.topMargin: 8 }
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: 6
@@ -783,7 +783,7 @@ PanelWindow {
                                 }
                                 Text {
                                     Layout.alignment: Qt.AlignHCenter
-                                    text: gameTile.active ? "Jogo: On" : "Modo Jogo"
+                                    text: gameTile.active ? (Theme.t("sidebar.game_mode", "Modo Jogo") + ": On") : Theme.t("sidebar.game_mode", "Modo Jogo")
                                     font.family: Theme.fontFamily
                                     font.pixelSize: 10
                                     color: gameTile.active ? Theme.background : Theme.subtext

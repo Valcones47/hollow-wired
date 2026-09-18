@@ -97,7 +97,7 @@ PanelWindow {
                     }
                     Text {
                         anchors.verticalCenter: parent.verticalCenter
-                        text: "Atalhos do Teclado"
+                        text: Theme.t("cheatsheet.title", "Atalhos do Teclado")
                         font.family: Theme.fontFamily
                         font.pixelSize: 18
                         font.weight: Font.Bold
@@ -145,7 +145,7 @@ PanelWindow {
                             }
 
                             Text {
-                                text: "Filtrar atalhos..."
+                                text: Theme.t("cheatsheet.search_placeholder", "Filtrar atalhos...")
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 13
                                 color: Theme.withAlpha(Theme.subtext, 0.6)
@@ -205,43 +205,43 @@ PanelWindow {
 
                     readonly property var allCategories: [
                         {
-                            category: "Navegação & Janelas",
+                            category: Theme.t("cheatsheet.cat_nav", "Navegação & Janelas"),
                             items: [
-                                { keys: ["Super"], desc: "Abrir / fechar Launcher" },
-                                { keys: ["Super", "Q"], desc: "Terminal Kitty" },
-                                { keys: ["Super", "E"], desc: "Gerenciador Dolphin" },
-                                { keys: ["Alt", "Tab"], desc: "Alternar janelas com miniaturas" },
-                                { keys: ["Super", "'"], desc: "Terminal drop-down suspenso" },
-                                { keys: ["Super", "Shift", "X"], desc: "Encerrar janela travada (Kill)" },
-                                { keys: ["Super", "L"], desc: "Bloquear sessão (hyprlock)" },
-                                { keys: ["Super", "M"], desc: "Sair do Hyprland" }
+                                { keys: ["Super"], desc: Theme.t("cheatsheet.desc_launcher", "Abrir / fechar Launcher") },
+                                { keys: ["Super", "Q"], desc: Theme.t("cheatsheet.desc_terminal", "Terminal Kitty") },
+                                { keys: ["Super", "E"], desc: Theme.t("cheatsheet.desc_dolphin", "Gerenciador Dolphin") },
+                                { keys: ["Alt", "Tab"], desc: Theme.t("cheatsheet.desc_alttab", "Alternar janelas com miniaturas") },
+                                { keys: ["Super", "'"], desc: Theme.t("cheatsheet.desc_dropterm", "Terminal drop-down suspenso") },
+                                { keys: ["Super", "Shift", "X"], desc: Theme.t("cheatsheet.desc_kill", "Encerrar janela travada (Kill)") },
+                                { keys: ["Super", "L"], desc: Theme.t("cheatsheet.desc_lock", "Bloquear sessão (hyprlock)") },
+                                { keys: ["Super", "M"], desc: Theme.t("cheatsheet.desc_exit", "Sair do Hyprland") }
                             ]
                         },
                         {
-                            category: "Ricing & Customização",
+                            category: Theme.t("cheatsheet.cat_ricing", "Ricing & Customização"),
                             items: [
-                                { keys: ["Super", "I"], desc: "Painel de Configurações do Rice" },
-                                { keys: ["Super", "F1"], desc: "Cheatsheet de atalhos" },
-                                { keys: ["Super", "W"], desc: "Editor de Widgets de Desktop" },
-                                { keys: ["Super", "N"], desc: "Painel de Notificações" },
-                                { keys: ["Super", "Shift", "N"], desc: "Alternar Não Perturbe (DND)" },
-                                { keys: ["Super", "S"], desc: "Seletor de Wallpapers Waywallen" },
-                                { keys: ["Super", "B"], desc: "Alternar Blur (Desfoque)" },
-                                { keys: ["Super", "Shift", "B"], desc: "Modo Ultra-Desempenho (0% iGPU)" },
-                                { keys: ["Super", "Ctrl", "R"], desc: "Reiniciar interface Quickshell" }
+                                { keys: ["Super", "I"], desc: Theme.t("cheatsheet.desc_settings", "Painel de Configurações do Rice") },
+                                { keys: ["Super", "F1"], desc: Theme.t("cheatsheet.desc_cheatsheet", "Cheatsheet de atalhos") },
+                                { keys: ["Super", "W"], desc: Theme.t("cheatsheet.desc_widgets", "Editor de Widgets de Desktop") },
+                                { keys: ["Super", "N"], desc: Theme.t("cheatsheet.desc_notif", "Painel de Notificações") },
+                                { keys: ["Super", "Shift", "N"], desc: Theme.t("cheatsheet.desc_dnd", "Alternar Não Perturbe (DND)") },
+                                { keys: ["Super", "S"], desc: Theme.t("cheatsheet.desc_wallpaper", "Seletor de Wallpapers Waywallen") },
+                                { keys: ["Super", "B"], desc: Theme.t("cheatsheet.desc_blur", "Alternar Blur (Desfoque)") },
+                                { keys: ["Super", "Shift", "B"], desc: Theme.t("cheatsheet.desc_perf", "Modo Ultra-Desempenho (0% iGPU)") },
+                                { keys: ["Super", "Ctrl", "R"], desc: Theme.t("cheatsheet.desc_restart", "Reiniciar interface Quickshell") }
                             ]
                         },
                         {
-                            category: "Captura & Multimídia",
+                            category: Theme.t("cheatsheet.cat_media", "Captura & Multimídia"),
                             items: [
-                                { keys: ["Super", "Shift", "S"], desc: "Screenshot da tela com anotação" },
-                                { keys: ["Super", "Shift", "R"], desc: "Gravar região da tela" },
-                                { keys: ["Super", "Ctrl", "Shift", "R"], desc: "Gravar tela inteira" },
-                                { keys: ["Super", "Shift", "C"], desc: "Conta-gotas de cores" },
-                                { keys: ["Super", "V"], desc: "Histórico da área de transferência" },
-                                { keys: ["Num Lock"], desc: "Mute / Unmute do microfone" },
-                                { keys: ["Vol + / -"], desc: "Ajustar volume no OSD flutuante" },
-                                { keys: ["Brilho + / -"], desc: "Ajustar brilho no OSD flutuante" }
+                                { keys: ["Super", "Shift", "S"], desc: Theme.t("cheatsheet.desc_screenshot", "Screenshot da tela com anotação") },
+                                { keys: ["Super", "Shift", "R"], desc: Theme.t("cheatsheet.desc_record_region", "Gravar região da tela") },
+                                { keys: ["Super", "Ctrl", "Shift", "R"], desc: Theme.t("cheatsheet.desc_record_screen", "Gravar tela inteira") },
+                                { keys: ["Super", "Shift", "C"], desc: Theme.t("cheatsheet.desc_picker", "Conta-gotas de cores") },
+                                { keys: ["Super", "V"], desc: Theme.t("cheatsheet.desc_clipboard", "Histórico da área de transferência") },
+                                { keys: ["Num Lock"], desc: Theme.t("cheatsheet.desc_mic", "Mute / Unmute do microfone") },
+                                { keys: ["Vol + / -"], desc: Theme.t("cheatsheet.desc_vol", "Ajustar volume no OSD flutuante") },
+                                { keys: ["Brilho + / -"], desc: Theme.t("cheatsheet.desc_bright", "Ajustar brilho no OSD flutuante") }
                             ]
                         }
                     ]

@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# rice-set-dock-icon: Define o ícone/GIF do botão fixo do Launcher na Dock
+# ==============================================================================
+set -euo pipefail
+
+DEFAULT_ICON="/home/val47/Imagens/Ícones/icons8-arch-linux-96(2).png"
+TARGET_FILE="${1:-}"
+
+if [ "$TARGET_FILE" = "--reset" ]; then
+    TARGET_FILE="$DEFAULT_ICON"
+elif [ -z "$TARGET_FILE" ]; then
+    if command -v zenity >/dev/null 2>&1; then
+        TARGET_FILE=$(zenity --file-selection --title="Escolha o ícone do Launcher da Dock" \
+            --file-filter="Imagens e GIFs (*.png *.jpg *.jpeg *.webp *.gif *.svg) | *.png *.jpg *.jpeg *.webp *.gif *.svg *.PNG *.JPG *.JPEG *.WEBP *.GIF *.SVG" \
+            2>/dev/null || true)
+    elif command -v kdialog >/dev/null 2>&1; then
+        TARGET_FILE=$(kdialog --getopenfilename "$HOME" "Imagens (*.png *.jpg *.jpeg *.webp *.gif *.svg)" 2>/dev/null || true)
+    fi
+fi
+
+if [ -z "$TARGET_FILE" ] || [ ! -f "$TARGET_FILE" ]; then
+    echo "Nenhum arquivo selecionado ou arquivo inválido." >&2
+    exit 0
+fi
+
+python3 -c "
+import json, os
+
+dock_file = os.path.expanduser('~/.config/quickshell/dock.json')
+data = {}
+if os.path.exists(dock_file):
+    try:
+        with open(dock_file, 'r') as f:
+            data = json.load(f)
+    except Exception:
+        data = {}
+
+data['launcherIcon'] = '$TARGET_FILE'
+
+with open(dock_file, 'w') as f:
+    json.dump(data, f, indent=2)
+"
+
+if command -v notify-send >/dev/null 2>&1; then
+    notify-send -i "$TARGET_FILE" -a "Quickshell" "Ícone da Dock Atualizado" "O ícone do Launcher foi alterado com sucesso!"
+fi
+
+echo "Ícone do launcher atualizado para: $TARGET_FILE"

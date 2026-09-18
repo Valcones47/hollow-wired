@@ -10,6 +10,7 @@ import Quickshell.Hyprland
 QtObject {
     id: root
 
+    property string launcherIcon: "/home/val47/Imagens/Ícones/icons8-arch-linux-96(2).png"
     property var pins: ["zen", "kitty", "org.kde.dolphin", "com.anthropic.Claude", "discord", "spotify"]
     property var games: ["steam", "heroic", "osu-lazer", "r2modman", "com.hypixel.HytaleLauncher"]
     property var usage: ({})
@@ -23,6 +24,11 @@ QtObject {
                 const t = text().trim();
                 if (!t) return;
                 const d = JSON.parse(t);
+                if (typeof d.launcherIcon === "string" && d.launcherIcon.length > 0) {
+                    root.launcherIcon = d.launcherIcon;
+                } else {
+                    root.launcherIcon = "/home/val47/Imagens/Ícones/icons8-arch-linux-96(2).png";
+                }
                 if (Array.isArray(d.pins)) root.pins = d.pins;
                 if (Array.isArray(d.games)) root.games = d.games;
                 if (d.usage && typeof d.usage === "object") {
@@ -41,7 +47,12 @@ QtObject {
     function save() {
         const u = Object.assign({}, usage);
         delete u["undefined"];
-        file.setText(JSON.stringify({ pins: pins, games: games, usage: u }, null, 2) + "\n");
+        file.setText(JSON.stringify({ launcherIcon: launcherIcon, pins: pins, games: games, usage: u }, null, 2) + "\n");
+    }
+
+    function setLauncherIcon(iconPath) {
+        launcherIcon = iconPath || "/home/val47/Imagens/Ícones/icons8-arch-linux-96(2).png";
+        save();
     }
 
     function isPinned(id) { return pins.includes(id); }

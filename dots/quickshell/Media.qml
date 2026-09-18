@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Mpris
 import "."
@@ -322,21 +323,41 @@ Item {
     ColumnLayout {
         anchors.centerIn: parent
         visible: root.player === null
-        spacing: 8
+        spacing: 12
+
+        Rectangle {
+            Layout.alignment: Qt.AlignHCenter
+            width: 72
+            height: 72
+            radius: 36
+            color: Theme.withAlpha(Theme.inactive, 0.08)
+            border.width: 1
+            border.color: Theme.withAlpha(Theme.inactive, 0.2)
+
+            Text {
+                anchors.centerIn: parent
+                text: ""
+                font.family: Theme.iconFontFamily
+                font.pixelSize: 32
+                color: Theme.withAlpha(Theme.inactive, 0.6)
+            }
+        }
 
         Text {
             Layout.alignment: Qt.AlignHCenter
-            text: ""
-            font.family: Theme.iconFontFamily
-            font.pixelSize: 32
-            color: Theme.withAlpha(Theme.inactive, 0.5)
+            text: Theme.t("media.no_media", "Nenhuma mídia em reprodução")
+            font.family: Theme.fontFamily
+            font.pixelSize: 14
+            font.weight: Font.DemiBold
+            color: Theme.textColor
         }
+
         Text {
             Layout.alignment: Qt.AlignHCenter
-            text: "Nada tocando"
+            text: Theme.t("media.no_media_sub", "Abra o Spotify, YouTube Music ou outro player de áudio")
             font.family: Theme.fontFamily
-            font.pixelSize: 13
-            color: Theme.inactive
+            font.pixelSize: 11
+            color: Theme.subtext
         }
     }
 }

@@ -55,7 +55,7 @@ Item {
                 label: "GPU temp"
                 secondaryValue: SysStats.gpuUsage
                 secondaryText: Math.round(SysStats.gpuUsage * 100) + "%"
-                secondaryLabel: "uso"
+                secondaryLabel: Theme.t("monitoring.usage", "uso")
             }
 
             Gauge {
@@ -68,7 +68,7 @@ Item {
                 label: "CPU temp"
                 secondaryValue: SysStats.cpuUsage
                 secondaryText: Math.round(SysStats.cpuUsage * 100) + "%"
-                secondaryLabel: "uso"
+                secondaryLabel: Theme.t("monitoring.usage", "uso")
             }
 
             ColumnLayout {
@@ -114,7 +114,7 @@ Item {
                         }
                         Text {
                             anchors.verticalCenter: parent.verticalCenter
-                            text: cleanProc.running ? "Limpando..." : "Limpar Caches"
+                            text: cleanProc.running ? Theme.t("monitoring.cleaning", "Limpando...") : Theme.t("monitoring.clean_cache", "Limpar Caches")
                             font.family: Theme.fontFamily
                             font.pixelSize: 11
                             font.weight: Font.DemiBold
@@ -159,7 +159,7 @@ Item {
                         }
                         Text {
                             anchors.verticalCenter: parent.verticalCenter
-                            text: "Não necessário"
+                            text: Theme.t("monitoring.not_needed", "Não necessário")
                             font.family: Theme.fontFamily
                             font.pixelSize: 10
                             font.weight: Font.Medium
@@ -283,7 +283,7 @@ Item {
 
                     Text {
                         Layout.fillWidth: true
-                        text: "Por que limpar cache não é necessário?"
+                        text: Theme.t("monitoring.why_title", "Por que limpar cache não é necessário?")
                         font.family: Theme.fontFamily
                         font.pixelSize: 13
                         font.weight: Font.Bold
@@ -380,7 +380,7 @@ Item {
 
                         Text {
                             anchors.centerIn: parent
-                            text: "Entendi"
+                            text: Theme.t("monitoring.understood", "Entendi")
                             font.family: Theme.fontFamily
                             font.pixelSize: 11
                             font.weight: Font.DemiBold

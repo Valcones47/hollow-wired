@@ -206,6 +206,10 @@ PanelWindow {
             target: Theme
             function onBackgroundChanged() { shape.requestPaint(); }
         }
+        Connections {
+            target: ShellCustomization
+            function onUpdated() { shape.requestPaint(); }
+        }
 
         Canvas {
             id: shape
@@ -218,7 +222,7 @@ PanelWindow {
                 const R = root.radius, B = dock.edgeY, T = B - bh;
                 const L = (width - root.bodyW) / 2, Rx = L + root.bodyW;
                 const f = Math.min(R, bh), c = Math.min(R, bh / 2);
-                ctx.fillStyle = Theme.surface;
+                ctx.fillStyle = ShellCustomization.getBgColor("dock");
                 ctx.beginPath();
                 ctx.moveTo(L - f, B);
                 ctx.arc(L - f, B - f, f, Math.PI / 2, 0, true);
@@ -262,6 +266,20 @@ PanelWindow {
                     ctx.closePath();
                 }
                 ctx.fill();
+
+                if (ShellCustomization.getStyle("dock") === "glow") {
+                    ctx.strokeStyle = ShellCustomization.getAccent("dock");
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                } else if (ShellCustomization.getStyle("dock") === "solid") {
+                    ctx.strokeStyle = Theme.withAlpha(Theme.outline, 0.25);
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                } else if (ShellCustomization.getStyle("dock") === "glass") {
+                    ctx.strokeStyle = Theme.withAlpha(ShellCustomization.getAccent("dock"), 0.35);
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                }
             }
         }
 
@@ -272,6 +290,8 @@ PanelWindow {
             y: dock.edgeY - root.bodyH
             width: root.bodyW
             height: root.bodyH
+            scale: ShellCustomization.getScale("dock")
+            transformOrigin: Item.Bottom
             clip: true
 
             RowLayout {
@@ -281,6 +301,55 @@ PanelWindow {
                 y: dock.dockH - root.bodyH + (dock.dockH - height) / 2
                 spacing: 4
                 opacity: root.bodyH / dock.dockH
+
+                // ---------- launcher (fixo à esquerda) ----------
+                Item {
+                    id: launcherBtn
+                    implicitWidth: dock.iconSize + 12
+                    implicitHeight: dock.dockH - 8
+
+                    Rectangle {
+                        anchors.fill: parent
+                        anchors.margins: 2
+                        radius: 14
+                        color: launcherArea.containsMouse ? Theme.tileHigh : "transparent"
+                        Behavior on color { ColorAnimation { duration: 120 } }
+                    }
+
+                    AnimatedImage {
+                        id: launcherImg
+                        anchors.centerIn: parent
+                        anchors.verticalCenterOffset: -3
+                        width: dock.iconSize
+                        height: dock.iconSize
+                        source: {
+                            const p = DockConfig.launcherIcon;
+                            if (!p) return "file:///home/val47/Imagens/Ícones/icons8-arch-linux-96(2).png";
+                            return p.startsWith("/") ? "file://" + p : p;
+                        }
+                        fillMode: Image.PreserveAspectFit
+                        mipmap: true
+                        asynchronous: true
+                    }
+
+                    MouseArea {
+                        id: launcherArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            Quickshell.execDetached(["quickshell", "ipc", "call", "launcher", "toggle"]);
+                        }
+                    }
+                }
+
+                // Separador fixo entre launcher e apps
+                Rectangle {
+                    implicitWidth: 1
+                    implicitHeight: 30
+                    anchors.verticalCenter: parent.verticalCenter
+                    color: Theme.withAlpha(Theme.outline, 0.45)
+                }
 
                 Repeater {
                     model: dock.items
@@ -596,14 +665,14 @@ PanelWindow {
                         Layout.topMargin: 4
                         visible: appPop.item && appPop.item.entry && appPop.wins.length > 0
                         icon: Theme.icons.plus
-                        label: "Nova janela"
+                        label: Theme.t("dock.new_window", "Nova janela")
                         onActivated: DockConfig.launch(appPop.item.entry)
                     }
                     PopAction {
                         visible: appPop.item && appPop.item.entry
                         icon: Theme.icons.pin
                         selected: appPop.item && appPop.item.pinned
-                        label: appPop.item && appPop.item.pinned ? "Desafixar da dock" : "Fixar na dock"
+                        label: appPop.item && appPop.item.pinned ? Theme.t("launcher.unpin_dock", "Desafixar da dock") : Theme.t("launcher.pin_dock", "Fixar na dock")
                         onActivated: DockConfig.togglePin(appPop.item.key)
                     }
                 }
@@ -624,12 +693,12 @@ PanelWindow {
 
                     RowLayout {
                         Layout.fillWidth: true
-                        PopTitle { text: "Jogos"; Layout.fillWidth: true }
+                        PopTitle { text: Theme.t("dock.games", "Jogos"); Layout.fillWidth: true }
                         PopAction {
                             Layout.fillWidth: false
                             implicitHeight: 26
                             icon: dock.gamesEdit ? Theme.icons.confirm : Theme.icons.pencil
-                            label: dock.gamesEdit ? "Pronto" : "Editar"
+                            label: dock.gamesEdit ? Theme.t("common.done", "Pronto") : Theme.t("common.edit", "Editar")
                             selected: dock.gamesEdit
                             onActivated: dock.gamesEdit = !dock.gamesEdit
                         }
@@ -639,8 +708,8 @@ PanelWindow {
                         Layout.fillWidth: true
                         wrapMode: Text.Wrap
                         font.pixelSize: 11
-                        text: (dock.gamesEdit ? "Arraste para reordenar · X remove · " : "")
-                            + "Adicione pelo launcher: botão direito → Adicionar aos jogos"
+                        text: (dock.gamesEdit ? Theme.t("dock.games_edit_hint", "Arraste para reordenar · X remove · ") : "")
+                            + Theme.t("dock.games_add_hint", "Adicione pelo launcher: botão direito → Adicionar aos jogos")
                     }
 
                     GridLayout {

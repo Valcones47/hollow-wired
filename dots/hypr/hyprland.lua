@@ -123,11 +123,25 @@ elseif hasNvidia and not hasIgpu then
 end
 -- Sistemas puramente AMD ou Intel usam drivers Mesa nativos sem flags extras.
 
--- Cursor (tema copiado do Plasma: kcminputrc [Mouse] cursorTheme)
-hl.env("XCURSOR_THEME", "Bibata-Modern-Ice")
+-- Cursor: Lê dinamicamente o tema do usuário (kcminputrc) ou mantém fallback limpo
+local cursor_theme = "default"
+local kcminput = io.open(home .. "/.config/kcminputrc", "r")
+if kcminput then
+    for line in kcminput:lines() do
+        local match = line:match("^cursorTheme=(.+)")
+        if match and match ~= "" then
+            cursor_theme = match:gsub("%s+$", "")
+            break
+        end
+    end
+    kcminput:close()
+end
+
+hl.env("XCURSOR_THEME", cursor_theme)
 hl.env("XCURSOR_SIZE", "24")
-hl.env("HYPRCURSOR_THEME", "Bibata-Modern-Ice")
+hl.env("HYPRCURSOR_THEME", cursor_theme)
 hl.env("HYPRCURSOR_SIZE", "24")
+
 
 -- Apps padrão de sessão (nunca em shell rc, apenas aqui)
 hl.env("TERMINAL", "kitty")
@@ -253,8 +267,10 @@ hl.layer_rule({ match = { namespace = "quickshell-sidebar" }, blur = true, ignor
 hl.layer_rule({ match = { namespace = "quickshell-bar" }, blur = true, ignore_alpha = 0.3 })
 hl.layer_rule({ match = { namespace = "quickshell-sysinfo" }, blur = true, ignore_alpha = 0.3 })
 hl.layer_rule({ match = { namespace = "quickshell-dock" }, blur = true, ignore_alpha = 0.3 })
--- hl.layer_rule({ match = { namespace = "quickshell-alttab" }, blur = true, ignore_alpha = 0.3 })
 hl.layer_rule({ match = { namespace = "quickshell-launcher" }, blur = true, ignore_alpha = 0.3 })
+hl.layer_rule({ match = { namespace = "quickshell-visualconfig" }, blur = true, ignore_alpha = 0.3 })
+hl.layer_rule({ match = { namespace = "quickshell-clipboard" }, blur = true, ignore_alpha = 0.3 })
+hl.layer_rule({ match = { namespace = "quickshell-cheatsheet" }, blur = true, ignore_alpha = 0.3 })
 hl.layer_rule({ match = { namespace = "quickshell-desktop-widgets" }, blur = false })
 
 -- Beziers customizados (não usa só os presets padrão)
@@ -412,6 +428,9 @@ hl.bind("XF86AudioMute",        hl.dsp.exec_cmd("quickshell ipc call osd volumeM
 hl.bind("XF86AudioMicMute", hl.dsp.exec_cmd("quickshell ipc call osd micMute"), { locked = true, repeating = true })
 
 -- Num_Lock: Desativa/ativa o áudio (Deafen) do Discord nativamente em segundo plano com debounce e liberação segura de teclas
+-- ==============================================================================
+-- ATALHOS GLOBAIS DO DISCORD / VESKTOP (MUTE & DEAFEN)
+-- ==============================================================================
 local discord_deafen_ready = true
 local function toggle_discord_deafen()
     if not discord_deafen_ready then
@@ -431,6 +450,27 @@ local function toggle_discord_deafen()
     hl.dispatch(hl.dsp.send_key_state({ mods = "", key = "Control_L", state = "up", window = "class:^(discord|vesktop)$" }))
     hl.dispatch(hl.dsp.send_key_state({ mods = "", key = "Shift_L", state = "up", window = "class:^(discord|vesktop)$" }))
 end
+
+local discord_mute_ready = true
+local function toggle_discord_mute()
+    if not discord_mute_ready then
+        return
+    end
+    discord_mute_ready = false
+
+    hl.timer(function()
+        discord_mute_ready = true
+    end, { timeout = 200, type = "oneshot" })
+
+    -- Envia Ctrl + Shift + m (minúsculo) para o Discord / Vesktop
+    hl.dispatch(hl.dsp.send_shortcut({ mods = "CTRL SHIFT", key = "m", window = "class:^(discord|vesktop)$" }))
+    hl.dispatch(hl.dsp.send_key_state({ mods = "", key = "m", state = "up", window = "class:^(discord|vesktop)$" }))
+    hl.dispatch(hl.dsp.send_key_state({ mods = "", key = "Control_L", state = "up", window = "class:^(discord|vesktop)$" }))
+    hl.dispatch(hl.dsp.send_key_state({ mods = "", key = "Shift_L", state = "up", window = "class:^(discord|vesktop)$" }))
+end
+
+-- DISCORD_BINDS
+hl.bind("CTRL + SHIFT + M", toggle_discord_mute, { locked = true })
 hl.bind("Num_Lock", toggle_discord_deafen, { locked = true })
 
 -- OSD de brilho via Quickshell
@@ -461,7 +501,7 @@ hl.bind("CTRL + Print",  hl.dsp.exec_cmd('hyprshot -m window -o "' .. screenshot
 hl.bind(mainMod .. " + SHIFT + S", hl.dsp.exec_cmd([[sh -c 'grim -g "$(slurp)" - | swappy -f -']]))
 -- Gravar tela: região (Super+Shift+R) ou tela inteira (Super+Ctrl+Shift+R).
 -- Rodar de novo para parar. Script em ~/.local/bin/rice-record.
-hl.bind(mainMod .. " + SHIFT + R",        hl.dsp.exec_cmd("rice-record"))
+hl.bind(mainMod .. " + SHIFT + R",        hl.dsp.exec_cmd("rice-record toggle --mode region"))
 hl.bind(mainMod .. " + CTRL + SHIFT + R", hl.dsp.exec_cmd("rice-record full"))
 -- Conta-gotas: clica num pixel e a cor (hex) vai pro clipboard.
 hl.bind(mainMod .. " + SHIFT + C", hl.dsp.exec_cmd([[sh -c 'c=$(hyprpicker -a -f hex) && notify-send -a "Conta-gotas" -t 2500 "Cor copiada" "$c"']]))

@@ -1,0 +1,309 @@
+#!/usr/bin/env python3
+"""
+rice-discord-binds: Gerenciador de atalhos globais de Mute e Deafen do Discord / Vesktop para Hyprland (Lua)
+"""
+
+import sys
+import os
+import re
+import json
+import subprocess
+import time
+import select
+try:
+    import evdev
+except ImportError:
+    evdev = None
+
+LUA_PATH = os.path.expanduser("~/.config/hypr/hyprland.lua")
+REPO_LUA_PATH = os.path.expanduser("~/projetos/hyprland-setup/dots/hypr/hyprland.lua")
+
+def get_running_client():
+    try:
+        r = subprocess.run(["pgrep", "-x", "discord"], stdout=subprocess.DEVNULL)
+        if r.returncode == 0:
+            return "discord", True
+    except Exception:
+        pass
+    try:
+        r = subprocess.run(["pgrep", "-x", "vesktop"], stdout=subprocess.DEVNULL)
+        if r.returncode == 0:
+            return "vesktop", True
+    except Exception:
+        pass
+    # Se nenhum está rodando, verifica qual está instalado
+    if subprocess.run(["which", "discord"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
+        return "discord", False
+    if subprocess.run(["which", "vesktop"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
+        return "vesktop", False
+    return "discord", False
+
+def get_current_binds():
+    mute_bind = "CTRL + SHIFT + M"
+    deafen_bind = "Num_Lock"
+    if not os.path.exists(LUA_PATH):
+        return mute_bind, deafen_bind
+    with open(LUA_PATH, "r", encoding="utf-8") as f:
+        content = f.read()
+    
+    m_mute = re.search(r'hl\.bind\(\s*["\']([^"\']+)["\']\s*,\s*toggle_discord_mute', content)
+    if m_mute:
+        mute_bind = m_mute.group(1)
+    
+    m_deafen = re.search(r'hl\.bind\(\s*["\']([^"\']+)["\']\s*,\s*toggle_discord_deafen', content)
+    if m_deafen:
+        deafen_bind = m_deafen.group(1)
+        
+    return mute_bind, deafen_bind
+
+def cmd_status():
+    client, running = get_running_client()
+    mute_bind, deafen_bind = get_current_binds()
+    data = {
+        "client": client,
+        "running": running,
+        "mute_bind": mute_bind,
+        "deafen_bind": deafen_bind
+    }
+    print(json.dumps(data, indent=2))
+
+def cmd_set(new_mute, new_deafen):
+    if not os.path.exists(LUA_PATH):
+        print("Erro: hyprland.lua não encontrado.", file=sys.stderr)
+        sys.exit(1)
+    with open(LUA_PATH, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    cur_mute, cur_deafen = get_current_binds()
+    target_mute = new_mute if new_mute is not None else cur_mute
+    target_deafen = new_deafen if new_deafen is not None else cur_deafen
+
+    # Substitui mute bind se existir, senão adiciona
+    if "toggle_discord_mute" in content and re.search(r'hl\.bind\(\s*["\'][^"\']+["\']\s*,\s*toggle_discord_mute', content):
+        content = re.sub(
+            r'hl\.bind\(\s*["\'][^"\']+["\']\s*,\s*toggle_discord_mute(\s*,\s*\{[^}]*\})?\s*\)',
+            f'hl.bind("{target_mute}", toggle_discord_mute, {{ locked = true }})',
+            content
+        )
+    else:
+        # Adiciona antes ou junto ao deafen
+        pass
+
+    # Substitui deafen bind
+    if "toggle_discord_deafen" in content and re.search(r'hl\.bind\(\s*["\'][^"\']+["\']\s*,\s*toggle_discord_deafen', content):
+        content = re.sub(
+            r'hl\.bind\(\s*["\'][^"\']+["\']\s*,\s*toggle_discord_deafen(\s*,\s*\{[^}]*\})?\s*\)',
+            f'hl.bind("{target_deafen}", toggle_discord_deafen, {{ locked = true }})',
+            content
+        )
+
+    with open(LUA_PATH, "w", encoding="utf-8") as f:
+        f.write(content)
+
+    # Sincroniza com o repositório se o arquivo existir
+    if os.path.exists(REPO_LUA_PATH):
+        try:
+            with open(REPO_LUA_PATH, "w", encoding="utf-8") as f:
+                f.write(content)
+        except Exception as e:
+            print("Aviso ao sincronizar repo:", e, file=sys.stderr)
+
+    # Recarrega Hyprland
+    subprocess.run(["hyprctl", "reload"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    
+    # Notifica
+    subprocess.run([
+        "notify-send", "-a", "Quickshell", "Atalhos do Discord Atualizados",
+        f"Mute: {target_mute}\nDeafen: {target_deafen}"
+    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    
+    print(f"Atalhos configurados com sucesso:\nMute: {target_mute}\nDeafen: {target_deafen}")
+
+def cmd_record(target=None, timeout=12.0):
+    if not evdev:
+        print(json.dumps({"status": "error", "message": "Módulo python-evdev não instalado"}))
+        return
+
+    devices = []
+    for p in evdev.list_devices():
+        try:
+            d = evdev.InputDevice(p)
+            caps = d.capabilities()
+            if evdev.ecodes.EV_KEY in caps and evdev.ecodes.KEY_A in caps[evdev.ecodes.EV_KEY]:
+                devices.append(d)
+        except Exception:
+            pass
+
+    if not devices:
+        print(json.dumps({"status": "error", "message": "Nenhum teclado encontrado em /dev/input"}))
+        return
+
+    MODIFIER_KEYS = {
+        evdev.ecodes.KEY_LEFTCTRL: "CTRL",
+        evdev.ecodes.KEY_RIGHTCTRL: "CTRL",
+        evdev.ecodes.KEY_LEFTSHIFT: "SHIFT",
+        evdev.ecodes.KEY_RIGHTSHIFT: "SHIFT",
+        evdev.ecodes.KEY_LEFTALT: "ALT",
+        evdev.ecodes.KEY_RIGHTALT: "ALT",
+        evdev.ecodes.KEY_LEFTMETA: "SUPER",
+        evdev.ecodes.KEY_RIGHTMETA: "SUPER",
+    }
+
+    SPECIAL_MAP = {
+        "KEY_NUMLOCK": "Num_Lock",
+        "KEY_CAPSLOCK": "Caps_Lock",
+        "KEY_SCROLLLOCK": "Scroll_Lock",
+        "KEY_PAUSE": "Pause",
+        "KEY_PRINT": "Print",
+        "KEY_SYSRQ": "Print",
+        "KEY_INSERT": "Insert",
+        "KEY_DELETE": "Delete",
+        "KEY_HOME": "Home",
+        "KEY_END": "End",
+        "KEY_PAGEUP": "Page_Up",
+        "KEY_PAGEDOWN": "Page_Down",
+        "KEY_ESC": "Escape",
+        "KEY_ENTER": "Return",
+        "KEY_KPENTER": "Return",
+        "KEY_TAB": "Tab",
+        "KEY_SPACE": "space",
+        "KEY_BACKSPACE": "BackSpace",
+        "KEY_MUTE": "XF86AudioMute",
+        "KEY_MICMUTE": "XF86AudioMicMute",
+        "KEY_VOLUMEUP": "XF86AudioRaiseVolume",
+        "KEY_VOLUMEDOWN": "XF86AudioLowerVolume",
+        "KEY_PLAYPAUSE": "XF86AudioPlay",
+        "KEY_PREVIOUSSONG": "XF86AudioPrev",
+        "KEY_NEXTSONG": "XF86AudioNext",
+        "KEY_KPSLASH": "KP_Divide",
+        "KEY_KPASTERISK": "KP_Multiply",
+        "KEY_KPMINUS": "KP_Subtract",
+        "KEY_KPPLUS": "KP_Add",
+        "KEY_KPDOT": "KP_Decimal",
+    }
+
+    start_time = time.time()
+    while time.time() - start_time < timeout:
+        remaining = timeout - (time.time() - start_time)
+        if remaining <= 0:
+            break
+        r, _, _ = select.select(devices, [], [], remaining)
+        if not r:
+            break
+
+        for dev in r:
+            try:
+                for event in dev.read():
+                    if event.type == evdev.ecodes.EV_KEY and event.value == 1: # Key down
+                        key_code = event.code
+
+                        # Se for modificador puro, aguarda a tecla principal
+                        if key_code in MODIFIER_KEYS:
+                            continue
+
+                        key_name_raw = evdev.ecodes.KEY.get(key_code, "")
+                        if isinstance(key_name_raw, list):
+                            key_name_raw = key_name_raw[0] if key_name_raw else ""
+
+                        if key_name_raw == "KEY_ESC":
+                            print(json.dumps({"status": "cancelled"}))
+                            return
+
+                        if key_name_raw in SPECIAL_MAP:
+                            key_name = SPECIAL_MAP[key_name_raw]
+                        elif key_name_raw.startswith("KEY_F") and key_name_raw[5:].isdigit():
+                            key_name = key_name_raw[4:] # F1..F24
+                        elif key_name_raw.startswith("KEY_KP") and key_name_raw[6:].isdigit():
+                            key_name = "KP_" + key_name_raw[6:]
+                        elif key_name_raw.startswith("KEY_") and len(key_name_raw) == 5:
+                            key_name = key_name_raw[4:] # Letras ou números
+                        else:
+                            key_name = key_name_raw.replace("KEY_", "")
+
+                        # Modificadores ativos
+                        active = set()
+                        for d in devices:
+                            try:
+                                active.update(d.active_keys())
+                            except Exception:
+                                pass
+
+                        mods = []
+                        if evdev.ecodes.KEY_LEFTCTRL in active or evdev.ecodes.KEY_RIGHTCTRL in active:
+                            mods.append("CTRL")
+                        if evdev.ecodes.KEY_LEFTSHIFT in active or evdev.ecodes.KEY_RIGHTSHIFT in active:
+                            mods.append("SHIFT")
+                        if evdev.ecodes.KEY_LEFTALT in active or evdev.ecodes.KEY_RIGHTALT in active:
+                            mods.append("ALT")
+                        if evdev.ecodes.KEY_LEFTMETA in active or evdev.ecodes.KEY_RIGHTMETA in active:
+                            mods.append("SUPER")
+
+                        full_bind = " + ".join(mods + [key_name]) if mods else key_name
+
+                        if target == "mute":
+                            cmd_set(new_mute=full_bind, new_deafen=None)
+                        elif target == "deafen":
+                            cmd_set(new_mute=None, new_deafen=full_bind)
+
+                        print(json.dumps({
+                            "status": "ok",
+                            "key": full_bind,
+                            "target": target
+                        }))
+                        return
+            except Exception:
+                pass
+
+    print(json.dumps({"status": "timeout"}))
+
+def main():
+    if len(sys.argv) < 2 or sys.argv[1] == "status":
+        cmd_status()
+        return
+
+    action = sys.argv[1]
+    if action == "set":
+        new_mute = None
+        new_deafen = None
+        args = sys.argv[2:]
+        i = 0
+        while i < len(args):
+            if args[i] == "--mute" and i + 1 < len(args):
+                new_mute = args[i + 1]
+                i += 2
+            elif args[i] == "--deafen" and i + 1 < len(args):
+                new_deafen = args[i + 1]
+                i += 2
+            else:
+                i += 1
+        cmd_set(new_mute, new_deafen)
+    elif action == "record":
+        target = None
+        timeout = 15.0
+        args = sys.argv[2:]
+        i = 0
+        while i < len(args):
+            if args[i] == "--target" and i + 1 < len(args):
+                target = args[i + 1]
+                i += 2
+            elif args[i] == "--timeout" and i + 1 < len(args):
+                timeout = float(args[i + 1])
+                i += 2
+            elif args[i] == "--mute":
+                target = "mute"
+                i += 1
+            elif args[i] == "--deafen":
+                target = "deafen"
+                i += 1
+            else:
+                i += 1
+        cmd_record(target=target, timeout=timeout)
+    elif action == "toggle-mute":
+        subprocess.run(["hyprctl", "dispatch", "sendshortcut", "CTRL SHIFT, m, class:^(discord|vesktop)$"])
+    elif action == "toggle-deafen":
+        subprocess.run(["hyprctl", "dispatch", "sendshortcut", "CTRL SHIFT, d, class:^(discord|vesktop)$"])
+    else:
+        print("Uso: rice-discord-binds [status | set --mute <KEY> --deafen <KEY> | record [--target mute|deafen] | toggle-mute | toggle-deafen]")
+
+if __name__ == "__main__":
+    main()

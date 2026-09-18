@@ -191,7 +191,7 @@ PanelWindow {
         command: ["bash", "-c", "f=$XDG_RUNTIME_DIR/rice-record.pid; [ -f $f ] && kill -0 $(cat $f) 2>/dev/null && echo 1 || echo 0"]
         stdout: StdioCollector { onStreamFinished: sidebar.recording = text.trim() === "1" }
     }
-    Process { id: recStopProc; command: ["rice-record"]; onExited: recProc.running = true }
+    Process { id: recStopProc; command: ["rice-record", "stop"]; onExited: recProc.running = true }
 
     // Luz noturna (wlsunset, sobe no autostart do hyprland.lua).
     property bool nightLight: false
@@ -402,6 +402,10 @@ PanelWindow {
             target: Theme
             function onBackgroundChanged() { shape.requestPaint(); }
         }
+        Connections {
+            target: ShellCustomization
+            function onUpdated() { shape.requestPaint(); }
+        }
 
         Canvas {
             id: shape
@@ -421,7 +425,7 @@ PanelWindow {
                 const L = E - bw;                              // lateral esquerda da barra
                 const pw = root.popW;
 
-                ctx.fillStyle = Theme.surface;
+                ctx.fillStyle = ShellCustomization.getBgColor("sidebar");
                 ctx.beginPath();
                 ctx.moveTo(E, T - f1);
                 ctx.arc(E - f1, T - f1, f1, 0, Math.PI / 2, false);
@@ -453,17 +457,30 @@ PanelWindow {
                 ctx.arc(E - f1, B + f1, f1, -Math.PI / 2, 0, false);
                 ctx.closePath();
                 ctx.fill();
+
+                if (ShellCustomization.getStyle("sidebar") === "glow") {
+                    ctx.strokeStyle = ShellCustomization.getAccent("sidebar");
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                } else if (ShellCustomization.getStyle("sidebar") === "solid") {
+                    ctx.strokeStyle = Theme.withAlpha(Theme.outline, 0.25);
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                } else if (ShellCustomization.getStyle("sidebar") === "glass") {
+                    ctx.strokeStyle = Theme.withAlpha(ShellCustomization.getAccent("sidebar"), 0.35);
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                }
             }
         }
 
         // ---------- indicador de gravação na moldura ----------
         Rectangle {
-            visible: sidebar.recording && !sidebar.open
-            x: sidebar.edgeX + (Theme.frameThickness - width) / 2
-            y: 16
-            width: 6
-            height: 6
-            radius: 3
+            visible: sidebar.recording
+            x: sidebar.edgeX
+            y: root.bodyTop
+            width: Theme.frameThickness
+            height: root.bodyH
             color: Theme.critical
             SequentialAnimation on opacity {
                 running: sidebar.recording
@@ -480,6 +497,8 @@ PanelWindow {
             y: root.bodyTop
             width: root.bodyW
             height: root.bodyH
+            scale: ShellCustomization.getScale("sidebar")
+            transformOrigin: Item.Right
             clip: true
 
             ColumnLayout {
@@ -745,7 +764,7 @@ PanelWindow {
                     spacing: 2
                     PopTitle { text: (Quickshell.env("USER") || "") }
                     PopText { text: sidebar.uptimeText !== "" ? "Ligado há " + sidebar.uptimeText : "..." }
-                    PopText { text: "Clique para ver as especificações do PC" }
+                    PopText { text: Theme.t("sidebar.pc_specs", "Clique para ver as especificações do PC") }
                 }
 
                 ColumnLayout {
@@ -753,8 +772,8 @@ PanelWindow {
                     visible: popContent.current === updatePop
                     spacing: 2
                     PopTitle {
-                        text: sidebar.updateCount === 0 ? "Sistema atualizado"
-                            : sidebar.updateCount + (sidebar.updateCount === 1 ? " atualização" : " atualizações")
+                        text: sidebar.updateCount === 0 ? Theme.t("sidebar.updates_none", "Sistema atualizado")
+                            : sidebar.updateCount + " " + Theme.t("sidebar.updates_available", "atualizações")
                     }
                     PopText {
                         visible: sidebar.updateCount > 0
@@ -796,15 +815,15 @@ PanelWindow {
                     id: recordPop
                     visible: popContent.current === recordPop
                     spacing: 2
-                    PopTitle { text: "Gravando a tela"; color: Theme.critical }
-                    PopText { text: "Clique para parar e salvar em ~/Vídeos/Gravações" }
+                    PopTitle { text: Theme.t("topbar.recording_active", "Gravando a tela"); color: Theme.critical }
+                    PopText { text: Theme.t("sidebar.recording_hint", "Clique para parar e salvar em ~/Vídeos/Gravações") }
                 }
 
                 ColumnLayout {
                     id: nightPop
                     visible: popContent.current === nightPop
                     spacing: 2
-                    PopTitle { text: sidebar.nightLight ? "Luz noturna ligada" : "Luz noturna desligada" }
+                    PopTitle { text: sidebar.nightLight ? Theme.t("sidebar.night_light_on", "Luz noturna ligada") : Theme.t("sidebar.night_light_off", "Luz noturna desligada") }
                     PopText { text: "Tela mais quente depois do pôr do sol (4000K)" }
                     PopText { text: "Clique para " + (sidebar.nightLight ? "desligar" : "ligar") }
                 }
@@ -830,8 +849,8 @@ PanelWindow {
                     id: lockPop
                     visible: popContent.current === lockPop
                     spacing: 2
-                    PopTitle { text: "Bloquear tela" }
-                    PopText { text: "Clique para bloquear (Super+L)" }
+                    PopTitle { text: Theme.t("sidebar.lock_screen", "Bloquear tela") }
+                    PopText { text: Theme.t("sidebar.lock_hint", "Clique para bloquear (Super+L)") }
                 }
 
                 ColumnLayout {
@@ -840,7 +859,7 @@ PanelWindow {
                     spacing: 6
                     readonly property var btn: sidebar.pop === "logout" ? logoutBtn : sidebar.pop === "reboot" ? rebootBtn : powerBtn
                     PopTitle {
-                        text: sidebar.pop === "logout" ? "Sair da sessão" : sidebar.pop === "reboot" ? "Reiniciar" : "Desligar"
+                        text: sidebar.pop === "logout" ? Theme.t("sidebar.logout", "Sair da sessão") : sidebar.pop === "reboot" ? Theme.t("sidebar.reboot", "Reiniciar") : Theme.t("sidebar.shutdown", "Desligar")
                     }
                     PopText {
                         visible: sidebar.pop === "reboot" && sidebar.rebootReason !== ""
@@ -861,7 +880,7 @@ PanelWindow {
 
                         Text {
                             anchors.centerIn: parent
-                            text: sidebar.pop === "logout" ? "Confirmar Saída" : sidebar.pop === "reboot" ? "Confirmar Reinício" : "Confirmar Desligar"
+                            text: sidebar.pop === "logout" ? Theme.t("sidebar.confirm_logout", "Confirmar Saída") : sidebar.pop === "reboot" ? Theme.t("sidebar.confirm_reboot", "Confirmar Reinício") : Theme.t("sidebar.confirm_shutdown", "Confirmar Desligar")
                             color: powerPop.btn && powerPop.btn.armed ? "#ffffff" : Theme.primary
                             font.family: Theme.fontFamily
                             font.pixelSize: 11

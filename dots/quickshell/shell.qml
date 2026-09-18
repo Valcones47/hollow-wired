@@ -57,7 +57,7 @@ ShellRoot {
             hub.open = true;
         }
         onVisualConfigClicked: visualConfig.open = !visualConfig.open
-        onStopRecording: Quickshell.execDetached(["rice-record"])
+        onStopRecording: Quickshell.execDetached(["rice-record", "stop"])
     }
 
     EnergySidebar {
@@ -145,7 +145,7 @@ ShellRoot {
                     const ctx = getContext("2d");
                     const r = width;
                     ctx.reset();
-                    ctx.fillStyle = Theme.surface;
+                    ctx.fillStyle = ShellCustomization.getBgColor("hub");
                     ctx.beginPath();
                     ctx.moveTo(0, 0);
                     ctx.lineTo(r, 0);
@@ -164,7 +164,7 @@ ShellRoot {
                     const ctx = getContext("2d");
                     const r = width;
                     ctx.reset();
-                    ctx.fillStyle = Theme.surface;
+                    ctx.fillStyle = ShellCustomization.getBgColor("hub");
                     ctx.beginPath();
                     ctx.moveTo(r, 0);
                     ctx.lineTo(0, 0);
@@ -181,27 +181,50 @@ ShellRoot {
                     cornerRight.requestPaint();
                 }
             }
+            Connections {
+                target: ShellCustomization
+                function onUpdated() {
+                    cornerLeft.requestPaint();
+                    cornerRight.requestPaint();
+                }
+            }
 
             Rectangle {
                 id: card
                 x: Theme.radius
                 width: Theme.panelWidth
                 height: parent.height
-                color: Theme.surface
+                scale: ShellCustomization.getScale("hub")
+                transformOrigin: Item.Top
+                color: ShellCustomization.getBgColor("hub")
+                border.width: ShellCustomization.getBorderWidth("hub")
+                border.color: ShellCustomization.getBorderColor("hub")
                 topLeftRadius: 0
                 topRightRadius: 0
                 bottomLeftRadius: Theme.radius
                 bottomRightRadius: Theme.radius
 
+                Rectangle {
+                    visible: ShellCustomization.getStyle("hub") === "glow"
+                    anchors.fill: parent
+                    anchors.margins: -3
+                    bottomLeftRadius: card.bottomLeftRadius + 3
+                    bottomRightRadius: card.bottomRightRadius + 3
+                    color: "transparent"
+                    border.color: Theme.withAlpha(ShellCustomization.getAccent("hub"), 0.4)
+                    border.width: 1
+                    z: -1
+                }
+
                 property int currentTab: 0
                 readonly property var tabs: [
-                    { icon: Theme.icons.dashboard, label: "Dashboard" },
-                    { icon: Theme.icons.media, label: "Mídia" },
-                    { icon: Theme.icons.performance, label: "Performance" },
-                    { icon: Theme.icons.workspaces, label: "Workspaces" },
-                    { icon: Theme.icons.tune, label: "Aparência" },
-                    { icon: Theme.icons.bell, label: "Notificações" },
-                    { icon: Theme.icons.record, label: "Gravação" }
+                    { icon: Theme.icons.dashboard, label: Theme.t("hub.tab_dashboard", "Dashboard") },
+                    { icon: Theme.icons.media, label: Theme.t("hub.tab_media", "Mídia") },
+                    { icon: Theme.icons.performance, label: Theme.t("hub.tab_performance", "Performance") },
+                    { icon: Theme.icons.workspaces, label: Theme.t("hub.tab_workspaces", "Workspaces") },
+                    { icon: Theme.icons.tune, label: Theme.t("hub.tab_appearance", "Aparência") },
+                    { icon: Theme.icons.bell, label: Theme.t("hub.tab_notifications", "Notificações") },
+                    { icon: Theme.icons.record, label: Theme.t("hub.tab_recording", "Gravação") }
                 ]
 
                 ColumnLayout {

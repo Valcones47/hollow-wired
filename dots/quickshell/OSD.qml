@@ -63,8 +63,8 @@ PanelWindow {
         isMuted = sink.audio.muted;
         osdValue = Math.max(0, Math.min(1, sink.audio.volume));
         osdIcon = volIcon(osdValue, isMuted);
-        osdTitle = isMuted ? "Áudio Mutado" : "Volume";
-        osdValueText = isMuted ? "Mudo" : Math.round(osdValue * 100) + "%";
+        osdTitle = isMuted ? Theme.t("osd.audio_muted", "Áudio Mutado") : Theme.t("osd.volume", "Volume");
+        osdValueText = isMuted ? Theme.t("osd.muted", "Mudo") : Math.round(osdValue * 100) + "%";
         open = true;
         hideTimer.restart();
     }
@@ -75,8 +75,8 @@ PanelWindow {
         isMuted = source.audio.muted;
         osdValue = isMuted ? 0 : 1;
         osdIcon = isMuted ? Theme.icons.micOff : Theme.icons.mic;
-        osdTitle = isMuted ? "Microfone Mutado" : "Microfone Ativo";
-        osdValueText = isMuted ? "Mutado" : "Ativo";
+        osdTitle = isMuted ? Theme.t("osd.mic_muted", "Microfone Mutado") : Theme.t("osd.mic_active", "Microfone Ativo");
+        osdValueText = isMuted ? Theme.t("osd.mutado_short", "Mutado") : Theme.t("osd.active_short", "Ativo");
         open = true;
         hideTimer.restart();
     }
@@ -86,7 +86,7 @@ PanelWindow {
         isMuted = false;
         osdValue = Math.max(0, Math.min(1, val));
         osdIcon = Theme.icons.brightness;
-        osdTitle = "Brilho";
+        osdTitle = Theme.t("osd.brightness", "Brilho");
         osdValueText = Math.round(osdValue * 100) + "%";
         open = true;
         hideTimer.restart();

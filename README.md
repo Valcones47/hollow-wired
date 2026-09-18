@@ -59,11 +59,14 @@ Legacy tools like Waybar, Rofi, SwayOSD, and Wofi are completely omitted. Every 
   - Real RAM usage (excluding buffers/cache), CPU telemetry, GPU monitor (NVIDIA RTX / AMD / Intel), real-time Network speed monitor, Analog & Digital clocks, MPRIS music player with spinning vinyl animation, Monthly Calendar grid, Battery health, Storage usage, Pomodoro timer, persistent Notepad, Weather, and Daily quote.
   - Toggle edit mode at any time with `Super + W` or right-clicking empty desktop space.
 - **Application Launcher (`Launcher.qml`)**: Keyboard-first fuzzy search opened via `Super` or `Super + R`. Features keyboard navigation, right-click contextual actions (pin to dock, add to gaming drawer), and instant query matching.
-- **Autohiding Dock (`Dock.qml`)**: Edge-triggered bottom dock with active workspace indicators (`1·3` or `✦`), drag-and-drop reordering, and an expandable gaming shelf.
+- **Autohiding Dock (`Dock.qml`)**: Edge-triggered bottom dock with active workspace indicators (`1·3` or `✦`), drag-and-drop reordering, expandable gaming shelf, and **dedicated Launcher button** with custom icon and animated GIF support (`rice-set-dock-icon`).
+- **Shell Customization (`ShellCustomization.qml`)**: Unified visual styling engine for Hub, Sidebar, and Dock. Supports Glass, Solid, Glow (Neon), and Borderless styles, custom scales (80%, 100%, 120%), background opacities, and 6 accent colors with live reactive synchronization.
 - **Dynamic Island OSD (`OSD.qml`)**: Non-intrusive floating capsule below the top bar providing visual feedback for volume levels, microphone mute, and screen brightness.
 - **Energy Sidebar (`EnergySidebar.qml`)**: Slide-out right panel providing system tray icons, update count badges (Repo + AUR + Dotfiles), night light toggle, blur toggle, and two-step power options.
 - **Alt+Tab Task Switcher (`AltTab.qml`)**: Live window thumbnails rendered via Wayland screencopy buffers, sorted by MRU (most recently used) focus history. Quick close windows on the fly with `Q`.
-- **Central Hub & Control Center (`VisualConfigPanel.qml` / `Super + I`)**: 19 comprehensive configuration tabs covering display refresh rates (144Hz/60Hz), FreeSync/VRR, Kitty terminal parameters, Fastfetch animated GIFs, Mako notification placement, system repair actions, and theme presets.
+- **Native Clipboard (`Clipboard.qml`)**: Built-in clipboard manager invoked with `Super + V`, supporting quick search, image preview, and instant history clearing.
+- **Internationalization (i18n)**: Seamless bilingual localization (English & Brazilian Portuguese) across all shell components and settings via reactive JSON dictionaries and `Theme.t(...)`.
+- **Central Hub & Control Center (`VisualConfigPanel.qml` / `Super + I`)**: **20 comprehensive configuration tabs** covering display refresh rates (144Hz/60Hz), FreeSync/VRR, Kitty terminal parameters, Fastfetch animated GIFs, Mako notifications, system repair actions, Discord shortcut binds, shell customization, app store, and theme presets.
 
 ### Theming & Dynamic Colors
 - **Wallust Palette Engine**: Dynamic color palette extracted directly from the active wallpaper. Automatically updates Hyprland window borders, Quickshell UI surfaces, and Kitty terminal colors without requiring session restarts.
@@ -85,7 +88,7 @@ Legacy tools like Waybar, Rofi, SwayOSD, and Wofi are completely omitted. Every 
 | `Super` or `Super + R` | Toggle Application Launcher |
 | `Super + Q` | Open Kitty Terminal |
 | `Super + E` | Open Dolphin File Manager |
-| `Super + I` | Open Control Center / Settings Hub |
+| `Super + I` | Open Control Center / Settings Hub (20 Categories) |
 | `Super + F1` | Keybindings Cheatsheet |
 | `Super + V` | Native Clipboard History |
 | `Super + W` | Toggle Desktop Widgets Edit Mode |
@@ -102,6 +105,8 @@ Legacy tools like Waybar, Rofi, SwayOSD, and Wofi are completely omitted. Every 
 | `Super + Shift + C` | Color Picker (`hyprpicker`) |
 | `Super + Shift + X` | Force Kill Unresponsive Window (`hyprctl kill`) |
 | `Super + Ctrl + R` | Emergency Reload Quickshell Shell |
+| `Ctrl + Shift + M` | Toggle Discord / Vesktop Mute in background |
+| `Num_Lock` or `Ctrl + Shift + D` | Toggle Discord / Vesktop Deafen in background |
 | `Media Keys` | Volume, Brightness, Microphone Mute, Play/Pause |
 
 ---
@@ -114,7 +119,7 @@ Legacy tools like Waybar, Rofi, SwayOSD, and Wofi are completely omitted. Every 
 - **Display Server:** Wayland
 
 ### Quick Setup
-Clone the repository and run the automated installer:
+Clone the repository and run the automated cyberpunk installer:
 
 ```bash
 git clone https://github.com/Valcones47/hollow-wired.git
@@ -123,7 +128,7 @@ chmod +x install.sh
 ./install.sh
 ```
 
-The installer verifies all necessary runtime packages, links configuration files, registers local helper binaries, and prompts for optional Wallpaper Engine and SDDM theme configuration.
+The installer features an interactive **cyberpunk terminal UI** with animated **Serial Experiments Lain** ASCII transitions via `chafa`. It installs only the necessary ricing components (Hyprland, Quickshell, Wallust, audio, portals, and helpers), completely delegating GPU drivers and gaming packages to CachyOS/Arch Linux for maximum stability.
 
 > **Note for KDE Plasma / GNOME Users:**  
 > Testing `hollow-wired` will **not** modify or break your existing desktop configuration. When prompted to configure SDDM/Limine during installation, simply select **N** (default). Afterward, log out of your current session and choose **Hyprland** from your display manager's session menu.

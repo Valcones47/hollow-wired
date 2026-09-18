@@ -49,7 +49,6 @@ depends=(
     'hyprlock'
     'hyprshot'
     'brightnessctl'
-    'bibata-cursor-theme'
     'gtk4-layer-shell'
     'python-gobject'
     'flatpak'

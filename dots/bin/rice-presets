@@ -104,7 +104,7 @@ apply_preset() {
     rice-hypr-prefs set dim_inactive "$dim_inactive"
     rice-hypr-prefs set dim_strength "$dim_strength"
     rice-hypr-prefs preset "$anim_preset"
-    rice-kitty-apply opacity "$kitty_opacity"
+    rice-kitty-apply set opacity "$kitty_opacity"
 
     if [ "$pid" = "competitive" ]; then
         # Desativa blur para desempenho maximo
