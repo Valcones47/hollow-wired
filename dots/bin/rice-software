@@ -218,10 +218,18 @@ check_updates() {
         fi
     fi
 
+    local rice_updates=0
+    local rice_info="{}"
+    if command -v rice-update &>/dev/null; then
+        rice_info=$(rice-update check 2>/dev/null || echo '{}')
+        rice_updates=$(echo "$rice_info" | jq -r '.count // 0' 2>/dev/null || echo 0)
+    fi
+
+    local total_count=$((count + rice_updates))
     local date_str
     date_str=$(date +"%d/%m %H:%M")
 
-    echo "{\"count\": $count, \"packages\": $pkgs, \"checked_at\": \"$date_str\"}"
+    echo "{\"count\": $total_count, \"packages\": $pkgs, \"sys_count\": $count, \"rice_updates\": $rice_updates, \"rice_info\": $rice_info, \"checked_at\": \"$date_str\"}"
 }
 
 list_apps() {
@@ -359,8 +367,11 @@ case "$cmd" in
     update-system)
         update_system
         ;;
+    update-rice)
+        rice-update gui
+        ;;
     *)
-        echo "Uso: $(basename "$0") [status|apps|install <id>|uninstall <id>|launch <id>|update-system]"
+        echo "Uso: $(basename "$0") [status|apps|install <id>|uninstall <id>|launch <id>|update-system|update-rice]"
         exit 1
         ;;
 esac

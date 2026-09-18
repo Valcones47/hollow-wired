@@ -76,6 +76,21 @@ Todos os elementos de interface gráfica do desktop são gerenciados pelo Quicks
   - Wrapper único que executa o `rice-sddm-install` e o `rice-limine-theme` em sequência com tratamento automático de elevação de privilégios (`sudo`). Também integrado diretamente na interface gráfica na aba "Efeitos & Hyprland" do `VisualConfigPanel.qml` e como entrada `.desktop` no menu de apps.
 - **Utilitário de Diagnóstico e Reparo Rápido (`rice-doctor`):**
   - Ferramenta com interface amigável via terminal (`kitty --title "Rice Doctor" rice-doctor`) acessível pelo menu de aplicativos. Diagnostica e oferece reparo em 1 clique para: áudio PipeWire travado, trava do banco do pacman (`db.lck`), limpeza de caches antigos, ativação do display manager SDDM e status do zRAM e placa NVIDIA RTX 3050.
+- **Auto-Atualizador de Dotfiles (`rice-update`) e Central de Atualizações:**
+  - Utilitário dedicado (`~/.local/bin/rice-update`) integrado ao repositório git. Possui subcomandos:
+    - `check`: Consulta silenciosamente o GitHub em segundo plano (`git fetch origin main`), compara hashes e retorna contagem e lista de novos commits em formato JSON.
+    - `apply`: Cria backup automático dos diretórios de configuração em `~/.config/rice-backup-TIMESTAMP`, realiza `git pull --ff-only`, sincroniza dotfiles e binários (`dots/` -> `~/.config/` e `~/.local/bin/`), recarrega o Quickshell ao vivo com `rice-restart` e dispara notificação no desktop.
+    - `gui`: Executa o atualizador de forma interativa em janela dedicada do Kitty.
+  - **Integração no Quickshell:**
+    - `EnergySidebar.qml`: O contador de atualizações pendentes agora soma pacotes oficiais + AUR + Dotfiles (`repoUpdates + aurUpdates + riceUpdates`). Caso haja novidades nas dotfiles, exibe destaque na lista e botão de 1 clique *"Atualizar Dotfiles (X novidades)"*.
+    - `VisualConfigPanel.qml`: Aba de softwares e atualizações (`rice-software status`) exibe botão dedicado de atualização de dotfiles quando há novos commits disponíveis.
+- **Auditoria do Instalador (`install.sh`) & Convivência com KDE Plasma:**
+  - Lista de dependências completa com todos os pacotes essenciais (`wlsunset`, `mako`, `hypridle`, `hyprlock`, `hyprshot`, `brightnessctl`, `bibata-cursor-theme`, `gtk4-layer-shell`, `python-gobject`, `flatpak`).
+  - O prompt de alteração do SDDM e Limine agora tem padrão não destrutivo (`s/N`, padrão `N`), impedindo que usuários em teste (como quem vem do KDE Plasma) alterem o bootloader ou o tema de login por engano.
+  - Guarda caminhos personalizados (ex: script de macro e CPU limits) sob checagem de existência (`if io.open(...)`), e o socket do Waywallen conta com timeout de 15s para evitar travamento em máquinas sem o app instalado.
+  - Registro automático do diretório clonado em `~/.config/hyprland-setup-repo`.
+- **Estrutura de Pacote AUR (`packaging/`):**
+  - Diretório `packaging/` contendo `PKGBUILD` (`hyprland-setup-git`) e `hyprland-setup.install` prontos para publicação no AUR, com mapeamento correto de dependências e regras do Arch Linux.
 - **Integração de Atalhos Gráficos (.desktop):**
   - Adicionados arquivos `.desktop` em `~/.local/share/applications/` e `dots/applications/` para: **Configurações Visuais do Rice**, **Reparador do Sistema (Rice Doctor)** e **Configurar Login e Boot (SDDM & Limine)**, permitindo busca e execução direta no Launcher (`Super`).
 

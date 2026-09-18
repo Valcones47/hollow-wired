@@ -5118,10 +5118,21 @@ PanelWindow {
                                             }
 
                                             ActionBtn {
+                                                icon: "\u{F03D8}"
+                                                text: "Atualizar Dotfiles (" + (win.softwareUpdatesData.rice_updates || 0) + ")"
+                                                primary: true
+                                                visible: (win.softwareUpdatesData.rice_updates || 0) > 0
+                                                onClicked: {
+                                                    Quickshell.execDetached(["rice-software", "update-rice"]);
+                                                    win.showToast("Atualizador de Dotfiles aberto!");
+                                                }
+                                            }
+
+                                            ActionBtn {
                                                 icon: "\u{F002A}"
                                                 text: "Atualizar Tudo Agora"
-                                                primary: true
-                                                visible: win.softwareUpdatesData.count > 0
+                                                primary: !(win.softwareUpdatesData.rice_updates > 0)
+                                                visible: (win.softwareUpdatesData.count || 0) > 0
                                                 onClicked: {
                                                     Quickshell.execDetached(["rice-software", "update-system"]);
                                                     win.showToast("Janela de atualização aberta no terminal!");

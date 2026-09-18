@@ -1,0 +1,94 @@
+# Maintainer: Valcones47 <https://github.com/Valcones47>
+pkgname=hyprland-setup-git
+_pkgname=hyprland-setup
+pkgver=r125.f87d5a8
+pkgrel=1
+pkgdesc="Rice completo e ultra-otimizado para Hyprland e Quickshell no Arch Linux / CachyOS"
+arch=('x86_64')
+url="https://github.com/Valcones47/hyprland-setup"
+license=('GPL-3.0-or-later')
+depends=(
+    'hyprland'
+    'aquamarine'
+    'quickshell'
+    'kitty'
+    'wallust'
+    'fastfetch'
+    'cava'
+    'playerctl'
+    'pipewire'
+    'pipewire-pulse'
+    'pipewire-alsa'
+    'wireplumber'
+    'wf-recorder'
+    'grim'
+    'slurp'
+    'swappy'
+    'cliphist'
+    'wl-clipboard'
+    'zenity'
+    'ffmpeg'
+    'libwebp'
+    'jq'
+    'socat'
+    'bc'
+    'lm_sensors'
+    'rsync'
+    'ttf-jetbrains-mono-nerd'
+    'noto-fonts'
+    'noto-fonts-cjk'
+    'noto-fonts-emoji'
+    'zram-generator'
+    'dolphin'
+    'xdg-desktop-portal'
+    'xdg-desktop-portal-hyprland'
+    'xdg-desktop-portal-kde'
+    'wlsunset'
+    'mako'
+    'hypridle'
+    'hyprlock'
+    'hyprshot'
+    'brightnessctl'
+    'bibata-cursor-theme'
+    'gtk4-layer-shell'
+    'python-gobject'
+    'flatpak'
+)
+optdepends=(
+    'nvidia-utils: Aceleração para dGPU NVIDIA'
+    'lib32-nvidia-utils: Suporte 32-bits para Steam em NVIDIA'
+    'cachyos-gaming-meta: Meta-pacote otimizado para jogos no CachyOS'
+    'steam: Plataforma Steam'
+    'gamemode: Otimizador Feral GameMode'
+)
+provides=("$_pkgname")
+conflicts=("$_pkgname")
+source=("git+https://github.com/Valcones47/hyprland-setup.git")
+sha256sums=('SKIP')
+install=hyprland-setup.install
+
+pkgver() {
+    cd "$srcdir/$_pkgname"
+    printf "r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
+
+package() {
+    cd "$srcdir/$_pkgname"
+
+    # Instala scripts utilitários em /usr/bin
+    install -dm755 "$pkgdir/usr/bin"
+    for b in dots/bin/*; do
+        [ -f "$b" ] && install -m755 "$b" "$pkgdir/usr/bin/"
+    done
+
+    # Instala modelos de configuração base em /usr/share/hyprland-setup
+    install -dm755 "$pkgdir/usr/share/hyprland-setup"
+    cp -a dots "$pkgdir/usr/share/hyprland-setup/"
+    install -m755 install.sh "$pkgdir/usr/share/hyprland-setup/"
+
+    # Instala entradas de aplicativo .desktop
+    if [ -d "dots/applications" ]; then
+        install -dm755 "$pkgdir/usr/share/applications"
+        install -m644 dots/applications/*.desktop "$pkgdir/usr/share/applications/"
+    fi
+}

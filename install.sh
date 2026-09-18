@@ -118,6 +118,16 @@ PACKAGES=(
     xdg-desktop-portal
     xdg-desktop-portal-hyprland
     xdg-desktop-portal-kde
+    wlsunset
+    mako
+    hypridle
+    hyprlock
+    hyprshot
+    brightnessctl
+    bibata-cursor-theme
+    gtk4-layer-shell
+    python-gobject
+    flatpak
 )
 
 # Pacotes adicionais de GPU
@@ -185,6 +195,9 @@ cp -a "$SCRIPT_DIR/dots/bin/"* "$HOME/.local/bin/"
 chmod +x "$HOME/.local/bin/"*
 systemctl --user restart xdg-desktop-portal 2>/dev/null || true
 
+# Registra o repositório para o auto-atualizador (rice-update)
+echo "$SCRIPT_DIR" > "$HOME/.config/hyprland-setup-repo"
+
 # Garantir ~/.local/bin no PATH
 if ! echo "$PATH" | grep -q "$HOME/.local/bin"; then
     echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.bashrc"
@@ -197,10 +210,19 @@ if [ ! -f "$HOME/.face.webp" ] && [ ! -f "$HOME/.face" ]; then
     touch "$HOME/.face"
 fi
 
-# 8. Opcional: Tela de Login SDDM & Bootloader Limine
-echo -e "\n${BOLD}[*] Deseja configurar o SDDM (SilentSDDM) e o Bootloader Limine agora? (S/n)${NC}"
+# 8. Opcional: Wallpaper Engine (Waywallen via Flatpak)
+echo -e "\n${BOLD}[*] Deseja instalar o suporte a Wallpaper Engine (Waywallen via Flatpak)? (S/n)${NC}"
+read -r -p "Opção: " INSTALL_WAYWALLEN || true
+if [[ "${INSTALL_WAYWALLEN:-s}" =~ ^[Ss]$ ]]; then
+    echo -e "${CYAN}==> Configurando Flathub e instalando Waywallen...${NC}"
+    flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo 2>/dev/null || true
+    flatpak install -y flathub org.waywallen.waywallen 2>/dev/null || true
+fi
+
+# 9. Opcional: Tela de Login SDDM & Bootloader Limine
+echo -e "\n${BOLD}[*] Deseja configurar o SDDM (SilentSDDM) e o Bootloader Limine agora? (s/N)${NC}"
 read -r -p "Opção: " APPLY_BOOT || true
-if [[ "${APPLY_BOOT:-s}" =~ ^[Ss]$ ]]; then
+if [[ "${APPLY_BOOT:-n}" =~ ^[Ss]$ ]]; then
     echo -e "${CYAN}==> Executando rice-apply-boot-login...${NC}"
     sudo "$HOME/.local/bin/rice-apply-boot-login" || true
 fi

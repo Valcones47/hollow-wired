@@ -1,0 +1,154 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# rice-update
+# Atualizador inteligente de Dotfiles e Utilitários do Rice (Hyprland + Quickshell)
+# ==============================================================================
+set -euo pipefail
+
+REPO_FILE="$HOME/.config/hyprland-setup-repo"
+DEFAULT_REPO="$HOME/projetos/hyprland-setup"
+
+# Determina o diretório do repositório git clonado
+if [ -f "$REPO_FILE" ] && [ -d "$(cat "$REPO_FILE")" ]; then
+    REPO_DIR="$(cat "$REPO_FILE")"
+elif [ -d "$DEFAULT_REPO/.git" ]; then
+    REPO_DIR="$DEFAULT_REPO"
+elif [ -d "$HOME/.hyprland-setup/.git" ]; then
+    REPO_DIR="$HOME/.hyprland-setup"
+else
+    REPO_DIR=""
+fi
+
+check_updates() {
+    if [ -z "$REPO_DIR" ] || [ ! -d "$REPO_DIR/.git" ]; then
+        echo '{"status": "error", "message": "Repositório git local não encontrado", "count": 0}'
+        return 0
+    fi
+
+    # Atualiza refs remotas silenciosamente
+    git -C "$REPO_DIR" fetch --quiet origin main 2>/dev/null || {
+        echo '{"status": "fetch_failed", "message": "Sem conexão ou falha no git fetch", "count": 0}'
+        return 0
+    }
+
+    LOCAL_HASH=$(git -C "$REPO_DIR" rev-parse --short HEAD 2>/dev/null || echo "unknown")
+    REMOTE_HASH=$(git -C "$REPO_DIR" rev-parse --short origin/main 2>/dev/null || echo "unknown")
+
+    if [ "$LOCAL_HASH" != "$REMOTE_HASH" ]; then
+        COUNT=$(git -C "$REPO_DIR" rev-list --count HEAD..origin/main 2>/dev/null || echo 0)
+        COMMITS=$(git -C "$REPO_DIR" log --oneline -n 5 HEAD..origin/main 2>/dev/null | jq -R . | jq -s . 2>/dev/null || echo "[]")
+        echo "{\"status\": \"update_available\", \"count\": $COUNT, \"local\": \"$LOCAL_HASH\", \"remote\": \"$REMOTE_HASH\", \"commits\": $COMMITS}"
+    else
+        echo "{\"status\": \"up_to_date\", \"count\": 0, \"hash\": \"$LOCAL_HASH\"}"
+    fi
+}
+
+apply_updates() {
+    local interactive="${1:-true}"
+
+    if [ -z "$REPO_DIR" ] || [ ! -d "$REPO_DIR/.git" ]; then
+        echo -e "\e[1;31m[!] Erro: Diretório do repositório não encontrado.\e[0m" >&2
+        exit 1
+    fi
+
+    echo -e "\e[1;36m====================================================\e[0m"
+    echo -e "\e[1;32m   Atualizador de Dotfiles (Hyprland & Quickshell)  \e[0m"
+    echo -e "\e[1;36m====================================================\e[0m"
+    echo ""
+    echo -e "Diretório local: \e[1;34m$REPO_DIR\e[0m"
+
+    # Busca novidades
+    echo -e "Verificando novidades no GitHub..."
+    git -C "$REPO_DIR" fetch --quiet origin main
+
+    LOCAL_HASH=$(git -C "$REPO_DIR" rev-parse --short HEAD)
+    REMOTE_HASH=$(git -C "$REPO_DIR" rev-parse --short origin/main)
+    COUNT=$(git -C "$REPO_DIR" rev-list --count HEAD..origin/main 2>/dev/null || echo 0)
+
+    if [ "$COUNT" -eq 0 ]; then
+        echo -e "\n\e[1;32m[✓] O seu rice já está na versão mais recente!\e[0m (Commit: $LOCAL_HASH)"
+        if [ "$interactive" = "true" ]; then
+            echo ""
+            read -r -p "Pressione ENTER para fechar..." _ || true
+        fi
+        return 0
+    fi
+
+    echo -e "\n\e[1;33m[!] Existem $COUNT nova(s) atualização(ões) disponíveis:\e[0m"
+    git -C "$REPO_DIR" log --oneline --color=always -n 8 HEAD..origin/main
+    echo ""
+
+    if [ "$interactive" = "true" ]; then
+        read -r -p "Deseja aplicar as atualizações e sincronizar agora? [S/n]: " CONFIRM || true
+        CONFIRM=${CONFIRM:-S}
+        if [[ ! "$CONFIRM" =~ ^[Ss]$ ]]; then
+            echo -e "\e[1;33mAtualização cancelada pelo usuário.\e[0m"
+            return 0
+        fi
+    fi
+
+    # 1. Backup de segurança
+    BACKUP_DIR="$HOME/.config/rice-backup-$(date +%Y%m%d_%H%M%S)"
+    echo -e "\n\e[1;34m[*] Criando backup de segurança em: $BACKUP_DIR\e[0m"
+    mkdir -p "$BACKUP_DIR"
+    for d in hypr quickshell kitty wallust xdg-desktop-portal fastfetch; do
+        if [ -d "$HOME/.config/$d" ]; then
+            cp -a "$HOME/.config/$d" "$BACKUP_DIR/" 2>/dev/null || true
+        fi
+    done
+
+    # 2. Puxar alterações do git
+    echo -e "\e[1;34m[*] Puxando alterações do GitHub...\e[0m"
+    git -C "$REPO_DIR" pull --ff-only origin main
+
+    # 3. Sincronizar dotfiles
+    echo -e "\e[1;34m[*] Sincronizando arquivos de configuração e scripts...\e[0m"
+    cp -a "$REPO_DIR/dots/hypr" "$HOME/.config/"
+    cp -a "$REPO_DIR/dots/quickshell" "$HOME/.config/"
+    cp -a "$REPO_DIR/dots/kitty" "$HOME/.config/"
+    [ -d "$REPO_DIR/dots/wallust" ] && cp -a "$REPO_DIR/dots/wallust" "$HOME/.config/"
+    [ -d "$REPO_DIR/dots/xdg-desktop-portal" ] && cp -a "$REPO_DIR/dots/xdg-desktop-portal" "$HOME/.config/"
+    [ -d "$REPO_DIR/dots/fastfetch" ] && cp -a "$REPO_DIR/dots/fastfetch" "$HOME/.config/"
+    [ -d "$REPO_DIR/dots/applications" ] && cp -a "$REPO_DIR/dots/applications/"* "$HOME/.local/share/applications/" 2>/dev/null || true
+    cp -a "$REPO_DIR/dots/bin/"* "$HOME/.local/bin/"
+    chmod +x "$HOME/.local/bin/"*
+
+    # 4. Reiniciar interface
+    echo -e "\e[1;34m[*] Recarregando interface gráfica (Quickshell)...\e[0m"
+    rice-restart >/dev/null 2>&1 || true
+
+    notify-send -a "Rice Updater" -i system-software-update -r 91199 -t 4000 "Setup Atualizado com Sucesso!" "$COUNT novas melhorias foram aplicadas."
+
+    echo -e "\n\e[1;32m════════════════════════════════════════════════════\e[0m"
+    echo -e "\e[1;32m  [✓] ATUALIZAÇÃO CONCLUÍDA COM SUCESSO!\e[0m"
+    echo -e "\e[1;32m════════════════════════════════════════════════════\e[0m"
+    echo -e "Versão atual: \e[1;36m$REMOTE_HASH\e[0m"
+    echo -e "Backup salvo em: \e[1;33m$BACKUP_DIR\e[0m"
+
+    if [ "$interactive" = "true" ]; then
+        echo ""
+        read -r -p "Pressione ENTER para fechar..." _ || true
+    fi
+}
+
+cmd="${1:-apply}"
+
+case "$cmd" in
+    check|status)
+        check_updates
+        ;;
+    apply|run)
+        apply_updates true
+        ;;
+    apply-silent|auto)
+        apply_updates false
+        ;;
+    gui)
+        # Abre em janela dedicada do Kitty
+        kitty --title "Atualizador de Dotfiles" -e "$HOME/.local/bin/rice-update" apply &
+        ;;
+    *)
+        echo "Uso: $(basename "$0") [check|status|apply|gui]"
+        exit 1
+        ;;
+esac

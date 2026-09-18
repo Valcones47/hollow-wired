@@ -120,11 +120,13 @@ PanelWindow {
     // ================= updates pendentes =================
     property int repoUpdates: 0
     property int aurUpdates: 0
-    readonly property int updateCount: repoUpdates + aurUpdates
+    property int riceUpdates: 0
+    readonly property int updateCount: repoUpdates + aurUpdates + riceUpdates
 
     function checkUpdates() {
         repoUpdatesProc.running = true;
         aurUpdatesProc.running = true;
+        riceUpdatesProc.running = true;
     }
     Timer {
         interval: 30 * 60 * 1000
@@ -143,6 +145,11 @@ PanelWindow {
         id: aurUpdatesProc
         command: ["bash", "-c", "yay -Qu --aur 2>/dev/null | grep -c '.'"]
         stdout: StdioCollector { onStreamFinished: sidebar.aurUpdates = parseInt(text.trim()) || 0 }
+    }
+    Process {
+        id: riceUpdatesProc
+        command: ["bash", "-c", "rice-update check 2>/dev/null | jq -r '.count // 0' 2>/dev/null || echo 0"]
+        stdout: StdioCollector { onStreamFinished: sidebar.riceUpdates = parseInt(text.trim()) || 0 }
     }
 
     // ================= ações =================
@@ -751,7 +758,17 @@ PanelWindow {
                     }
                     PopText {
                         visible: sidebar.updateCount > 0
-                        text: sidebar.repoUpdates + " repositório · " + sidebar.aurUpdates + " AUR"
+                        text: sidebar.repoUpdates + " repositório · " + sidebar.aurUpdates + " AUR" + (sidebar.riceUpdates > 0 ? " · " + sidebar.riceUpdates + " dotfiles" : "")
+                    }
+                    PopAction {
+                        visible: sidebar.riceUpdates > 0
+                        Layout.topMargin: 4
+                        icon: Theme.icons.palette
+                        label: "Atualizar Dotfiles (" + sidebar.riceUpdates + " novidades)"
+                        onActivated: {
+                            Quickshell.execDetached(["rice-update", "gui"]);
+                            sidebar.open = false;
+                        }
                     }
                     PopAction {
                         Layout.topMargin: 4

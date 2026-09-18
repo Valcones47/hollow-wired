@@ -149,10 +149,11 @@ hl.on("hyprland.start", function()
     -- Remove modificador Mod2 do Num_Lock no XWayland (evita que Discord/jogos detectem NumLock indevidamente)
     hl.exec_cmd(home .. "/.local/bin/rice-fix-xwayland-numlock")
 
-    -- Autostarts genéricos trazidos do Plasma (~/.config/autostart), não
-    -- específicos do KDE
+    -- Autostarts genéricos
     hl.exec_cmd("arch-update --tray")
-    hl.exec_cmd("/usr/local/bin/limitar_cpu.sh")
+    if io.open("/usr/local/bin/limitar_cpu.sh", "r") then
+        hl.exec_cmd("/usr/local/bin/limitar_cpu.sh")
+    end
 
     -- waywallen: o daemon roda em Flatpak e não enxerga o protocolo
     -- layer-shell de dentro do sandbox, então precisa do binário nativo
@@ -160,7 +161,7 @@ hl.on("hyprland.start", function()
     -- github.com/waywallen/waywallen-display) rodando fora do Flatpak e
     -- falando com o daemon via socket unix.
     hl.exec_cmd("flatpak run org.waywallen.waywallen --no-ui")
-    hl.exec_cmd([[sh -c 'while [ ! -S "$XDG_RUNTIME_DIR/waywallen/display.sock" ]; do sleep 0.5; done; exec ]] .. home .. [[/.local/bin/waywallen-layer-shell --socket "$XDG_RUNTIME_DIR/waywallen/display.sock"']])
+    hl.exec_cmd([[sh -c 'for i in $(seq 1 30); do [ -S "$XDG_RUNTIME_DIR/waywallen/display.sock" ] && exec "]] .. home .. [[/.local/bin/waywallen-layer-shell" --socket "$XDG_RUNTIME_DIR/waywallen/display.sock"; sleep 0.5; done']])
 end)
 
 -----------------------------
@@ -367,7 +368,9 @@ hl.bind(mainMod .. " + SHIFT + A", hl.dsp.window.move({ workspace = "special:mag
 hl.bind(mainMod .. " + S", hl.dsp.exec_cmd(home .. "/.local/bin/waywallen-switcher"))
 hl.bind("CTRL + slash",         hl.dsp.exec_cmd("claude-desktop"))
 hl.bind("CTRL + bracketright",  hl.dsp.exec_cmd("zapzap"))
-hl.bind("CTRL + bracketleft",   hl.dsp.exec_cmd(home .. "/projetos/FischMacro/noisefish-linux/.venv/bin/python " .. home .. "/projetos/FischMacro/noisefish-linux/tray.py"))
+if io.open(home .. "/projetos/FischMacro/noisefish-linux/tray.py", "r") then
+    hl.bind("CTRL + bracketleft", hl.dsp.exec_cmd(home .. "/projetos/FischMacro/noisefish-linux/.venv/bin/python " .. home .. "/projetos/FischMacro/noisefish-linux/tray.py"))
+end
 
 hl.bind(mainMod .. " + mouse_down", hl.dsp.focus({ workspace = "e+1" }))
 hl.bind(mainMod .. " + mouse_up",   hl.dsp.focus({ workspace = "e-1" }))
