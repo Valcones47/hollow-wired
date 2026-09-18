@@ -27,7 +27,8 @@ ensure_prefs_file() {
   "mouse_accel": "flat",
   "numlock": true,
   "vrr": 0,
-  "monitor_hz": 144
+  "monitor_hz": 144,
+  "monitor_scale": 1
 }
 JSON
     fi
@@ -58,6 +59,8 @@ apply_all() {
     anim_enabled=$(jq -r '.anim_enabled // true' "$PREFS_FILE")
     anim_preset=$(jq -r '.anim_preset // "smooth"' "$PREFS_FILE")
 
+    local kb_layout kb_variant mouse_sensitivity mouse_accel numlock vrr monitor_hz monitor_scale
+
     kb_layout=$(jq -r '.kb_layout // "br"' "$PREFS_FILE")
     kb_variant=$(jq -r '.kb_variant // ""' "$PREFS_FILE")
     mouse_sensitivity=$(jq -r '.mouse_sensitivity // 0.0' "$PREFS_FILE")
@@ -65,6 +68,7 @@ apply_all() {
     numlock=$(jq -r '.numlock // true' "$PREFS_FILE")
     vrr=$(jq -r '.vrr // 0' "$PREFS_FILE")
     monitor_hz=$(jq -r '.monitor_hz // 144' "$PREFS_FILE")
+    monitor_scale=$(jq -r '.monitor_scale // 1' "$PREFS_FILE")
 
     local gaps_out_sides=$(( gaps_out + 10 ))
 
@@ -107,12 +111,23 @@ hl.device({
 })
 " &>/dev/null
 
-    # 3. Monitor e taxa de atualização
-    local mode_str="1920x1080@${monitor_hz}.03Hz"
-    if [ "$monitor_hz" = "60" ]; then
-        mode_str="1920x1080@60.02Hz"
+    # 3. Monitor, escala e taxa de atualização
+    # Aplica escala global para qualquer monitor (evita o bug de zoom 300% do 'auto')
+    hyprctl eval "hl.monitor({ output = '', mode = 'preferred', position = 'auto', scale = '$monitor_scale' })" &>/dev/null || true
+
+    local mon_name
+    mon_name=$(hyprctl monitors -j 2>/dev/null | jq -r '.[0].name // empty' 2>/dev/null || true)
+    if [ -n "$mon_name" ]; then
+        local mode_str="preferred"
+        if [ "$mon_name" = "eDP-1" ]; then
+            if [ "$monitor_hz" = "60" ]; then
+                mode_str="1920x1080@60.02Hz"
+            else
+                mode_str="1920x1080@144.03Hz"
+            fi
+        fi
+        hyprctl eval "hl.monitor({ output = '$mon_name', mode = '$mode_str', position = '0x0', scale = '$monitor_scale' })" &>/dev/null || true
     fi
-    hyprctl eval "hl.monitor({ output = 'eDP-1', mode = '$mode_str', position = '0x0', scale = '1' })" &>/dev/null || true
 
     # 4. Preset de animação
     apply_anim_preset "$anim_preset"
@@ -206,7 +221,8 @@ case "$cmd" in
   "mouse_accel": "flat",
   "numlock": true,
   "vrr": 0,
-  "monitor_hz": 144
+  "monitor_hz": 144,
+  "monitor_scale": 1
 }
 JSON
         apply_all

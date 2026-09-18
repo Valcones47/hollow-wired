@@ -122,17 +122,20 @@ apply_updates() {
     cp -a "$REPO_DIR/dots/bin/"* "$HOME/.local/bin/"
     chmod +x "$HOME/.local/bin/"*
 
-    # 4. Correção automática de preferências (elimina flickering por VRR)
-    if [ -f "$HOME/.config/hypr/prefs.json" ] && command -v jq >/dev/null 2>&1; then
-        tmp_prefs=$(jq '.vrr = 0' "$HOME/.config/hypr/prefs.json" 2>/dev/null || true)
-        [ -n "$tmp_prefs" ] && echo "$tmp_prefs" > "$HOME/.config/hypr/prefs.json"
-    fi
+    # 4. Correção automática de preferências (elimina flickering por VRR e bug de zoom 300%)
+    for p_file in "$HOME/.config/hypr/user-prefs.json" "$HOME/.config/hypr/prefs.json"; do
+        if [ -f "$p_file" ] && command -v jq >/dev/null 2>&1; then
+            tmp_prefs=$(jq '.vrr = 0 | .monitor_scale = (.monitor_scale // 1)' "$p_file" 2>/dev/null || true)
+            [ -n "$tmp_prefs" ] && echo "$tmp_prefs" > "$p_file"
+        fi
+    done
 
     # 5. Recarregar Hyprland ao vivo sem reiniciar a sessão nem fechar aplicativos
     echo -e "\e[1;34m[*] Recarregando compositor Hyprland...\e[0m"
     if command -v hyprctl >/dev/null 2>&1; then
         hyprctl reload >/dev/null 2>&1 || true
         hyprctl eval "hl.config({ misc = { vrr = 0 }, render = { direct_scanout = 0 } })" >/dev/null 2>&1 || true
+        hyprctl eval "hl.monitor({ output = '', mode = 'preferred', position = 'auto', scale = '1' })" >/dev/null 2>&1 || true
     fi
     "$HOME/.local/bin/rice-hypr-prefs" apply >/dev/null 2>&1 || true
 

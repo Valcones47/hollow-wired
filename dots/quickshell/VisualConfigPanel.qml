@@ -74,6 +74,7 @@ PanelWindow {
     property string monitorModel: "AU Optronics 144Hz IPS"
     property string monitorRes: "1920x1080"
     property int monitorHz: 144
+    property real monitorScale: 1.0
     property bool vrrEnabled: false
     property int screenBrightness: 40
 
@@ -260,6 +261,7 @@ PanelWindow {
                     if (d.gaps_in !== undefined) win.gapsIn = d.gaps_in;
                     if (d.anim_preset !== undefined) win.animPreset = d.anim_preset;
                     if (d.monitor_hz !== undefined) win.monitorHz = parseInt(d.monitor_hz) || 144;
+                    if (d.monitor_scale !== undefined) win.monitorScale = parseFloat(d.monitor_scale) || 1.0;
                     if (d.vrr !== undefined) win.vrrEnabled = (d.vrr === 1 || d.vrr === true);
                     if (d.kb_layout !== undefined) win.kbLayout = d.kb_layout;
                     if (d.mouse_sensitivity !== undefined) win.mouseSensitivity = d.mouse_sensitivity;
@@ -282,6 +284,7 @@ PanelWindow {
                         win.monitorRes = arr[0].width + "x" + arr[0].height;
                         win.monitorModel = (arr[0].make ? arr[0].make + " " : "") + (arr[0].model || "Display IPS");
                         if (arr[0].refreshRate) win.monitorHz = Math.round(arr[0].refreshRate);
+                        if (arr[0].scale) win.monitorScale = parseFloat(arr[0].scale) || 1.0;
                     }
                 } catch (e) {}
             }
@@ -1986,6 +1989,68 @@ PanelWindow {
                                                 win.monitorHz = 60;
                                                 Quickshell.execDetached(["rice-hypr-prefs", "set", "monitor_hz", "60"]);
                                                 win.showToast("Taxa ajustada para 60 Hz");
+                                            }
+                                        }
+                                    }
+                                }
+
+                                SectionHeader {
+                                    title: "Escala da Tela (HiDPI / Zoom)"
+                                    subtitle: "Ajuste o tamanho de janelas e fontes (100% padrão para 1080p, aumente para 2K/4K ou diminua se ficou grande)"
+                                }
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 8
+
+                                    Repeater {
+                                        model: [
+                                            { label: "100%", val: 1.0, desc: "Padrão (1080p)" },
+                                            { label: "125%", val: 1.25, desc: "Médio (2K)" },
+                                            { label: "150%", val: 1.5, desc: "Grande (HiDPI)" },
+                                            { label: "175%", val: 1.75, desc: "Ultra" },
+                                            { label: "200%", val: 2.0, desc: "4K / TV" }
+                                        ]
+
+                                        delegate: Rectangle {
+                                            Layout.fillWidth: true
+                                            implicitHeight: 60
+                                            radius: 10
+                                            readonly property bool isCurrent: Math.abs(win.monitorScale - modelData.val) < 0.05
+                                            color: isCurrent ? Theme.withAlpha(Theme.primary, 0.25) : (scaleArea.containsMouse ? Theme.tileHigh : Theme.tile)
+                                            border.width: isCurrent ? 1.5 : 1
+                                            border.color: isCurrent ? Theme.primary : Theme.withAlpha(Theme.outline, 0.15)
+
+                                            ColumnLayout {
+                                                anchors.centerIn: parent
+                                                spacing: 2
+                                                Text {
+                                                    Layout.alignment: Qt.AlignHCenter
+                                                    text: modelData.label
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 14
+                                                    font.weight: Font.Bold
+                                                    color: isCurrent ? Theme.primary : Theme.textColor
+                                                }
+                                                Text {
+                                                    Layout.alignment: Qt.AlignHCenter
+                                                    text: modelData.desc
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 9
+                                                    color: Theme.subtext
+                                                }
+                                            }
+
+                                            MouseArea {
+                                                id: scaleArea
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: {
+                                                    win.monitorScale = modelData.val;
+                                                    Quickshell.execDetached(["rice-hypr-prefs", "set", "monitor_scale", String(modelData.val)]);
+                                                    win.showToast("Escala do monitor ajustada para " + modelData.label);
+                                                }
                                             }
                                         }
                                     }
