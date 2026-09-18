@@ -199,7 +199,7 @@ RICE_PACKAGES=(
     aquamarine
     quickshell
     kitty
-    wallust
+    wallust-git
     fastfetch
     cava
     mako
@@ -238,15 +238,18 @@ RICE_PACKAGES=(
     dolphin
     xdg-desktop-portal
     xdg-desktop-portal-hyprland
+    xdg-desktop-portal-gtk
     xdg-desktop-portal-kde
     zram-generator
     flatpak
     
-    # Fontes
+    # Fontes & Temas de Ícones
     ttf-jetbrains-mono-nerd
     noto-fonts
     noto-fonts-cjk
     noto-fonts-emoji
+    papirus-icon-theme
+    breeze-icons
     
     # Bibliotecas de Interface & Atalhos
     gtk4-layer-shell
@@ -264,6 +267,9 @@ fi
 info_msg "Verificando dependências já presentes no sistema..."
 MISSING_PKGS=()
 for pkg in "${RICE_PACKAGES[@]}"; do
+    if [ "$pkg" = "wallust-git" ] && (pacman -T wallust >/dev/null 2>&1 || pacman -T wallust-git >/dev/null 2>&1 || command -v wallust >/dev/null 2>&1); then
+        continue
+    fi
     if ! pacman -T "$pkg" >/dev/null 2>&1; then
         MISSING_PKGS+=("$pkg")
     fi
@@ -311,7 +317,7 @@ step_banner "03/04" "Sincronização de Dotfiles & Configurações" "Aplicando t
 
 # 1. Backup de segurança de configurações existentes
 mkdir -p "$BACKUP_DIR"
-for dir in hypr quickshell kitty wallust xdg-desktop-portal fastfetch; do
+for dir in hypr quickshell kitty wallust xdg-desktop-portal fastfetch swappy gtk-3.0 gtk-4.0; do
     if [ -d "$HOME/.config/$dir" ]; then
         info_msg "Criando backup preventivo de ~/.config/$dir em $BACKUP_DIR/"
         cp -a "$HOME/.config/$dir" "$BACKUP_DIR/" 2>/dev/null || true
@@ -328,13 +334,16 @@ mkdir -p "$HOME/.config" \
          "$HOME/Imagens/FastFetch"
 
 # 3. Cópia dos dotfiles para o usuário
-gear_msg "Copiando configurações do Quickshell, Hyprland Lua e Kitty..."
+gear_msg "Copiando configurações do Quickshell, Hyprland Lua, Kitty e Temas..."
 cp -a "$SCRIPT_DIR/dots/hypr" "$HOME/.config/"
 cp -a "$SCRIPT_DIR/dots/quickshell" "$HOME/.config/"
 cp -a "$SCRIPT_DIR/dots/kitty" "$HOME/.config/"
 [ -d "$SCRIPT_DIR/dots/wallust" ] && cp -a "$SCRIPT_DIR/dots/wallust" "$HOME/.config/"
 [ -d "$SCRIPT_DIR/dots/xdg-desktop-portal" ] && cp -a "$SCRIPT_DIR/dots/xdg-desktop-portal" "$HOME/.config/"
 [ -d "$SCRIPT_DIR/dots/fastfetch" ] && cp -a "$SCRIPT_DIR/dots/fastfetch" "$HOME/.config/"
+[ -d "$SCRIPT_DIR/dots/swappy" ] && cp -a "$SCRIPT_DIR/dots/swappy" "$HOME/.config/"
+[ -d "$SCRIPT_DIR/dots/gtk-3.0" ] && cp -a "$SCRIPT_DIR/dots/gtk-3.0" "$HOME/.config/"
+[ -d "$SCRIPT_DIR/dots/gtk-4.0" ] && cp -a "$SCRIPT_DIR/dots/gtk-4.0" "$HOME/.config/"
 
 # 4. Cópia dos atalhos .desktop e binários
 gear_msg "Instalando utilitários do rice em ~/.local/bin/..."
@@ -348,9 +357,12 @@ if [ -d "$SCRIPT_DIR/dots/fastfetch/logos" ]; then
     cp -a "$SCRIPT_DIR/dots/fastfetch/logos/"* "$HOME/Imagens/FastFetch/" 2>/dev/null || true
 fi
 
-# 6. Atualização dinâmica do caminho no Fastfetch config para o usuário atual
+# 6. Atualização dinâmica do caminho no Fastfetch e Swappy config para o usuário atual
 if [ -f "$HOME/.config/fastfetch/config.jsonc" ]; then
     sed -i "s|/home/[^/]*/Imagens/FastFetch|$HOME/Imagens/FastFetch|g" "$HOME/.config/fastfetch/config.jsonc"
+fi
+if [ -f "$HOME/.config/swappy/config" ]; then
+    sed -i "s|save_dir=.*|save_dir=$HOME/Imagens/Capturas de tela|g" "$HOME/.config/swappy/config"
 fi
 
 # 7. Registra repositório para o atualizador automático (rice-update)
@@ -364,12 +376,20 @@ if ! echo "$PATH" | grep -q "$HOME/.local/bin"; then
     info_msg "Adicionado ~/.local/bin ao PATH em ~/.bashrc / ~/.zshrc"
 fi
 
+# 9. Configuração de Temas de Ícones e Aparência GTK
+if command -v gsettings >/dev/null 2>&1; then
+    gsettings set org.gnome.desktop.interface icon-theme "Papirus-Dark" 2>/dev/null || true
+    gsettings set org.gnome.desktop.interface gtk-theme "cachyos-nord" 2>/dev/null || true
+    gsettings set org.gnome.desktop.interface color-scheme "prefer-dark" 2>/dev/null || true
+fi
+sudo ln -sf /usr/share/icons/*.png /usr/share/pixmaps/ 2>/dev/null || true
+
 # 9. Avatar Inicial se não existir
 if [ ! -f "$HOME/.face.webp" ] && [ ! -f "$HOME/.face" ]; then
     touch "$HOME/.face"
 fi
 
-systemctl --user restart xdg-desktop-portal 2>/dev/null || true
+"$HOME/.local/bin/rice-portals" 2>/dev/null || true
 ok_msg "Dotfiles, scripts e assets aplicados com perfeição!"
 
 # ------------------------------------------------------------------------------

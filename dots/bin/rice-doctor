@@ -87,6 +87,24 @@ else
   echo -e "${C_YELLOW}[⚠ DRIVER NÃO CARREGADO OU GPU SUSPENSA]${C_RESET}"
 fi
 
+# 8. Tema de Ícones do Sistema
+echo -ne "${C_BOLD}8. Tema de Ícones (Papirus / GTK)... ${C_RESET}"
+if [ -d /usr/share/icons/Papirus ] || [ -d "$HOME/.local/share/icons/Papirus" ]; then
+  echo -e "${C_GREEN}[✔ PAPIRUS DETECTADO]${C_RESET}"
+else
+  echo -e "${C_YELLOW}[⚠ NÃO INSTALADO]${C_RESET} (Execute: sudo pacman -S --needed papirus-icon-theme)"
+  BAD_ICONS=1
+fi
+
+# 9. Portais XDG & Comunicação DBus (Elimina delay de 25s)
+echo -ne "${C_BOLD}9. Portais XDG & Comunicação DBus... ${C_RESET}"
+if systemctl --user is-active --quiet xdg-desktop-portal && systemctl --user is-active --quiet xdg-desktop-portal-hyprland; then
+  echo -e "${C_GREEN}[✔ PORTAIS ATIVOS]${C_RESET}"
+else
+  echo -e "${C_YELLOW}[⚠ INCONSISTENTES / TIMEOUT]${C_RESET}"
+  BAD_PORTALS=1
+fi
+
 echo ""
 echo -e "${C_CYAN}--------------------------------------------------------------${C_RESET}"
 echo -e "${C_BOLD}AÇÕES DE REPARAÇÃO RÁPIDA:${C_RESET}"
@@ -95,10 +113,12 @@ echo -e " [2] Destravar o Pacman (remover db.lck)"
 echo -e " [3] Limpar cache de pacotes antigos do pacman (liberar espaço)"
 echo -e " [4] Configurar e ativar a tela de login SDDM + Limine"
 echo -e " [5] Reiniciar o Quickshell (recarregar barras e menus)"
+echo -e " [6] Reparar tema de ícones e compatibilidade de pixmaps"
+echo -e " [7] Reparar e reiniciar portais XDG (elimina delay de 25s em apps)"
 echo -e " [A] Executar limpeza e reparos recomendados automaticamente"
 echo -e " [0] Sair"
 echo -e "${C_CYAN}--------------------------------------------------------------${C_RESET}"
-echo -n "Escolha uma opção [0-5 / A]: "
+echo -n "Escolha uma opção [0-7 / A]: "
 read -r OPT
 
 case "$OPT" in
@@ -110,20 +130,35 @@ case "$OPT" in
   2)
     echo -e "\n${C_BLUE}==> Removendo trava do pacman...${C_RESET}"
     sudo rm -f /var/lib/pacman/db.lck
-    echo -e "${C_GREEN}✔ Trava removida com sucesso!${C_RESET}"
+    echo -e "${C_GREEN}✔ Pacman destravado!${C_RESET}"
     ;;
   3)
-    echo -e "\n${C_BLUE}==> Limpando caches antigos...${C_RESET}"
+    echo -e "\n${C_BLUE}==> Limpando cache do pacman...${C_RESET}"
     sudo paccache -rk2 2>/dev/null || sudo pacman -Sc --noconfirm
-    echo -e "${C_GREEN}✔ Cache limpo com sucesso!${C_RESET}"
+    echo -e "${C_GREEN}✔ Cache limpo!${C_RESET}"
     ;;
   4)
     echo -e "\n${C_BLUE}==> Configurando SDDM e Limine...${C_RESET}"
-    sudo /home/val47/.local/bin/rice-apply-boot-login
+    sudo rice-apply-boot-login
     ;;
   5)
     echo -e "\n${C_BLUE}==> Reiniciando o Quickshell...${C_RESET}"
     rice-restart
+    ;;
+  6)
+    echo -e "\n${C_BLUE}==> Reparando tema de ícones e pixmaps...${C_RESET}"
+    sudo pacman -S --needed --noconfirm papirus-icon-theme breeze-icons 2>/dev/null || true
+    sudo ln -sf /usr/share/icons/*.png /usr/share/pixmaps/ 2>/dev/null || true
+    if command -v gsettings >/dev/null 2>&1; then
+      gsettings set org.gnome.desktop.interface icon-theme "Papirus-Dark" 2>/dev/null || true
+    fi
+    echo -e "${C_GREEN}✔ Tema de ícones configurado!${C_RESET}"
+    ;;
+  7)
+    echo -e "\n${C_BLUE}==> Reparando e reiniciando portais XDG...${C_RESET}"
+    sudo pacman -S --needed --noconfirm xdg-desktop-portal-gtk 2>/dev/null || true
+    rice-portals
+    echo -e "${C_GREEN}✔ Portais XDG reiniciados com sucesso!${C_RESET}"
     ;;
   [aA])
     echo -e "\n${C_BLUE}==> Executando rotina automática de reparos...${C_RESET}"
@@ -132,6 +167,15 @@ case "$OPT" in
       sudo rm -f /var/lib/pacman/db.lck 2>/dev/null || true
     fi
     sudo paccache -rk2 2>/dev/null || true
+    if [ "$BAD_ICONS" = "1" ]; then
+      sudo pacman -S --needed --noconfirm papirus-icon-theme breeze-icons 2>/dev/null || true
+      sudo ln -sf /usr/share/icons/*.png /usr/share/pixmaps/ 2>/dev/null || true
+      gsettings set org.gnome.desktop.interface icon-theme "Papirus-Dark" 2>/dev/null || true
+    fi
+    if [ "$BAD_PORTALS" = "1" ]; then
+      sudo pacman -S --needed --noconfirm xdg-desktop-portal-gtk 2>/dev/null || true
+      rice-portals
+    fi
     echo -e "${C_GREEN}✔ Reparos automáticos concluídos!${C_RESET}"
     ;;
   *)

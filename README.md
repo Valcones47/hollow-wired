@@ -99,7 +99,8 @@ Legacy tools like Waybar, Rofi, SwayOSD, and Wofi are completely omitted. Every 
 | `Super + L` | Lock Screen (`hyprlock`) |
 | `Super + M` | Exit Hyprland Session |
 | `Alt + Tab` | Live Window Switcher |
-| `Super + Shift + S` | Interactive Screenshot with Annotation (Swappy) |
+| `Print` or `Super + Shift + S` | Region Screenshot (Saves to pictures, copies to clipboard & notifies) |
+| `Super + Alt + S` | Interactive Screenshot with Annotation (Swappy) |
 | `Super + Shift + R` | Record Selected Screen Region |
 | `Super + Ctrl + Shift + R` | Record Entire Display |
 | `Super + Shift + C` | Color Picker (`hyprpicker`) |

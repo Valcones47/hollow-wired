@@ -234,7 +234,8 @@ PanelWindow {
                         {
                             category: Theme.t("cheatsheet.cat_media", "Captura & Multimídia"),
                             items: [
-                                { keys: ["Super", "Shift", "S"], desc: Theme.t("cheatsheet.desc_screenshot", "Screenshot da tela com anotação") },
+                                { keys: ["Print", "/", "Super", "Shift", "S"], desc: Theme.t("cheatsheet.desc_screenshot", "Captura de região (salva e copia)") },
+                                { keys: ["Super", "Alt", "S"], desc: Theme.t("cheatsheet.desc_screenshot_edit", "Captura com editor de anotações (Swappy)") },
                                 { keys: ["Super", "Shift", "R"], desc: Theme.t("cheatsheet.desc_record_region", "Gravar região da tela") },
                                 { keys: ["Super", "Ctrl", "Shift", "R"], desc: Theme.t("cheatsheet.desc_record_screen", "Gravar tela inteira") },
                                 { keys: ["Super", "Shift", "C"], desc: Theme.t("cheatsheet.desc_picker", "Conta-gotas de cores") },

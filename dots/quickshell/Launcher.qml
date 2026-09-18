@@ -124,6 +124,16 @@ PanelWindow {
         open = false;
     }
 
+    function appIconSource(iconName) {
+        if (!iconName || iconName === "") {
+            return Quickshell.iconPath("application-x-executable");
+        }
+        if (iconName.startsWith("/") || iconName.startsWith("file://")) {
+            return iconName.startsWith("file://") ? iconName : "file://" + iconName;
+        }
+        return Quickshell.iconPath(iconName, "application-x-executable");
+    }
+
     // ================= menu do app =================
     property var menuEntry: null
     property real menuY: 0
@@ -367,7 +377,7 @@ PanelWindow {
 
                             IconImage {
                                 implicitSize: 34
-                                source: Quickshell.iconPath(rowItem.modelData.icon, "application-x-executable")
+                                source: launcher.appIconSource(rowItem.modelData.icon)
                                 scale: rowItem.ListView.isCurrentItem ? 1.08 : 1
                                 Behavior on scale { NumberAnimation { duration: 140; easing.type: Easing.OutBack } }
                             }

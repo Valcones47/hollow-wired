@@ -1,0 +1,1 @@
+/home/val47/.local/bin/rice-blur-toggle

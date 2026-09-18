@@ -123,6 +123,10 @@ PanelWindow {
 
     function iconFor(item) {
         const name = item.entry ? item.entry.icon : item.appId;
+        if (!name || name === "") return Quickshell.iconPath("application-x-executable");
+        if (name.startsWith("/") || name.startsWith("file://")) {
+            return name.startsWith("file://") ? name : "file://" + name;
+        }
         return Quickshell.iconPath(name, "application-x-executable");
     }
     function activateItem(item) {

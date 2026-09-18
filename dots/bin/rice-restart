@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Botão de emergência: reinicia a interface (quickshell + waybar, se existir)
 # sem precisar abrir terminal. Bind: Super+Ctrl+R.
-pkill -x quickshell
-pkill -x waybar
+pkill -9 -x quickshell 2>/dev/null || true
+pkill -x waybar 2>/dev/null || true
 sleep 0.5
-nohup quickshell >/dev/null 2>&1 &
+quickshell -d >/dev/null 2>&1 || (nohup quickshell >/dev/null 2>&1 & disown)
 if [ -f "$HOME/.config/waybar/config.jsonc" ] && grep -qE "^[[:space:]]*hl.exec_cmd\(\"waybar\"\)" "$HOME/.config/hypr/hyprland.lua"; then
-    nohup waybar >/dev/null 2>&1 &
+    nohup waybar >/dev/null 2>&1 & disown
 fi
 notify-send -a "Rice" -t 2000 "Interface reiniciada"

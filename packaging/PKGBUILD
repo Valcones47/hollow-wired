@@ -42,6 +42,7 @@ depends=(
     'dolphin'
     'xdg-desktop-portal'
     'xdg-desktop-portal-hyprland'
+    'xdg-desktop-portal-gtk'
     'xdg-desktop-portal-kde'
     'wlsunset'
     'mako'
@@ -52,6 +53,8 @@ depends=(
     'gtk4-layer-shell'
     'python-gobject'
     'flatpak'
+    'papirus-icon-theme'
+    'breeze-icons'
 )
 optdepends=(
     'nvidia-utils: Aceleração para dGPU NVIDIA'

@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# rice-portals: Inicialização e reset de portais XDG e variáveis de ambiente DBus
+# Elimina o congelamento de 25 segundos no início de aplicativos no Hyprland
+# ==============================================================================
+set -e
+
+sleep 1
+
+# 1. Exporta variáveis Wayland para o ambiente do DBus e systemd --user
+if command -v dbus-update-activation-environment >/dev/null 2>&1; then
+    dbus-update-activation-environment --systemd \
+        WAYLAND_DISPLAY \
+        DISPLAY \
+        XDG_CURRENT_DESKTOP=Hyprland \
+        XDG_SESSION_TYPE=wayland \
+        XDG_SESSION_DESKTOP=Hyprland \
+        QT_QPA_PLATFORMTHEME \
+        2>/dev/null || true
+fi
+
+if command -v systemctl >/dev/null 2>&1; then
+    systemctl --user import-environment \
+        WAYLAND_DISPLAY \
+        DISPLAY \
+        XDG_CURRENT_DESKTOP \
+        XDG_SESSION_TYPE \
+        XDG_SESSION_DESKTOP \
+        QT_QPA_PLATFORMTHEME \
+        2>/dev/null || true
+
+    # 2. Desativa e mascara o xdg-desktop-portal-gnome se presente
+    # (Causa congelamento crônico de 25s fora do ambiente GNOME Shell)
+    if systemctl --user list-unit-files 2>/dev/null | grep -q "xdg-desktop-portal-gnome"; then
+        systemctl --user stop xdg-desktop-portal-gnome 2>/dev/null || true
+        systemctl --user mask xdg-desktop-portal-gnome 2>/dev/null || true
+    fi
+
+    # 3. Reinicia os serviços de portal na ordem correta
+    systemctl --user stop xdg-desktop-portal-hyprland xdg-desktop-portal-gtk xdg-desktop-portal-kde xdg-desktop-portal 2>/dev/null || true
+    sleep 0.5
+    systemctl --user start xdg-desktop-portal-hyprland 2>/dev/null || true
+    systemctl --user start xdg-desktop-portal 2>/dev/null || true
+fi

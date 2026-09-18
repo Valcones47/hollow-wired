@@ -5264,9 +5264,10 @@ PanelWindow {
                                         {
                                             cat: "Captura & Gravação de Tela",
                                             binds: [
-                                                { key: "Print / Super+Shift+S", action: "Print de Região com Editor Swappy" },
-                                                { key: "Shift + Print", action: "Print da Tela Inteira" },
-                                                { key: "Ctrl + Print", action: "Print da Janela Ativa" },
+                                                { key: "Print / Super+Shift+S", action: "Captura de Região (Salva e Copia)" },
+                                                { key: "Super + Alt + S", action: "Captura com Editor de Anotações (Swappy)" },
+                                                { key: "Shift + Print", action: "Captura da Tela Inteira" },
+                                                { key: "Ctrl + Print", action: "Captura da Janela Ativa" },
                                                 { key: "Super + Shift + R", action: "Gravar Vídeo de Região com Áudio" },
                                                 { key: "Super + Ctrl + Shift + R", action: "Gravar Vídeo da Tela Inteira" }
                                             ]

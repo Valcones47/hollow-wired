@@ -159,6 +159,11 @@ hl.on("hyprland.start", function()
         hl.exec_cmd("systemctl --user unset-environment __NV_PRIME_RENDER_OFFLOAD __GLX_VENDOR_LIBRARY_NAME")
     end
 
+    -- Atualiza variáveis Wayland para o DBus/systemd e inicia portais limpos (elimina delay crônico de 25s em apps)
+    hl.exec_cmd("dbus-update-activation-environment --systemd WAYLAND_DISPLAY DISPLAY XDG_CURRENT_DESKTOP=Hyprland XDG_SESSION_TYPE=wayland QT_QPA_PLATFORMTHEME")
+    hl.exec_cmd("systemctl --user import-environment WAYLAND_DISPLAY DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_TYPE QT_QPA_PLATFORMTHEME")
+    hl.exec_cmd(home .. "/.local/bin/rice-portals")
+
     -- Desativa blur automaticamente quando a janela ativa está em tela cheia;
     -- reativa ao sair. Evita gastar ~70% da Intel UHD com blur inútil em jogo.
     -- (os.execute com & porque hl.exec_cmd não mantém scripts de longa duração)
@@ -487,20 +492,18 @@ hl.bind("XF86AudioNext", hl.dsp.exec_cmd("playerctl next"),       { locked = tru
 -----------------
 ---- SCREENSHOT -
 -----------------
--- hyprshot (equivalente ao Spectacle do KDE). hyprshot.conf NÃO é lido pelo
--- hyprshot de verdade (não existe suporte a arquivo de config nele) — por
--- isso a pasta de destino vai direto na flag -o.
-local screenshotDir = home .. "/Imagens/Capturas de tela"
-hl.bind("Print",        hl.dsp.exec_cmd('hyprshot -m region -o "' .. screenshotDir .. '"'))
-hl.bind("SHIFT + Print", hl.dsp.exec_cmd('hyprshot -m output -o "' .. screenshotDir .. '"'))
-hl.bind("CTRL + Print",  hl.dsp.exec_cmd('hyprshot -m window -o "' .. screenshotDir .. '"'))
+-- Sistema unificado de captura via rice-screenshot (hyprshot + swappy seguro)
+-- Print e Super+Shift+S: Captura de região (salva em ~/Imagens/Capturas de tela, copia pro clipboard e notifica)
+-- Super+Alt+S: Captura de região com editor de anotações (Swappy)
+hl.bind("Print",                         hl.dsp.exec_cmd("rice-screenshot region"))
+hl.bind(mainMod .. " + SHIFT + S",       hl.dsp.exec_cmd("rice-screenshot region"))
+hl.bind(mainMod .. " + ALT + S",         hl.dsp.exec_cmd("rice-screenshot edit"))
+hl.bind("SHIFT + Print",                 hl.dsp.exec_cmd("rice-screenshot output"))
+hl.bind("CTRL + Print",                  hl.dsp.exec_cmd("rice-screenshot window"))
 
 -----------------------
 ---- QoL (backlog) ----
 -----------------------
--- Print com anotação: seleciona região e abre no swappy (salva em
--- screenshotDir, config em ~/.config/swappy/config).
-hl.bind(mainMod .. " + SHIFT + S", hl.dsp.exec_cmd([[sh -c 'grim -g "$(slurp)" - | swappy -f -']]))
 -- Gravar tela: região (Super+Shift+R) ou tela inteira (Super+Ctrl+Shift+R).
 -- Rodar de novo para parar. Script em ~/.local/bin/rice-record.
 hl.bind(mainMod .. " + SHIFT + R",        hl.dsp.exec_cmd("rice-record toggle --mode region"))

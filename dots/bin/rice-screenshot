@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# rice-screenshot: Sistema unificado de captura de tela do hollow-wired
+# Suporta: seleção de região, tela inteira, janela ativa e anotação (swappy)
+# ==============================================================================
+set -e
+
+DIR="${XDG_PICTURES_DIR:-$HOME/Imagens}/Capturas de tela"
+mkdir -p "$DIR"
+
+MODE="${1:-region}"
+
+case "$MODE" in
+    region)
+        # Captura de região via hyprshot (salva no disco, copia pro clipboard e notifica)
+        hyprshot -m region -o "$DIR" 2>/dev/null || true
+        ;;
+
+    output|full)
+        # Captura de tela inteira do monitor atual
+        hyprshot -m output -o "$DIR" 2>/dev/null || true
+        ;;
+
+    window)
+        # Captura da janela ativa sob o cursor/foco
+        hyprshot -m window -o "$DIR" 2>/dev/null || true
+        ;;
+
+    edit|swappy|annotate)
+        # Seleção segura via slurp: se o usuário cancelar (ESC/clique solto), aborta sem abrir janela vazia
+        GEOM=$(slurp 2>/dev/null) || true
+        if [ -z "$GEOM" ]; then
+            exit 0
+        fi
+
+        TEMP_IMG="/tmp/swappy-shot-$(date +%s%N).png"
+        if grim -g "$GEOM" "$TEMP_IMG" 2>/dev/null; then
+            # Se swappy estiver disponível, abre para edição/anotação
+            if command -v swappy >/dev/null 2>&1; then
+                swappy -f "$TEMP_IMG"
+            else
+                # Fallback caso swappy não esteja instalado: copia e salva diretamente
+                wl-copy < "$TEMP_IMG"
+                DEST="$DIR/captura-$(date +%Y-%m-%d_%H-%M-%S).png"
+                cp "$TEMP_IMG" "$DEST"
+                notify-send "Captura de tela" "Imagem salva em $DEST e copiada para a área de transferência" -i "$DEST" -a "Screenshot"
+            fi
+            rm -f "$TEMP_IMG"
+        fi
+        ;;
+
+    *)
+        echo "Uso: rice-screenshot [region|output|full|window|edit]"
+        echo "  region : Seleciona região (padrão)"
+        echo "  output : Tela inteira"
+        echo "  window : Janela sob o cursor"
+        echo "  edit   : Seleciona região e abre no editor de anotações (Swappy)"
+        exit 1
+        ;;
+esac
