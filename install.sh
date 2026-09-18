@@ -145,10 +145,26 @@ fi
 CPU_MODEL=$(lscpu | grep "Model name:" | sed 's/Model name:[ \t]*//' || echo "Processador Compatível")
 info_msg "Processador: ${WHITE}$CPU_MODEL${NC}"
 
-# Detecção informativa de GPU (NÃO instala drivers no sistema; deixa para o CachyOS / usuário)
+# Detecção informativa de GPU & Verificação de Séries Legadas da NVIDIA (900 / 1000)
 GPU_INFO=$(lspci 2>/dev/null | grep -Ei "vga|3d" | sed 's/.*: //g' | tr '\n' ' | ' | sed 's/ | $//' || echo "Gráficos Genéricos")
 info_msg "Placa(s) de Vídeo: ${WHITE}$GPU_INFO${NC}"
-info_msg "Drivers de GPU: ${GREEN}Gerenciamento delegado ao CachyOS/Hardware Detection (chwd)${NC}"
+
+IS_LEGACY_NVIDIA=false
+LEGACY_NVIDIA_NAME=""
+if echo "$GPU_INFO" | grep -Eiq "(GeForce|GTX|GT)[^]]*\b9[0-9]{2}"; then
+    IS_LEGACY_NVIDIA=true
+    LEGACY_NVIDIA_NAME="Série 900 (Maxwell - ex: GTX 950/960/970/980)"
+elif echo "$GPU_INFO" | grep -Eiq "(GeForce|GTX|GT)[^]]*\b10[0-9]{2}"; then
+    IS_LEGACY_NVIDIA=true
+    LEGACY_NVIDIA_NAME="Série 1000 (Pascal - ex: GTX 1050/1060/1070/1080)"
+fi
+
+if [ "$IS_LEGACY_NVIDIA" = true ]; then
+    warn_msg "NVIDIA ${WHITE}$LEGACY_NVIDIA_NAME${AMBER} detectada!"
+    info_msg "Drivers de GPU: ${CYAN}Opção de instalação do driver legado proprietário (550xx) será oferecida na Etapa 4.${NC}"
+else
+    info_msg "Drivers de GPU: ${GREEN}Gerenciamento delegado ao CachyOS/Hardware Detection (chwd)${NC}"
+fi
 
 CHASSIS="Desktop"
 if [ -d /sys/class/power_supply/BAT0 ] || [ -d /sys/class/power_supply/BAT1 ]; then
@@ -396,6 +412,32 @@ if [[ "$APPLY_BOOT" =~ ^[Ss]$ ]]; then
     gear_msg "Executando rice-apply-boot-login..."
     sudo "$HOME/.local/bin/rice-apply-boot-login" || true
     ok_msg "SDDM e Limine configurados com sucesso!"
+fi
+
+# Opcional: Driver Proprietário Legado NVIDIA para Séries 900 / 1000 (Maxwell / Pascal)
+if [ "$IS_LEGACY_NVIDIA" = true ]; then
+    echo -e "\n${CYAN}◈ [OPCIONAL] Placa NVIDIA ${WHITE}$LEGACY_NVIDIA_NAME${CYAN} detectada!${NC}"
+    if pacman -Q nvidia-550xx-dkms >/dev/null 2>&1 || pacman -Q nvidia-dkms >/dev/null 2>&1; then
+        ok_msg "Driver proprietário NVIDIA já está instalado no sistema."
+    else
+        echo -e "  ${GRAY}Os drivers abertos (nouveau) travam GPUs dessa série em clock mínimo de repouso (~135 MHz).${NC}"
+        echo -e "  ${GRAY}Instalar o driver proprietário (nvidia-550xx-dkms) libera 100% de clock, FPS e aceleração por hardware.${NC}"
+        read -rp "  Deseja instalar o driver legado nvidia-550xx agora? [s/N]: " INSTALL_LEGACY_NV || true
+        INSTALL_LEGACY_NV=${INSTALL_LEGACY_NV:-n}
+        if [[ "$INSTALL_LEGACY_NV" =~ ^[Ss]$ ]]; then
+            gear_msg "Instalando nvidia-550xx-dkms e utilitários via $AUR_HELPER..."
+            $AUR_HELPER -S --needed --noconfirm nvidia-550xx-dkms nvidia-550xx-utils lib32-nvidia-550xx-utils 2>/dev/null || \
+            $AUR_HELPER -S --needed nvidia-550xx-dkms nvidia-550xx-utils lib32-nvidia-550xx-utils
+            
+            gear_msg "Configurando nvidia-drm.modeset=1 e preservação de VRAM em /etc/modprobe.d/nvidia.conf..."
+            sudo bash -c 'cat << "EOF" > /etc/modprobe.d/nvidia.conf
+options nvidia-drm modeset=1 fbdev=1
+options nvidia NVreg_PreserveVideoMemoryAllocations=1
+EOF'
+            sudo systemctl enable nvidia-suspend.service nvidia-hibernate.service nvidia-resume.service 2>/dev/null || true
+            ok_msg "Driver legado nvidia-550xx e serviços de kernel configurados com sucesso!"
+        fi
+    fi
 fi
 
 # ------------------------------------------------------------------------------
