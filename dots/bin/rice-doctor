@@ -68,12 +68,23 @@ else
   BAD_QS=1
 fi
 
-# 7. dGPU NVIDIA (para jogos)
-echo -ne "${C_BOLD}7. Placa Gráfica NVIDIA RTX 3050... ${C_RESET}"
+# 7. Placa Gráfica NVIDIA
+GPU_NAME=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -n 1)
+[ -z "$GPU_NAME" ] && GPU_NAME=$(lspci 2>/dev/null | grep -Ei "vga|3d" | grep -i "nvidia" | sed 's/.*: //g' | head -n 1)
+GPU_LABEL="${GPU_NAME:-NVIDIA GPU}"
+echo -ne "${C_BOLD}7. Placa Gráfica ($GPU_LABEL)... ${C_RESET}"
 if nvidia-smi &>/dev/null; then
   echo -e "${C_GREEN}[✔ PRONTA (Driver Ativo)]${C_RESET}"
+  if [ -f /sys/module/nvidia_drm/parameters/modeset ]; then
+    MODESET=$(cat /sys/module/nvidia_drm/parameters/modeset 2>/dev/null)
+    if [ "$MODESET" = "Y" ]; then
+      echo -e "   ${C_CYAN}└─ DRM Kernel Modesetting (nvidia-drm.modeset=1): [✔ ATIVO]${C_RESET}"
+    else
+      echo -e "   ${C_YELLOW}└─ DRM Modeset: [⚠ INATIVO] (Configure nvidia-drm.modeset=1)${C_RESET}"
+    fi
+  fi
 else
-  echo -e "${C_YELLOW}[⚠ DRIVER OU GPU SUSPENSA]${C_RESET}"
+  echo -e "${C_YELLOW}[⚠ DRIVER NÃO CARREGADO OU GPU SUSPENSA]${C_RESET}"
 fi
 
 echo ""

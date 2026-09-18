@@ -117,6 +117,7 @@ if hasNvidia and hasIgpu then
 elseif hasNvidia and not hasIgpu then
     -- PC Desktop com NVIDIA exclusiva (sem iGPU): aceleração direta por hardware
     hl.env("LIBVA_DRIVER_NAME", "nvidia")
+    hl.env("GBM_BACKEND", "nvidia-drm")
     hl.env("__GLX_VENDOR_LIBRARY_NAME", "nvidia")
     hl.env("NVD_BACKEND", "direct")
     hl.env("ELECTRON_OZONE_PLATFORM_HINT", "auto")
@@ -343,7 +344,8 @@ hl.config({
     },
 
     cursor = {
-        no_hardware_cursors = false,
+        -- Em desktops com NVIDIA exclusiva (ex: GTX 950/1060), software cursors evita sumiço ou lag de ponteiro
+        no_hardware_cursors = (hasNvidia and not hasIgpu),
         -- Não teleporta o mouse pro centro da janela ao focar (dock, launcher,
         -- Super+setas). Pedido do usuário.
         no_warps = true,
