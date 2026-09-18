@@ -11,24 +11,24 @@ import Quickshell.Io
 QtObject {
     id: root
 
-    property color background: "#191B1C"
-    property color foreground: "#42FFFF"
-    property color color0: "#04131F"
-    property color color1: "#A4296F"
-    property color color2: "#A8295F"
-    property color color3: "#A22246"
-    property color color4: "#179394"
-    property color color5: "#A52557"
-    property color color6: "#079595"
-    property color color7: "#39FFFF"
-    property color color8: "#00B5B6"
-    property color color9: "#FE36A7"
-    property color color10: "#FE3087"
-    property color color11: "#F01F59"
-    property color color12: "#16E6E7"
-    property color color13: "#F62877"
-    property color color14: "#05FEFE"
-    property color color15: "#94F7F7"
+    property color background: "#111218"
+    property color foreground: "#e2e8f0"
+    property color color0: "#181922"
+    property color color1: "#f43f5e"
+    property color color2: "#10b981"
+    property color color3: "#f59e0b"
+    property color color4: "#3b82f6"
+    property color color5: "#d946ef"
+    property color color6: "#06b6d4"
+    property color color7: "#94a3b8"
+    property color color8: "#475569"
+    property color color9: "#fb7185"
+    property color color10: "#ff2a85"
+    property color color11: "#ef4444"
+    property color color12: "#60a5fa"
+    property color color13: "#e879f9"
+    property color color14: "#22d3ee"
+    property color color15: "#f8fafc"
 
     // Aliases semânticos, no mesmo espírito das variáveis @wallust_* do
     // waybar/eww (mesmo mapeamento: accent1=color4, accent2=color6,
@@ -134,28 +134,33 @@ QtObject {
         watchChanges: true
         onFileChanged: reload()
         onLoaded: {
-            const data = JSON.parse(text());
-            root.background = data.background;
-            root.foreground = data.foreground;
-            root.color0 = data.color0;
-            root.color1 = data.color1;
-            root.color2 = data.color2;
-            root.color3 = data.color3;
-            root.color4 = data.color4;
-            root.color5 = data.color5;
-            root.color6 = data.color6;
-            root.color7 = data.color7;
-            root.color8 = data.color8;
-            root.color9 = data.color9;
-            root.color10 = data.color10;
-            root.color11 = data.color11;
-            root.color12 = data.color12;
-            root.color13 = data.color13;
-            root.color14 = data.color14;
-            root.color15 = data.color15;
+            try {
+                const data = JSON.parse(text());
+                if (!data) return;
+                if (data.background) root.background = data.background;
+                if (data.foreground) root.foreground = data.foreground;
+                if (data.color0) root.color0 = data.color0;
+                if (data.color1) root.color1 = data.color1;
+                if (data.color2) root.color2 = data.color2;
+                if (data.color3) root.color3 = data.color3;
+                if (data.color4) root.color4 = data.color4;
+                if (data.color5) root.color5 = data.color5;
+                if (data.color6) root.color6 = data.color6;
+                if (data.color7) root.color7 = data.color7;
+                if (data.color8) root.color8 = data.color8;
+                if (data.color9) root.color9 = data.color9;
+                if (data.color10) root.color10 = data.color10;
+                if (data.color11) root.color11 = data.color11;
+                if (data.color12) root.color12 = data.color12;
+                if (data.color13) root.color13 = data.color13;
+                if (data.color14) root.color14 = data.color14;
+                if (data.color15) root.color15 = data.color15;
+            } catch (e) {
+                console.log("Theme: erro ao processar colors-quickshell.json:", e);
+            }
         }
         onLoadFailed: (error) => {
-            console.log("Theme: falha ao carregar colors-quickshell.json:", error);
+            console.log("Theme: colors-quickshell.json ausente (usando paleta padrão dark):", error);
         }
     }
 

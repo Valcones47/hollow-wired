@@ -524,11 +524,20 @@ class SwitcherWindow(Gtk.ApplicationWindow):
             # Regenera a paleta do sistema (hypr/waybar/kitty/mako) a partir
             # do preview do wallpaper recém-aplicado. Ver ~/.config/wallust/.
             if wallpaper["preview"]:
-                subprocess.Popen(
-                    ["wallust", "run", wallpaper["preview"]],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                )
+                import shutil
+                if shutil.which("wallust"):
+                    subprocess.Popen(
+                        ["wallust", "run", wallpaper["preview"]],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
+                else:
+                    subprocess.Popen(
+                        ["notify-send", "-a", "Wallust", "-i", "dialog-warning", "-t", "4000",
+                         "Wallust não encontrado", "Instale com: yay -S wallust-git para extrair cores do wallpaper"],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                    )
                 sddm_sync = os.path.expanduser("~/.local/bin/rice-sddm-sync-wallpaper")
                 if os.path.isfile(sddm_sync):
                     subprocess.Popen(

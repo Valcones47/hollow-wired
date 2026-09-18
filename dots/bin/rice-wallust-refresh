@@ -25,6 +25,12 @@ except Exception:
     pass
 ' 2>/dev/null || true)
 
+if ! command -v wallust >/dev/null 2>&1; then
+    echo "[-] wallust não encontrado. Instale com: yay -S wallust-git"
+    notify-send -a "Wallust" -u normal -i dialog-warning -r 91199 -t 4000 "Wallust não encontrado" "Instale com: yay -S wallust-git para cores dinâmicas do wallpaper"
+    exit 1
+fi
+
 if [ -n "$preview" ] && [ -f "$preview" ]; then
     wallust run "$preview" >/dev/null 2>&1
     notify-send -a "Wallust" -i preferences-desktop-color -r 91199 -t 2500 "Paleta de Cores Atualizada" "Cores sincronizadas com o wallpaper ativo"

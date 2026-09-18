@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """
-rice-default-apps: Gerenciamento visual de aplicativos padrão para o Rice Hyprland / Quickshell
+rice-default-apps: Gerenciamento visual e preciso de aplicativos padrão para o Rice Hyprland / Quickshell
+Permite definir qualquer aplicativo instalado ou comando específico sem depender de presets frágeis.
 Uso:
   rice-default-apps get
-  rice-default-apps set <category> <desktop_file>
+  rice-default-apps set <category> <app_or_command_or_desktop>
+  rice-default-apps list
 """
 
 import sys
@@ -12,85 +14,267 @@ import os
 import glob
 import json
 import configparser
+import shutil
 
 CATEGORIES = {
     "browser": {
         "label": "Navegador Web",
-        "mimes": ["x-scheme-handler/http", "x-scheme-handler/https", "text/html"],
-        "candidates": ["zen.desktop", "brave-browser.desktop", "google-chrome.desktop", "firefox.desktop", "chromium.desktop"]
+        "desc": "Abre links HTTP/HTTPS e arquivos HTML",
+        "icon": "dashboard",
+        "mimes": ["x-scheme-handler/http", "x-scheme-handler/https", "text/html", "application/xhtml+xml", "x-scheme-handler/chrome"]
     },
     "filemanager": {
-        "label": "Gerenciador de Arquivos",
-        "mimes": ["inode/directory"],
-        "candidates": ["org.kde.dolphin.desktop", "thunar.desktop", "nautilus.desktop", "nemo.desktop", "pcmanfm.desktop"]
+        "label": "Gerenciador de Pastas",
+        "desc": "Abre diretórios e dispositivos de armazenamento",
+        "icon": "laptop",
+        "mimes": ["inode/directory"]
     },
     "editor": {
         "label": "Editor de Código & Texto",
-        "mimes": ["text/plain", "text/x-python", "text/x-shellscript", "text/markdown"],
-        "candidates": ["antigravity.desktop", "code.desktop", "code-oss.desktop", "kate.desktop", "micro.desktop", "mousepad.desktop", "nvim.desktop", "gedit.desktop"]
+        "desc": "Abre scripts, código-fonte e notas de texto",
+        "icon": "console",
+        "mimes": ["text/plain", "text/x-python", "text/x-shellscript", "text/markdown", "application/json", "text/x-c", "text/x-c++"]
     },
     "video": {
         "label": "Player de Vídeo",
-        "mimes": ["video/mp4", "video/x-matroska", "video/quicktime", "video/webm", "video/x-msvideo"],
-        "candidates": ["mpv.desktop", "vlc.desktop", "org.kde.haruna.desktop", "celluloid.desktop", "totem.desktop"]
+        "desc": "Reproduz filmes, gravações e clipes MP4/MKV",
+        "icon": "media",
+        "mimes": ["video/mp4", "video/x-matroska", "video/quicktime", "video/webm", "video/x-msvideo", "video/mpeg", "video/ogg"]
     },
     "image": {
         "label": "Visualizador de Imagens",
-        "mimes": ["image/png", "image/jpeg", "image/webp", "image/gif", "image/svg+xml"],
-        "candidates": ["org.kde.gwenview.desktop", "org.gnome.Loupe.desktop", "imv.desktop", "feh.desktop", "viewnior.desktop", "ristretto.desktop", "chromium.desktop"]
+        "desc": "Abre fotos, capturas de tela e imagens PNG/JPG",
+        "icon": "camera",
+        "mimes": ["image/png", "image/jpeg", "image/webp", "image/gif", "image/svg+xml", "image/bmp"]
+    },
+    "audio": {
+        "label": "Player de Música & Áudio",
+        "desc": "Reproduz faixas MP3, FLAC, OGG, WAV e AAC",
+        "icon": "music",
+        "mimes": ["audio/mpeg", "audio/ogg", "audio/flac", "audio/x-wav", "audio/aac", "audio/mp4"]
     }
 }
 
+APP_DIRS = [
+    os.path.expanduser("~/.local/share/applications"),
+    "/usr/share/applications",
+    "/var/lib/flatpak/exports/share/applications",
+    os.path.expanduser("~/.local/share/flatpak/exports/share/applications")
+]
+
 def notify(msg, title="Aplicativos Padrão", icon="preferences-desktop-default-applications"):
     try:
-        subprocess.run(["notify-send", "-a", "Rice", "-i", icon, "-t", "2500", title, msg], check=False)
+        subprocess.run(["notify-send", "-a", "Rice", "-i", icon, "-t", "2800", title, msg], check=False)
     except Exception:
         pass
 
-def parse_desktop_name(desktop_file):
-    paths = [
-        os.path.expanduser(f"~/.local/share/applications/{desktop_file}"),
-        f"/usr/share/applications/{desktop_file}",
-        f"/var/lib/flatpak/exports/share/applications/{desktop_file}",
-        os.path.expanduser(f"~/.local/share/flatpak/exports/share/applications/{desktop_file}")
-    ]
-    for p in paths:
-        if os.path.exists(p):
-            try:
-                cp = configparser.ConfigParser(interpolation=None)
-                cp.read(p, encoding="utf-8", errors="ignore")
-                if "Desktop Entry" in cp:
-                    name = cp["Desktop Entry"].get("Name[pt_BR]") or cp["Desktop Entry"].get("Name")
-                    icon = cp["Desktop Entry"].get("Icon", "application-x-executable")
-                    if name:
-                        return name, icon
-            except Exception:
-                pass
-    clean = desktop_file.replace(".desktop", "").split(".")[-1].capitalize()
-    return clean, "application-x-executable"
+def parse_desktop_file(p):
+    try:
+        cp = configparser.ConfigParser(interpolation=None)
+        with open(p, "r", encoding="utf-8", errors="ignore") as f:
+            cp.read_file(f)
+        if "Desktop Entry" in cp:
+            sec = cp["Desktop Entry"]
+            name = sec.get("Name[pt_BR]") or sec.get("Name") or ""
+            icon = sec.get("Icon") or "application-x-executable"
+            comment = sec.get("Comment[pt_BR]") or sec.get("Comment") or ""
+            exec_cmd = sec.get("Exec") or ""
+            no_display = sec.getboolean("NoDisplay", fallback=False)
+            return {
+                "name": name,
+                "icon": icon,
+                "comment": comment,
+                "exec": exec_cmd,
+                "no_display": no_display,
+                "path": p
+            }
+    except Exception:
+        pass
+    return None
 
-def get_installed_desktop_files():
-    all_files = set()
-    dirs = [
-        "/usr/share/applications",
-        os.path.expanduser("~/.local/share/applications"),
-        "/var/lib/flatpak/exports/share/applications",
-        os.path.expanduser("~/.local/share/flatpak/exports/share/applications")
-    ]
-    for d in dirs:
-        if os.path.exists(d):
-            for f in os.listdir(d):
-                if f.endswith(".desktop"):
-                    all_files.add(f)
-    return all_files
+def find_desktop_info(desktop_id):
+    """Localiza o arquivo .desktop pelo ID nos diretórios padrão."""
+    if not desktop_id:
+        return None
+    for d in APP_DIRS:
+        p = os.path.join(d, desktop_id)
+        if os.path.isfile(p):
+            info = parse_desktop_file(p)
+            if info:
+                return info
+    clean_name = desktop_id.replace(".desktop", "").split(".")[-1].capitalize()
+    return {
+        "name": clean_name,
+        "icon": "application-x-executable",
+        "comment": "",
+        "exec": desktop_id,
+        "no_display": False,
+        "path": ""
+    }
+
+def resolve_desktop_target(query):
+    """
+    Resolve qualquer entrada do usuário (nome, comando, parcial ou .desktop)
+    para o arquivo .desktop exato correspondente no sistema.
+    """
+    q = query.strip()
+    if not q:
+        return None, None
+
+    # 1. Se já termina com .desktop ou nome exato em diretórios
+    target_names = [q] if q.endswith(".desktop") else [q + ".desktop", q]
+    for d in APP_DIRS:
+        for t in target_names:
+            p = os.path.join(d, t)
+            if os.path.isfile(p):
+                info = parse_desktop_file(p)
+                return t, info["name"] if info and info["name"] else q
+
+    q_low = q.lower()
+
+    # 2. Busca inteligente por similaridade em todos os .desktops instalados
+    matches = []
+    for d in APP_DIRS:
+        if not os.path.isdir(d):
+            continue
+        for fname in os.listdir(d):
+            if not fname.endswith(".desktop"):
+                continue
+            p = os.path.join(d, fname)
+            info = parse_desktop_file(p)
+            if not info or info["no_display"]:
+                continue
+
+            fname_low = fname.lower()
+            name_low = info["name"].lower()
+            exec_low = info["exec"].lower()
+
+            score = 0
+            if fname_low == q_low or fname_low == q_low + ".desktop":
+                score = 100
+            elif name_low == q_low:
+                score = 98
+            elif fname_low.startswith(q_low):
+                score = 85
+            elif name_low.startswith(q_low):
+                score = 80
+            elif q_low in fname_low:
+                score = 65
+            elif q_low in name_low:
+                score = 60
+            elif exec_low.startswith(q_low) or f"/{q_low}" in exec_low:
+                score = 55
+
+            if score > 0:
+                matches.append((score, fname, info["name"]))
+
+    if matches:
+        matches.sort(key=lambda x: -x[0])
+        return matches[0][1], matches[0][2]
+
+    # 3. Se é um comando válido no PATH sem .desktop existente, cria um desktop customizado em ~/.local/share/applications
+    bin_path = shutil.which(q)
+    if bin_path:
+        custom_desktop = f"{os.path.basename(q)}-user.desktop"
+        custom_path = os.path.expanduser(f"~/.local/share/applications/{custom_desktop}")
+        os.makedirs(os.path.dirname(custom_path), exist_ok=True)
+        content = f"""[Desktop Entry]
+Type=Application
+Name={q.capitalize()}
+Exec={bin_path} %U
+Icon=application-x-executable
+Terminal=false
+Comment=Aplicativo configurado pelo Rice Control Center
+"""
+        try:
+            with open(custom_path, "w", encoding="utf-8") as f:
+                f.write(content)
+            subprocess.run(["update-desktop-database", os.path.expanduser("~/.local/share/applications")], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return custom_desktop, q.capitalize()
+        except Exception:
+            pass
+
+    # 4. Fallback: se o usuário digitou algo com .desktop, usa diretamente
+    if q.endswith(".desktop"):
+        return q, q.replace(".desktop", "").capitalize()
+
+    return f"{q}.desktop", q.capitalize()
+
+def update_mimeapps_list(desktop_file, mimes):
+    """Atualiza ~/.config/mimeapps.list de forma atômica e segura."""
+    mime_path = os.path.expanduser("~/.config/mimeapps.list")
+    lines = []
+    if os.path.isfile(mime_path):
+        try:
+            with open(mime_path, "r", encoding="utf-8", errors="ignore") as f:
+                lines = f.readlines()
+        except Exception:
+            lines = []
+
+    sections = {}
+    order = []
+    curr_sec = "Default Applications"
+
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("[") and stripped.endswith("]"):
+            curr_sec = stripped[1:-1]
+            if curr_sec not in sections:
+                sections[curr_sec] = []
+                order.append(curr_sec)
+        else:
+            if curr_sec not in sections:
+                sections[curr_sec] = []
+                order.append(curr_sec)
+            sections[curr_sec].append(line)
+
+    if "Default Applications" not in sections:
+        sections["Default Applications"] = []
+        order.insert(0, "Default Applications")
+    if "Added Associations" not in sections:
+        sections["Added Associations"] = []
+        order.append("Added Associations")
+
+    for sec_name in ["Default Applications", "Added Associations"]:
+        sec_lines = sections[sec_name]
+        for mime in mimes:
+            new_lines = []
+            found = False
+            for l in sec_lines:
+                s = l.strip()
+                if s.startswith(f"{mime}="):
+                    parts = s.split("=", 1)[1].split(";")
+                    parts = [p.strip() for p in parts if p.strip() and p.strip() != desktop_file]
+                    parts.insert(0, desktop_file)
+                    new_lines.append(f"{mime}={';'.join(parts)};\n")
+                    found = True
+                else:
+                    new_lines.append(l)
+            if not found:
+                new_lines.append(f"{mime}={desktop_file};\n")
+            sections[sec_name] = new_lines
+
+    output = []
+    for sec_name in order:
+        output.append(f"[{sec_name}]\n")
+        output.extend(sections[sec_name])
+        if sections[sec_name] and not sections[sec_name][-1].endswith("\n"):
+            output.append("\n")
+
+    tmp_path = mime_path + ".tmp"
+    try:
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            f.writelines(output)
+        os.replace(tmp_path, mime_path)
+    except Exception as e:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
 
 def get_data():
-    installed = get_installed_desktop_files()
     data = {}
-
     for cat_id, cat_info in CATEGORIES.items():
-        # Get current default
         curr_desktop = None
+
         if cat_id == "browser":
             try:
                 out = subprocess.check_output(["xdg-settings", "get", "default-web-browser"], text=True, stderr=subprocess.DEVNULL).strip()
@@ -98,73 +282,93 @@ def get_data():
                     curr_desktop = out
             except Exception:
                 pass
-        
+
         if not curr_desktop:
-            primary_mime = cat_info["mimes"][0]
-            try:
-                out = subprocess.check_output(["xdg-mime", "query", "default", primary_mime], text=True, stderr=subprocess.DEVNULL).strip()
-                if out:
-                    curr_desktop = out
-            except Exception:
-                pass
+            for mime in cat_info["mimes"]:
+                try:
+                    out = subprocess.check_output(["xdg-mime", "query", "default", mime], text=True, stderr=subprocess.DEVNULL).strip()
+                    if out:
+                        curr_desktop = out
+                        break
+                except Exception:
+                    pass
 
-        curr_name, curr_icon = parse_desktop_name(curr_desktop) if curr_desktop else ("Não definido", "application-x-executable")
-
-        # Discover all installed apps matching candidates or current
-        opts = []
-        seen = set()
-        
-        # Always include current if exists
-        if curr_desktop and curr_desktop in installed:
-            opts.append({
-                "desktop": curr_desktop,
-                "name": curr_name,
-                "icon": curr_icon,
-                "is_current": True
-            })
-            seen.add(curr_desktop)
-
-        # Include candidate options installed
-        for cand in cat_info["candidates"]:
-            if cand in installed and cand not in seen:
-                c_name, c_icon = parse_desktop_name(cand)
-                opts.append({
-                    "desktop": cand,
-                    "name": c_name,
-                    "icon": c_icon,
-                    "is_current": (cand == curr_desktop)
-                })
-                seen.add(cand)
+        info = find_desktop_info(curr_desktop) if curr_desktop else None
+        curr_name = info["name"] if info and info["name"] else (curr_desktop or "Não definido")
+        curr_icon = info["icon"] if info and info["icon"] else "application-x-executable"
 
         data[cat_id] = {
+            "id": cat_id,
             "label": cat_info["label"],
-            "current": curr_desktop,
+            "desc": cat_info["desc"],
+            "icon": cat_info["icon"],
+            "current_desktop": curr_desktop or "",
             "current_name": curr_name,
-            "options": opts
+            "current_icon": curr_icon,
+            "is_set": bool(curr_desktop)
         }
 
     return data
 
-def set_default(cat_id, desktop_file):
+def set_default(cat_id, target_query):
     if cat_id not in CATEGORIES:
-        return False
+        return False, "Categoria inválida"
 
     cat_info = CATEGORIES[cat_id]
+    desktop_file, app_name = resolve_desktop_target(target_query)
+
+    if not desktop_file:
+        return False, f"Não foi possível identificar o app '{target_query}'"
+
+    # Se for navegador web, atualiza xdg-settings
     if cat_id == "browser":
         try:
-            subprocess.run(["xdg-settings", "set", "default-web-browser", desktop_file], check=False)
+            subprocess.run(["xdg-settings", "set", "default-web-browser", desktop_file], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except Exception:
             pass
 
+    # Atualiza todos os MIME types da categoria via xdg-mime
     for mime in cat_info["mimes"]:
         try:
-            subprocess.run(["xdg-mime", "default", desktop_file, mime], check=False)
+            subprocess.run(["xdg-mime", "default", desktop_file, mime], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except Exception:
             pass
 
-    name, _ = parse_desktop_name(desktop_file)
-    notify(f"{name} definido como padrão para {cat_info['label']}")
-    return True
+    # Atualiza diretamente o ~/.config/mimeapps.list
+    update_mimeapps_list(desktop_file, cat_info["mimes"])
+
+    # Atualiza banco do desktop
+    local_apps = os.path.expanduser("~/.local/share/applications")
+    if os.path.isdir(local_apps):
+        subprocess.run(["update-desktop-database", local_apps], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    notify(f"{app_name} definido como padrão para {cat_info['label']} ({desktop_file})")
+    return True, desktop_file
+
+def list_installed_apps():
+    """Retorna todos os aplicativos com .desktop instalados no sistema."""
+    apps = []
+    seen = set()
+    for d in APP_DIRS:
+        if not os.path.isdir(d):
+            continue
+        for f in sorted(os.listdir(d)):
+            if not f.endswith(".desktop") or f in seen:
+                continue
+            seen.add(f)
+            p = os.path.join(d, f)
+            info = parse_desktop_file(p)
+            if info and not info["no_display"] and info["name"]:
+                apps.append({
+                    "id": f,
+                    "filename": f,
+                    "name": info["name"],
+                    "icon": info["icon"],
+                    "comment": info["comment"],
+                    "exec": info["exec"]
+                })
+    apps.sort(key=lambda x: x["name"].lower())
+    return apps
 
 def main():
     cmd = sys.argv[1] if len(sys.argv) > 1 else "get"
@@ -175,12 +379,16 @@ def main():
 
     if cmd == "set" and len(sys.argv) > 3:
         cat = sys.argv[2]
-        desktop = sys.argv[3]
-        ok = set_default(cat, desktop)
-        print(json.dumps({"success": ok}))
+        target = sys.argv[3]
+        ok, res = set_default(cat, target)
+        print(json.dumps({"success": ok, "result": res}))
         return
 
-    print("Uso: rice-default-apps [get|set <category> <desktop_file>]")
+    if cmd == "list":
+        print(json.dumps(list_installed_apps(), indent=2))
+        return
+
+    print("Uso: rice-default-apps [get|set <category> <app>|list]")
 
 if __name__ == "__main__":
     main()

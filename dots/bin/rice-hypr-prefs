@@ -26,7 +26,7 @@ ensure_prefs_file() {
   "mouse_sensitivity": 0.0,
   "mouse_accel": "flat",
   "numlock": true,
-  "vrr": 1,
+  "vrr": 0,
   "monitor_hz": 144
 }
 JSON
@@ -63,7 +63,7 @@ apply_all() {
     mouse_sensitivity=$(jq -r '.mouse_sensitivity // 0.0' "$PREFS_FILE")
     mouse_accel=$(jq -r '.mouse_accel // "flat"' "$PREFS_FILE")
     numlock=$(jq -r '.numlock // true' "$PREFS_FILE")
-    vrr=$(jq -r '.vrr // 1' "$PREFS_FILE")
+    vrr=$(jq -r '.vrr // 0' "$PREFS_FILE")
     monitor_hz=$(jq -r '.monitor_hz // 144' "$PREFS_FILE")
 
     local gaps_out_sides=$(( gaps_out + 10 ))
@@ -205,7 +205,7 @@ case "$cmd" in
   "mouse_sensitivity": 0.0,
   "mouse_accel": "flat",
   "numlock": true,
-  "vrr": 1,
+  "vrr": 0,
   "monitor_hz": 144
 }
 JSON

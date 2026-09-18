@@ -74,7 +74,7 @@ PanelWindow {
     property string monitorModel: "AU Optronics 144Hz IPS"
     property string monitorRes: "1920x1080"
     property int monitorHz: 144
-    property bool vrrEnabled: true
+    property bool vrrEnabled: false
     property int screenBrightness: 40
 
     // Áudio
@@ -123,7 +123,9 @@ PanelWindow {
     property string netSelectedSsid: ""
 
     // Aplicativos Padrão
-    property var defaultAppsData: ({ browser: {}, filemanager: {}, editor: {}, video: {}, image: {} })
+    property var defaultAppsData: ({ browser: {}, filemanager: {}, editor: {}, video: {}, image: {}, audio: {} })
+    property string pickingDefaultCategory: ""
+    property string defaultAppSearchQuery: ""
 
     // Jogos & GPU
     property var gamingData: ({ gpu: { name: "", temp: 0, vram_used: 0, vram_total: 4096, util: 0, available: false }, gamemode_active: false })
@@ -154,6 +156,15 @@ PanelWindow {
     function showToast(msg) {
         win.toastMsg = msg;
         toastTimer.restart();
+    }
+    function appIconSource(iconName) {
+        if (!iconName || iconName === "") {
+            return Quickshell.iconPath("application-x-executable");
+        }
+        if (iconName.startsWith("/") || iconName.startsWith("file://")) {
+            return iconName.startsWith("file://") ? iconName : "file://" + iconName;
+        }
+        return Quickshell.iconPath(iconName, "application-x-executable");
     }
 
     // Processos de Leitura
@@ -4419,33 +4430,36 @@ PanelWindow {
                                         { id: "filemanager", title: "Gerenciador de Pastas", icon: Theme.icons.laptop, desc: "Abre diretórios e dispositivos" },
                                         { id: "editor", title: "Editor de Código & Texto", icon: Theme.icons.console, desc: "Abre scripts, código-fonte e notas de texto" },
                                         { id: "video", title: "Player de Vídeo", icon: Theme.icons.media, desc: "Reproduz filmes, gravações e clipes MP4/MKV" },
-                                        { id: "image", title: "Visualizador de Imagens", icon: Theme.icons.camera, desc: "Abre capturas de tela e fotos PNG/JPG" }
+                                        { id: "image", title: "Visualizador de Imagens", icon: Theme.icons.camera, desc: "Abre capturas de tela e fotos PNG/JPG" },
+                                        { id: "audio", title: "Player de Música & Áudio", icon: Theme.icons.music, desc: "Reproduz faixas MP3, FLAC, OGG, WAV e AAC" }
                                     ]
                                     delegate: Rectangle {
                                         id: defCatCard
                                         required property var modelData
                                         Layout.fillWidth: true
-                                        implicitHeight: catCol.implicitHeight + 24
+                                        implicitHeight: catCol.implicitHeight + 28
                                         radius: 12
                                         color: Theme.tile
                                         border.width: 1
-                                        border.color: Theme.withAlpha(Theme.outline, 0.2)
+                                        border.color: defCatCard.isPicking ? Theme.primary : Theme.withAlpha(Theme.outline, 0.2)
 
                                         property var catInfo: (win.defaultAppsData && win.defaultAppsData[defCatCard.modelData.id]) ? win.defaultAppsData[defCatCard.modelData.id] : null
+                                        property bool isPicking: win.pickingDefaultCategory === defCatCard.modelData.id
 
                                         ColumnLayout {
                                             id: catCol
                                             anchors.fill: parent
-                                            anchors.margins: 12
-                                            spacing: 10
+                                            anchors.margins: 14
+                                            spacing: 12
 
+                                            // Cabeçalho da Categoria
                                             RowLayout {
                                                 Layout.fillWidth: true
                                                 spacing: 8
                                                 Text {
                                                     text: defCatCard.modelData.icon
                                                     font.family: Theme.iconFontFamily
-                                                    font.pixelSize: 16
+                                                    font.pixelSize: 18
                                                     color: Theme.primary
                                                 }
                                                 ColumnLayout {
@@ -4467,74 +4481,395 @@ PanelWindow {
                                                 }
                                             }
 
-                                            Flow {
+                                            // Banner do App Padrão Atual
+                                            Rectangle {
+                                                Layout.fillWidth: true
+                                                implicitHeight: 46
+                                                radius: 8
+                                                color: Theme.withAlpha(Theme.background, 0.6)
+                                                border.width: 1
+                                                border.color: Theme.withAlpha(Theme.outline, 0.2)
+
+                                                RowLayout {
+                                                    anchors.fill: parent
+                                                    anchors.leftMargin: 12
+                                                    anchors.rightMargin: 12
+                                                    spacing: 10
+
+                                                    Image {
+                                                        Layout.preferredWidth: 26
+                                                        Layout.preferredHeight: 26
+                                                        source: (defCatCard.catInfo && defCatCard.catInfo.current_icon) ? win.appIconSource(defCatCard.catInfo.current_icon) : win.appIconSource("")
+                                                        fillMode: Image.PreserveAspectFit
+                                                    }
+
+                                                    ColumnLayout {
+                                                        Layout.fillWidth: true
+                                                        spacing: 0
+                                                        Text {
+                                                            text: (defCatCard.catInfo && defCatCard.catInfo.current_name) ? defCatCard.catInfo.current_name : "Não definido"
+                                                            font.family: Theme.fontFamily
+                                                            font.pixelSize: 12
+                                                            font.weight: Font.DemiBold
+                                                            color: Theme.textColor
+                                                            elide: Text.ElideRight
+                                                        }
+                                                        Text {
+                                                            text: (defCatCard.catInfo && defCatCard.catInfo.current_desktop) ? defCatCard.catInfo.current_desktop : "Nenhum aplicativo associado"
+                                                            font.family: Theme.monoFamily
+                                                            font.pixelSize: 9
+                                                            color: Theme.subtext
+                                                            elide: Text.ElideRight
+                                                        }
+                                                    }
+
+                                                    Rectangle {
+                                                        implicitHeight: 22
+                                                        implicitWidth: currentBadgeRow.implicitWidth + 14
+                                                        radius: 6
+                                                        color: (defCatCard.catInfo && defCatCard.catInfo.is_set) ? Theme.withAlpha(Theme.primary, 0.2) : Theme.withAlpha(Theme.warning, 0.2)
+                                                        border.width: 1
+                                                        border.color: (defCatCard.catInfo && defCatCard.catInfo.is_set) ? Theme.primary : Theme.warning
+
+                                                        RowLayout {
+                                                            id: currentBadgeRow
+                                                            anchors.centerIn: parent
+                                                            spacing: 4
+                                                            Text {
+                                                                text: (defCatCard.catInfo && defCatCard.catInfo.is_set) ? Theme.icons.confirm : Theme.icons.alert
+                                                                font.family: Theme.iconFontFamily
+                                                                font.pixelSize: 11
+                                                                color: (defCatCard.catInfo && defCatCard.catInfo.is_set) ? Theme.primary : Theme.warning
+                                                            }
+                                                            Text {
+                                                                text: (defCatCard.catInfo && defCatCard.catInfo.is_set) ? "Padrão Ativo" : "Não Definido"
+                                                                font.family: Theme.fontFamily
+                                                                font.pixelSize: 10
+                                                                font.weight: Font.Bold
+                                                                color: (defCatCard.catInfo && defCatCard.catInfo.is_set) ? Theme.textColor : Theme.warning
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            // Linha de Ação: Entrada Manual Direta + Botões
+                                            RowLayout {
                                                 Layout.fillWidth: true
                                                 spacing: 8
 
-                                                Repeater {
-                                                    model: (defCatCard.catInfo && defCatCard.catInfo.options) ? defCatCard.catInfo.options : []
-                                                    delegate: Rectangle {
-                                                        id: optChip
-                                                        required property var modelData
+                                                Rectangle {
+                                                    Layout.fillWidth: true
+                                                    implicitHeight: 34
+                                                    radius: 8
+                                                    color: Theme.background
+                                                    border.width: 1
+                                                    border.color: customInput.activeFocus ? Theme.primary : Theme.withAlpha(Theme.outline, 0.3)
+
+                                                    RowLayout {
+                                                        anchors.fill: parent
+                                                        anchors.leftMargin: 10
+                                                        anchors.rightMargin: 10
+                                                        spacing: 8
+
+                                                        Text {
+                                                            text: Theme.icons.pencil
+                                                            font.family: Theme.iconFontFamily
+                                                            font.pixelSize: 12
+                                                            color: Theme.subtext
+                                                        }
+
+                                                        TextInput {
+                                                            id: customInput
+                                                            Layout.fillWidth: true
+                                                            font.family: Theme.fontFamily
+                                                            font.pixelSize: 11
+                                                            color: Theme.textColor
+                                                            selectByMouse: true
+                                                            clip: true
+                                                            text: ""
+
+                                                            Text {
+                                                                visible: !customInput.text && !customInput.activeFocus
+                                                                text: "Digitar app específico (ex: zen, firefox, code, dolphin, mpv)..."
+                                                                font.family: Theme.fontFamily
+                                                                font.pixelSize: 11
+                                                                color: Theme.withAlpha(Theme.subtext, 0.6)
+                                                            }
+
+                                                            onAccepted: applyBtnArea.clicked(null)
+                                                        }
+
+                                                        Text {
+                                                            visible: customInput.text.length > 0
+                                                            text: Theme.icons.close
+                                                            font.family: Theme.iconFontFamily
+                                                            font.pixelSize: 12
+                                                            color: Theme.subtext
+                                                            MouseArea {
+                                                                anchors.fill: parent
+                                                                cursorShape: Qt.PointingHandCursor
+                                                                onClicked: customInput.text = ""
+                                                            }
+                                                        }
+                                                    }
+                                                }
+
+                                                // Botão Salvar App Digitado
+                                                Rectangle {
+                                                    implicitHeight: 34
+                                                    implicitWidth: applyRow.implicitWidth + 20
+                                                    radius: 8
+                                                    color: applyBtnArea.containsMouse ? Theme.mix(Theme.primary, Theme.background, 0.2) : Theme.primary
+
+                                                    RowLayout {
+                                                        id: applyRow
+                                                        anchors.centerIn: parent
+                                                        spacing: 6
+                                                        Text {
+                                                            text: Theme.icons.confirm
+                                                            font.family: Theme.iconFontFamily
+                                                            font.pixelSize: 12
+                                                            color: Theme.background
+                                                        }
+                                                        Text {
+                                                            text: "Salvar"
+                                                            font.family: Theme.fontFamily
+                                                            font.pixelSize: 11
+                                                            font.weight: Font.Bold
+                                                            color: Theme.background
+                                                        }
+                                                    }
+
+                                                    MouseArea {
+                                                        id: applyBtnArea
+                                                        anchors.fill: parent
+                                                        hoverEnabled: true
+                                                        cursorShape: Qt.PointingHandCursor
+                                                        onClicked: {
+                                                            const val = customInput.text.trim();
+                                                            if (!val) {
+                                                                win.showToast("Digite o nome de um app ou escolha na lista");
+                                                                return;
+                                                            }
+                                                            Quickshell.execDetached(["rice-default-apps", "set", defCatCard.modelData.id, val]);
+                                                            win.showToast("Definindo " + val + " como padrão...");
+                                                            customInput.text = "";
+                                                            defaultAppsRefreshTimer.restart();
+                                                        }
+                                                    }
+                                                }
+
+                                                // Botão Escolher dos Apps Instalados
+                                                Rectangle {
+                                                    implicitHeight: 34
+                                                    implicitWidth: pickBtnRow.implicitWidth + 20
+                                                    radius: 8
+                                                    color: defCatCard.isPicking ? Theme.withAlpha(Theme.primary, 0.25) : (pickBtnArea.containsMouse ? Theme.tileHigh : Theme.background)
+                                                    border.width: 1
+                                                    border.color: defCatCard.isPicking ? Theme.primary : Theme.withAlpha(Theme.outline, 0.3)
+
+                                                    RowLayout {
+                                                        id: pickBtnRow
+                                                        anchors.centerIn: parent
+                                                        spacing: 6
+                                                        Text {
+                                                            text: defCatCard.isPicking ? Theme.icons.close : Theme.icons.magnify
+                                                            font.family: Theme.iconFontFamily
+                                                            font.pixelSize: 12
+                                                            color: defCatCard.isPicking ? Theme.primary : Theme.textColor
+                                                        }
+                                                        Text {
+                                                            text: defCatCard.isPicking ? "Fechar Lista" : "Escolher App..."
+                                                            font.family: Theme.fontFamily
+                                                            font.pixelSize: 11
+                                                            font.weight: Font.Medium
+                                                            color: defCatCard.isPicking ? Theme.primary : Theme.textColor
+                                                        }
+                                                    }
+
+                                                    MouseArea {
+                                                        id: pickBtnArea
+                                                        anchors.fill: parent
+                                                        hoverEnabled: true
+                                                        cursorShape: Qt.PointingHandCursor
+                                                        onClicked: {
+                                                            if (defCatCard.isPicking) {
+                                                                win.pickingDefaultCategory = "";
+                                                            } else {
+                                                                win.pickingDefaultCategory = defCatCard.modelData.id;
+                                                                win.defaultAppSearchQuery = "";
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            // Gaveta Expansível com Todos os Aplicativos do Sistema
+                                            Rectangle {
+                                                Layout.fillWidth: true
+                                                implicitHeight: pickerCol.implicitHeight + 20
+                                                visible: defCatCard.isPicking
+                                                radius: 10
+                                                color: Theme.withAlpha(Theme.background, 0.85)
+                                                border.width: 1
+                                                border.color: Theme.withAlpha(Theme.primary, 0.3)
+
+                                                ColumnLayout {
+                                                    id: pickerCol
+                                                    anchors.fill: parent
+                                                    anchors.margins: 10
+                                                    spacing: 8
+
+                                                    // Campo de busca com filtro dinâmico
+                                                    Rectangle {
+                                                        Layout.fillWidth: true
                                                         implicitHeight: 32
-                                                        implicitWidth: chipRow.implicitWidth + 20
-                                                        radius: 8
-                                                        color: optChip.modelData.is_current ? Theme.withAlpha(Theme.primary, 0.25) : (chipArea.containsMouse ? Theme.tileHigh : Theme.background)
-                                                        border.width: optChip.modelData.is_current ? 1.5 : 1
-                                                        border.color: optChip.modelData.is_current ? Theme.primary : Theme.withAlpha(Theme.outline, 0.2)
+                                                        radius: 6
+                                                        color: Theme.background
+                                                        border.width: 1
+                                                        border.color: searchAppInput.activeFocus ? Theme.primary : Theme.withAlpha(Theme.outline, 0.25)
 
                                                         RowLayout {
-                                                            id: chipRow
-                                                            anchors.centerIn: parent
+                                                            anchors.fill: parent
+                                                            anchors.leftMargin: 8
+                                                            anchors.rightMargin: 8
                                                             spacing: 6
 
                                                             Text {
-                                                                visible: optChip.modelData.is_current
-                                                                text: Theme.icons.confirm
+                                                                text: Theme.icons.magnify
                                                                 font.family: Theme.iconFontFamily
                                                                 font.pixelSize: 12
-                                                                color: Theme.primary
+                                                                color: Theme.subtext
                                                             }
 
-                                                            Text {
-                                                                text: optChip.modelData.name
+                                                            TextInput {
+                                                                id: searchAppInput
+                                                                Layout.fillWidth: true
                                                                 font.family: Theme.fontFamily
                                                                 font.pixelSize: 11
-                                                                font.weight: optChip.modelData.is_current ? Font.Bold : Font.Normal
-                                                                color: optChip.modelData.is_current ? Theme.textColor : Theme.subtext
-                                                            }
+                                                                color: Theme.textColor
+                                                                selectByMouse: true
+                                                                clip: true
+                                                                text: win.defaultAppSearchQuery
+                                                                onTextChanged: win.defaultAppSearchQuery = text
 
-                                                            Rectangle {
-                                                                visible: optChip.modelData.is_current
-                                                                implicitWidth: 44
-                                                                implicitHeight: 16
-                                                                radius: 8
-                                                                color: Theme.primary
                                                                 Text {
-                                                                    anchors.centerIn: parent
-                                                                    text: "Padrão"
+                                                                    visible: !searchAppInput.text
+                                                                    text: "Pesquisar entre todos os aplicativos do sistema..."
                                                                     font.family: Theme.fontFamily
-                                                                    font.pixelSize: 9
-                                                                    font.weight: Font.Bold
-                                                                    color: Theme.background
+                                                                    font.pixelSize: 11
+                                                                    color: Theme.withAlpha(Theme.subtext, 0.6)
                                                                 }
                                                             }
                                                         }
+                                                    }
 
-                                                        MouseArea {
-                                                            id: chipArea
-                                                            anchors.fill: parent
-                                                            hoverEnabled: true
-                                                            cursorShape: Qt.PointingHandCursor
-                                                            onClicked: {
-                                                                Quickshell.execDetached(["rice-default-apps", "set", defCatCard.modelData.id, optChip.modelData.desktop]);
-                                                                loadDefaultAppsProc.running = true;
+                                                    // Lista rolável de aplicativos instalados
+                                                    Flickable {
+                                                        Layout.fillWidth: true
+                                                        implicitHeight: Math.min(appListCol.implicitHeight, 210)
+                                                        contentHeight: appListCol.implicitHeight
+                                                        clip: true
+                                                        boundsBehavior: Flickable.StopAtBounds
+
+                                                        ColumnLayout {
+                                                            id: appListCol
+                                                            width: parent.width
+                                                            spacing: 4
+
+                                                            Repeater {
+                                                                model: {
+                                                                    const q = (win.defaultAppSearchQuery || "").toLowerCase().trim();
+                                                                    const list = win.availableApps || [];
+                                                                    if (!q) return list;
+                                                                    return list.filter(a => {
+                                                                        const name = (a.name || "").toLowerCase();
+                                                                        const file = (a.filename || "").toLowerCase();
+                                                                        const comment = (a.comment || "").toLowerCase();
+                                                                        return name.includes(q) || file.includes(q) || comment.includes(q);
+                                                                    });
+                                                                }
+                                                                delegate: Rectangle {
+                                                                    id: appItemRow
+                                                                    required property var modelData
+                                                                    Layout.fillWidth: true
+                                                                    implicitHeight: 38
+                                                                    radius: 6
+                                                                    color: appItemArea.containsMouse ? Theme.tileHigh : Theme.withAlpha(Theme.tile, 0.5)
+                                                                    border.width: (defCatCard.catInfo && defCatCard.catInfo.current_desktop === appItemRow.modelData.filename) ? 1 : 0
+                                                                    border.color: Theme.primary
+
+                                                                    RowLayout {
+                                                                        anchors.fill: parent
+                                                                        anchors.leftMargin: 8
+                                                                        anchors.rightMargin: 8
+                                                                        spacing: 10
+
+                                                                        Image {
+                                                                            Layout.preferredWidth: 24
+                                                                            Layout.preferredHeight: 24
+                                                                            source: win.appIconSource(appItemRow.modelData.icon)
+                                                                            fillMode: Image.PreserveAspectFit
+                                                                        }
+
+                                                                        ColumnLayout {
+                                                                            Layout.fillWidth: true
+                                                                            spacing: 0
+                                                                            Text {
+                                                                                text: appItemRow.modelData.name
+                                                                                font.family: Theme.fontFamily
+                                                                                font.pixelSize: 11
+                                                                                font.weight: Font.DemiBold
+                                                                                color: Theme.textColor
+                                                                                elide: Text.ElideRight
+                                                                            }
+                                                                            Text {
+                                                                                text: appItemRow.modelData.filename
+                                                                                font.family: Theme.monoFamily
+                                                                                font.pixelSize: 9
+                                                                                color: Theme.subtext
+                                                                                elide: Text.ElideRight
+                                                                            }
+                                                                        }
+
+                                                                        Text {
+                                                                            visible: defCatCard.catInfo && defCatCard.catInfo.current_desktop === appItemRow.modelData.filename
+                                                                            text: Theme.icons.confirm + " Atual"
+                                                                            font.family: Theme.fontFamily
+                                                                            font.pixelSize: 10
+                                                                            font.weight: Font.Bold
+                                                                            color: Theme.primary
+                                                                        }
+                                                                    }
+
+                                                                    MouseArea {
+                                                                        id: appItemArea
+                                                                        anchors.fill: parent
+                                                                        hoverEnabled: true
+                                                                        cursorShape: Qt.PointingHandCursor
+                                                                        onClicked: {
+                                                                            Quickshell.execDetached(["rice-default-apps", "set", defCatCard.modelData.id, appItemRow.modelData.filename]);
+                                                                            win.showToast("Definido como padrão: " + appItemRow.modelData.name);
+                                                                            win.pickingDefaultCategory = "";
+                                                                            defaultAppsRefreshTimer.restart();
+                                                                        }
+                                                                    }
+                                                                }
                                                             }
                                                         }
                                                     }
                                                 }
                                             }
                                         }
+                                    }
+                                }
+
+                                Timer {
+                                    id: defaultAppsRefreshTimer
+                                    interval: 600
+                                    onTriggered: {
+                                        loadDefaultAppsProc.running = true;
                                     }
                                 }
                             }
