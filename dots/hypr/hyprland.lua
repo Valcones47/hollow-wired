@@ -81,24 +81,47 @@ hl.env("XDG_CURRENT_DESKTOP", "Hyprland")
 hl.env("XDG_SESSION_TYPE", "wayland")
 hl.env("XDG_SESSION_DESKTOP", "Hyprland")
 
--- GPU híbrida Intel + NVIDIA (RTX 3050 Mobile). A tela interna é ligada à
--- Intel (eDP-1 em card2/i915) — a NVIDIA (card1) não tem saída de vídeo
--- nenhuma, só renderiza (reverse PRIME). Forçar o Hyprland inteiro pra
--- NVIDIA aqui (LIBVA_DRIVER_NAME/__GLX_VENDOR_LIBRARY_NAME/GBM_BACKEND)
--- fazia o compositor tentar renderizar via NVIDIA e copiar de volta pra
--- Intel o tempo todo — bate com os travamentos vistos após a atualização
--- do driver 610->615. Removido em 2026-09-15; o padrão agora roda na
--- Intel. Pra rodar algo específico na NVIDIA (jogos, etc.), usa `prime-run
--- comando` (já instalado, pacote nvidia-prime) em vez de env aqui.
---
--- /etc/environment (global, fora deste arquivo) força __NV_PRIME_RENDER_OFFLOAD=1
--- e __GLX_VENDOR_LIBRARY_NAME=nvidia pra TODOS os apps — o Quickshell e o resto
--- renderizavam na NVIDIA e cada frame era copiado pra Intel (interface lagada,
--- erro "does not work across GPUs" no log do Quickshell). Desfeito aqui só pra
--- sessão Hyprland (não mexe no Plasma). Jogos continuam na NVIDIA pelo
--- prime-run / steam.desktop / Heroic.
-hl.env("__NV_PRIME_RENDER_OFFLOAD", "0")
-hl.env("__GLX_VENDOR_LIBRARY_NAME", "mesa")
+-- Detecção dinâmica de GPU (NVIDIA dedicada, Intel, AMD Radeon e Laptops Híbridos)
+local hasNvidia = false
+local hasIgpu = false
+
+local pciDevices = io.popen("ls -d /sys/bus/pci/devices/* 2>/dev/null")
+if pciDevices then
+    for dev in pciDevices:lines() do
+        local cf = io.open(dev .. "/class", "r")
+        if cf then
+            local class = cf:read("*line") or ""
+            cf:close()
+            if class:sub(1, 4) == "0x03" then
+                local vf = io.open(dev .. "/vendor", "r")
+                if vf then
+                    local vendor = vf:read("*line") or ""
+                    vf:close()
+                    if vendor == "0x10de" then
+                        hasNvidia = true
+                    elseif vendor == "0x8086" or vendor == "0x1002" then
+                        hasIgpu = true
+                    end
+                end
+            end
+        end
+    end
+    pciDevices:close()
+end
+
+if hasNvidia and hasIgpu then
+    -- Laptop híbrido (Optimus / PRIME): compositor roda liso na iGPU (Intel ou AMD),
+    -- eliminando overhead de cópia inter-GPU. Jogos usam dGPU via prime-run.
+    hl.env("__NV_PRIME_RENDER_OFFLOAD", "0")
+    hl.env("__GLX_VENDOR_LIBRARY_NAME", "mesa")
+elseif hasNvidia and not hasIgpu then
+    -- PC Desktop com NVIDIA exclusiva (sem iGPU): aceleração direta por hardware
+    hl.env("LIBVA_DRIVER_NAME", "nvidia")
+    hl.env("__GLX_VENDOR_LIBRARY_NAME", "nvidia")
+    hl.env("NVD_BACKEND", "direct")
+    hl.env("ELECTRON_OZONE_PLATFORM_HINT", "auto")
+end
+-- Sistemas puramente AMD ou Intel usam drivers Mesa nativos sem flags extras.
 
 -- Cursor (tema copiado do Plasma: kcminputrc [Mouse] cursorTheme)
 hl.env("XCURSOR_THEME", "Bibata-Modern-Ice")
@@ -116,8 +139,10 @@ hl.env("BROWSER", "zen-browser")
 ---- AUTOSTART --
 -----------------
 hl.on("hyprland.start", function()
-    -- apps abertos via D-Bus/systemd também não herdam o offload global
-    hl.exec_cmd("systemctl --user unset-environment __NV_PRIME_RENDER_OFFLOAD __GLX_VENDOR_LIBRARY_NAME")
+    -- apps abertos via D-Bus/systemd também não herdam o offload global em laptops híbridos
+    if hasNvidia and hasIgpu then
+        hl.exec_cmd("systemctl --user unset-environment __NV_PRIME_RENDER_OFFLOAD __GLX_VENDOR_LIBRARY_NAME")
+    end
 
     -- Desativa blur automaticamente quando a janela ativa está em tela cheia;
     -- reativa ao sair. Evita gastar ~70% da Intel UHD com blur inútil em jogo.

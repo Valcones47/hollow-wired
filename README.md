@@ -12,7 +12,7 @@
 
 <br />
 
-<img src="quickshell-progress/etapa-8-dashboard.png" alt="Desktop Overview" width="880" />
+<img src="quickshell-progress/etapa-28-appearance-tab.png" alt="Desktop Overview & Appearance Hub" width="880" />
 
 </div>
 
@@ -33,21 +33,21 @@ Legacy tools like Waybar, Rofi, SwayOSD, and Wofi are completely omitted. Every 
 <tr>
 <td width="50%">
 <img src="quickshell-progress/etapa-15-launcher.png" alt="App Launcher" />
-<p align="center"><b>App Launcher & Search</b></p>
+<p align="center"><b>App Launcher & Fuzzy Search</b></p>
 </td>
 <td width="50%">
 <img src="quickshell-progress/etapa-14-dock-jogos.png" alt="Dock and Game Drawer" />
-<p align="center"><b>Smart Dock & Game Drawer</b></p>
+<p align="center"><b>Smart Autohide Dock & Game Shelf</b></p>
 </td>
 </tr>
 <tr>
 <td width="50%">
-<img src="quickshell-progress/etapa-16-alttab.png" alt="Alt+Tab Switcher" />
-<p align="center"><b>Live Screencopy Alt+Tab</b></p>
+<img src="quickshell-progress/etapa-12-pop-audio.png" alt="Quick Settings & Audio Flyout" />
+<p align="center"><b>TopBar Flyout & Quick Controls</b></p>
 </td>
 <td width="50%">
-<img src="quickshell-progress/etapa-28-appearance-tab.png" alt="Appearance Hub" />
-<p align="center"><b>Control Center & Appearance Hub</b></p>
+<img src="quickshell-progress/etapa-9-sidebar-tray.png" alt="Energy Sidebar & System Trays" />
+<p align="center"><b>Slide-out Sidebar & System Trays</b></p>
 </td>
 </tr>
 </table>

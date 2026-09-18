@@ -49,7 +49,7 @@ if lspci | grep -Ei "vga|3d" | grep -qi "nvidia"; then
     HAS_NVIDIA=true
     echo -e "  • Placa de Vídeo: ${GREEN}NVIDIA detectada${NC}"
 fi
-if lspci | grep -Ei "vga|3d" | grep -qi "amd|radeon|advanced micro"; then
+if lspci | grep -Ei "vga|3d" | grep -E -qi "amd|radeon|advanced micro"; then
     HAS_AMD=true
     echo -e "  • Placa de Vídeo: ${RED}AMD Radeon detectada${NC}"
 fi
@@ -133,6 +133,9 @@ PACKAGES=(
 # Pacotes adicionais de GPU
 if [ "$HAS_NVIDIA" = true ]; then
     PACKAGES+=(nvidia-utils lib32-nvidia-utils)
+fi
+if [ "$HAS_AMD" = true ]; then
+    PACKAGES+=(vulkan-radeon lib32-vulkan-radeon mesa lib32-mesa)
 fi
 
 echo -e "${BLUE}[*] Instalando dependências via pacman e AUR...${NC}"
