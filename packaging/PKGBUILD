@@ -5,7 +5,7 @@ pkgver=r125.f87d5a8
 pkgrel=1
 pkgdesc="Rice completo e ultra-otimizado para Hyprland e Quickshell no Arch Linux / CachyOS"
 arch=('x86_64')
-url="https://github.com/Valcones47/hyprland-setup"
+url="https://github.com/Valcones47/hollow-wired"
 license=('GPL-3.0-or-later')
 depends=(
     'hyprland'
@@ -63,7 +63,7 @@ optdepends=(
 )
 provides=("$_pkgname")
 conflicts=("$_pkgname")
-source=("git+https://github.com/Valcones47/hyprland-setup.git")
+source=("git+https://github.com/Valcones47/hollow-wired.git")
 sha256sums=('SKIP')
 install=hyprland-setup.install
 
