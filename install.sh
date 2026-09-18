@@ -138,8 +138,15 @@ if [ "$HAS_AMD" = true ]; then
     PACKAGES+=(vulkan-radeon lib32-vulkan-radeon mesa lib32-mesa)
 fi
 
+# 3. Atualizar chaveiros e sincronizar bases para evitar erros de 404 e chaves PGP expiradas
+echo -e "\n${BOLD}[*] Sincronizando repositórios e atualizando chaveiros de segurança (keyrings)...${NC}"
+sudo pacman -Sy --needed --noconfirm archlinux-keyring 2>/dev/null || true
+if [ "$IS_CACHYOS" = true ]; then
+    sudo pacman -Sy --needed --noconfirm cachyos-keyring 2>/dev/null || true
+fi
+
 echo -e "${BLUE}[*] Instalando dependências via pacman e AUR...${NC}"
-$AUR_HELPER -S --needed --noconfirm "${PACKAGES[@]}"
+$AUR_HELPER -Sy --needed --noconfirm "${PACKAGES[@]}"
 
 # 4. Pacote Opcional de Jogos
 echo -e "\n${BOLD}[3/5] Suporte a Jogos & Gaming Meta...${NC}"
