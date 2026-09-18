@@ -161,7 +161,7 @@ fi
 
 if [ "$IS_LEGACY_NVIDIA" = true ]; then
     warn_msg "NVIDIA ${WHITE}$LEGACY_NVIDIA_NAME${AMBER} detectada!"
-    info_msg "Drivers de GPU: ${CYAN}Opção de instalação do driver legado proprietário (550xx) será oferecida na Etapa 4.${NC}"
+    info_msg "Drivers de GPU: ${CYAN}Opção de instalação do driver legado proprietário (580xx) será oferecida na Etapa 4.${NC}"
 else
     info_msg "Drivers de GPU: ${GREEN}Gerenciamento delegado ao CachyOS/Hardware Detection (chwd)${NC}"
 fi
@@ -417,17 +417,25 @@ fi
 # Opcional: Driver Proprietário Legado NVIDIA para Séries 900 / 1000 (Maxwell / Pascal)
 if [ "$IS_LEGACY_NVIDIA" = true ]; then
     echo -e "\n${CYAN}◈ [OPCIONAL] Placa NVIDIA ${WHITE}$LEGACY_NVIDIA_NAME${CYAN} detectada!${NC}"
-    if pacman -Q nvidia-550xx-dkms >/dev/null 2>&1 || pacman -Q nvidia-dkms >/dev/null 2>&1; then
+    if pacman -Q nvidia-580xx-dkms >/dev/null 2>&1 || pacman -Q nvidia-550xx-dkms >/dev/null 2>&1 || pacman -Q nvidia-dkms >/dev/null 2>&1; then
         ok_msg "Driver proprietário NVIDIA já está instalado no sistema."
     else
         echo -e "  ${GRAY}Os drivers abertos (nouveau) travam GPUs dessa série em clock mínimo de repouso (~135 MHz).${NC}"
-        echo -e "  ${GRAY}Instalar o driver proprietário (nvidia-550xx-dkms) libera 100% de clock, FPS e aceleração por hardware.${NC}"
-        read -rp "  Deseja instalar o driver legado nvidia-550xx agora? [s/N]: " INSTALL_LEGACY_NV || true
+        echo -e "  ${GRAY}Instalar o driver proprietário legado (nvidia-580xx-dkms) libera 100% de clock, FPS e aceleração por hardware.${NC}"
+        read -rp "  Deseja instalar o driver legado nvidia-580xx agora? [s/N]: " INSTALL_LEGACY_NV || true
         INSTALL_LEGACY_NV=${INSTALL_LEGACY_NV:-n}
         if [[ "$INSTALL_LEGACY_NV" =~ ^[Ss]$ ]]; then
-            gear_msg "Instalando nvidia-550xx-dkms e utilitários via $AUR_HELPER..."
-            $AUR_HELPER -S --needed --noconfirm nvidia-550xx-dkms nvidia-550xx-utils lib32-nvidia-550xx-utils 2>/dev/null || \
-            $AUR_HELPER -S --needed nvidia-550xx-dkms nvidia-550xx-utils lib32-nvidia-550xx-utils
+            gear_msg "Instalando driver proprietário nvidia-580xx..."
+            
+            # Tenta via chwd se disponível, senão via pacman direto (repo cachyos), senão via AUR helper
+            if command -v chwd >/dev/null 2>&1 && chwd -i nvidia-dkms-580xx 2>/dev/null; then
+                ok_msg "Perfil nvidia-dkms-580xx aplicado com sucesso via chwd!"
+            elif pacman -Si nvidia-580xx-dkms >/dev/null 2>&1; then
+                sudo pacman -S --needed --noconfirm nvidia-580xx-dkms nvidia-580xx-utils lib32-nvidia-580xx-utils
+            else
+                $AUR_HELPER -S --needed --noconfirm nvidia-580xx-dkms nvidia-580xx-utils lib32-nvidia-580xx-utils 2>/dev/null || \
+                $AUR_HELPER -S --needed --noconfirm nvidia-550xx-dkms nvidia-550xx-utils lib32-nvidia-550xx-utils
+            fi
             
             gear_msg "Configurando nvidia-drm.modeset=1 e preservação de VRAM em /etc/modprobe.d/nvidia.conf..."
             sudo bash -c 'cat << "EOF" > /etc/modprobe.d/nvidia.conf
@@ -435,7 +443,7 @@ options nvidia-drm modeset=1 fbdev=1
 options nvidia NVreg_PreserveVideoMemoryAllocations=1
 EOF'
             sudo systemctl enable nvidia-suspend.service nvidia-hibernate.service nvidia-resume.service 2>/dev/null || true
-            ok_msg "Driver legado nvidia-550xx e serviços de kernel configurados com sucesso!"
+            ok_msg "Driver legado nvidia-580xx e serviços de kernel configurados com sucesso!"
         fi
     fi
 fi
