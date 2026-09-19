@@ -144,10 +144,6 @@ PanelWindow {
     property string softwareCatFilter: "all"
     property string softwareSearchQuery: ""
 
-    // Perfis de Estilo & Backups
-    property var presetsData: []
-    property var backupsData: []
-
     // Toast de notificação interna
     property string toastMsg: ""
     Timer {
@@ -498,29 +494,6 @@ PanelWindow {
         }
     }
 
-    Process {
-        id: loadPresetsProc
-        command: ["rice-presets", "list"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                try {
-                    win.presetsData = JSON.parse(text);
-                } catch (e) {}
-            }
-        }
-    }
-
-    Process {
-        id: loadBackupsProc
-        command: ["rice-presets", "backup-list"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                try {
-                    win.backupsData = JSON.parse(text);
-                } catch (e) {}
-            }
-        }
-    }
 
     Process {
         id: loadDiscordProc
@@ -597,8 +570,6 @@ PanelWindow {
         loadStorageProc.running = true;
         loadSoftwareUpdatesProc.running = true;
         loadSoftwareAppsProc.running = true;
-        loadPresetsProc.running = true;
-        loadBackupsProc.running = true;
         loadDiscordProc.running = true;
     }
 
@@ -1050,8 +1021,7 @@ PanelWindow {
                                 { tabIndex: 15, name: Theme.t("settings.cat_shortcuts", "Guia de Atalhos"), icon: Theme.icons.magnify, desc: Theme.t("settings.desc_shortcuts", "Buscar Teclas do Rice"), keywords: "atalhos shortcuts teclas binds keybinds cheatsheet super mod custom user-binds" },
                                 { tabIndex: 16, name: Theme.t("settings.cat_system", "Sistema & Reparo"), icon: Theme.icons.health, desc: Theme.t("settings.desc_system", "Snapshots & Auto-Reparo"), keywords: "sistema system reparo repair snapshot timeshift btrfs auto-reparo diagnostico info logs status" },
                                 { tabIndex: 17, name: Theme.t("settings.cat_store", "Loja & Atualizações"), icon: Theme.icons.packages, desc: Theme.t("settings.desc_store", "Apps & Updates do Sistema"), keywords: "loja store updates atualizacoes pacotes packages arch pacman aur yay flatpak programas instalar" },
-                                { tabIndex: 18, name: Theme.t("settings.cat_presets", "Perfis & Backup"), icon: Theme.icons.palette, desc: Theme.t("settings.desc_presets", "Estilos & Restauração"), keywords: "perfis presets backup restore salvar restaurar estilos styles config exportar importar" },
-                                { tabIndex: 19, name: Theme.t("settings.cat_shell_custom", "Customização do Shell"), icon: Theme.icons.palette, desc: Theme.t("settings.desc_shell_custom", "Hub, Sidebar & Dock"), keywords: "shell quickshell customizacao dock topbar sidebar hub aparencia widgets glass solid glow borderless escala" }
+                                { tabIndex: 18, name: Theme.t("settings.cat_shell_custom", "Customização do Shell"), icon: Theme.icons.palette, desc: Theme.t("settings.desc_shell_custom", "Hub, Sidebar & Dock"), keywords: "shell quickshell customizacao dock topbar sidebar hub aparencia widgets glass solid glow borderless escala" }
                             ]
 
                             Repeater {
@@ -1289,8 +1259,7 @@ PanelWindow {
                                     Theme.t("header.title_15", "Guia de Teclas & Atalhos"),
                                     Theme.t("header.title_16", "Sistema, Snapshots & Reparo"),
                                     Theme.t("header.title_17", "Central de Aplicativos & Atualizações"),
-                                    Theme.t("header.title_18", "Perfis de Estilo & Gerenciador de Backup"),
-                                    Theme.t("header.title_19", "Customização do Shell")
+                                    Theme.t("header.title_18", "Customização do Shell")
                                 ][win.currentTab] || Theme.t("settings.panel_title", "Configurações")
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 16
@@ -1318,8 +1287,7 @@ PanelWindow {
                                     Theme.t("header.sub_15", "Consulte e busque todos os atalhos de teclado do Hyprland com 1 clique."),
                                     Theme.t("header.sub_16", "Crie pontos de restauração Btrfs e resolva problemas comuns com 1 clique."),
                                     Theme.t("header.sub_17", "Verifique atualizações pendentes do Arch Linux e instale programas essenciais."),
-                                    Theme.t("header.sub_18", "Alterne estilos estéticos do rice e crie cópias de segurança com 1 clique."),
-                                    Theme.t("header.sub_19", "Ajuste estilo, escala, blur e cores de destaque dos componentes do shell.")
+                                    Theme.t("header.sub_18", "Ajuste estilo, escala, blur e cores de destaque dos componentes do shell.")
                                 ][win.currentTab] || ""
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 11
@@ -6678,346 +6646,12 @@ PanelWindow {
                         }
 
                         // ==========================================
-                        // ABA 18: PERFIS DE ESTILO & BACKUP DO RICE
-                        // ==========================================
-                        Flickable {
-                            anchors.fill: parent
-                            visible: win.currentTab === 18
-                            contentHeight: presetsCol.implicitHeight + 24
-                            contentWidth: width
-                            clip: true
-                            boundsBehavior: Flickable.StopAtBounds
-
-                            ColumnLayout {
-                                id: presetsCol
-                                width: parent.width
-                                spacing: 20
-
-                                // 1. Seção de Perfis Visuais
-                                ColumnLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 12
-
-                                    RowLayout {
-                                        Layout.fillWidth: true
-                                        Text {
-                                            text: Theme.t("presets.section_profiles", "PERFIS DE ESTILO & PERFORMANCE")
-                                            font.family: Theme.fontFamily
-                                            font.pixelSize: 12
-                                            font.weight: Font.Bold
-                                            color: Theme.primary
-                                        }
-                                        Item { Layout.fillWidth: true }
-                                        Text {
-                                            text: Theme.t("presets.section_profiles_sub", "Altera gaps, cantos arredondados, animações e efeitos com 1 clique")
-                                            font.family: Theme.fontFamily
-                                            font.pixelSize: 10
-                                            color: Theme.subtext
-                                        }
-                                    }
-
-                                    // Cards dos Perfis
-                                    ColumnLayout {
-                                        Layout.fillWidth: true
-                                        spacing: 10
-
-                                        Repeater {
-                                            model: win.presetsData || []
-                                            delegate: Rectangle {
-                                                id: presetCard
-                                                required property var modelData
-                                                Layout.fillWidth: true
-                                                implicitHeight: 82
-                                                radius: 12
-                                                color: Theme.tile
-                                                border.width: 1
-                                                border.color: prsArea.containsMouse ? presetCard.modelData.accent : Theme.withAlpha(Theme.outline, 0.2)
-
-                                                Behavior on border.color { ColorAnimation { duration: 140 } }
-
-                                                RowLayout {
-                                                    anchors.fill: parent
-                                                    anchors.margins: 14
-                                                    spacing: 14
-
-                                                    Rectangle {
-                                                        implicitWidth: 46
-                                                        implicitHeight: 46
-                                                        radius: 12
-                                                        color: Theme.withAlpha(presetCard.modelData.accent, 0.18)
-                                                        border.width: 1
-                                                        border.color: Theme.withAlpha(presetCard.modelData.accent, 0.5)
-
-                                                        Text {
-                                                            anchors.centerIn: parent
-                                                            text: presetCard.modelData.icon || "\u{F01E}"
-                                                            font.family: Theme.iconFontFamily
-                                                            font.pixelSize: 20
-                                                            color: presetCard.modelData.accent
-                                                        }
-                                                    }
-
-                                                    ColumnLayout {
-                                                        Layout.fillWidth: true
-                                                        spacing: 3
-
-                                                        RowLayout {
-                                                            spacing: 10
-                                                            Text {
-                                                                text: presetCard.modelData.name
-                                                                font.family: Theme.fontFamily
-                                                                font.pixelSize: 13
-                                                                font.weight: Font.Bold
-                                                                color: Theme.textColor
-                                                            }
-
-                                                            // Badges com os parâmetros
-                                                            Rectangle {
-                                                                implicitHeight: 18
-                                                                implicitWidth: gpText.implicitWidth + 10
-                                                                radius: 9
-                                                                color: Theme.tileHigh
-                                                                Text {
-                                                                    id: gpText
-                                                                    anchors.centerIn: parent
-                                                                    text: Theme.t("presets.gaps_label", "Gaps: ") + presetCard.modelData.gaps_in + "px"
-                                                                    font.family: Theme.monoFamily
-                                                                    font.pixelSize: 9
-                                                                    color: Theme.subtext
-                                                                }
-                                                            }
-
-                                                            Rectangle {
-                                                                implicitHeight: 18
-                                                                implicitWidth: rdText.implicitWidth + 10
-                                                                radius: 9
-                                                                color: Theme.tileHigh
-                                                                Text {
-                                                                    id: rdText
-                                                                    anchors.centerIn: parent
-                                                                    text: Theme.t("presets.corners_label", "Cantos: ") + presetCard.modelData.rounding + "px"
-                                                                    font.family: Theme.monoFamily
-                                                                    font.pixelSize: 9
-                                                                    color: Theme.subtext
-                                                                }
-                                                            }
-                                                        }
-
-                                                        Text {
-                                                            Layout.fillWidth: true
-                                                            text: presetCard.modelData.desc
-                                                            font.family: Theme.fontFamily
-                                                            font.pixelSize: 11
-                                                            color: Theme.subtext
-                                                        }
-                                                    }
-
-                                                    ActionBtn {
-                                                        icon: "\u{F00C}"
-                                                        text: Theme.t("presets.apply_btn", "Aplicar Perfil")
-                                                        primary: true
-                                                        onClicked: {
-                                                            Quickshell.execDetached(["rice-presets", "apply", presetCard.modelData.id]);
-                                                            win.showToast("Perfil " + presetCard.modelData.name + " aplicado!");
-                                                        }
-                                                    }
-                                                }
-
-                                                MouseArea {
-                                                    id: prsArea
-                                                    anchors.fill: parent
-                                                    hoverEnabled: true
-                                                    cursorShape: Qt.PointingHandCursor
-                                                    z: -1
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-
-                                // 2. Seção de Backups & Restauração Local
-                                ColumnLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 12
-
-                                    RowLayout {
-                                        Layout.fillWidth: true
-                                        Text {
-                                            text: Theme.t("presets.section_backups", "PONTOS DE RESTAURAÇÃO DO RICE (BACKUPS)")
-                                            font.family: Theme.fontFamily
-                                            font.pixelSize: 12
-                                            font.weight: Font.Bold
-                                            color: Theme.primary
-                                        }
-                                        Item { Layout.fillWidth: true }
-                                        ActionBtn {
-                                            icon: Theme.icons.disk
-                                            text: Theme.t("presets.create_backup_btn", "Criar Novo Backup Agora")
-                                            primary: true
-                                            onClicked: {
-                                                Quickshell.execDetached(["rice-presets", "backup-create"]);
-                                                win.showToast("Criando backup das configurações...");
-                                                backupReloadTimer.restart();
-                                            }
-                                        }
-                                    }
-
-                                    Timer {
-                                        id: backupReloadTimer
-                                        interval: 1000
-                                        onTriggered: loadBackupsProc.running = true
-                                    }
-
-                                    // Lista de Backups
-                                    ColumnLayout {
-                                        Layout.fillWidth: true
-                                        spacing: 8
-
-                                        Repeater {
-                                            model: win.backupsData || []
-                                            delegate: Rectangle {
-                                                id: bkCard
-                                                required property var modelData
-                                                Layout.fillWidth: true
-                                                implicitHeight: 64
-                                                radius: 12
-                                                color: Theme.tile
-                                                border.width: 1
-                                                border.color: Theme.withAlpha(Theme.outline, 0.2)
-
-                                                RowLayout {
-                                                    anchors.fill: parent
-                                                    anchors.margins: 12
-                                                    spacing: 12
-
-                                                    Rectangle {
-                                                        implicitWidth: 38
-                                                        implicitHeight: 38
-                                                        radius: 10
-                                                        color: Theme.withAlpha(Theme.primary, 0.15)
-                                                        Text {
-                                                            anchors.centerIn: parent
-                                                            text: Theme.icons.disk
-                                                            font.family: Theme.iconFontFamily
-                                                            font.pixelSize: 16
-                                                            color: Theme.primary
-                                                        }
-                                                    }
-
-                                                    ColumnLayout {
-                                                        Layout.fillWidth: true
-                                                        spacing: 2
-                                                        Text {
-                                                            text: bkCard.modelData.name
-                                                            font.family: Theme.monoFamily
-                                                            font.pixelSize: 11
-                                                            font.weight: Font.Medium
-                                                            color: Theme.textColor
-                                                        }
-                                                        RowLayout {
-                                                            spacing: 8
-                                                            Text {
-                                                                text: Theme.t("presets.date_label", "Data: ") + bkCard.modelData.date
-                                                                font.family: Theme.fontFamily
-                                                                font.pixelSize: 10
-                                                                color: Theme.subtext
-                                                            }
-                                                            Text {
-                                                                text: "•"
-                                                                font.pixelSize: 10
-                                                                color: Theme.subtext
-                                                            }
-                                                            Text {
-                                                                text: Theme.t("presets.size_label", "Tamanho: ") + bkCard.modelData.size
-                                                                font.family: Theme.monoFamily
-                                                                font.pixelSize: 10
-                                                                color: Theme.subtext
-                                                            }
-                                                        }
-                                                    }
-
-                                                    ActionBtn {
-                                                        icon: Theme.icons.refresh
-                                                        text: Theme.t("presets.restore_btn", "Restaurar")
-                                                        onClicked: {
-                                                            Quickshell.execDetached(["rice-presets", "backup-restore", bkCard.modelData.path]);
-                                                            win.showToast("Restaurando configurações do backup...");
-                                                        }
-                                                    }
-
-                                                    Rectangle {
-                                                        implicitWidth: 32
-                                                        implicitHeight: 32
-                                                        radius: 8
-                                                        color: delBkArea.containsMouse ? Theme.withAlpha("#ef4444", 0.2) : Theme.tileHigh
-                                                        border.width: 1
-                                                        border.color: delBkArea.containsMouse ? "#ef4444" : Theme.withAlpha(Theme.outline, 0.2)
-
-                                                        Text {
-                                                            anchors.centerIn: parent
-                                                            text: Theme.icons.trash
-                                                            font.family: Theme.iconFontFamily
-                                                            font.pixelSize: 13
-                                                            color: delBkArea.containsMouse ? "#ef4444" : Theme.subtext
-                                                        }
-
-                                                        MouseArea {
-                                                            id: delBkArea
-                                                            anchors.fill: parent
-                                                            hoverEnabled: true
-                                                            cursorShape: Qt.PointingHandCursor
-                                                            onClicked: {
-                                                                Quickshell.execDetached(["rice-presets", "backup-delete", bkCard.modelData.path]);
-                                                                backupReloadTimer.restart();
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-
-                                        // Placeholder se vazio
-                                        Rectangle {
-                                            visible: !win.backupsData || win.backupsData.length === 0
-                                            Layout.fillWidth: true
-                                            implicitHeight: 70
-                                            radius: 10
-                                            color: Theme.withAlpha(Theme.tile, 0.5)
-                                            border.width: 1
-                                            border.color: Theme.withAlpha(Theme.outline, 0.15)
-
-                                            ColumnLayout {
-                                                anchors.centerIn: parent
-                                                spacing: 4
-                                                Text {
-                                                    Layout.alignment: Qt.AlignHCenter
-                                                    text: Theme.t("presets.empty_backups", "Nenhum ponto de restauração encontrado.")
-                                                    font.family: Theme.fontFamily
-                                                    font.pixelSize: 11
-                                                    font.weight: Font.Medium
-                                                    color: Theme.subtext
-                                                }
-                                                Text {
-                                                    Layout.alignment: Qt.AlignHCenter
-                                                    text: Theme.t("presets.empty_backups_sub", "Clique em 'Criar Novo Backup Agora' para gerar uma cópia de segurança completa das suas configs.")
-                                                    font.family: Theme.fontFamily
-                                                    font.pixelSize: 10
-                                                    color: Theme.withAlpha(Theme.subtext, 0.7)
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        // ==========================================
-                        // ABA 19: CUSTOMIZAÇÃO DO SHELL (HUB, SIDEBAR, DOCK)
+                        // ABA 18: CUSTOMIZAÇÃO DO SHELL (HUB, SIDEBAR, DOCK)
                         // ==========================================
                         Flickable {
                             id: shellCustomTab
                             anchors.fill: parent
-                            visible: win.currentTab === 19
+                            visible: win.currentTab === 18
                             contentHeight: shellCustomCol.implicitHeight + 40
                             contentWidth: width
                             clip: true
@@ -7709,8 +7343,6 @@ PanelWindow {
             loadStorageProc.running = true;
             loadSoftwareUpdatesProc.running = true;
             loadSoftwareAppsProc.running = true;
-            loadPresetsProc.running = true;
-            loadBackupsProc.running = true;
         }
     }
 }
