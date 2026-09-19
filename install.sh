@@ -436,20 +436,32 @@ ok_msg "Dotfiles, scripts e assets aplicados com perfeição!"
 # ------------------------------------------------------------------------------
 step_banner "04/04" "Serviços, zRAM & Opções Adicionais" "Configurações de memória ultrarrápida e recursos opcionais"
 
-# Configuração de zRAM com algoritmo ZSTD (3:1 de compactação na RAM)
-if [ ! -f /etc/systemd/zram-generator.conf ]; then
-    gear_msg "Configurando zRAM ZSTD para multitarefa sem travamentos..."
+# Configuração inteligente de zRAM (garante pelo menos 16GB com algoritmo ZSTD)
+CURRENT_ZRAM_BYTES=$(zramctl -b -n -o DISKSIZE /dev/zram0 2>/dev/null | head -n1 || echo 0)
+[ -z "$CURRENT_ZRAM_BYTES" ] && CURRENT_ZRAM_BYTES=0
+
+# 16GB = 17179869184 bytes (ou ~16777216 KB em /proc/swaps)
+if [ "$CURRENT_ZRAM_BYTES" -ge 17179869184 ] 2>/dev/null; then
+    ok_msg "zRAM já configurado com 16GB ou mais ($((CURRENT_ZRAM_BYTES / 1024 / 1024 / 1024))GB). Nenhuma alteração necessária."
+else
+    if [ "$CURRENT_ZRAM_BYTES" -gt 0 ] 2>/dev/null; then
+        warn_msg "zRAM atual detectado abaixo de 16GB ($((CURRENT_ZRAM_BYTES / 1024 / 1024))MB). Redefinindo para 16GB ZSTD..."
+    else
+        gear_msg "zRAM não detectado ou inativo. Configurando 16GB de zRAM com compressão ZSTD..."
+    fi
+
     sudo bash -c 'cat << "ZRAM_EOF" > /etc/systemd/zram-generator.conf
 [zram0]
-zram-size = ram
+zram-size = 16384
 compression-algorithm = zstd
 swap-priority = 100
+fs-type = swap
 ZRAM_EOF'
+
     sudo systemctl daemon-reload
-    sudo systemctl start /dev/zram0 2>/dev/null || true
-    ok_msg "zRAM ZSTD configurado e ativado com sucesso!"
-else
-    ok_msg "zRAM já configurado no sistema."
+    sudo swapoff /dev/zram0 2>/dev/null || true
+    sudo systemctl restart /dev/zram0 2>/dev/null || sudo systemctl restart systemd-zram-setup@zram0.service 2>/dev/null || true
+    ok_msg "zRAM configurado para 16GB (ZSTD) com sucesso!"
 fi
 
 # Opcional: Wallpaper Engine (Waywallen via Flatpak)
