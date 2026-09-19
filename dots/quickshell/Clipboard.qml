@@ -299,7 +299,7 @@ PanelWindow {
                         }
 
                         Text {
-                            text: "Pesquisar no histórico..."
+                            text: Theme.t("clipboard.search_placeholder", "Pesquisar no histórico...")
                             font.family: Theme.fontFamily
                             font.pixelSize: 13
                             color: Theme.withAlpha(Theme.subtext, 0.6)

@@ -421,7 +421,8 @@ if io.open(home .. "/projetos/FischMacro/noisefish-linux/tray.py", "r") then
 end
 
 -- Ctrl + Alt + Delete = Menu de Energia / Desligar / Suspender
-hl.bind("CTRL + ALT + Delete", hl.dsp.exec_cmd("quickshell ipc call energy open"))
+hl.bind("CTRL + ALT + Delete", hl.dsp.exec_cmd("quickshell ipc call sidebar toggle"))
+hl.bind("CTRL + ALT + delete", hl.dsp.exec_cmd("quickshell ipc call sidebar toggle"))
 
 hl.bind(mainMod .. " + mouse_down", hl.dsp.focus({ workspace = "e+1" }))
 hl.bind(mainMod .. " + mouse_up",   hl.dsp.focus({ workspace = "e-1" }))

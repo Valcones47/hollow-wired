@@ -863,7 +863,7 @@ PanelWindow {
                     }
                     PopText {
                         visible: sidebar.pop === "reboot" && sidebar.rebootReason !== ""
-                        text: "Reboot recomendado: " + sidebar.rebootReason.split(";").join(", ")
+                        text: Theme.t("sidebar.reboot_recommended", "Reboot recomendado: ") + sidebar.rebootReason.split(";").join(", ")
                         color: Theme.primary
                     }
                     PopText {
@@ -911,11 +911,13 @@ PanelWindow {
         }
     }
 
-    // IPC: `qs ipc call sidebar toggle|hide|check|popup <kind>|trayPopup <n>`
+    // IPC: `qs ipc call sidebar toggle|open|hide|check|popup <kind>|trayPopup <n>`
     IpcHandler {
         target: "sidebar"
         function toggle(): void { sidebar.open = !sidebar.open; }
+        function open(): void { sidebar.open = true; }
         function hide(): void { sidebar.open = false; }
+        function close(): void { sidebar.open = false; }
         function check(): void { sidebar.checkUpdates(); }
         function trayPopup(index: string): void {
             const i = parseInt(index) || 0;
@@ -931,5 +933,13 @@ PanelWindow {
             sidebar.showPop(kind, anchors[kind] || logoutBtn, null);
             popHide.stop();
         }
+    }
+
+    IpcHandler {
+        target: "energy"
+        function toggle(): void { sidebar.open = !sidebar.open; }
+        function open(): void { sidebar.open = true; }
+        function hide(): void { sidebar.open = false; }
+        function close(): void { sidebar.open = false; }
     }
 }

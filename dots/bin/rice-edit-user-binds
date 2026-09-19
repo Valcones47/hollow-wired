@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# rice-edit-user-binds: Abre ~/.config/hypr/user-binds.lua de forma confiável
+# ==============================================================================
+set -euo pipefail
+
+TARGET_FILE="$HOME/.config/hypr/user-binds.lua"
+
+# Cria se não existir, priorizando o template de exemplo
+if [ ! -f "$TARGET_FILE" ]; then
+    mkdir -p "$(dirname "$TARGET_FILE")"
+    for p in \
+        "$HOME/.hollow-wired/dots/hypr/user-binds.lua.example" \
+        "$HOME/projetos/hyprland-setup/dots/hypr/user-binds.lua.example" \
+        "$HOME/hyprland-setup/dots/hypr/user-binds.lua.example" \
+        "/etc/skel/.config/hypr/user-binds.lua.example"; do
+        if [ -f "$p" ]; then
+            cp "$p" "$TARGET_FILE"
+            break
+        fi
+    done
+    if [ ! -f "$TARGET_FILE" ]; then
+        cat << 'EOF' > "$TARGET_FILE"
+-- ~/.config/hypr/user-binds.lua
+-- Adicione seus atalhos personalizados aqui!
+-- hl.bind("CTRL + ALT + Delete", hl.dsp.exec_cmd("quickshell ipc call sidebar toggle"))
+EOF
+    fi
+fi
+
+# Tenta primeiro editores gráficos modernos para máxima comodidade
+for gui_editor in kate kwrite code codium gedit gnome-text-editor mousepad geany; do
+    if command -v "$gui_editor" >/dev/null 2>&1; then
+        exec "$gui_editor" "$TARGET_FILE"
+    fi
+done
+
+# Caso nenhum editor gráfico esteja instalado, abre em terminal Kitty com micro, nano ou vim
+if command -v kitty >/dev/null 2>&1; then
+    for cli_editor in micro nano vim vi; do
+        if command -v "$cli_editor" >/dev/null 2>&1; then
+            exec kitty --title "Atalhos Customizados (user-binds.lua)" -e "$cli_editor" "$TARGET_FILE"
+        fi
+    done
+fi
+
+# Fallback final com xdg-open
+exec xdg-open "$TARGET_FILE"

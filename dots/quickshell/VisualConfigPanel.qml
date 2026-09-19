@@ -1271,26 +1271,27 @@ PanelWindow {
 
                             Text {
                                 text: [
-                                    "Fastfetch & Terminal Fetch",
-                                    "Kitty Terminal & Tipografia",
-                                    "Mako Notificações",
-                                    "Monitores & Exibição",
-                                    "Áudio, Som & Microfone",
-                                    "Teclado, Mouse & Entradas",
-                                    "Energia & Bateria",
-                                    "Inicialização Automática (Boot)",
-                                    "Cores & Wallust Dinâmico",
-                                    "Efeitos Visuais, Bordas & SDDM",
-                                    "Bluetooth & Periféricos sem Fio",
-                                    "Rede, Conexões & Wi-Fi",
-                                    "Aplicativos Padrão do Sistema",
-                                    "Jogos & Gráficos NVIDIA",
-                                    "Armazenamento & Limpeza de Disco",
-                                    "Guia de Teclas & Atalhos",
-                                    "Sistema, Snapshots & Reparo",
-                                    "Central de Aplicativos & Atualizações",
-                                    "Perfis de Estilo & Gerenciador de Backup"
-                                ][win.currentTab] || "Configurações"
+                                    Theme.t("header.title_0", "Fastfetch & Terminal Fetch"),
+                                    Theme.t("header.title_1", "Kitty Terminal & Tipografia"),
+                                    Theme.t("header.title_2", "Mako Notificações"),
+                                    Theme.t("header.title_3", "Monitores & Exibição"),
+                                    Theme.t("header.title_4", "Áudio, Som & Microfone"),
+                                    Theme.t("header.title_5", "Teclado, Mouse & Entradas"),
+                                    Theme.t("header.title_6", "Energia & Bateria"),
+                                    Theme.t("header.title_7", "Inicialização Automática (Boot)"),
+                                    Theme.t("header.title_8", "Cores & Wallust Dinâmico"),
+                                    Theme.t("header.title_9", "Efeitos Visuais, Bordas & SDDM"),
+                                    Theme.t("header.title_10", "Bluetooth & Periféricos sem Fio"),
+                                    Theme.t("header.title_11", "Rede, Conexões & Wi-Fi"),
+                                    Theme.t("header.title_12", "Aplicativos Padrão do Sistema"),
+                                    Theme.t("header.title_13", "Jogos & Gráficos NVIDIA"),
+                                    Theme.t("header.title_14", "Armazenamento & Limpeza de Disco"),
+                                    Theme.t("header.title_15", "Guia de Teclas & Atalhos"),
+                                    Theme.t("header.title_16", "Sistema, Snapshots & Reparo"),
+                                    Theme.t("header.title_17", "Central de Aplicativos & Atualizações"),
+                                    Theme.t("header.title_18", "Perfis de Estilo & Gerenciador de Backup"),
+                                    Theme.t("header.title_19", "Customização do Shell")
+                                ][win.currentTab] || Theme.t("settings.panel_title", "Configurações")
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 16
                                 font.weight: Font.Bold
@@ -1299,25 +1300,26 @@ PanelWindow {
 
                             Text {
                                 text: [
-                                    "Personalize o logo, dimensões e informações mostradas no terminal.",
-                                    "Ajuste opacidade, tamanho de texto, espaçamento interno e cursor.",
-                                    "Escolha a posição na tela, tempo de exibição e bordas das notificações.",
-                                    "Controle taxa de atualização (144Hz/60Hz), FreeSync/VRR e brilho.",
-                                    "Selecione saída de áudio, microfone, volumes e execute teste estéreo.",
-                                    "Seletor de layout ABNT2/US, sensibilidade do mouse e perfil de aceleração.",
-                                    "Monitore saúde da bateria, ciclos de carga e escolha perfis de energia.",
-                                    "Gerencie quais programas iniciam automaticamente ao ligar o computador.",
-                                    "Visualize a paleta de 16 cores ativas do wallpaper e copie códigos HEX.",
-                                    "Luz noturna, transparência inativa, cantos arredondados, animações e login.",
-                                    "Gerencie controles de videogame, fones de ouvido e conexões Bluetooth.",
-                                    "Monitore a velocidade e latência da internet e conecte-se a novas redes Wi-Fi.",
-                                    "Escolha quais programas abrem páginas da web, pastas, códigos, fotos e vídeos.",
-                                    "Monitore a GPU dedicada RTX 3050, GameMode e parâmetros da Steam.",
-                                    "Monitore o uso do SSD e recupere espaço em disco com limpezas seguras.",
-                                    "Consulte e busque todos os atalhos de teclado do Hyprland com 1 clique.",
-                                    "Crie pontos de restauração Btrfs e resolva problemas comuns com 1 clique.",
-                                    "Verifique atualizações pendentes do Arch Linux e instale programas essenciais.",
-                                    "Alterne estilos estéticos do rice e crie cópias de segurança com 1 clique."
+                                    Theme.t("header.sub_0", "Personalize o logo, dimensões e informações mostradas no terminal."),
+                                    Theme.t("header.sub_1", "Ajuste opacidade, tamanho de texto, espaçamento interno e cursor."),
+                                    Theme.t("header.sub_2", "Escolha a posição na tela, tempo de exibição e bordas das notificações."),
+                                    Theme.t("header.sub_3", "Controle taxa de atualização (144Hz/60Hz), FreeSync/VRR e brilho."),
+                                    Theme.t("header.sub_4", "Selecione saída de áudio, microfone, volumes e execute teste estéreo."),
+                                    Theme.t("header.sub_5", "Seletor de layout ABNT2/US, sensibilidade do mouse e perfil de aceleração."),
+                                    Theme.t("header.sub_6", "Monitore saúde da bateria, ciclos de carga e escolha perfis de energia."),
+                                    Theme.t("header.sub_7", "Gerencie quais programas iniciam automaticamente ao ligar o computador."),
+                                    Theme.t("header.sub_8", "Visualize a paleta de 16 cores ativas do wallpaper e copie códigos HEX."),
+                                    Theme.t("header.sub_9", "Luz noturna, transparência inativa, cantos arredondados, animações e login."),
+                                    Theme.t("header.sub_10", "Gerencie controles de videogame, fones de ouvido e conexões Bluetooth."),
+                                    Theme.t("header.sub_11", "Monitore a velocidade e latência da internet e conecte-se a novas redes Wi-Fi."),
+                                    Theme.t("header.sub_12", "Escolha quais programas abrem páginas da web, pastas, códigos, fotos e vídeos."),
+                                    Theme.t("header.sub_13", "Monitore a GPU dedicada RTX 3050, GameMode e parâmetros da Steam."),
+                                    Theme.t("header.sub_14", "Monitore o uso do SSD e recupere espaço em disco com limpezas seguras."),
+                                    Theme.t("header.sub_15", "Consulte e busque todos os atalhos de teclado do Hyprland com 1 clique."),
+                                    Theme.t("header.sub_16", "Crie pontos de restauração Btrfs e resolva problemas comuns com 1 clique."),
+                                    Theme.t("header.sub_17", "Verifique atualizações pendentes do Arch Linux e instale programas essenciais."),
+                                    Theme.t("header.sub_18", "Alterne estilos estéticos do rice e crie cópias de segurança com 1 clique."),
+                                    Theme.t("header.sub_19", "Ajuste estilo, escala, blur e cores de destaque dos componentes do shell.")
                                 ][win.currentTab] || ""
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 11
@@ -1397,13 +1399,13 @@ PanelWindow {
                                 RowLayout {
                                     Layout.fillWidth: true
                                     SectionHeader {
-                                        title: "Logo & Imagens do Fastfetch"
-                                        subtitle: "Imagens detectadas em ~/Imagens/FastFetch"
+                                        title: Theme.t("ff.section_logo", "Logo & Imagens do Fastfetch")
+                                        subtitle: Theme.t("ff.section_logo_sub", "Imagens detectadas em ~/Imagens/FastFetch")
                                     }
                                     Item { Layout.fillWidth: true }
                                     ActionBtn {
                                         icon: Theme.icons.laptop
-                                        text: "Abrir Pasta"
+                                        text: Theme.t("ff.open_folder", "Abrir Pasta")
                                         onClicked: Quickshell.execDetached(["dolphin", (Quickshell.env("HOME") || "") + "/Imagens/FastFetch"])
                                     }
                                 }
@@ -1434,7 +1436,7 @@ PanelWindow {
                                             }
                                             Text {
                                                 Layout.alignment: Qt.AlignHCenter
-                                                text: "Arch Padrão"
+                                                text: Theme.t("ff.default_arch", "Arch Padrão")
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: 11
                                                 font.weight: Font.Medium
@@ -1512,7 +1514,7 @@ PanelWindow {
                                     Layout.fillWidth: true
                                     spacing: 20
                                     CfgSlider {
-                                        title: "Largura do Logo (Colunas)"
+                                        title: Theme.t("ff.logo_width", "Largura do Logo (Colunas)")
                                         minVal: 15; maxVal: 50; value: win.ffWidth; unit: " col"
                                         onChanged: newVal => {
                                             win.ffWidth = Math.round(newVal);
@@ -1522,7 +1524,7 @@ PanelWindow {
                                         }
                                     }
                                     CfgSlider {
-                                        title: "Altura do Logo (Linhas)"
+                                        title: Theme.t("ff.logo_height", "Altura do Logo (Linhas)")
                                         minVal: 8; maxVal: 32; value: win.ffHeight; unit: " lin"
                                         onChanged: newVal => {
                                             win.ffHeight = Math.round(newVal);
@@ -1534,8 +1536,8 @@ PanelWindow {
                                 }
 
                                 SectionHeader {
-                                    title: "Módulos de Sistema Exibidos"
-                                    subtitle: "Clique para ativar ou ocultar cada informação no Fastfetch"
+                                    title: Theme.t("ff.section_modules", "Módulos de Sistema Exibidos")
+                                    subtitle: Theme.t("ff.section_modules_sub", "Clique para ativar ou ocultar cada informação no Fastfetch")
                                 }
 
                                 Flow {
@@ -1543,23 +1545,23 @@ PanelWindow {
                                     spacing: 8
                                     Repeater {
                                         model: [
-                                            { key: "os", label: "Sistema (OS)", icon: Theme.icons.arch },
-                                            { key: "host", label: "Máquina", icon: Theme.icons.laptop },
-                                            { key: "kernel", label: "Kernel", icon: Theme.icons.chip },
-                                            { key: "uptime", label: "Tempo de Atividade", icon: Theme.icons.clock },
-                                            { key: "packages", label: "Pacotes", icon: Theme.icons.packages },
-                                            { key: "shell", label: "Shell", icon: Theme.icons.console },
-                                            { key: "display", label: "Tela & Resolução", icon: Theme.icons.monitor },
-                                            { key: "de", label: "Ambiente (DE)", icon: Theme.icons.dashboard },
-                                            { key: "wm", label: "Compositor (WM)", icon: Theme.icons.workspaces },
-                                            { key: "theme", label: "Tema & Cores", icon: Theme.icons.palette },
-                                            { key: "icons", label: "Ícones", icon: Theme.icons.tune },
-                                            { key: "terminal", label: "Terminal", icon: Theme.icons.console },
-                                            { key: "cpu", label: "Processador (CPU)", icon: Theme.icons.cpu },
-                                            { key: "gpu", label: "Placa de Vídeo (GPU)", icon: Theme.icons.gpu },
-                                            { key: "memory", label: "Memória RAM", icon: Theme.icons.memory },
-                                            { key: "swap", label: "Swap / zRAM", icon: Theme.icons.disk },
-                                            { key: "disk", label: "Armazenamento", icon: Theme.icons.disk }
+                                            { key: "os", label: Theme.t("ff.mod_os", "Sistema (OS)"), icon: Theme.icons.arch },
+                                            { key: "host", label: Theme.t("ff.mod_host", "Máquina"), icon: Theme.icons.laptop },
+                                            { key: "kernel", label: Theme.t("ff.mod_kernel", "Kernel"), icon: Theme.icons.chip },
+                                            { key: "uptime", label: Theme.t("ff.mod_uptime", "Tempo de Atividade"), icon: Theme.icons.clock },
+                                            { key: "packages", label: Theme.t("ff.mod_packages", "Pacotes"), icon: Theme.icons.packages },
+                                            { key: "shell", label: Theme.t("ff.mod_shell", "Shell"), icon: Theme.icons.console },
+                                            { key: "display", label: Theme.t("ff.mod_display", "Tela & Resolução"), icon: Theme.icons.monitor },
+                                            { key: "de", label: Theme.t("ff.mod_de", "Ambiente (DE)"), icon: Theme.icons.dashboard },
+                                            { key: "wm", label: Theme.t("ff.mod_wm", "Compositor (WM)"), icon: Theme.icons.workspaces },
+                                            { key: "theme", label: Theme.t("ff.mod_theme", "Tema & Cores"), icon: Theme.icons.palette },
+                                            { key: "icons", label: Theme.t("ff.mod_icons", "Ícones"), icon: Theme.icons.tune },
+                                            { key: "terminal", label: Theme.t("ff.mod_terminal", "Terminal"), icon: Theme.icons.console },
+                                            { key: "cpu", label: Theme.t("ff.mod_cpu", "Processador (CPU)"), icon: Theme.icons.cpu },
+                                            { key: "gpu", label: Theme.t("ff.mod_gpu", "Placa de Vídeo (GPU)"), icon: Theme.icons.gpu },
+                                            { key: "memory", label: Theme.t("ff.mod_memory", "Memória RAM"), icon: Theme.icons.memory },
+                                            { key: "swap", label: Theme.t("ff.mod_swap", "Swap / zRAM"), icon: Theme.icons.disk },
+                                            { key: "disk", label: Theme.t("ff.mod_disk", "Armazenamento"), icon: Theme.icons.disk }
                                         ]
                                         delegate: Rectangle {
                                             required property var modelData
@@ -1609,13 +1611,13 @@ PanelWindow {
                                     spacing: 12
                                     ActionBtn {
                                         icon: Theme.icons.console
-                                        text: "Visualizar no Terminal (Kitty)"
+                                        text: Theme.t("ff.preview_btn", "Visualizar no Terminal (Kitty)")
                                         primary: true
                                         onClicked: Quickshell.execDetached(["rice-fastfetch-apply", "run"])
                                     }
                                     ActionBtn {
                                         icon: Theme.icons.refresh
-                                        text: "Restaurar Padrões"
+                                        text: Theme.t("ff.reset_btn", "Restaurar Padrões")
                                         onClicked: {
                                             Quickshell.execDetached(["rice-fastfetch-apply", "reset"]);
                                             loadFFProc.running = true;
@@ -1640,15 +1642,15 @@ PanelWindow {
                                 spacing: 16
 
                                 SectionHeader {
-                                    title: "Aparência & Tipografia"
-                                    subtitle: "Ajuste em tempo real da opacidade e legibilidade do terminal Kitty"
+                                    title: Theme.t("kitty.section_appear", "Aparência & Tipografia")
+                                    subtitle: Theme.t("kitty.section_appear_sub", "Ajuste em tempo real da opacidade e legibilidade do terminal Kitty")
                                 }
 
                                 RowLayout {
                                     Layout.fillWidth: true
                                     spacing: 20
                                     CfgSlider {
-                                        title: "Opacidade de Fundo"
+                                        title: Theme.t("kitty.opacity", "Opacidade de Fundo")
                                         minVal: 0.3; maxVal: 1.0; value: win.kittyOpacity; decimals: 2
                                         onChanged: newVal => {
                                             win.kittyOpacity = newVal;
@@ -1658,7 +1660,7 @@ PanelWindow {
                                         }
                                     }
                                     CfgSlider {
-                                        title: "Tamanho da Fonte"
+                                        title: Theme.t("kitty.font_size", "Tamanho da Fonte")
                                         minVal: 8; maxVal: 20; value: win.kittyFontSize; decimals: 1; unit: " pt"
                                         onChanged: newVal => {
                                             win.kittyFontSize = newVal;
@@ -1670,7 +1672,7 @@ PanelWindow {
                                 }
 
                                 CfgSlider {
-                                    title: "Espaçamento Interno (Margem / Padding)"
+                                    title: Theme.t("kitty.padding", "Espaçamento Interno (Margem / Padding)")
                                     minVal: 0; maxVal: 32; value: win.kittyPadding; unit: " px"
                                     onChanged: newVal => {
                                         win.kittyPadding = Math.round(newVal);
@@ -1681,8 +1683,8 @@ PanelWindow {
                                 }
 
                                 SectionHeader {
-                                    title: "Estilo do Cursor & Efeitos"
-                                    subtitle: "Formato do ponteiro e comportamento de áudio"
+                                    title: Theme.t("kitty.section_cursor", "Estilo do Cursor & Efeitos")
+                                    subtitle: Theme.t("kitty.section_cursor_sub", "Formato do ponteiro e comportamento de áudio")
                                 }
 
                                 RowLayout {
@@ -1690,9 +1692,9 @@ PanelWindow {
                                     spacing: 12
                                     Repeater {
                                         model: [
-                                            { id: "beam", name: "Linha Vertical (Beam)", icon: Theme.icons.cursor },
-                                            { id: "block", name: "Bloco Sólido (Block)", icon: Theme.icons.dashboard },
-                                            { id: "underline", name: "Sublinhado (Underline)", icon: Theme.icons.timer }
+                                            { id: "beam", name: Theme.t("kitty.cursor_beam", "Linha Vertical (Beam)"), icon: Theme.icons.cursor },
+                                            { id: "block", name: Theme.t("kitty.cursor_block", "Bloco Sólido (Block)"), icon: Theme.icons.dashboard },
+                                            { id: "underline", name: Theme.t("kitty.cursor_underline", "Sublinhado (Underline)"), icon: Theme.icons.timer }
                                         ]
                                         delegate: Rectangle {
                                             required property var modelData
@@ -1737,8 +1739,8 @@ PanelWindow {
                                 }
 
                                 CfgToggle {
-                                    title: "Desfoque de Fundo (Background Blur)"
-                                    subtitle: "Ativa efeito de vidro fosco atrás do terminal (Hyprland)"
+                                    title: Theme.t("kitty.blur_title", "Desfoque de Fundo (Background Blur)")
+                                    subtitle: Theme.t("kitty.blur_desc", "Ativa efeito de vidro fosco atrás do terminal (Hyprland)")
                                     checked: win.kittyBlur
                                     onToggled: nv => {
                                         win.kittyBlur = nv;
@@ -1747,8 +1749,8 @@ PanelWindow {
                                 }
 
                                 CfgToggle {
-                                    title: "Sino Sonoro (Audio Bell)"
-                                    subtitle: "Toca bipe do sistema ao atingir o limite ou cometer erro"
+                                    title: Theme.t("kitty.bell_title", "Sino Sonoro (Audio Bell)")
+                                    subtitle: Theme.t("kitty.bell_desc", "Toca bipe do sistema ao atingir o limite ou cometer erro")
                                     checked: win.kittyBell
                                     onToggled: nv => {
                                         win.kittyBell = nv;
@@ -1761,13 +1763,13 @@ PanelWindow {
                                     spacing: 12
                                     ActionBtn {
                                         icon: Theme.icons.console
-                                        text: "Abrir Novo Terminal Kitty"
+                                        text: Theme.t("kitty.open_btn", "Abrir Novo Terminal Kitty")
                                         primary: true
                                         onClicked: Quickshell.execDetached(["kitty"])
                                     }
                                     ActionBtn {
                                         icon: Theme.icons.refresh
-                                        text: "Restaurar Padrões"
+                                        text: Theme.t("kitty.reset_btn", "Restaurar Padrões")
                                         onClicked: {
                                             Quickshell.execDetached(["rice-kitty-apply", "reset"]);
                                             loadKittyProc.running = true;
@@ -1792,8 +1794,8 @@ PanelWindow {
                                 spacing: 16
 
                                 SectionHeader {
-                                    title: "Posição na Tela"
-                                    subtitle: "Escolha onde os banners de notificação devem surgir"
+                                    title: Theme.t("mako.section_pos", "Posição na Tela")
+                                    subtitle: Theme.t("mako.section_pos_sub", "Escolha onde os banners de notificação devem surgir")
                                 }
 
                                 GridLayout {
@@ -1804,12 +1806,12 @@ PanelWindow {
 
                                     Repeater {
                                         model: [
-                                            { id: "top-left", name: "Canto Superior Esquerdo" },
-                                            { id: "top-center", name: "Superior Centro" },
-                                            { id: "top-right", name: "Canto Superior Direito (Padrão)" },
-                                            { id: "bottom-left", name: "Canto Inferior Esquerdo" },
-                                            { id: "bottom-center", name: "Inferior Centro" },
-                                            { id: "bottom-right", name: "Canto Inferior Direito" }
+                                            { id: "top-left", name: Theme.t("mako.pos_top_left", "Canto Superior Esquerdo") },
+                                            { id: "top-center", name: Theme.t("mako.pos_top_center", "Superior Centro") },
+                                            { id: "top-right", name: Theme.t("mako.pos_top_right", "Canto Superior Direito (Padrão)") },
+                                            { id: "bottom-left", name: Theme.t("mako.pos_bottom_left", "Canto Inferior Esquerdo") },
+                                            { id: "bottom-center", name: Theme.t("mako.pos_bottom_center", "Inferior Centro") },
+                                            { id: "bottom-right", name: Theme.t("mako.pos_bottom_right", "Canto Inferior Direito") }
                                         ]
                                         delegate: Rectangle {
                                             required property var modelData
@@ -1854,15 +1856,15 @@ PanelWindow {
                                 }
 
                                 SectionHeader {
-                                    title: "Comportamento & Geometria"
-                                    subtitle: "Tempo de exibição, bordas e arredondamento dos banners"
+                                    title: Theme.t("mako.section_geom", "Comportamento & Geometria")
+                                    subtitle: Theme.t("mako.section_geom_sub", "Tempo de exibição, bordas e arredondamento dos banners")
                                 }
 
                                 RowLayout {
                                     Layout.fillWidth: true
                                     spacing: 20
                                     CfgSlider {
-                                        title: "Tempo em Tela (Timeout)"
+                                        title: Theme.t("mako.timeout", "Tempo em Tela (Timeout)")
                                         minVal: 2; maxVal: 20; value: win.makoTimeout; unit: " s"
                                         onChanged: newVal => {
                                             win.makoTimeout = Math.round(newVal);
@@ -1872,7 +1874,7 @@ PanelWindow {
                                         }
                                     }
                                     CfgSlider {
-                                        title: "Arredondamento dos Cantos"
+                                        title: Theme.t("mako.radius", "Arredondamento dos Cantos")
                                         minVal: 0; maxVal: 20; value: win.makoRadius; unit: " px"
                                         onChanged: newVal => {
                                             win.makoRadius = Math.round(newVal);
@@ -1884,7 +1886,7 @@ PanelWindow {
                                 }
 
                                 CfgSlider {
-                                    title: "Espessura da Borda"
+                                    title: Theme.t("mako.border_size", "Espessura da Borda")
                                     minVal: 0; maxVal: 6; value: win.makoBorder; unit: " px"
                                     onChanged: newVal => {
                                         win.makoBorder = Math.round(newVal);
@@ -1899,13 +1901,13 @@ PanelWindow {
                                     spacing: 12
                                     ActionBtn {
                                         icon: Theme.icons.bell
-                                        text: "Enviar Notificação de Teste"
+                                        text: Theme.t("mako.test_btn", "Enviar Notificação de Teste")
                                         primary: true
                                         onClicked: Quickshell.execDetached(["rice-mako-apply", "test"])
                                     }
                                     ActionBtn {
                                         icon: Theme.icons.refresh
-                                        text: "Restaurar Padrões"
+                                        text: Theme.t("mako.reset_btn", "Restaurar Padrões")
                                         onClicked: {
                                             Quickshell.execDetached(["rice-mako-apply", "reset"]);
                                             loadMakoProc.running = true;
@@ -1930,8 +1932,8 @@ PanelWindow {
                                 spacing: 16
 
                                 SectionHeader {
-                                    title: "Monitor Principal Detectado"
-                                    subtitle: "Informações de hardware e resolução da tela ativa"
+                                    title: Theme.t("monitor.primary_title", "Monitor Principal Detectado")
+                                    subtitle: Theme.t("monitor.primary_sub", "Informações de hardware e resolução da tela ativa")
                                 }
 
                                 Rectangle {
@@ -1981,7 +1983,7 @@ PanelWindow {
                                                     Text {
                                                         id: hzBadge
                                                         anchors.centerIn: parent
-                                                        text: win.monitorHz + " Hz Ativo"
+                                                        text: win.monitorHz + " Hz " + Theme.t("common.active", "Ativo")
                                                         font.family: Theme.fontFamily
                                                         font.pixelSize: 10
                                                         font.weight: Font.Bold
@@ -2101,8 +2103,8 @@ PanelWindow {
                                 }
 
                                 SectionHeader {
-                                    title: "Escala da Tela (HiDPI / Zoom)"
-                                    subtitle: "Ajuste o tamanho de janelas e fontes (100% padrão para 1080p, aumente para 2K/4K ou diminua se ficou grande)"
+                                    title: Theme.t("monitor.scale_title", "Escala da Tela (HiDPI / Zoom)")
+                                    subtitle: Theme.t("monitor.scale_sub", "Ajuste o tamanho de janelas e fontes (100% padrão para 1080p, aumente para 2K/4K ou diminua se ficou grande)")
                                 }
 
                                 RowLayout {
@@ -2111,11 +2113,11 @@ PanelWindow {
 
                                     Repeater {
                                         model: [
-                                            { label: "100%", val: 1.0, desc: "Padrão (1080p)" },
-                                            { label: "125%", val: 1.25, desc: "Médio (2K)" },
-                                            { label: "150%", val: 1.5, desc: "Grande (HiDPI)" },
-                                            { label: "175%", val: 1.75, desc: "Ultra" },
-                                            { label: "200%", val: 2.0, desc: "4K / TV" }
+                                            { label: "100%", val: 1.0, desc: Theme.t("monitor.scale_100", "Padrão (1080p)") },
+                                            { label: "125%", val: 1.25, desc: Theme.t("monitor.scale_125", "Médio (2K)") },
+                                            { label: "150%", val: 1.5, desc: Theme.t("monitor.scale_150", "Grande (HiDPI)") },
+                                            { label: "175%", val: 1.75, desc: Theme.t("monitor.scale_175", "Ultra") },
+                                            { label: "200%", val: 2.0, desc: Theme.t("monitor.scale_200", "4K / TV") }
                                         ]
 
                                         delegate: Rectangle {
@@ -2163,28 +2165,28 @@ PanelWindow {
                                 }
 
                                 SectionHeader {
-                                    title: "Sincronização & Tearing"
-                                    subtitle: "Elimina cortes visuais (tearing) adaptando os frames à taxa do monitor"
+                                    title: Theme.t("monitor.sync_title", "Sincronização & Tearing")
+                                    subtitle: Theme.t("monitor.sync_sub", "Elimina cortes visuais (tearing) adaptando os frames à taxa do monitor")
                                 }
 
                                 CfgToggle {
-                                    title: "VRR / FreeSync Adaptativo (Variable Refresh Rate)"
-                                    subtitle: "Ajusta dinamicamente a taxa de atualização do monitor conforme os FPS dos jogos."
+                                    title: Theme.t("monitor.vrr_title", "VRR / FreeSync Adaptativo (Variable Refresh Rate)")
+                                    subtitle: Theme.t("monitor.vrr_desc", "Ajusta dinamicamente a taxa de atualização do monitor conforme os FPS dos jogos.")
                                     checked: win.vrrEnabled
                                     onToggled: nv => {
                                         win.vrrEnabled = nv;
                                         Quickshell.execDetached(["rice-hypr-prefs", "set", "vrr", nv ? "1" : "0"]);
-                                        win.showToast(nv ? "VRR ativado" : "VRR desativado");
+                                        win.showToast(nv ? "VRR ativado" : Theme.t("monitor.vrr_toast_off", "VRR desativado"));
                                     }
                                 }
 
                                 SectionHeader {
-                                    title: "Brilho do Painel"
-                                    subtitle: "Ajuste suave de iluminação da tela interna (backlight)"
+                                    title: Theme.t("monitor.brightness_section", "Brilho do Painel")
+                                    subtitle: Theme.t("monitor.brightness_section_sub", "Ajuste suave de iluminação da tela interna (backlight)")
                                 }
 
                                 CfgSlider {
-                                    title: "Nível de Brilho da Tela"
+                                    title: Theme.t("monitor.brightness_slider", "Nível de Brilho da Tela")
                                     minVal: 5; maxVal: 100; value: win.screenBrightness; unit: "%"
                                     onChanged: newVal => {
                                         win.screenBrightness = Math.round(newVal);
@@ -2210,8 +2212,8 @@ PanelWindow {
                                 spacing: 16
 
                                 SectionHeader {
-                                    title: "Dispositivo de Saída de Áudio (Alto-falantes / Fones)"
-                                    subtitle: "Clique para definir onde o som dos programas deve tocar"
+                                    title: Theme.t("audio.section_out", "Dispositivo de Saída de Áudio (Alto-falantes / Fones)")
+                                    subtitle: Theme.t("audio.section_out_sub", "Clique para definir onde o som dos programas deve tocar")
                                 }
 
                                 ColumnLayout {
@@ -2252,7 +2254,7 @@ PanelWindow {
                                                         color: Theme.textColor
                                                     }
                                                     Text {
-                                                        text: sinkCard.modelData.is_default ? "Dispositivo Padrão Ativo · " + sinkCard.modelData.volume + "%" : "Clique para selecionar"
+                                                        text: sinkCard.modelData.is_default ? Theme.t("audio.default_active", "Dispositivo Padrão Ativo") + " · " + sinkCard.modelData.volume + "%" : Theme.t("audio.click_select", "Clique para selecionar")
                                                         font.family: Theme.fontFamily
                                                         font.pixelSize: 10
                                                         color: sinkCard.modelData.is_default ? Theme.primary : Theme.subtext
@@ -2267,7 +2269,7 @@ PanelWindow {
                                                     color: Theme.primary
                                                     Text {
                                                         anchors.centerIn: parent
-                                                        text: "Ativo"
+                                                        text: Theme.t("common.active", "Ativo")
                                                         font.family: Theme.fontFamily
                                                         font.pixelSize: 10
                                                         font.weight: Font.Bold
@@ -2292,7 +2294,7 @@ PanelWindow {
                                 }
 
                                 CfgSlider {
-                                    title: "Volume Geral da Saída Padrão"
+                                    title: Theme.t("audio.vol_out", "Volume Geral da Saída Padrão")
                                     minVal: 0; maxVal: 150; value: win.audioData.sink_volume || 100; unit: "%"
                                     onChanged: newVal => {
                                         win.audioData.sink_volume = Math.round(newVal);
@@ -2303,8 +2305,8 @@ PanelWindow {
                                 }
 
                                 SectionHeader {
-                                    title: "Dispositivo de Entrada de Áudio (Microfone)"
-                                    subtitle: "Selecione o microfone ativo para jogos, Discord e gravações"
+                                    title: Theme.t("audio.section_in", "Dispositivo de Entrada de Áudio (Microfone)")
+                                    subtitle: Theme.t("audio.section_in_sub", "Selecione o microfone ativo para jogos, Discord e gravações")
                                 }
 
                                 ColumnLayout {
@@ -2345,7 +2347,7 @@ PanelWindow {
                                                         color: Theme.textColor
                                                     }
                                                     Text {
-                                                        text: sourceCard.modelData.is_default ? "Microfone Padrão Ativo · " + sourceCard.modelData.volume + "%" : "Clique para selecionar"
+                                                        text: sourceCard.modelData.is_default ? Theme.t("audio.default_in_active", "Microfone Padrão Ativo") + " · " + sourceCard.modelData.volume + "%" : Theme.t("audio.click_select", "Clique para selecionar")
                                                         font.family: Theme.fontFamily
                                                         font.pixelSize: 10
                                                         color: sourceCard.modelData.is_default ? Theme.primary : Theme.subtext
@@ -2360,7 +2362,7 @@ PanelWindow {
                                                     color: Theme.primary
                                                     Text {
                                                         anchors.centerIn: parent
-                                                        text: "Ativo"
+                                                        text: Theme.t("common.active", "Ativo")
                                                         font.family: Theme.fontFamily
                                                         font.pixelSize: 10
                                                         font.weight: Font.Bold
@@ -2385,7 +2387,7 @@ PanelWindow {
                                 }
 
                                 CfgSlider {
-                                    title: "Volume / Sensibilidade do Microfone"
+                                    title: Theme.t("audio.vol_in", "Volume / Sensibilidade do Microfone")
                                     minVal: 0; maxVal: 150; value: win.audioData.source_volume || 80; unit: "%"
                                     onChanged: newVal => {
                                         win.audioData.source_volume = Math.round(newVal);
@@ -2396,8 +2398,8 @@ PanelWindow {
                                 }
 
                                 SectionHeader {
-                                    title: "Teste & Diagnóstico"
-                                    subtitle: "Verifique se os canais de áudio estão funcionando perfeitamente"
+                                    title: Theme.t("audio.diag_title", "Teste & Diagnóstico")
+                                    subtitle: Theme.t("audio.diag_sub", "Verifique se os canais de áudio estão funcionando perfeitamente")
                                 }
 
                                 RowLayout {
@@ -2405,7 +2407,7 @@ PanelWindow {
                                     spacing: 12
                                     ActionBtn {
                                         icon: Theme.icons.speaker
-                                        text: "Testar Alto-falantes (Esquerdo / Direito)"
+                                        text: Theme.t("audio.test_btn", "Testar Alto-falantes (Esquerdo / Direito)")
                                         primary: true
                                         onClicked: {
                                             Quickshell.execDetached(["rice-audio", "test"]);
@@ -2414,7 +2416,7 @@ PanelWindow {
                                     }
                                     ActionBtn {
                                         icon: Theme.icons.refresh
-                                        text: "Reiniciar PipeWire"
+                                        text: Theme.t("audio.restart_btn", "Reiniciar PipeWire")
                                         onClicked: {
                                             Quickshell.execDetached(["rice-maintenance", "audio"]);
                                             win.showToast("Reiniciando áudio...");
@@ -2452,8 +2454,8 @@ PanelWindow {
                                 spacing: 16
 
                                 SectionHeader {
-                                    title: "Layout do Teclado"
-                                    subtitle: "Alterne instantaneamente o mapa de teclas sem precisar reiniciar a sessão"
+                                    title: Theme.t("input.kb_title", "Layout do Teclado")
+                                    subtitle: Theme.t("input.kb_sub", "Alterne instantaneamente o mapa de teclas sem precisar reiniciar a sessão")
                                 }
 
                                 RowLayout {
@@ -2477,14 +2479,14 @@ PanelWindow {
                                                 Layout.fillWidth: true
                                                 spacing: 1
                                                 Text {
-                                                    text: "Português Brasil (ABNT2)"
+                                                    text: Theme.t("input.kb_br", "Português Brasil (ABNT2)")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 13
                                                     font.weight: Font.DemiBold
                                                     color: Theme.textColor
                                                 }
                                                 Text {
-                                                    text: "Teclado padrão com tecla 'Ç' física dedicada."
+                                                    text: Theme.t("input.kb_br_desc", "Teclado padrão com tecla 'Ç' física dedicada.")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 10
                                                     color: Theme.subtext
@@ -2522,14 +2524,14 @@ PanelWindow {
                                                 Layout.fillWidth: true
                                                 spacing: 1
                                                 Text {
-                                                    text: "Inglês Internacional (US Intl)"
+                                                    text: Theme.t("input.kb_us", "Inglês Internacional (US Intl)")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 13
                                                     font.weight: Font.DemiBold
                                                     color: Theme.textColor
                                                 }
                                                 Text {
-                                                    text: "Padrão americano com dead keys (' + c = ç, ~ + a = ã)."
+                                                    text: Theme.t("input.kb_us_desc", "Padrão americano com dead keys (' + c = ç, ~ + a = ã).")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 10
                                                     color: Theme.subtext
@@ -2552,12 +2554,12 @@ PanelWindow {
                                 }
 
                                 SectionHeader {
-                                    title: "Sensibilidade & Velocidade do Mouse"
-                                    subtitle: "Ajuste preciso de -1.0 a +1.0 (0.0 = velocidade nativa do sensor)"
+                                    title: Theme.t("input.mouse_sens_title", "Sensibilidade & Velocidade do Mouse")
+                                    subtitle: Theme.t("input.mouse_sens_sub", "Ajuste preciso de -1.0 a +1.0 (0.0 = velocidade nativa do sensor)")
                                 }
 
                                 CfgSlider {
-                                    title: "Velocidade do Ponteiro"
+                                    title: Theme.t("input.mouse_speed", "Velocidade do Ponteiro")
                                     minVal: -1.0; maxVal: 1.0; value: win.mouseSensitivity; decimals: 2
                                     onChanged: newVal => {
                                         win.mouseSensitivity = newVal;
@@ -2571,7 +2573,7 @@ PanelWindow {
                                     Layout.fillWidth: true
                                     ActionBtn {
                                         icon: Theme.icons.refresh
-                                        text: "Redefinir Sensibilidade Neutra (0.0)"
+                                        text: Theme.t("input.mouse_reset", "Redefinir Sensibilidade Neutra (0.0)")
                                         onClicked: {
                                             win.mouseSensitivity = 0.0;
                                             Quickshell.execDetached(["rice-hypr-prefs", "set", "mouse_sensitivity", "0.0"]);
@@ -2582,8 +2584,8 @@ PanelWindow {
                                 }
 
                                 SectionHeader {
-                                    title: "Perfil de Aceleração do Mouse"
-                                    subtitle: "Flat elimina aceleração (ideal para mira em jogos); Adaptativo acelera com movimentos rápidos"
+                                    title: Theme.t("input.mouse_accel_title", "Perfil de Aceleração do Mouse")
+                                    subtitle: Theme.t("input.mouse_accel_sub", "Flat elimina aceleração (ideal para mira em jogos); Adaptativo acelera com movimentos rápidos")
                                 }
 
                                 RowLayout {
@@ -2612,14 +2614,14 @@ PanelWindow {
                                                 Layout.fillWidth: true
                                                 spacing: 1
                                                 Text {
-                                                    text: "Flat (Sem Aceleração - 1:1)"
+                                                    text: Theme.t("input.accel_flat", "Flat (Sem Aceleração - 1:1)")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 13
                                                     font.weight: Font.DemiBold
                                                     color: Theme.textColor
                                                 }
                                                 Text {
-                                                    text: "Movimento previsível e consistente. Essencial para jogos (FPS)."
+                                                    text: Theme.t("input.accel_flat_desc", "Movimento previsível e consistente. Essencial para jogos (FPS).")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 10
                                                     color: Theme.subtext
@@ -2662,14 +2664,14 @@ PanelWindow {
                                                 Layout.fillWidth: true
                                                 spacing: 1
                                                 Text {
-                                                    text: "Adaptativo (Com Aceleração)"
+                                                    text: Theme.t("input.accel_adapt", "Adaptativo (Com Aceleração)")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 13
                                                     font.weight: Font.DemiBold
                                                     color: Theme.textColor
                                                 }
                                                 Text {
-                                                    text: "Aumenta a velocidade em gestos rápidos. Padrão confortável."
+                                                    text: Theme.t("input.accel_adapt_desc", "Aumenta a velocidade em gestos rápidos. Padrão confortável.")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 10
                                                     color: Theme.subtext
@@ -2692,13 +2694,13 @@ PanelWindow {
                                 }
 
                                 SectionHeader {
-                                    title: "Comportamento de Inicialização"
-                                    subtitle: "Opções de inicialização automática de hardware"
+                                    title: Theme.t("input.boot_title", "Comportamento de Inicialização")
+                                    subtitle: Theme.t("input.boot_sub", "Opções de inicialização automática de hardware")
                                 }
 
                                 CfgToggle {
-                                    title: "NumLock Ativado no Boot"
-                                    subtitle: "Habilita o teclado numérico automaticamente assim que a sessão do Hyprland inicia."
+                                    title: Theme.t("input.numlock_title", "NumLock Ativado no Boot")
+                                    subtitle: Theme.t("input.numlock_desc", "Habilita o teclado numérico automaticamente assim que a sessão do Hyprland inicia.")
                                     checked: win.numlock
                                     onToggled: nv => {
                                         win.numlock = nv;
@@ -2709,7 +2711,7 @@ PanelWindow {
 
                                 SectionHeader {
                                     title: Theme.t("settings.discord_binds", "Atalhos Globais do Discord")
-                                    subtitle: "Mute e Deafen globais que funcionam mesmo com Discord ou Vesktop minimizado em segundo plano"
+                                    subtitle: Theme.t("input.discord_sub", "Mute e Deafen globais que funcionam mesmo com Discord ou Vesktop minimizado em segundo plano")
                                 }
 
                                 Rectangle {
@@ -2767,7 +2769,7 @@ PanelWindow {
                                                     }
                                                 }
                                                 Text {
-                                                    text: "Os atalhos gravam diretamente em ~/.config/hypr/hyprland.lua usando hl.bind"
+                                                    text: Theme.t("discord.bind_note", "Os atalhos gravam diretamente em ~/.config/hypr/hyprland.lua usando hl.bind")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 10
                                                     color: Theme.subtext
@@ -2788,7 +2790,7 @@ PanelWindow {
                                                         color: Theme.textColor
                                                     }
                                                     Text {
-                                                        text: "Verificar"
+                                                        text: Theme.t("discord.verify_btn", "Verificar")
                                                         font.family: Theme.fontFamily
                                                         font.pixelSize: 10
                                                         color: Theme.textColor
@@ -3025,7 +3027,7 @@ PanelWindow {
                                                 Layout.fillWidth: true
                                                 spacing: 6
                                                 Text {
-                                                    text: "Sugestões rápidas:"
+                                                    text: Theme.t("discord.quick_suggestions", "Sugestões rápidas:")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 9
                                                     color: Theme.subtext
@@ -3254,7 +3256,7 @@ PanelWindow {
                                                 Layout.fillWidth: true
                                                 spacing: 6
                                                 Text {
-                                                    text: "Sugestões rápidas:"
+                                                    text: Theme.t("discord.quick_suggestions", "Sugestões rápidas:")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 9
                                                     color: Theme.subtext
@@ -3309,8 +3311,8 @@ PanelWindow {
                                 spacing: 16
 
                                 SectionHeader {
-                                    title: "Perfil de Desempenho & Energia"
-                                    subtitle: "Ajusta o escalonamento do processador e limites térmicos do sistema"
+                                    title: Theme.t("power.section_profile", "Perfil de Desempenho & Energia")
+                                    subtitle: Theme.t("power.section_profile_sub", "Ajusta o escalonamento do processador e limites térmicos do sistema")
                                 }
 
                                 RowLayout {
@@ -3319,9 +3321,9 @@ PanelWindow {
 
                                     Repeater {
                                         model: [
-                                            { id: "performance", name: "Desempenho", icon: Theme.icons.perf, desc: "Clocks máximos para jogos e tarefas pesadas" },
-                                            { id: "balanced", name: "Equilibrado", icon: Theme.icons.balanced, desc: "Balanço inteligente entre fluidez e consumo" },
-                                            { id: "power-saver", name: "Economia", icon: Theme.icons.saver, desc: "Prioriza autonomia da bateria e silêncio" }
+                                            { id: "performance", name: "Desempenho", icon: Theme.icons.perf, desc: Theme.t("power.prof_perf_desc", "Clocks máximos para jogos e tarefas pesadas") },
+                                            { id: "balanced", name: "Equilibrado", icon: Theme.icons.balanced, desc: Theme.t("power.prof_bal_desc", "Balanço inteligente entre fluidez e consumo") },
+                                            { id: "power-saver", name: "Economia", icon: Theme.icons.saver, desc: Theme.t("power.prof_saver_desc", "Prioriza autonomia da bateria e silêncio") }
                                         ]
                                         delegate: Rectangle {
                                             id: pCard
@@ -3382,8 +3384,8 @@ PanelWindow {
                                 }
 
                                 SectionHeader {
-                                    title: "Saúde & Estatísticas da Bateria"
-                                    subtitle: "Dados de integridade física e ciclos de carga do notebook"
+                                    title: Theme.t("power.section_battery", "Saúde & Estatísticas da Bateria")
+                                    subtitle: Theme.t("power.section_battery_sub", "Dados de integridade física e ciclos de carga do notebook")
                                 }
 
                                 RowLayout {
@@ -3406,8 +3408,8 @@ PanelWindow {
                                             ColumnLayout {
                                                 Layout.fillWidth: true
                                                 spacing: 2
-                                                Text { text: "Saúde da Bateria"; font.family: Theme.fontFamily; font.pixelSize: 11; color: Theme.subtext }
-                                                Text { text: win.powerData.health + "% Capacidade"; font.family: Theme.fontFamily; font.pixelSize: 15; font.weight: Font.Bold; color: Theme.textColor }
+                                                Text { text: Theme.t("power.battery_health", "Saúde da Bateria"); font.family: Theme.fontFamily; font.pixelSize: 11; color: Theme.subtext }
+                                                Text { text: win.powerData.health + "% " + Theme.t("power.capacity", "Capacidade"); font.family: Theme.fontFamily; font.pixelSize: 15; font.weight: Font.Bold; color: Theme.textColor }
                                             }
                                         }
                                     }
@@ -3428,8 +3430,8 @@ PanelWindow {
                                             ColumnLayout {
                                                 Layout.fillWidth: true
                                                 spacing: 2
-                                                Text { text: "Ciclos de Carga"; font.family: Theme.fontFamily; font.pixelSize: 11; color: Theme.subtext }
-                                                Text { text: win.powerData.cycles + " Ciclos Completos"; font.family: Theme.fontFamily; font.pixelSize: 15; font.weight: Font.Bold; color: Theme.textColor }
+                                                Text { text: Theme.t("power.charge_cycles", "Ciclos de Carga"); font.family: Theme.fontFamily; font.pixelSize: 11; color: Theme.subtext }
+                                                Text { text: win.powerData.cycles + " " + Theme.t("power.cycles_completed", "Ciclos Completos"); font.family: Theme.fontFamily; font.pixelSize: 15; font.weight: Font.Bold; color: Theme.textColor }
                                             }
                                         }
                                     }
@@ -3450,7 +3452,7 @@ PanelWindow {
                                             ColumnLayout {
                                                 Layout.fillWidth: true
                                                 spacing: 2
-                                                Text { text: "Status de Alimentação"; font.family: Theme.fontFamily; font.pixelSize: 11; color: Theme.subtext }
+                                                Text { text: Theme.t("power.power_status", "Status de Alimentação"); font.family: Theme.fontFamily; font.pixelSize: 11; color: Theme.subtext }
                                                 Text { text: win.powerData.status + " (" + win.powerData.percent + "%)"; font.family: Theme.fontFamily; font.pixelSize: 14; font.weight: Font.Bold; color: Theme.textColor }
                                             }
                                         }
@@ -3478,8 +3480,8 @@ PanelWindow {
                                 spacing: 16
 
                                 SectionHeader {
-                                    title: "Aplicativos na Inicialização do Sistema"
-                                    subtitle: "Ative ou desative quais programas abrem sozinhos quando você liga o computador"
+                                    title: Theme.t("boot.section_autostart", "Aplicativos na Inicialização do Sistema")
+                                    subtitle: Theme.t("boot.section_autostart_sub", "Ative ou desative quais programas abrem sozinhos quando você liga o computador")
                                 }
 
                                 ColumnLayout {
@@ -3488,7 +3490,7 @@ PanelWindow {
 
                                     Text {
                                         visible: win.autostartEntries.length === 0
-                                        text: "Nenhum aplicativo configurado para iniciar automaticamente."
+                                        text: Theme.t("boot.empty_autostart", "Nenhum aplicativo configurado para iniciar automaticamente.")
                                         font.family: Theme.fontFamily
                                         font.pixelSize: 12
                                         color: Theme.subtext
@@ -3601,8 +3603,8 @@ PanelWindow {
                                 }
 
                                 SectionHeader {
-                                    title: "Adicionar Aplicativo à Inicialização Rápida"
-                                    subtitle: "Selecione qualquer aplicativo instalado para abrir junto com o Hyprland"
+                                    title: Theme.t("boot.section_quick_add", "Adicionar Aplicativo à Inicialização Rápida")
+                                    subtitle: Theme.t("boot.section_quick_add_sub", "Selecione qualquer aplicativo instalado para abrir junto com o Hyprland")
                                 }
 
                                 Flow {
@@ -3680,8 +3682,8 @@ PanelWindow {
                                 spacing: 16
 
                                 SectionHeader {
-                                    title: "Paleta Dinâmica Extraída do Wallpaper"
-                                    subtitle: "Todas as cores da interface e terminal são geradas pelo Wallust a partir do papel de parede ativo"
+                                    title: Theme.t("wallust.section_palette", "Paleta Dinâmica Extraída do Wallpaper")
+                                    subtitle: Theme.t("wallust.section_palette_sub", "Todas as cores da interface e terminal são geradas pelo Wallust a partir do papel de parede ativo")
                                 }
 
                                 RowLayout {
@@ -3690,10 +3692,10 @@ PanelWindow {
 
                                     Repeater {
                                         model: [
-                                            { label: "Fundo", hex: win.wallustColors.background || "#170D0C" },
-                                            { label: "Texto", hex: win.wallustColors.foreground || "#C2A6A5" },
-                                            { label: "Destaque 1", hex: win.wallustColors.color4 || "#5D1D1D" },
-                                            { label: "Destaque 2", hex: win.wallustColors.color10 || "#A62727" }
+                                            { label: Theme.t("wallust.bg", "Fundo"), hex: win.wallustColors.background || "#170D0C" },
+                                            { label: Theme.t("wallust.fg", "Texto"), hex: win.wallustColors.foreground || "#C2A6A5" },
+                                            { label: Theme.t("wallust.accent1", "Destaque 1"), hex: win.wallustColors.color4 || "#5D1D1D" },
+                                            { label: Theme.t("wallust.accent2", "Destaque 2"), hex: win.wallustColors.color10 || "#A62727" }
                                         ]
                                         delegate: Rectangle {
                                             id: colorCard
@@ -3749,8 +3751,8 @@ PanelWindow {
                                 }
 
                                 SectionHeader {
-                                    title: "Paleta Completa de 16 Cores ANSI"
-                                    subtitle: "Clique em qualquer cor para copiar o código HEX para a área de transferência"
+                                    title: Theme.t("wallust.section_ansi", "Paleta Completa de 16 Cores ANSI")
+                                    subtitle: Theme.t("wallust.section_ansi_sub", "Clique em qualquer cor para copiar o código HEX para a área de transferência")
                                 }
 
                                 GridLayout {
@@ -3809,8 +3811,8 @@ PanelWindow {
                                 }
 
                                 SectionHeader {
-                                    title: "Ações de Wallpaper & Sincronização"
-                                    subtitle: "Alterne papéis de parede animados ou regenere a paleta do sistema"
+                                    title: Theme.t("wallust.section_actions", "Ações de Wallpaper & Sincronização")
+                                    subtitle: Theme.t("wallust.section_actions_sub", "Alterne papéis de parede animados ou regenere a paleta do sistema")
                                 }
 
                                 RowLayout {
@@ -3819,7 +3821,7 @@ PanelWindow {
 
                                     ActionBtn {
                                         icon: Theme.icons.palette
-                                        text: "Regenerar Cores do Wallpaper Atual"
+                                        text: Theme.t("wallust.refresh_btn", "Regenerar Cores do Wallpaper Atual")
                                         primary: true
                                         onClicked: {
                                             Quickshell.execDetached(["rice-wallust-refresh"]);
@@ -3830,7 +3832,7 @@ PanelWindow {
 
                                     ActionBtn {
                                         icon: Theme.icons.dashboard
-                                        text: "Abrir Seletor de Wallpapers (Super + S)"
+                                        text: Theme.t("wallust.switcher_btn", "Abrir Seletor de Wallpapers (Super + S)")
                                         onClicked: {
                                             win.open = false;
                                             Quickshell.execDetached(["waywallen-switcher"]);
@@ -3861,13 +3863,13 @@ PanelWindow {
                                 spacing: 16
 
                                 SectionHeader {
-                                    title: "Luz Noturna (Filtro de Luz Azul)"
-                                    subtitle: "Reduz o cansaço visual ajustando a temperatura de cor da tela"
+                                    title: Theme.t("effects.nightlight_title", "Luz Noturna (Filtro de Luz Azul)")
+                                    subtitle: Theme.t("effects.nightlight_sub", "Reduz o cansaço visual ajustando a temperatura de cor da tela")
                                 }
 
                                 CfgToggle {
-                                    title: "Ativar Luz Noturna"
-                                    subtitle: "Aplica filtro quente instantaneamente via hyprsunset"
+                                    title: Theme.t("effects.nightlight_toggle", "Ativar Luz Noturna")
+                                    subtitle: Theme.t("effects.nightlight_toggle_desc", "Aplica filtro quente instantaneamente via hyprsunset")
                                     checked: win.nightlightActive
                                     onToggled: nv => {
                                         win.nightlightActive = nv;
@@ -3876,7 +3878,7 @@ PanelWindow {
                                 }
 
                                 CfgSlider {
-                                    title: "Temperatura de Cor"
+                                    title: Theme.t("effects.nightlight_temp", "Temperatura de Cor")
                                     minVal: 2500; maxVal: 6500; value: win.nightlightTemp; unit: " K"
                                     onChanged: newVal => {
                                         win.nightlightTemp = Math.round(newVal);
@@ -3887,13 +3889,13 @@ PanelWindow {
                                 }
 
                                 SectionHeader {
-                                    title: "Foco & Janelas Inativas"
-                                    subtitle: "Escurece as janelas que não estão recebendo comandos no momento"
+                                    title: Theme.t("effects.dim_title", "Foco & Janelas Inativas")
+                                    subtitle: Theme.t("effects.dim_sub", "Escurece as janelas que não estão recebendo comandos no momento")
                                 }
 
                                 CfgToggle {
-                                    title: "Escurecer Janelas Inativas (Dim Inactive)"
-                                    subtitle: "Destaca a janela atualmente em uso escurecendo as janelas de fundo"
+                                    title: Theme.t("effects.dim_toggle", "Escurecer Janelas Inativas (Dim Inactive)")
+                                    subtitle: Theme.t("effects.dim_toggle_desc", "Destaca a janela atualmente em uso escurecendo as janelas de fundo")
                                     checked: win.dimInactive
                                     onToggled: nv => {
                                         win.dimInactive = nv;
@@ -3902,7 +3904,7 @@ PanelWindow {
                                 }
 
                                 CfgSlider {
-                                    title: "Intensidade do Escurecimento (Dim Strength)"
+                                    title: Theme.t("effects.dim_strength", "Intensidade do Escurecimento (Dim Strength)")
                                     minVal: 0.05; maxVal: 0.50; value: win.dimStrength; decimals: 2
                                     onChanged: newVal => {
                                         win.dimStrength = newVal;
@@ -3913,15 +3915,15 @@ PanelWindow {
                                 }
 
                                 SectionHeader {
-                                    title: "Geometria do Hyprland"
-                                    subtitle: "Curvatura dos cantos e espaçamento entre janelas"
+                                    title: Theme.t("effects.geom_title", "Geometria do Hyprland")
+                                    subtitle: Theme.t("effects.geom_sub", "Curvatura dos cantos e espaçamento entre janelas")
                                 }
 
                                 RowLayout {
                                     Layout.fillWidth: true
                                     spacing: 20
                                     CfgSlider {
-                                        title: "Arredondamento dos Cantos (Rounding)"
+                                        title: Theme.t("effects.rounding", "Arredondamento dos Cantos (Rounding)")
                                         minVal: 0; maxVal: 20; value: win.rounding; unit: " px"
                                         onChanged: newVal => {
                                             win.rounding = Math.round(newVal);
@@ -3931,7 +3933,7 @@ PanelWindow {
                                         }
                                     }
                                     CfgSlider {
-                                        title: "Espaçamento Interno (Gaps In)"
+                                        title: Theme.t("effects.gaps_in", "Espaçamento Interno (Gaps In)")
                                         minVal: 0; maxVal: 18; value: win.gapsIn; unit: " px"
                                         onChanged: newVal => {
                                             win.gapsIn = Math.round(newVal);
@@ -3943,8 +3945,8 @@ PanelWindow {
                                 }
 
                                 SectionHeader {
-                                    title: "Estilo de Animação"
-                                    subtitle: "Curvas de Bézier e velocidade para abertura, fechamento e workspaces"
+                                    title: Theme.t("effects.anim_title", "Estilo de Animação")
+                                    subtitle: Theme.t("effects.anim_sub", "Curvas de Bézier e velocidade para abertura, fechamento e workspaces")
                                 }
 
                                 RowLayout {
@@ -3952,9 +3954,9 @@ PanelWindow {
                                     spacing: 12
                                     Repeater {
                                         model: [
-                                            { id: "smooth", name: "Suave (Padrão)", desc: "Fluido e equilibrado" },
-                                            { id: "bouncy", name: "Elástico (Bouncy)", desc: "Com leve overshoot" },
-                                            { id: "snappy", name: "Rápido (Snappy)", desc: "Imediato e seco" }
+                                            { id: "smooth", name: "Suave (Padrão)", desc: Theme.t("effects.anim_smooth_desc", "Fluido e equilibrado") },
+                                            { id: "bouncy", name: "Elástico (Bouncy)", desc: Theme.t("effects.anim_bouncy_desc", "Com leve overshoot") },
+                                            { id: "snappy", name: Theme.t("effects.anim_snappy", "Rápido (Snappy)"), desc: "Imediato e seco" }
                                         ]
                                         delegate: Rectangle {
                                             required property var modelData
@@ -4002,8 +4004,8 @@ PanelWindow {
                                 }
 
                                 SectionHeader {
-                                    title: "Inicialização & Tela de Login (SDDM & Limine)"
-                                    subtitle: "Aplica o tema SilentSDDM e wallpaper suavizado no bootloader do sistema"
+                                    title: Theme.t("effects.boot_login_title", "Inicialização & Tela de Login (SDDM & Limine)")
+                                    subtitle: Theme.t("effects.boot_login_sub", "Aplica o tema SilentSDDM e wallpaper suavizado no bootloader do sistema")
                                 }
 
                                 RowLayout {
@@ -4012,7 +4014,7 @@ PanelWindow {
 
                                     ActionBtn {
                                         icon: Theme.icons.verified
-                                        text: "Aplicar SDDM e Bootloader Limine"
+                                        text: Theme.t("effects.apply_boot_login", "Aplicar SDDM e Bootloader Limine")
                                         primary: true
                                         onClicked: {
                                             Quickshell.execDetached([
@@ -4024,7 +4026,7 @@ PanelWindow {
 
                                     ActionBtn {
                                         icon: Theme.icons.laptop
-                                        text: "Testar Tela do SDDM em Janela"
+                                        text: Theme.t("effects.test_sddm", "Testar Tela do SDDM em Janela")
                                         onClicked: {
                                             Quickshell.execDetached(["bash", "-c", "sddm-greeter-qt6 --test-mode --theme /usr/share/sddm/themes/SilentSDDM 2>/dev/null || sddm-greeter --test-mode --theme /usr/share/sddm/themes/SilentSDDM"]);
                                         }
@@ -4051,13 +4053,13 @@ PanelWindow {
                                 RowLayout {
                                     Layout.fillWidth: true
                                     SectionHeader {
-                                        title: "Bluetooth & Dispositivos sem Fio"
-                                        subtitle: "Conecte controles Xbox/PS, fones de ouvido e periféricos sem fio"
+                                        title: Theme.t("bt.section_title", "Bluetooth & Dispositivos sem Fio")
+                                        subtitle: Theme.t("bt.section_sub", "Conecte controles Xbox/PS, fones de ouvido e periféricos sem fio")
                                     }
                                     Item { Layout.fillWidth: true }
                                     ActionBtn {
                                         icon: Theme.icons.refresh
-                                        text: "Escanear"
+                                        text: Theme.t("bt.scan_btn", "Escanear")
                                         onClicked: {
                                             Quickshell.execDetached(["rice-bluetooth", "scan"]);
                                             showToast("Buscando dispositivos próximos...");
@@ -4089,14 +4091,14 @@ PanelWindow {
                                             Layout.fillWidth: true
                                             spacing: 2
                                             Text {
-                                                text: win.btData && win.btData.powered ? "Bluetooth Ativado" : "Bluetooth Desativado"
+                                                text: win.btData && win.btData.powered ? "Bluetooth Ativado" : Theme.t("bt.status_off", "Bluetooth Desativado")
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: 13
                                                 font.weight: Font.DemiBold
                                                 color: Theme.textColor
                                             }
                                             Text {
-                                                text: win.btData && win.btData.powered ? "Pronto para conexões e pareamento automático" : "Ligue o adaptador para conectar periféricos"
+                                                text: win.btData && win.btData.powered ? Theme.t("bt.status_on_desc", "Pronto para conexões e pareamento automático") : "Ligue o adaptador para conectar periféricos"
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: 11
                                                 color: Theme.subtext
@@ -4114,8 +4116,8 @@ PanelWindow {
                                 }
 
                                 SectionHeader {
-                                    title: "Dispositivos Pareados & Conhecidos"
-                                    subtitle: "Clique em Conectar para vincular o controle ou fone instantaneamente"
+                                    title: Theme.t("bt.devices_title", "Dispositivos Pareados & Conhecidos")
+                                    subtitle: Theme.t("bt.devices_sub", "Clique em Conectar para vincular o controle ou fone instantaneamente")
                                 }
 
                                 ColumnLayout {
@@ -4180,7 +4182,7 @@ PanelWindow {
                                                             border.color: Theme.primary
                                                             Text {
                                                                 anchors.centerIn: parent
-                                                                text: "● Conectado"
+                                                                text: Theme.t("bt.connected", "● Conectado")
                                                                 font.family: Theme.fontFamily
                                                                 font.pixelSize: 9
                                                                 font.weight: Font.Bold
@@ -4212,7 +4214,7 @@ PanelWindow {
 
                                                 ActionBtn {
                                                     icon: btDevCard.modelData.connected ? Theme.icons.close : Theme.icons.btConnected
-                                                    text: btDevCard.modelData.connected ? "Desconectar" : "Conectar"
+                                                    text: btDevCard.modelData.connected ? Theme.t("bt.disconnect", "Desconectar") : "Conectar"
                                                     primary: !btDevCard.modelData.connected
                                                     onClicked: {
                                                         if (btDevCard.modelData.connected) {
@@ -4253,7 +4255,7 @@ PanelWindow {
 
                                     Text {
                                         visible: !win.btData || !win.btData.devices || win.btData.devices.length === 0
-                                        text: "Nenhum dispositivo encontrado. Coloque seu controle ou fone em modo de pareamento e clique em 'Escanear'."
+                                        text: Theme.t("bt.empty", "Nenhum dispositivo encontrado. Coloque seu controle ou fone em modo de pareamento e clique em 'Escanear'.")
                                         font.family: Theme.fontFamily
                                         font.pixelSize: 11
                                         color: Theme.subtext
@@ -4278,13 +4280,13 @@ PanelWindow {
                                 RowLayout {
                                     Layout.fillWidth: true
                                     SectionHeader {
-                                        title: "Rede & Wi-Fi"
-                                        subtitle: "Monitore a conexão de internet e conecte-se a novas redes"
+                                        title: Theme.t("net.section_title", "Rede & Wi-Fi")
+                                        subtitle: Theme.t("net.section_sub", "Monitore a conexão de internet e conecte-se a novas redes")
                                     }
                                     Item { Layout.fillWidth: true }
                                     ActionBtn {
                                         icon: Theme.icons.refresh
-                                        text: "Atualizar Redes"
+                                        text: Theme.t("net.scan_btn", "Atualizar Redes")
                                         onClicked: {
                                             Quickshell.execDetached(["rice-network", "scan"]);
                                             loadNetScanProc.running = true;
@@ -4327,7 +4329,7 @@ PanelWindow {
                                             RowLayout {
                                                 spacing: 8
                                                 Text {
-                                                    text: win.netData && win.netData.connected_ssid ? win.netData.connected_ssid : "Nenhuma rede conectada"
+                                                    text: win.netData && win.netData.connected_ssid ? win.netData.connected_ssid : Theme.t("net.no_conn", "Nenhuma rede conectada")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 15
                                                     font.weight: Font.Bold
@@ -4392,13 +4394,13 @@ PanelWindow {
                                             spacing: 6
                                             ActionBtn {
                                                 icon: Theme.icons.speed
-                                                text: "Testar Ping"
+                                                text: Theme.t("net.test_ping", "Testar Ping")
                                                 onClicked: loadPingProc.running = true
                                             }
                                             ActionBtn {
                                                 visible: win.netData && !!win.netData.connected_ssid
                                                 icon: Theme.icons.close
-                                                text: "Desconectar"
+                                                text: Theme.t("net.disconnect", "Desconectar")
                                                 onClicked: {
                                                     Quickshell.execDetached(["rice-network", "disconnect"]);
                                                     loadNetProc.running = true;
@@ -4409,8 +4411,8 @@ PanelWindow {
                                 }
 
                                 SectionHeader {
-                                    title: "Redes Wi-Fi Disponíveis"
-                                    subtitle: "Selecione uma rede para conectar"
+                                    title: Theme.t("net.available_title", "Redes Wi-Fi Disponíveis")
+                                    subtitle: Theme.t("net.available_sub", "Selecione uma rede para conectar")
                                 }
 
                                 ColumnLayout {
@@ -4490,7 +4492,7 @@ PanelWindow {
                                                     ActionBtn {
                                                         visible: !wifiCard.modelData.active && !wifiCard.isConnecting
                                                         icon: Theme.icons.confirm
-                                                        text: "Conectar"
+                                                        text: Theme.t("net.connect_btn", "Conectar")
                                                         primary: true
                                                         onClicked: {
                                                             if (wifiCard.modelData.protected) {
@@ -4511,7 +4513,7 @@ PanelWindow {
                                                         color: Theme.withAlpha(Theme.primary, 0.2)
                                                         Text {
                                                             anchors.centerIn: parent
-                                                            text: "Ativa"
+                                                            text: Theme.t("net.active_badge", "Ativa")
                                                             font.family: Theme.fontFamily
                                                             font.pixelSize: 10
                                                             font.weight: Font.Bold
@@ -4545,7 +4547,7 @@ PanelWindow {
                                                             onTextChanged: win.netPassInput = text
                                                             Text {
                                                                 visible: !passInput.text
-                                                                text: "Digite a senha do Wi-Fi..."
+                                                                text: Theme.t("net.password_placeholder", "Digite a senha do Wi-Fi...")
                                                                 font.family: Theme.fontFamily
                                                                 font.pixelSize: 11
                                                                 color: Theme.subtext
@@ -4555,7 +4557,7 @@ PanelWindow {
 
                                                     ActionBtn {
                                                         icon: Theme.icons.confirm
-                                                        text: "Confirmar"
+                                                        text: Theme.t("net.confirm", "Confirmar")
                                                         primary: true
                                                         onClicked: {
                                                             Quickshell.execDetached(["rice-network", "connect", wifiCard.modelData.ssid, win.netPassInput]);
@@ -4566,7 +4568,7 @@ PanelWindow {
 
                                                     ActionBtn {
                                                         icon: Theme.icons.close
-                                                        text: "Cancelar"
+                                                        text: Theme.t("common.cancel", "Cancelar")
                                                         onClicked: win.netSelectedSsid = ""
                                                     }
                                                 }
@@ -4591,18 +4593,18 @@ PanelWindow {
                                 spacing: 16
 
                                 SectionHeader {
-                                    title: "Aplicativos Padrão do Sistema"
-                                    subtitle: "Selecione quais programas abrem páginas da web, pastas, códigos, fotos e vídeos"
+                                    title: Theme.t("defaults.section_title", "Aplicativos Padrão do Sistema")
+                                    subtitle: Theme.t("defaults.section_sub", "Selecione quais programas abrem páginas da web, pastas, códigos, fotos e vídeos")
                                 }
 
                                 Repeater {
                                     model: [
-                                        { id: "browser", title: "Navegador Web", icon: Theme.icons.dashboard, desc: "Abre links HTTP/HTTPS e arquivos HTML" },
-                                        { id: "filemanager", title: "Gerenciador de Pastas", icon: Theme.icons.laptop, desc: "Abre diretórios e dispositivos" },
-                                        { id: "editor", title: "Editor de Código & Texto", icon: Theme.icons.console, desc: "Abre scripts, código-fonte e notas de texto" },
-                                        { id: "video", title: "Player de Vídeo", icon: Theme.icons.media, desc: "Reproduz filmes, gravações e clipes MP4/MKV" },
-                                        { id: "image", title: "Visualizador de Imagens", icon: Theme.icons.camera, desc: "Abre capturas de tela e fotos PNG/JPG" },
-                                        { id: "audio", title: "Player de Música & Áudio", icon: Theme.icons.music, desc: "Reproduz faixas MP3, FLAC, OGG, WAV e AAC" }
+                                        { id: "browser", title: "Navegador Web", icon: Theme.icons.dashboard, desc: Theme.t("defaults.cat_browser_desc", "Abre links HTTP/HTTPS e arquivos HTML") },
+                                        { id: "filemanager", title: "Gerenciador de Pastas", icon: Theme.icons.laptop, desc: Theme.t("defaults.cat_filemanager_desc", "Abre diretórios e dispositivos") },
+                                        { id: "editor", title: "Editor de Código & Texto", icon: Theme.icons.console, desc: Theme.t("defaults.cat_editor_desc", "Abre scripts, código-fonte e notas de texto") },
+                                        { id: "video", title: "Player de Vídeo", icon: Theme.icons.media, desc: Theme.t("defaults.cat_video_desc", "Reproduz filmes, gravações e clipes MP4/MKV") },
+                                        { id: "image", title: "Visualizador de Imagens", icon: Theme.icons.camera, desc: Theme.t("defaults.cat_image_desc", "Abre capturas de tela e fotos PNG/JPG") },
+                                        { id: "audio", title: "Player de Música & Áudio", icon: Theme.icons.music, desc: Theme.t("defaults.cat_audio_desc", "Reproduz faixas MP3, FLAC, OGG, WAV e AAC") }
                                     ]
                                     delegate: Rectangle {
                                         id: defCatCard
@@ -4678,7 +4680,7 @@ PanelWindow {
                                                         Layout.fillWidth: true
                                                         spacing: 0
                                                         Text {
-                                                            text: (defCatCard.catInfo && defCatCard.catInfo.current_name) ? defCatCard.catInfo.current_name : "Não definido"
+                                                            text: (defCatCard.catInfo && defCatCard.catInfo.current_name) ? defCatCard.catInfo.current_name : Theme.t("defaults.not_set", "Não definido")
                                                             font.family: Theme.fontFamily
                                                             font.pixelSize: 12
                                                             font.weight: Font.DemiBold
@@ -4686,7 +4688,7 @@ PanelWindow {
                                                             elide: Text.ElideRight
                                                         }
                                                         Text {
-                                                            text: (defCatCard.catInfo && defCatCard.catInfo.current_desktop) ? defCatCard.catInfo.current_desktop : "Nenhum aplicativo associado"
+                                                            text: (defCatCard.catInfo && defCatCard.catInfo.current_desktop) ? defCatCard.catInfo.current_desktop : Theme.t("defaults.no_app_assoc", "Nenhum aplicativo associado")
                                                             font.family: Theme.monoFamily
                                                             font.pixelSize: 9
                                                             color: Theme.subtext
@@ -4713,7 +4715,7 @@ PanelWindow {
                                                                 color: (defCatCard.catInfo && defCatCard.catInfo.is_set) ? Theme.primary : Theme.warning
                                                             }
                                                             Text {
-                                                                text: (defCatCard.catInfo && defCatCard.catInfo.is_set) ? "Padrão Ativo" : "Não Definido"
+                                                                text: (defCatCard.catInfo && defCatCard.catInfo.is_set) ? Theme.t("defaults.active_default", "Padrão Ativo") : "Não Definido"
                                                                 font.family: Theme.fontFamily
                                                                 font.pixelSize: 10
                                                                 font.weight: Font.Bold
@@ -4762,7 +4764,7 @@ PanelWindow {
 
                                                             Text {
                                                                 visible: !customInput.text && !customInput.activeFocus
-                                                                text: "Digitar app específico (ex: zen, firefox, code, dolphin, mpv)..."
+                                                                text: Theme.t("defaults.input_placeholder", "Digitar app específico (ex: zen, firefox, code, dolphin, mpv)...")
                                                                 font.family: Theme.fontFamily
                                                                 font.pixelSize: 11
                                                                 color: Theme.withAlpha(Theme.subtext, 0.6)
@@ -4804,7 +4806,7 @@ PanelWindow {
                                                             color: Theme.background
                                                         }
                                                         Text {
-                                                            text: "Salvar"
+                                                            text: Theme.t("defaults.save_btn", "Salvar")
                                                             font.family: Theme.fontFamily
                                                             font.pixelSize: 11
                                                             font.weight: Font.Bold
@@ -4851,7 +4853,7 @@ PanelWindow {
                                                             color: defCatCard.isPicking ? Theme.primary : Theme.textColor
                                                         }
                                                         Text {
-                                                            text: defCatCard.isPicking ? "Fechar Lista" : "Escolher App..."
+                                                            text: defCatCard.isPicking ? "Fechar Lista" : Theme.t("defaults.choose_app", "Escolher App...")
                                                             font.family: Theme.fontFamily
                                                             font.pixelSize: 11
                                                             font.weight: Font.Medium
@@ -4927,7 +4929,7 @@ PanelWindow {
 
                                                                 Text {
                                                                     visible: !searchAppInput.text
-                                                                    text: "Pesquisar entre todos os aplicativos do sistema..."
+                                                                    text: Theme.t("defaults.search_placeholder", "Pesquisar entre todos os aplicativos do sistema...")
                                                                     font.family: Theme.fontFamily
                                                                     font.pixelSize: 11
                                                                     color: Theme.withAlpha(Theme.subtext, 0.6)
@@ -5006,7 +5008,7 @@ PanelWindow {
 
                                                                         Text {
                                                                             visible: defCatCard.catInfo && defCatCard.catInfo.current_desktop === appItemRow.modelData.filename
-                                                                            text: Theme.icons.confirm + " Atual"
+                                                                            text: Theme.icons.confirm + Theme.t("defaults.current_tag", " Atual")
                                                                             font.family: Theme.fontFamily
                                                                             font.pixelSize: 10
                                                                             font.weight: Font.Bold
@@ -5060,8 +5062,8 @@ PanelWindow {
                                 spacing: 16
 
                                 SectionHeader {
-                                    title: "Jogos & Placa Gráfica Dedicada"
-                                    subtitle: "Monitore a NVIDIA GeForce RTX 3050, GameMode e parâmetros da Steam"
+                                    title: Theme.t("gaming.section_title", "Jogos & Placa Gráfica Dedicada")
+                                    subtitle: Theme.t("gaming.section_sub", "Monitore a NVIDIA GeForce RTX 3050, GameMode e parâmetros da Steam")
                                 }
 
                                 RowLayout {
@@ -5092,7 +5094,7 @@ PanelWindow {
                                             ColumnLayout {
                                                 spacing: 2
                                                 Text {
-                                                    text: "Temperatura GPU"
+                                                    text: Theme.t("gaming.gpu_temp", "Temperatura GPU")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 10
                                                     color: Theme.subtext
@@ -5134,7 +5136,7 @@ PanelWindow {
                                             ColumnLayout {
                                                 spacing: 2
                                                 Text {
-                                                    text: "VRAM Utilizada"
+                                                    text: Theme.t("gaming.vram_used", "VRAM Utilizada")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 10
                                                     color: Theme.subtext
@@ -5176,7 +5178,7 @@ PanelWindow {
                                             ColumnLayout {
                                                 spacing: 2
                                                 Text {
-                                                    text: "Driver NVIDIA"
+                                                    text: Theme.t("gaming.nvidia_driver", "Driver NVIDIA")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 10
                                                     color: Theme.subtext
@@ -5217,14 +5219,14 @@ PanelWindow {
                                             Layout.fillWidth: true
                                             spacing: 2
                                             Text {
-                                                text: "Feral GameMode"
+                                                text: Theme.t("gaming.gamemode_title", "Feral GameMode")
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: 13
                                                 font.weight: Font.DemiBold
                                                 color: Theme.textColor
                                             }
                                             Text {
-                                                text: "Otimiza a CPU para priorizar taxas de quadros (FPS) e reduz a latência nos jogos"
+                                                text: Theme.t("gaming.gamemode_desc", "Otimiza a CPU para priorizar taxas de quadros (FPS) e reduz a latência nos jogos")
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: 11
                                                 color: Theme.subtext
@@ -5242,15 +5244,15 @@ PanelWindow {
                                 }
 
                                 SectionHeader {
-                                    title: "Parâmetros para Jogos da Steam"
-                                    subtitle: "Clique em Copiar e cole nas Propriedades do Jogo -> Opções de Inicialização"
+                                    title: Theme.t("gaming.steam_params", "Parâmetros para Jogos da Steam")
+                                    subtitle: Theme.t("gaming.steam_params_sub", "Clique em Copiar e cole nas Propriedades do Jogo -> Opções de Inicialização")
                                 }
 
                                 Repeater {
                                     model: [
-                                        { id: "nvidia", title: "NVIDIA Dedicada (prime-run)", param: "prime-run %command%", desc: "Garante que o jogo rode diretamente na GPU dedicada NVIDIA RTX 3050." },
-                                        { id: "gamemode", title: "NVIDIA + Feral GameMode", param: "gamemoderun prime-run %command%", desc: "Combina aceleração máxima da GPU com prioridade de processador." },
-                                        { id: "compat", title: "Compatibilidade (Desativa NVAPI)", param: "PROTON_DISABLE_NVAPI=1 prime-run %command%", desc: "Use apenas se algum jogo der tela preta ou erro com DLSS." }
+                                        { id: "nvidia", title: "NVIDIA Dedicada (prime-run)", param: "prime-run %command%", desc: Theme.t("gaming.param_nvidia_desc", "Garante que o jogo rode diretamente na GPU dedicada NVIDIA RTX 3050.") },
+                                        { id: "gamemode", title: "NVIDIA + Feral GameMode", param: "gamemoderun prime-run %command%", desc: Theme.t("gaming.param_gamemode_desc", "Combina aceleração máxima da GPU com prioridade de processador.") },
+                                        { id: "compat", title: "Compatibilidade (Desativa NVAPI)", param: "PROTON_DISABLE_NVAPI=1 prime-run %command%", desc: Theme.t("gaming.param_compat_desc", "Use apenas se algum jogo der tela preta ou erro com DLSS.") }
                                     ]
                                     delegate: Rectangle {
                                         id: steamCard
@@ -5294,7 +5296,7 @@ PanelWindow {
 
                                             ActionBtn {
                                                 icon: Theme.icons.confirm
-                                                text: "Copiar"
+                                                text: Theme.t("gaming.copy", "Copiar")
                                                 primary: true
                                                 onClicked: {
                                                     Quickshell.execDetached(["rice-gaming", "copy-param", steamCard.modelData.id]);
@@ -5310,12 +5312,12 @@ PanelWindow {
                                     spacing: 12
                                     ActionBtn {
                                         icon: Theme.icons.gamepad
-                                        text: "Abrir Steam"
+                                        text: Theme.t("gaming.open_steam", "Abrir Steam")
                                         onClicked: Quickshell.execDetached(["steam"])
                                     }
                                     ActionBtn {
                                         icon: Theme.icons.speed
-                                        text: "Abrir Heroic Games"
+                                        text: Theme.t("gaming.open_heroic", "Abrir Heroic Games")
                                         onClicked: Quickshell.execDetached(["heroic"])
                                     }
                                     Item { Layout.fillWidth: true }
@@ -5337,8 +5339,8 @@ PanelWindow {
                                 spacing: 16
 
                                 SectionHeader {
-                                    title: "Armazenamento & Limpeza Segura"
-                                    subtitle: "Monitore o SSD e libere gigabytes de caches temporários sem risco"
+                                    title: Theme.t("storage.section_title", "Armazenamento & Limpeza Segura")
+                                    subtitle: Theme.t("storage.section_sub", "Monitore o SSD e libere gigabytes de caches temporários sem risco")
                                 }
 
                                 Rectangle {
@@ -5357,7 +5359,7 @@ PanelWindow {
                                         RowLayout {
                                             Layout.fillWidth: true
                                             Text {
-                                                text: "SSD Principal (Partição Btrfs /)"
+                                                text: Theme.t("storage.ssd_root", "SSD Principal (Partição Btrfs /)")
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: 13
                                                 font.weight: Font.DemiBold
@@ -5365,7 +5367,7 @@ PanelWindow {
                                             }
                                             Item { Layout.fillWidth: true }
                                             Text {
-                                                text: (win.storageData ? win.storageData.root_used : "") + " usado de " + (win.storageData ? win.storageData.root_total : "") + " (" + (win.storageData ? win.storageData.root_avail : "") + " livres)"
+                                                text: (win.storageData ? win.storageData.root_used : "") + " " + Theme.t("storage.used_of", "usado de") + " " + (win.storageData ? win.storageData.root_total : "") + " (" + (win.storageData ? win.storageData.root_avail : "") + " " + Theme.t("storage.free", "livres") + ")"
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: 11
                                                 color: Theme.subtext
@@ -5387,7 +5389,7 @@ PanelWindow {
                                         }
 
                                         Text {
-                                            text: (win.storageData ? win.storageData.root_pct : 0) + "% do espaço ocupado"
+                                            text: (win.storageData ? win.storageData.root_pct : 0) + "% " + Theme.t("storage.space_occupied", "do espaço ocupado")
                                             font.family: Theme.fontFamily
                                             font.pixelSize: 10
                                             color: Theme.subtext
@@ -5396,8 +5398,8 @@ PanelWindow {
                                 }
 
                                 SectionHeader {
-                                    title: "Caches & Espaço Recuperável"
-                                    subtitle: "Arquivos que podem ser apagados com segurança para recuperar espaço"
+                                    title: Theme.t("storage.section_recover", "Caches & Espaço Recuperável")
+                                    subtitle: Theme.t("storage.section_recover_sub", "Arquivos que podem ser apagados com segurança para recuperar espaço")
                                 }
 
                                 RowLayout {
@@ -5416,7 +5418,7 @@ PanelWindow {
                                             spacing: 2
                                             Text {
                                                 Layout.alignment: Qt.AlignHCenter
-                                                text: "Cache Pacman"
+                                                text: Theme.t("storage.pacman_cache", "Cache Pacman")
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: 11
                                                 color: Theme.subtext
@@ -5444,7 +5446,7 @@ PanelWindow {
                                             spacing: 2
                                             Text {
                                                 Layout.alignment: Qt.AlignHCenter
-                                                text: "Miniaturas"
+                                                text: Theme.t("storage.thumbnails", "Miniaturas")
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: 11
                                                 color: Theme.subtext
@@ -5472,7 +5474,7 @@ PanelWindow {
                                             spacing: 2
                                             Text {
                                                 Layout.alignment: Qt.AlignHCenter
-                                                text: "Lixeira"
+                                                text: Theme.t("storage.trash", "Lixeira")
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: 11
                                                 color: Theme.subtext
@@ -5500,7 +5502,7 @@ PanelWindow {
                                             spacing: 2
                                             Text {
                                                 Layout.alignment: Qt.AlignHCenter
-                                                text: "Caches de Apps"
+                                                text: Theme.t("storage.app_cache", "Caches de Apps")
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: 11
                                                 color: Theme.subtext
@@ -5542,14 +5544,14 @@ PanelWindow {
                                                 Layout.fillWidth: true
                                                 spacing: 1
                                                 Text {
-                                                    text: "Limpar Pacotes Antigos do Pacman"
+                                                    text: Theme.t("storage.clean_pacman_title", "Limpar Pacotes Antigos do Pacman")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 12
                                                     font.weight: Font.DemiBold
                                                     color: Theme.textColor
                                                 }
                                                 Text {
-                                                    text: "Mantém as 2 últimas versões instaladas para rollback seguro e remove o restante."
+                                                    text: Theme.t("storage.clean_pacman_desc", "Mantém as 2 últimas versões instaladas para rollback seguro e remove o restante.")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 10
                                                     color: Theme.subtext
@@ -5557,7 +5559,7 @@ PanelWindow {
                                             }
                                             ActionBtn {
                                                 icon: Theme.icons.broom
-                                                text: "Limpar"
+                                                text: Theme.t("storage.clean_btn", "Limpar")
                                                 onClicked: {
                                                     Quickshell.execDetached(["rice-storage", "clean-pacman"]);
                                                     loadStorageProc.running = true;
@@ -5587,14 +5589,14 @@ PanelWindow {
                                                 Layout.fillWidth: true
                                                 spacing: 1
                                                 Text {
-                                                    text: "Limpar Miniaturas em Cache"
+                                                    text: Theme.t("storage.clean_thumbs_title", "Limpar Miniaturas em Cache")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 12
                                                     font.weight: Font.DemiBold
                                                     color: Theme.textColor
                                                 }
                                                 Text {
-                                                    text: "Remove thumbnails geradas para arquivos e vídeos. Elas serão recriadas se necessário."
+                                                    text: Theme.t("storage.clean_thumbs_desc", "Remove thumbnails geradas para arquivos e vídeos. Elas serão recriadas se necessário.")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 10
                                                     color: Theme.subtext
@@ -5602,7 +5604,7 @@ PanelWindow {
                                             }
                                             ActionBtn {
                                                 icon: Theme.icons.broom
-                                                text: "Limpar"
+                                                text: Theme.t("storage.clean_btn", "Limpar")
                                                 onClicked: {
                                                     Quickshell.execDetached(["rice-storage", "clean-thumbnails"]);
                                                     loadStorageProc.running = true;
@@ -5632,14 +5634,14 @@ PanelWindow {
                                                 Layout.fillWidth: true
                                                 spacing: 1
                                                 Text {
-                                                    text: "Esvaziar Lixeira do Usuário"
+                                                    text: Theme.t("storage.empty_trash_title", "Esvaziar Lixeira do Usuário")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 12
                                                     font.weight: Font.DemiBold
                                                     color: Theme.textColor
                                                 }
                                                 Text {
-                                                    text: "Apaga permanentemente os arquivos descartados em ~/.local/share/Trash."
+                                                    text: Theme.t("storage.empty_trash_desc", "Apaga permanentemente os arquivos descartados em ~/.local/share/Trash.")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 10
                                                     color: Theme.subtext
@@ -5647,7 +5649,7 @@ PanelWindow {
                                             }
                                             ActionBtn {
                                                 icon: Theme.icons.trash
-                                                text: "Esvaziar"
+                                                text: Theme.t("storage.empty_btn", "Esvaziar")
                                                 onClicked: {
                                                     Quickshell.execDetached(["rice-storage", "clean-trash"]);
                                                     loadStorageProc.running = true;
@@ -5661,7 +5663,7 @@ PanelWindow {
                                         spacing: 12
                                         ActionBtn {
                                             icon: Theme.icons.broom
-                                            text: "Executar Limpeza Profunda Completa"
+                                            text: Theme.t("storage.deep_clean_btn", "Executar Limpeza Profunda Completa")
                                             primary: true
                                             onClicked: {
                                                 Quickshell.execDetached(["rice-storage", "clean-all"]);
@@ -5691,8 +5693,8 @@ PanelWindow {
                                 RowLayout {
                                     Layout.fillWidth: true
                                     SectionHeader {
-                                        title: "Guia de Teclas & Atalhos"
-                                        subtitle: "Atalhos essenciais do Hyprland com busca instantânea"
+                                        title: Theme.t("binds.section_title", "Guia de Teclas & Atalhos")
+                                        subtitle: Theme.t("binds.section_sub", "Atalhos essenciais do Hyprland com busca instantânea")
                                     }
                                     Item { Layout.fillWidth: true }
 
@@ -5724,7 +5726,7 @@ PanelWindow {
                                                 onTextChanged: win.bindsFilter = text.toLowerCase()
                                                 Text {
                                                     visible: !searchInput.text
-                                                    text: "Buscar atalho..."
+                                                    text: Theme.t("binds.search_placeholder", "Buscar atalho...")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 11
                                                     color: Theme.subtext
@@ -5792,7 +5794,7 @@ PanelWindow {
                                                 text: Theme.t("binds.custom_btn", "Editar Atalhos Customizados")
                                                 primary: true
                                                 onClicked: {
-                                                    Quickshell.execDetached(["bash", "-c", "f=\"$HOME/.config/hypr/user-binds.lua\"; if [ ! -f \"$f\" ]; then for p in \"$HOME/.hollow-wired/dots/hypr/user-binds.lua.example\" \"$HOME/projetos/hyprland-setup/dots/hypr/user-binds.lua.example\" \"$HOME/hyprland-setup/dots/hypr/user-binds.lua.example\"; do if [ -f \"$p\" ]; then cp \"$p\" \"$f\" && break; fi; done; if [ ! -f \"$f\" ]; then echo '-- ~/.config/hypr/user-binds.lua\n-- Adicione seus atalhos personalizados aqui!\n-- hl.bind(\"CTRL + ALT + Delete\", hl.dsp.exec_cmd(\"quickshell ipc call energy open\"))\n' > \"$f\"; fi; fi; xdg-open \"$f\" || kate \"$f\" || kitty -e micro \"$f\""]);
+                                                    Quickshell.execDetached(["rice-edit-user-binds"]);
                                                     win.showToast(Theme.t("binds.opened_toast", "Abrindo user-binds.lua..."));
                                                 }
                                             }
@@ -5803,57 +5805,57 @@ PanelWindow {
                                 Repeater {
                                     model: [
                                         {
-                                            cat: "Janelas & Navegação",
+                                            cat: Theme.t("binds.cat_windows", "Janelas & Navegação"),
                                             binds: [
-                                                { key: "Super + Q", action: "Abrir Terminal Kitty" },
-                                                { key: "Super + C", action: "Fechar Janela Ativa" },
-                                                { key: "Alt + F4", action: "Fechar Janela Ativa (Padrão Windows)" },
-                                                { key: "Super + F", action: "Alternar Tela Cheia (Fullscreen)" },
-                                                { key: "Super + Shift + V", action: "Alternar Janela Flutuante" },
-                                                { key: "Super + P", action: "Alternar Modo Pseudo-Tiling" },
-                                                { key: "Super + J", action: "Alternar Divisão Horizontal / Vertical" },
-                                                { key: "Super + Setas", action: "Mudar Foco entre Janelas" },
-                                                { key: "Super + 1..9", action: "Mudar para Área de Trabalho (Workspace)" },
-                                                { key: "Super + Shift + 1..9", action: "Mover Janela para Área de Trabalho" },
-                                                { key: "Super + A", action: "Abrir Área Especial (Scratchpad)" }
+                                                { key: "Super + Q", action: Theme.t("binds.act_kitty", "Abrir Terminal Kitty") },
+                                                { key: "Super + C", action: Theme.t("binds.act_close", "Fechar Janela Ativa") },
+                                                { key: "Alt + F4", action: Theme.t("binds.act_close_alt", "Fechar Janela Ativa (Padrão Windows)") },
+                                                { key: "Super + F", action: Theme.t("binds.act_fullscreen", "Alternar Tela Cheia (Fullscreen)") },
+                                                { key: "Super + Shift + V", action: Theme.t("binds.act_floating", "Alternar Janela Flutuante") },
+                                                { key: "Super + P", action: Theme.t("binds.act_pseudo", "Alternar Modo Pseudo-Tiling") },
+                                                { key: "Super + J", action: Theme.t("binds.act_split", "Alternar Divisão Horizontal / Vertical") },
+                                                { key: "Super + Setas", action: Theme.t("binds.act_focus", "Mudar Foco entre Janelas") },
+                                                { key: "Super + 1..9", action: Theme.t("binds.act_workspace", "Mudar para Área de Trabalho (Workspace)") },
+                                                { key: "Super + Shift + 1..9", action: Theme.t("binds.act_movetoworkspace", "Mover Janela para Área de Trabalho") },
+                                                { key: "Super + A", action: Theme.t("binds.act_scratchpad", "Abrir Área Especial (Scratchpad)") }
                                             ]
                                         },
                                         {
-                                            cat: "Aplicativos & Ferramentas do Rice",
+                                            cat: Theme.t("binds.cat_rice", "Aplicativos & Ferramentas do Rice"),
                                             binds: [
-                                                { key: "Ctrl + Alt + Del", action: "Menu de Energia / Desligar / Suspender" },
-                                                { key: "Super / Super + R", action: "Menu de Aplicativos (Launcher Quickshell)" },
-                                                { key: "Super + E", action: "Gerenciador de Pastas (Dolphin)" },
-                                                { key: "Super + I", action: "Painel de Controle Rice (Esta Central Gráfica)" },
-                                                { key: "Super + S", action: "Trocar Papel de Parede (Waywallen Switcher)" },
-                                                { key: "Super + V", action: "Histórico da Área de Transferência" },
-                                                { key: "Super + B", action: "Alternar Desfoque de Janelas (Blur On/Off)" },
-                                                { key: "Super + W", action: "Editar Widgets da Área de Trabalho" },
-                                                { key: "Super + N", action: "Abrir Central de Notificações" },
-                                                { key: "Super + Shift + N", action: "Alternar Não Perturbe (DND)" },
-                                                { key: "Super + L", action: "Bloquear Tela (Hyprlock)" },
-                                                { key: "Alt + Tab", action: "Alternador de Janelas com Miniaturas" }
+                                                { key: "Ctrl + Alt + Del", action: Theme.t("binds.act_powermenu", "Menu de Energia / Desligar / Suspender") },
+                                                { key: "Super / Super + R", action: Theme.t("binds.act_launcher", "Menu de Aplicativos (Launcher Quickshell)") },
+                                                { key: "Super + E", action: Theme.t("binds.act_dolphin", "Gerenciador de Pastas (Dolphin)") },
+                                                { key: "Super + I", action: Theme.t("binds.act_ricepanel", "Painel de Controle Rice (Esta Central Gráfica)") },
+                                                { key: "Super + S", action: Theme.t("binds.act_wallpaper", "Trocar Papel de Parede (Waywallen Switcher)") },
+                                                { key: "Super + V", action: Theme.t("binds.act_clipboard", "Histórico da Área de Transferência") },
+                                                { key: "Super + B", action: Theme.t("binds.act_blur", "Alternar Desfoque de Janelas (Blur On/Off)") },
+                                                { key: "Super + W", action: Theme.t("binds.act_widgets", "Editar Widgets da Área de Trabalho") },
+                                                { key: "Super + N", action: Theme.t("binds.act_notifcenter", "Abrir Central de Notificações") },
+                                                { key: "Super + Shift + N", action: Theme.t("binds.act_dnd", "Alternar Não Perturbe (DND)") },
+                                                { key: "Super + L", action: Theme.t("binds.act_lock", "Bloquear Tela (Hyprlock)") },
+                                                { key: "Alt + Tab", action: Theme.t("binds.act_alttab", "Alternador de Janelas com Miniaturas") }
                                             ]
                                         },
                                         {
-                                            cat: "Captura & Gravação de Tela",
+                                            cat: Theme.t("binds.cat_capture", "Captura & Gravação de Tela"),
                                             binds: [
-                                                { key: "Print / Super+Shift+S", action: "Captura de Região (Salva e Copia)" },
-                                                { key: "Super + Alt + S", action: "Captura com Editor de Anotações (Swappy)" },
-                                                { key: "Shift + Print", action: "Captura da Tela Inteira" },
-                                                { key: "Ctrl + Print", action: "Captura da Janela Ativa" },
-                                                { key: "Super + Shift + R", action: "Gravar Vídeo de Região com Áudio" },
-                                                { key: "Super + Ctrl + Shift + R", action: "Gravar Vídeo da Tela Inteira" }
+                                                { key: "Print / Super+Shift+S", action: Theme.t("binds.act_screenshot_region", "Captura de Região (Salva e Copia)") },
+                                                { key: "Super + Alt + S", action: Theme.t("binds.act_screenshot_swappy", "Captura com Editor de Anotações (Swappy)") },
+                                                { key: "Shift + Print", action: Theme.t("binds.act_screenshot_full", "Captura da Tela Inteira") },
+                                                { key: "Ctrl + Print", action: Theme.t("binds.act_screenshot_window", "Captura da Janela Ativa") },
+                                                { key: "Super + Shift + R", action: Theme.t("binds.act_record_region", "Gravar Vídeo de Região com Áudio") },
+                                                { key: "Super + Ctrl + Shift + R", action: Theme.t("binds.act_record_full", "Gravar Vídeo da Tela Inteira") }
                                             ]
                                         },
                                         {
-                                            cat: "Áudio & Multimídia",
+                                            cat: Theme.t("binds.cat_media", "Áudio & Multimídia"),
                                             binds: [
-                                                { key: "Volume + / -", action: "Aumentar / Diminuir Volume" },
-                                                { key: "Mute", action: "Silenciar / Reativar Som" },
-                                                { key: "NumLock", action: "Silenciar Microfone Instantaneamente" },
-                                                { key: "Brilho + / -", action: "Aumentar / Diminuir Brilho do Monitor" },
-                                                { key: "Play / Pause", action: "Reproduzir / Pausar Música" }
+                                                { key: "Volume + / -", action: Theme.t("binds.act_vol", "Aumentar / Diminuir Volume") },
+                                                { key: "Mute", action: Theme.t("binds.act_mute", "Silenciar / Reativar Som") },
+                                                { key: "NumLock", action: Theme.t("binds.act_mic_mute", "Silenciar Microfone Instantaneamente") },
+                                                { key: "Brilho + / -", action: Theme.t("binds.act_bright", "Aumentar / Diminuir Brilho do Monitor") },
+                                                { key: "Play / Pause", action: Theme.t("binds.act_playpause", "Reproduzir / Pausar Música") }
                                             ]
                                         }
                                     ]
@@ -5945,8 +5947,8 @@ PanelWindow {
                                 spacing: 16
 
                                 SectionHeader {
-                                    title: "Pontos de Restauração Btrfs (Snapshots de Segurança)"
-                                    subtitle: "Crie pontos de restauração antes de atualizar o sistema para desfazer qualquer problema pelo Limine"
+                                    title: Theme.t("sys.section_snap", "Pontos de Restauração Btrfs (Snapshots de Segurança)")
+                                    subtitle: Theme.t("sys.section_snap_sub", "Crie pontos de restauração antes de atualizar o sistema para desfazer qualquer problema pelo Limine")
                                 }
 
                                 RowLayout {
@@ -5954,7 +5956,7 @@ PanelWindow {
                                     spacing: 12
                                     ActionBtn {
                                         icon: Theme.icons.plus
-                                        text: "Criar Ponto de Restauração Agora"
+                                        text: Theme.t("sys.create_snap_btn", "Criar Ponto de Restauração Agora")
                                         primary: true
                                         onClicked: {
                                             Quickshell.execDetached(["rice-snapshots", "create", "Snapshot Manual do Usuário"]);
@@ -6055,8 +6057,8 @@ PanelWindow {
                                 }
 
                                 SectionHeader {
-                                    title: "Auto-Reparo & Soluções Rápidas de Um Clique"
-                                    subtitle: "Ferramentas práticas para resolver problemas comuns sem abrir o terminal ou digitar comandos"
+                                    title: Theme.t("sys.section_autorepair", "Auto-Reparo & Soluções Rápidas de Um Clique")
+                                    subtitle: Theme.t("sys.section_autorepair_sub", "Ferramentas práticas para resolver problemas comuns sem abrir o terminal ou digitar comandos")
                                 }
 
                                 ColumnLayout {
@@ -6095,14 +6097,14 @@ PanelWindow {
                                                 Layout.fillWidth: true
                                                 spacing: 2
                                                 Text {
-                                                    text: "Reiniciar Sistema de Áudio (PipeWire)"
+                                                    text: Theme.t("sys.audio_repair_title", "Reiniciar Sistema de Áudio (PipeWire)")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 12
                                                     font.weight: Font.DemiBold
                                                     color: Theme.textColor
                                                 }
                                                 Text {
-                                                    text: "Se o som parou ou o microfone não responde após conectar um fone/headset."
+                                                    text: Theme.t("sys.audio_repair_desc", "Se o som parou ou o microfone não responde após conectar um fone/headset.")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 10
                                                     color: Theme.subtext
@@ -6111,7 +6113,7 @@ PanelWindow {
 
                                             ActionBtn {
                                                 icon: Theme.icons.refresh
-                                                text: "Reiniciar Áudio"
+                                                text: Theme.t("sys.audio_repair_btn", "Reiniciar Áudio")
                                                 primary: true
                                                 onClicked: {
                                                     Quickshell.execDetached(["rice-maintenance", "audio"]);
@@ -6153,14 +6155,14 @@ PanelWindow {
                                                 Layout.fillWidth: true
                                                 spacing: 2
                                                 Text {
-                                                    text: "Destravar Pacman (Remover db.lck)"
+                                                    text: Theme.t("sys.pacman_unlock_title", "Destravar Pacman (Remover db.lck)")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 12
                                                     font.weight: Font.DemiBold
                                                     color: Theme.textColor
                                                 }
                                                 Text {
-                                                    text: "Resolve o erro 'banco de dados está bloqueado' se o terminal fechou durante um update."
+                                                    text: Theme.t("sys.pacman_unlock_desc", "Resolve o erro 'banco de dados está bloqueado' se o terminal fechou durante um update.")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 10
                                                     color: Theme.subtext
@@ -6169,7 +6171,7 @@ PanelWindow {
 
                                             ActionBtn {
                                                 icon: Theme.icons.verified
-                                                text: "Destravar Pacman"
+                                                text: Theme.t("sys.pacman_unlock_btn", "Destravar Pacman")
                                                 onClicked: {
                                                     Quickshell.execDetached(["rice-maintenance", "unlockpacman"]);
                                                 }
@@ -6209,14 +6211,14 @@ PanelWindow {
                                                 Layout.fillWidth: true
                                                 spacing: 2
                                                 Text {
-                                                    text: "Limpeza de Disco & Caches Antigos"
+                                                    text: Theme.t("sys.clean_disk_title", "Limpeza de Disco & Caches Antigos")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 12
                                                     font.weight: Font.DemiBold
                                                     color: Theme.textColor
                                                 }
                                                 Text {
-                                                    text: "Remove versões antigas de pacotes do pacman e miniaturas expiradas com segurança."
+                                                    text: Theme.t("sys.clean_disk_desc", "Remove versões antigas de pacotes do pacman e miniaturas expiradas com segurança.")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 10
                                                     color: Theme.subtext
@@ -6225,7 +6227,7 @@ PanelWindow {
 
                                             ActionBtn {
                                                 icon: Theme.icons.disk
-                                                text: "Limpar Caches"
+                                                text: Theme.t("sys.clean_disk_btn", "Limpar Caches")
                                                 onClicked: {
                                                     Quickshell.execDetached(["rice-maintenance", "cleancache"]);
                                                     win.showToast("Limpando caches do sistema...");
@@ -6266,14 +6268,14 @@ PanelWindow {
                                                 Layout.fillWidth: true
                                                 spacing: 2
                                                 Text {
-                                                    text: "Assistente de Diagnóstico (Rice Doctor)"
+                                                    text: Theme.t("sys.doctor_title", "Assistente de Diagnóstico (Rice Doctor)")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 12
                                                     font.weight: Font.DemiBold
                                                     color: Theme.textColor
                                                 }
                                                 Text {
-                                                    text: "Varredura completa de integridade de áudio, GPU, Waywallen, SDDM e zRAM."
+                                                    text: Theme.t("sys.doctor_desc", "Varredura completa de integridade de áudio, GPU, Waywallen, SDDM e zRAM.")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 10
                                                     color: Theme.subtext
@@ -6282,7 +6284,7 @@ PanelWindow {
 
                                             ActionBtn {
                                                 icon: Theme.icons.console
-                                                text: "Executar Rice Doctor"
+                                                text: Theme.t("sys.doctor_btn", "Executar Rice Doctor")
                                                 primary: true
                                                 onClicked: {
                                                     Quickshell.execDetached(["rice-maintenance", "doctor"]);
@@ -6349,8 +6351,8 @@ PanelWindow {
                                                 spacing: 8
                                                 Text {
                                                     text: win.softwareUpdatesData.count > 0
-                                                        ? win.softwareUpdatesData.count + " Atualizações Disponíveis"
-                                                        : "Sistema 100% Atualizado (Arch Linux / CachyOS)"
+                                                        ? win.softwareUpdatesData.count + " " + Theme.t("store.updates_avail", "Atualizações Disponíveis")
+                                                        : Theme.t("store.system_updated", "Sistema 100% Atualizado (Arch Linux / CachyOS)")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 15
                                                     font.weight: Font.Bold
@@ -6366,7 +6368,7 @@ PanelWindow {
                                                     Text {
                                                         id: updCountText
                                                         anchors.centerIn: parent
-                                                        text: win.softwareUpdatesData.count + " pacotes"
+                                                        text: win.softwareUpdatesData.count + " " + Theme.t("store.packages", "pacotes")
                                                         font.family: Theme.fontFamily
                                                         font.pixelSize: 10
                                                         font.weight: Font.Bold
@@ -6377,8 +6379,8 @@ PanelWindow {
 
                                             Text {
                                                 text: win.softwareUpdatesData.count > 0
-                                                    ? "Há novos pacotes do sistema e do repositório AUR prontos para instalar com segurança."
-                                                    : "Todos os pacotes oficiais, kernel e drivers estão na versão mais recente."
+                                                    ? Theme.t("store.updates_sub", "Há novos pacotes do sistema e do repositório AUR prontos para instalar com segurança.")
+                                                    : Theme.t("store.updated_sub", "Todos os pacotes oficiais, kernel e drivers estão na versão mais recente.")
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: 11
                                                 color: Theme.subtext
@@ -6422,7 +6424,7 @@ PanelWindow {
                                             spacing: 8
                                             ActionBtn {
                                                 icon: Theme.icons.refresh
-                                                text: "Verificar Novamente"
+                                                text: Theme.t("store.check_again", "Verificar Novamente")
                                                 onClicked: {
                                                     loadSoftwareUpdatesProc.running = true;
                                                     loadSoftwareAppsProc.running = true;
@@ -6432,7 +6434,7 @@ PanelWindow {
 
                                             ActionBtn {
                                                 icon: "\u{F03D8}"
-                                                text: "Atualizar Dotfiles (" + (win.softwareUpdatesData.rice_updates || 0) + ")"
+                                                text: Theme.t("store.update_dotfiles", "Atualizar Dotfiles") + " (" + (win.softwareUpdatesData.rice_updates || 0) + ")"
                                                 primary: true
                                                 visible: (win.softwareUpdatesData.rice_updates || 0) > 0
                                                 onClicked: {
@@ -6443,7 +6445,7 @@ PanelWindow {
 
                                             ActionBtn {
                                                 icon: "\u{F002A}"
-                                                text: "Atualizar Tudo Agora"
+                                                text: Theme.t("store.update_all", "Atualizar Tudo Agora")
                                                 primary: !(win.softwareUpdatesData.rice_updates > 0)
                                                 visible: (win.softwareUpdatesData.count || 0) > 0
                                                 onClicked: {
@@ -6461,7 +6463,7 @@ PanelWindow {
                                     spacing: 10
 
                                     Text {
-                                        text: "CATÁLOGO DE SOFTWARES RECOMENDADOS"
+                                        text: Theme.t("store.catalog_title", "CATÁLOGO DE SOFTWARES RECOMENDADOS")
                                         font.family: Theme.fontFamily
                                         font.pixelSize: 12
                                         font.weight: Font.Bold
@@ -6475,13 +6477,13 @@ PanelWindow {
                                         spacing: 6
                                         Repeater {
                                             model: [
-                                                { id: "all", label: "Todos" },
-                                                { id: "comm", label: "Comunicação" },
-                                                { id: "media", label: "Mídia & Streaming" },
-                                                { id: "gaming", label: "Jogos" },
-                                                { id: "prod", label: "Produtividade" },
-                                                { id: "browser", label: "Navegadores" },
-                                                { id: "tools", label: "Utilitários" }
+                                                { id: "all", label: Theme.t("store.cat_all", "Todos") },
+                                                { id: "comm", label: Theme.t("store.cat_comm", "Comunicação") },
+                                                { id: "media", label: Theme.t("store.cat_media", "Mídia & Streaming") },
+                                                { id: "gaming", label: Theme.t("store.cat_gaming", "Jogos") },
+                                                { id: "prod", label: Theme.t("store.cat_prod", "Produtividade") },
+                                                { id: "browser", label: Theme.t("store.cat_browser", "Navegadores") },
+                                                { id: "tools", label: Theme.t("store.cat_tools", "Utilitários") }
                                             ]
                                             delegate: Rectangle {
                                                 required property var modelData
@@ -6592,7 +6594,7 @@ PanelWindow {
                                                             Text {
                                                                 id: stBadgeText
                                                                 anchors.centerIn: parent
-                                                                text: appCard.modelData.installed ? "✓ Instalado" : "Disponível"
+                                                                text: appCard.modelData.installed ? Theme.t("store.badge_installed", "✓ Instalado") : "Disponível"
                                                                 font.family: Theme.fontFamily
                                                                 font.pixelSize: 9
                                                                 font.weight: Font.Bold
@@ -6621,7 +6623,7 @@ PanelWindow {
                                                     ActionBtn {
                                                         visible: appCard.modelData.installed
                                                         icon: "\u{F04B}"
-                                                        text: "Abrir"
+                                                        text: Theme.t("store.open", "Abrir")
                                                         primary: true
                                                         onClicked: {
                                                             Quickshell.execDetached(["rice-software", "launch", appCard.modelData.id]);
@@ -6660,7 +6662,7 @@ PanelWindow {
                                                     ActionBtn {
                                                         visible: !appCard.modelData.installed
                                                         icon: "\u{F01DA}"
-                                                        text: "Instalar"
+                                                        text: Theme.t("store.install", "Instalar")
                                                         primary: false
                                                         onClicked: {
                                                             Quickshell.execDetached(["rice-software", "install", appCard.modelData.id]);
@@ -6699,7 +6701,7 @@ PanelWindow {
                                     RowLayout {
                                         Layout.fillWidth: true
                                         Text {
-                                            text: "PERFIS DE ESTILO & PERFORMANCE"
+                                            text: Theme.t("presets.section_profiles", "PERFIS DE ESTILO & PERFORMANCE")
                                             font.family: Theme.fontFamily
                                             font.pixelSize: 12
                                             font.weight: Font.Bold
@@ -6707,7 +6709,7 @@ PanelWindow {
                                         }
                                         Item { Layout.fillWidth: true }
                                         Text {
-                                            text: "Altera gaps, cantos arredondados, animações e efeitos com 1 clique"
+                                            text: Theme.t("presets.section_profiles_sub", "Altera gaps, cantos arredondados, animações e efeitos com 1 clique")
                                             font.family: Theme.fontFamily
                                             font.pixelSize: 10
                                             color: Theme.subtext
@@ -6778,7 +6780,7 @@ PanelWindow {
                                                                 Text {
                                                                     id: gpText
                                                                     anchors.centerIn: parent
-                                                                    text: "Gaps: " + presetCard.modelData.gaps_in + "px"
+                                                                    text: Theme.t("presets.gaps_label", "Gaps: ") + presetCard.modelData.gaps_in + "px"
                                                                     font.family: Theme.monoFamily
                                                                     font.pixelSize: 9
                                                                     color: Theme.subtext
@@ -6793,7 +6795,7 @@ PanelWindow {
                                                                 Text {
                                                                     id: rdText
                                                                     anchors.centerIn: parent
-                                                                    text: "Cantos: " + presetCard.modelData.rounding + "px"
+                                                                    text: Theme.t("presets.corners_label", "Cantos: ") + presetCard.modelData.rounding + "px"
                                                                     font.family: Theme.monoFamily
                                                                     font.pixelSize: 9
                                                                     color: Theme.subtext
@@ -6812,7 +6814,7 @@ PanelWindow {
 
                                                     ActionBtn {
                                                         icon: "\u{F00C}"
-                                                        text: "Aplicar Perfil"
+                                                        text: Theme.t("presets.apply_btn", "Aplicar Perfil")
                                                         primary: true
                                                         onClicked: {
                                                             Quickshell.execDetached(["rice-presets", "apply", presetCard.modelData.id]);
@@ -6841,7 +6843,7 @@ PanelWindow {
                                     RowLayout {
                                         Layout.fillWidth: true
                                         Text {
-                                            text: "PONTOS DE RESTAURAÇÃO DO RICE (BACKUPS)"
+                                            text: Theme.t("presets.section_backups", "PONTOS DE RESTAURAÇÃO DO RICE (BACKUPS)")
                                             font.family: Theme.fontFamily
                                             font.pixelSize: 12
                                             font.weight: Font.Bold
@@ -6850,7 +6852,7 @@ PanelWindow {
                                         Item { Layout.fillWidth: true }
                                         ActionBtn {
                                             icon: Theme.icons.disk
-                                            text: "Criar Novo Backup Agora"
+                                            text: Theme.t("presets.create_backup_btn", "Criar Novo Backup Agora")
                                             primary: true
                                             onClicked: {
                                                 Quickshell.execDetached(["rice-presets", "backup-create"]);
@@ -6915,7 +6917,7 @@ PanelWindow {
                                                         RowLayout {
                                                             spacing: 8
                                                             Text {
-                                                                text: "Data: " + bkCard.modelData.date
+                                                                text: Theme.t("presets.date_label", "Data: ") + bkCard.modelData.date
                                                                 font.family: Theme.fontFamily
                                                                 font.pixelSize: 10
                                                                 color: Theme.subtext
@@ -6926,7 +6928,7 @@ PanelWindow {
                                                                 color: Theme.subtext
                                                             }
                                                             Text {
-                                                                text: "Tamanho: " + bkCard.modelData.size
+                                                                text: Theme.t("presets.size_label", "Tamanho: ") + bkCard.modelData.size
                                                                 font.family: Theme.monoFamily
                                                                 font.pixelSize: 10
                                                                 color: Theme.subtext
@@ -6936,7 +6938,7 @@ PanelWindow {
 
                                                     ActionBtn {
                                                         icon: Theme.icons.refresh
-                                                        text: "Restaurar"
+                                                        text: Theme.t("presets.restore_btn", "Restaurar")
                                                         onClicked: {
                                                             Quickshell.execDetached(["rice-presets", "backup-restore", bkCard.modelData.path]);
                                                             win.showToast("Restaurando configurações do backup...");
@@ -6989,7 +6991,7 @@ PanelWindow {
                                                 spacing: 4
                                                 Text {
                                                     Layout.alignment: Qt.AlignHCenter
-                                                    text: "Nenhum ponto de restauração encontrado."
+                                                    text: Theme.t("presets.empty_backups", "Nenhum ponto de restauração encontrado.")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 11
                                                     font.weight: Font.Medium
@@ -6997,7 +6999,7 @@ PanelWindow {
                                                 }
                                                 Text {
                                                     Layout.alignment: Qt.AlignHCenter
-                                                    text: "Clique em 'Criar Novo Backup Agora' para gerar uma cópia de segurança completa das suas configs."
+                                                    text: Theme.t("presets.empty_backups_sub", "Clique em 'Criar Novo Backup Agora' para gerar uma cópia de segurança completa das suas configs.")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 10
                                                     color: Theme.withAlpha(Theme.subtext, 0.7)
@@ -7485,7 +7487,7 @@ PanelWindow {
                                             }
                                             Item { Layout.fillWidth: true }
                                             Text {
-                                                text: "PNG, JPG, SVG, WebP ou GIF"
+                                                text: Theme.t("shell_custom.formats_desc", "PNG, JPG, SVG, WebP ou GIF")
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: 10
                                                 color: Theme.subtext
