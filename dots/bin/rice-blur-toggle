@@ -35,10 +35,12 @@ set_blur() {
     if [ "$target" -eq 1 ]; then
         rm -f "$state"
         hyprctl eval "hl.config({ decoration = { blur = { enabled = true } } })" &>/dev/null
+        command -v rice-hypr-prefs >/dev/null 2>&1 && rice-hypr-prefs set blur true >/dev/null 2>&1 || true
         notify-send -a "Hyprland" -r 91192 -t 1500 "Blur ativado" "Desfoque de janelas e camadas ligado"
     else
         touch "$state"
         hyprctl eval "hl.config({ decoration = { blur = { enabled = false } } })" &>/dev/null
+        command -v rice-hypr-prefs >/dev/null 2>&1 && rice-hypr-prefs set blur false >/dev/null 2>&1 || true
         notify-send -a "Hyprland" -r 91192 -t 1500 "Blur desativado" "Desfoque desligado para economizar GPU"
     fi
 }

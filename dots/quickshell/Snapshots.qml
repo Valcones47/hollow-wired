@@ -164,7 +164,7 @@ Item {
                         PopText { text: "Nada aqui é permanente até restaurar."; color: Theme.textColor }
                         PopAction {
                             icon: Theme.icons.restore
-                            label: "Tornar este snapshot permanente"
+                            label: Theme.t("snapshots.make_permanent", "Tornar este snapshot permanente")
                             needsConfirm: true
                             onActivated: restoreProc.running = true
                         }
@@ -196,7 +196,7 @@ Item {
                             Text {
                                 anchors.verticalCenter: parent.verticalCenter
                                 visible: descInput.text === "" && !descInput.activeFocus
-                                text: "Descrição do novo snapshot…"
+                                text: Theme.t("snapshots.desc_placeholder", "Descrição do novo snapshot…")
                                 font: descInput.font
                                 color: Theme.subtext
                             }
@@ -206,7 +206,7 @@ Item {
                         id: createBtn
                         Layout.fillWidth: false
                         icon: Theme.icons.plus
-                        label: createProc.running ? "Criando…" : "Criar"
+                        label: createProc.running ? Theme.t("common.creating", "Criando…") : Theme.t("common.create", "Criar")
                         onActivated: {
                             if (createProc.running) return;
                             createProc.desc = descInput.text.trim() || "manual-" + Qt.formatDateTime(new Date(), "yyyy-MM-dd-HHmm");
@@ -217,7 +217,7 @@ Item {
                 }
 
                 PopText {
-                    text: root.loading && root.snaps.length === 0 ? "Carregando…"
+                    text: root.loading && root.snaps.length === 0 ? Theme.t("common.loading", "Carregando…")
                         : root.snaps.length + " snapshots · ícone de boot = aparece no menu do Limine"
                     font.pixelSize: 11
                 }

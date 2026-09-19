@@ -47,7 +47,7 @@ from gi.repository import (  # noqa: E402
 # that works; Gtk.Picture loads GIF previews as blank cards.
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-APP_ID = "org.val47.waywallen-switcher"
+APP_ID = "org.hollowwired.waywallen-switcher"
 # waywallen is installed as a flatpak, so its live data is under ~/.var/app;
 # ~/.local/share/waywallen is a stale copy from an old non-flatpak install.
 FLATPAK_ROOT = os.path.expanduser("~/.var/app/org.waywallen.waywallen")

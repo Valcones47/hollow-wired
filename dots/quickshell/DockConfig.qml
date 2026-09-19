@@ -10,7 +10,7 @@ import Quickshell.Hyprland
 QtObject {
     id: root
 
-    property string launcherIcon: "/home/val47/Imagens/Ícones/icons8-arch-linux-96(2).png"
+    property string launcherIcon: "/usr/share/pixmaps/archlinux-logo.png"
     property var pins: ["zen", "kitty", "org.kde.dolphin", "com.anthropic.Claude", "discord", "spotify"]
     property var games: ["steam", "heroic", "osu-lazer", "r2modman", "com.hypixel.HytaleLauncher"]
     property var usage: ({})
@@ -27,7 +27,7 @@ QtObject {
                 if (typeof d.launcherIcon === "string" && d.launcherIcon.length > 0) {
                     root.launcherIcon = d.launcherIcon;
                 } else {
-                    root.launcherIcon = "/home/val47/Imagens/Ícones/icons8-arch-linux-96(2).png";
+                    root.launcherIcon = "/usr/share/pixmaps/archlinux-logo.png";
                 }
                 if (Array.isArray(d.pins)) root.pins = d.pins;
                 if (Array.isArray(d.games)) root.games = d.games;
@@ -51,7 +51,7 @@ QtObject {
     }
 
     function setLauncherIcon(iconPath) {
-        launcherIcon = iconPath || "/home/val47/Imagens/Ícones/icons8-arch-linux-96(2).png";
+        launcherIcon = iconPath || "/usr/share/pixmaps/archlinux-logo.png";
         save();
     }
 

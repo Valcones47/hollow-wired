@@ -17,7 +17,8 @@ DOTS_DIR=""
 for candidate in \
   "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." 2>/dev/null && pwd)/dots" \
   "$USER_HOME/projetos/hyprland-setup/dots" \
-  "/home/val47/projetos/hyprland-setup/dots"; do
+  "$USER_HOME/projetos/hollow-wired/dots" \
+  "$USER_HOME/.hollow-wired/dots"; do
   if [ -d "$candidate/sddm" ]; then
     DOTS_DIR="$candidate"
     break

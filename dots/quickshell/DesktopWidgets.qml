@@ -427,9 +427,11 @@ PanelWindow {
             }
 
             function greeting(h) {
-                if (h >= 5 && h < 12) return "Bom dia, val47";
-                if (h >= 12 && h < 18) return "Boa tarde, val47";
-                return "Boa noite, val47";
+                var u = (Quickshell.env("USER") || Quickshell.env("LOGNAME") || "User");
+                var uname = u.charAt(0).toUpperCase() + u.slice(1);
+                if (h >= 5 && h < 12) return Theme.t("greeting.morning", "Bom dia") + ", " + uname;
+                if (h >= 12 && h < 18) return Theme.t("greeting.afternoon", "Boa tarde") + ", " + uname;
+                return Theme.t("greeting.evening", "Boa noite") + ", " + uname;
             }
 
             ColumnLayout {
@@ -454,7 +456,7 @@ PanelWindow {
                 }
 
                 Text {
-                    text: Qt.formatDate(w.now, "dddd, d 'de' MMMM")
+                    text: Qt.formatDate(w.now, Theme.t("clock.date_format", "dddd, d 'de' MMMM"))
                     font.family: Theme.fontFamily
                     font.pixelSize: 12
                     color: Theme.subtext
@@ -1723,7 +1725,7 @@ PanelWindow {
                 Text {
                     id: clearText
                     anchors.centerIn: parent
-                    text: "Limpar"
+                    text: Theme.t("common.clear", "Limpar")
                     font.family: Theme.fontFamily; font.pixelSize: 11; font.weight: Font.Medium
                     color: clearArea.containsMouse ? "#ffffff" : Theme.textColor
                 }
@@ -1745,7 +1747,7 @@ PanelWindow {
                 Text {
                     id: doneText
                     anchors.centerIn: parent
-                    text: "✓ Concluir"
+                    text: "✓ " + Theme.t("widgets.done", "Concluir")
                     font.family: Theme.fontFamily; font.pixelSize: 11; font.weight: Font.Bold
                     color: Theme.background
                 }
@@ -1766,9 +1768,16 @@ PanelWindow {
     // ================= INSPECTOR / CUSTOMIZADOR VISUAL DE WIDGET =================
     Rectangle {
         id: inspectorCard
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
-        anchors.margins: 24
+        property real customX: -1
+        property real customY: -1
+
+        // Se o usuário ainda não moveu manualmente, posiciona do lado oposto do widget selecionado
+        x: customX !== -1 ? customX : (
+            (dwWindow.selectedWidgetData && dwWindow.selectedWidgetData.x > ((dwWindow.width || 1920) / 2 - 160))
+                ? 24
+                : ((dwWindow.width || 1920) - width - 24)
+        )
+        y: customY !== -1 ? customY : Math.max(Theme.waybarHeight + 10, (dwWindow.height || 1080) - implicitHeight - 48)
         width: 320
         implicitHeight: inspCol.implicitHeight + 28
         radius: Theme.radius
@@ -1785,24 +1794,63 @@ PanelWindow {
             anchors.margins: 14
             spacing: 12
 
-            // Header do Inspector
-            RowLayout {
+            // Header do Inspector (Arrastável)
+            Item {
+                id: inspHeaderItem
                 Layout.fillWidth: true
-                Text {
-                    text: Theme.icons.tune
-                    font.family: Theme.iconFontFamily; font.pixelSize: 15; color: Theme.primary
+                implicitHeight: 28
+
+                RowLayout {
+                    anchors.fill: parent
+                    spacing: 8
+
+                    Text {
+                        text: Theme.icons.tune
+                        font.family: Theme.iconFontFamily; font.pixelSize: 15; color: Theme.primary
+                    }
+                    Text {
+                        text: Theme.t("widgets.style_title", "Estilizar Widget")
+                        font.family: Theme.fontFamily; font.pixelSize: 13; font.weight: Font.Bold
+                        color: Theme.textColor; Layout.fillWidth: true
+                    }
+                    Text {
+                        text: "⠿"
+                        font.pixelSize: 14; color: Theme.subtext
+                    }
+                    Rectangle {
+                        id: closeBtnRect
+                        z: 10
+                        implicitWidth: 24; implicitHeight: 24; radius: 12
+                        color: closeArea.containsMouse ? Theme.tile : "transparent"
+                        Text {
+                            anchors.centerIn: parent
+                            text: Theme.icons.close
+                            font.family: Theme.iconFontFamily; font.pixelSize: 14; color: Theme.subtext
+                        }
+                        MouseArea {
+                            id: closeArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: dwWindow.selectedWidgetId = ""
+                        }
+                    }
                 }
-                Text {
-                    text: "Estilizar Widget"
-                    font.family: Theme.fontFamily; font.pixelSize: 13; font.weight: Font.Bold
-                    color: Theme.textColor; Layout.fillWidth: true
-                }
-                Text {
-                    text: Theme.icons.close
-                    font.family: Theme.iconFontFamily; font.pixelSize: 14; color: Theme.subtext
-                    MouseArea {
-                        anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                        onClicked: dwWindow.selectedWidgetId = ""
+
+                MouseArea {
+                    id: inspDragArea
+                    anchors.fill: parent
+                    anchors.rightMargin: 32
+                    z: 5
+                    cursorShape: Qt.SizeAllCursor
+                    drag.target: inspectorCard
+                    drag.minimumX: 10
+                    drag.maximumX: (dwWindow ? dwWindow.width : 1920) - inspectorCard.width - 10
+                    drag.minimumY: Theme.waybarHeight + 6
+                    drag.maximumY: (dwWindow ? dwWindow.height : 1080) - inspectorCard.height - 10
+                    onReleased: {
+                        inspectorCard.customX = inspectorCard.x;
+                        inspectorCard.customY = inspectorCard.y;
                     }
                 }
             }
@@ -1812,7 +1860,7 @@ PanelWindow {
             // 1. Estilo do Card
             ColumnLayout {
                 Layout.fillWidth: true; spacing: 4
-                Text { text: "Estilo Visual"; font.family: Theme.fontFamily; font.pixelSize: 11; color: Theme.subtext }
+                Text { text: Theme.t("widgets.style_visual", "Estilo Visual"); font.family: Theme.fontFamily; font.pixelSize: 11; color: Theme.subtext }
                 Row {
                     spacing: 6
                     readonly property var styles: [
@@ -1848,7 +1896,7 @@ PanelWindow {
             // 2. Escala / Tamanho
             ColumnLayout {
                 Layout.fillWidth: true; spacing: 4
-                Text { text: "Escala"; font.family: Theme.fontFamily; font.pixelSize: 11; color: Theme.subtext }
+                Text { text: Theme.t("widgets.scale", "Escala"); font.family: Theme.fontFamily; font.pixelSize: 11; color: Theme.subtext }
                 Row {
                     spacing: 6
                     readonly property var scales: [
@@ -1883,7 +1931,7 @@ PanelWindow {
             // 3. Opacidade do Fundo
             ColumnLayout {
                 Layout.fillWidth: true; spacing: 4
-                Text { text: "Opacidade do Fundo"; font.family: Theme.fontFamily; font.pixelSize: 11; color: Theme.subtext }
+                Text { text: Theme.t("widgets.opacity", "Opacidade do Fundo"); font.family: Theme.fontFamily; font.pixelSize: 11; color: Theme.subtext }
                 Row {
                     spacing: 6
                     readonly property var opacities: [
@@ -1919,7 +1967,7 @@ PanelWindow {
             // 4. Cor de Destaque
             ColumnLayout {
                 Layout.fillWidth: true; spacing: 4
-                Text { text: "Cor de Destaque"; font.family: Theme.fontFamily; font.pixelSize: 11; color: Theme.subtext }
+                Text { text: Theme.t("widgets.accent_color", "Cor de Destaque"); font.family: Theme.fontFamily; font.pixelSize: 11; color: Theme.subtext }
                 Row {
                     spacing: 8
                     readonly property var colors: [
@@ -1959,7 +2007,7 @@ PanelWindow {
                     Layout.fillWidth: true; implicitHeight: 28; radius: 14
                     color: Theme.tile; border.color: Theme.withAlpha(Theme.outline, 0.3); border.width: 1
                     Text {
-                        anchors.centerIn: parent; text: "⧉ Duplicar"
+                        anchors.centerIn: parent; text: "⧉ " + Theme.t("widgets.duplicate", "Duplicar")
                         font.family: Theme.fontFamily; font.pixelSize: 11; color: Theme.textColor
                     }
                     MouseArea {
@@ -1972,7 +2020,7 @@ PanelWindow {
                     Layout.fillWidth: true; implicitHeight: 28; radius: 14
                     color: Theme.withAlpha(Theme.critical, 0.15); border.color: Theme.critical; border.width: 1
                     Text {
-                        anchors.centerIn: parent; text: "Excluir"
+                        anchors.centerIn: parent; text: Theme.t("common.delete", "Excluir")
                         font.family: Theme.fontFamily; font.pixelSize: 11; color: Theme.critical
                     }
                     MouseArea {

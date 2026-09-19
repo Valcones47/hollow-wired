@@ -27,6 +27,7 @@ ensure_prefs_file() {
   "mouse_accel": "flat",
   "numlock": true,
   "vrr": 0,
+  "blur": true,
   "monitor_hz": 144,
   "monitor_scale": 1
 }
@@ -67,12 +68,19 @@ apply_all() {
     mouse_accel=$(jq -r '.mouse_accel // "flat"' "$PREFS_FILE")
     numlock=$(jq -r '.numlock // true' "$PREFS_FILE")
     vrr=$(jq -r '.vrr // 0' "$PREFS_FILE")
+    blur=$(jq -r '.blur // true' "$PREFS_FILE")
+    local run="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+    if [ "$blur" = "false" ]; then
+        touch "$run/rice-blur-disabled" 2>/dev/null || true
+    else
+        rm -f "$run/rice-blur-disabled" 2>/dev/null || true
+    fi
     monitor_hz=$(jq -r '.monitor_hz // 144' "$PREFS_FILE")
     monitor_scale=$(jq -r '.monitor_scale // 1' "$PREFS_FILE")
 
     local gaps_out_sides=$(( gaps_out + 10 ))
 
-    # 1. Configurações gerais de janelas, decoração, animações, VRR e input
+    # 1. Configurações gerais de janelas, layout e periféricos
     hyprctl eval "
 hl.config({
     general = {
@@ -84,7 +92,10 @@ hl.config({
         rounding = $rounding,
         inactive_opacity = $inactive_opacity,
         dim_inactive = $dim_inactive,
-        dim_strength = $dim_strength
+        dim_strength = $dim_strength,
+        blur = {
+            enabled = $blur
+        }
     },
     animations = {
         enabled = $anim_enabled
@@ -119,11 +130,13 @@ hl.device({
     mon_name=$(hyprctl monitors -j 2>/dev/null | jq -r '.[0].name // empty' 2>/dev/null || true)
     if [ -n "$mon_name" ]; then
         local mode_str="preferred"
-        if [ "$mon_name" = "eDP-1" ]; then
-            if [ "$monitor_hz" = "60" ]; then
-                mode_str="1920x1080@60.02Hz"
+        if [ -n "$monitor_hz" ] && [ "$monitor_hz" != "0" ] && [ "$monitor_hz" != "null" ]; then
+            local matched_mode
+            matched_mode=$(hyprctl monitors -j 2>/dev/null | jq -r --arg hz "$monitor_hz" '.[0].availableModes[]? | select(test("@" + $hz + "(\\.[0-9]+)?Hz"))' 2>/dev/null | head -1 || true)
+            if [ -n "$matched_mode" ]; then
+                mode_str="$matched_mode"
             else
-                mode_str="1920x1080@144.03Hz"
+                mode_str="preferred@${monitor_hz}Hz"
             fi
         fi
         hyprctl eval "hl.monitor({ output = '$mon_name', mode = '$mode_str', position = '0x0', scale = '$monitor_scale' })" &>/dev/null || true
@@ -193,6 +206,9 @@ case "$cmd" in
         fi
         echo "$tmp" > "$PREFS_FILE"
         apply_all
+        if [ "$key" = "monitor_scale" ]; then
+            command -v rice-wallpaper-reload >/dev/null 2>&1 && rice-wallpaper-reload >/dev/null 2>&1 &
+        fi
         ;;
     preset)
         p="${2:-smooth}"
@@ -221,6 +237,7 @@ case "$cmd" in
   "mouse_accel": "flat",
   "numlock": true,
   "vrr": 0,
+  "blur": true,
   "monitor_hz": 144,
   "monitor_scale": 1
 }

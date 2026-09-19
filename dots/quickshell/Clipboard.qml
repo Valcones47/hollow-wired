@@ -176,7 +176,7 @@ PanelWindow {
                     }
                     Text {
                         anchors.verticalCenter: parent.verticalCenter
-                        text: "Área de Transferência"
+                        text: Theme.t("clipboard.title", "Área de Transferência")
                         font.family: Theme.fontFamily
                         font.pixelSize: 16
                         font.weight: Font.Bold
@@ -263,8 +263,15 @@ PanelWindow {
                         font.family: Theme.fontFamily
                         font.pixelSize: 13
                         color: Theme.textColor
-                        clip: true
                         onTextChanged: clipWindow.updateFiltered()
+
+                        Text {
+                            visible: !searchField.text
+                            text: Theme.t("clipboard.search_placeholder", "Filtrar histórico...")
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 13
+                            color: Theme.withAlpha(Theme.subtext, 0.6)
+                        }
 
                         Keys.onPressed: event => {
                             if (event.key === Qt.Key_Escape) {

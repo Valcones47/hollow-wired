@@ -164,6 +164,14 @@ QtObject {
         }
     }
 
+    property FileView waywallenWatcher: FileView {
+        path: Quickshell.env("HOME") + "/.var/app/org.waywallen.waywallen/config/waywallen/config.toml"
+        watchChanges: true
+        onFileChanged: {
+            Quickshell.execDetached(["rice-wallust-refresh"]);
+        }
+    }
+
     // ---------- Internacionalização (i18n) ----------
     property string locale: "pt-BR"
     property var translationsPt: ({})

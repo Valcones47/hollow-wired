@@ -264,7 +264,7 @@ PanelWindow {
                                 { icon: Theme.icons.arch, text: win.mod("OS") ? win.mod("OS").prettyName : "" },
                                 { icon: Theme.icons.monitor, text: win.mod("WM") ? "Hyprland " + win.mod("WM").version : "" },
                                 { icon: Theme.icons.console, text: "fish · kitty" },
-                                { icon: Theme.icons.clock, text: win.mod("Uptime") ? "ligado há " + win.fmtUptime(win.mod("Uptime").uptime) : "" },
+                                { icon: Theme.icons.clock, text: win.mod("Uptime") ? Theme.t("sysinfo.uptime_prefix", "ligado há ") + win.fmtUptime(win.mod("Uptime").uptime) : "" },
                                 { icon: Theme.icons.laptop, text: win.mod("Host") ? win.mod("Host").vendor + " " + win.mod("Host").family : "" }
                             ]
                             delegate: Rectangle {
@@ -331,7 +331,7 @@ PanelWindow {
 
                 Section {
                     icon: Theme.icons.info
-                    title: "Sistema"
+                    title: Theme.t("sysinfo.system", "Sistema")
                     Row2 { label: "Distro"; value: win.mod("OS") ? win.mod("OS").prettyName + " (" + (win.mod("OS").buildID || "rolling") + ")" : "" }
                     Row2 { label: "Kernel"; value: win.mod("Kernel") ? win.mod("Kernel").release : "" }
                     Row2 { label: "WM"; value: win.mod("WM") ? win.mod("WM").prettyName + " " + win.mod("WM").version + " (" + win.mod("WM").protocolName + ")" : "" }
@@ -348,7 +348,7 @@ PanelWindow {
 
                 Section {
                     icon: Theme.icons.chip
-                    title: "Processador e gráficos"
+                    title: Theme.t("sysinfo.cpu_gpu", "Processador e gráficos")
                     Row2 { label: "CPU"; value: win.mod("CPU") ? win.mod("CPU").cpu.replace("11th Gen ", "").replace("(R)", "").replace("(TM)", "") : "" }
                     Row2 { label: "Núcleos"; value: win.mod("CPU") ? win.mod("CPU").cores.physical + " núcleos · " + win.mod("CPU").cores.logical + " threads" : "" }
                     Row2 { label: "Frequência"; value: win.mod("CPU") ? (win.mod("CPU").frequency.base / 1000).toFixed(1) + " – " + (win.mod("CPU").frequency.max / 1000).toFixed(1) + " GHz" : "" }
@@ -366,7 +366,7 @@ PanelWindow {
 
                 Section {
                     icon: Theme.icons.memory
-                    title: "Memória e armazenamento"
+                    title: Theme.t("sysinfo.mem_storage", "Memória e armazenamento")
                     Bar2 {
                         label: "RAM"
                         value: win.mod("Memory") ? win.gib(win.mod("Memory").used) + " / " + win.gib(win.mod("Memory").total) : ""
@@ -395,7 +395,7 @@ PanelWindow {
 
                 Section {
                     icon: Theme.icons.monitor
-                    title: "Tela e áudio"
+                    title: Theme.t("sysinfo.screen_audio", "Tela e áudio")
                     Repeater {
                         model: win.mod("Display") || []
                         delegate: ColumnLayout {
@@ -419,7 +419,7 @@ PanelWindow {
 
                 Section {
                     icon: (win.batDesign > 0 || (win.mod("Battery") && win.mod("Battery").length > 0)) ? Theme.icons.batHealth : Theme.icons.bolt
-                    title: (win.batDesign > 0 || (win.mod("Battery") && win.mod("Battery").length > 0)) ? "Bateria" : "Alimentação"
+                    title: (win.batDesign > 0 || (win.mod("Battery") && win.mod("Battery").length > 0)) ? Theme.t("sysinfo.battery", "Bateria") : Theme.t("sysinfo.power", "Alimentação")
                     Bar2 {
                         visible: win.batDesign > 0
                         label: "Saúde (capacidade atual vs. de fábrica)"
@@ -456,7 +456,7 @@ PanelWindow {
 
                 Section {
                     icon: Theme.icons.laptop
-                    title: "Placa e rede"
+                    title: Theme.t("sysinfo.board_net", "Placa e rede")
                     Row2 { label: "Computador"; value: win.mod("Host") ? win.mod("Host").vendor + " " + win.mod("Host").name : "" }
                     Row2 { label: "Placa-mãe"; value: win.mod("Board") ? win.mod("Board").name + " (" + win.mod("Board").vendor + ")" : "" }
                     Row2 { label: "BIOS"; value: win.mod("BIOS") ? win.mod("BIOS").vendor + " " + win.mod("BIOS").version + " · " + win.mod("BIOS").date + " · " + win.mod("BIOS").type : "" }

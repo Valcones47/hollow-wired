@@ -763,7 +763,7 @@ PanelWindow {
                     visible: popContent.current === avatarPop
                     spacing: 2
                     PopTitle { text: (Quickshell.env("USER") || "") }
-                    PopText { text: sidebar.uptimeText !== "" ? "Ligado há " + sidebar.uptimeText : "..." }
+                    PopText { text: sidebar.uptimeText !== "" ? Theme.t("sidebar.uptime", "Ligado há ") + sidebar.uptimeText : "..." }
                     PopText { text: Theme.t("sidebar.pc_specs", "Clique para ver as especificações do PC") }
                 }
 
@@ -824,8 +824,8 @@ PanelWindow {
                     visible: popContent.current === nightPop
                     spacing: 2
                     PopTitle { text: sidebar.nightLight ? Theme.t("sidebar.night_light_on", "Luz noturna ligada") : Theme.t("sidebar.night_light_off", "Luz noturna desligada") }
-                    PopText { text: "Tela mais quente depois do pôr do sol (4000K)" }
-                    PopText { text: "Clique para " + (sidebar.nightLight ? "desligar" : "ligar") }
+                    PopText { text: Theme.t("sidebar.night_light_desc", "Tela mais quente depois do pôr do sol (4000K)") }
+                    PopText { text: Theme.t("sidebar.night_light_action", "Clique para alternar") }
                 }
 
                 ColumnLayout {
@@ -833,16 +833,16 @@ PanelWindow {
                     visible: popContent.current === gpuPop
                     spacing: 2
                     PopTitle {
-                        text: sidebar.nvidiaState === "active" ? "NVIDIA acordada" : sidebar.nvidiaState === "suspended" ? "NVIDIA dormindo" : "NVIDIA"
+                        text: sidebar.nvidiaState === "active" ? Theme.t("sidebar.nvidia_active", "NVIDIA acordada") : sidebar.nvidiaState === "suspended" ? Theme.t("sidebar.nvidia_sleeping", "NVIDIA dormindo") : "NVIDIA"
                     }
                     PopText {
-                        text: sidebar.nvidiaState === "suspended" ? "Tudo rodando na Intel (economiza bateria)"
+                        text: sidebar.nvidiaState === "suspended" ? Theme.t("sidebar.nvidia_sleeping", "Tudo rodando na Intel (economiza bateria)")
                             : sidebar.nvidiaApps.length > 0 ? "Usando: " + sidebar.nvidiaApps.join(", ")
                             : "Nenhum app usando agora"
                         wrapMode: Text.Wrap
                         Layout.maximumWidth: Theme.popoutMaxWidth - 40
                     }
-                    PopText { text: "Tela desenhada pela Intel · jogos vão pra NVIDIA (prime-run)" }
+                    PopText { text: Theme.t("sidebar.nvidia_hybrid_desc", "Tela desenhada pela Intel · jogos vão pra NVIDIA (prime-run)") }
                 }
 
                 ColumnLayout {
@@ -867,7 +867,7 @@ PanelWindow {
                         color: Theme.primary
                     }
                     PopText {
-                        text: powerPop.btn.armed ? "Clique de novo ou confirme abaixo:" : "Clique duas vezes ou confirme abaixo:"
+                        text: powerPop.btn.armed ? Theme.t("sidebar.confirm_click_again", "Clique de novo ou confirme abaixo:") : Theme.t("sidebar.confirm_click_twice", "Clique duas vezes ou confirme abaixo:")
                         color: powerPop.btn.armed ? Theme.primary : Theme.subtext
                     }
                     Rectangle {

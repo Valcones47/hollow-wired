@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# rice-wallpaper-reload
+# Recarrega a camada do Waywallen (waywallen-layer-shell) adaptando à nova resolução/escala.
+set -e
+
+pkill -9 waywallen-layer-shell 2>/dev/null || true
+sleep 0.3
+
+sock="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/waywallen/display.sock"
+binary="$HOME/.local/bin/waywallen-layer-shell"
+
+if [ -S "$sock" ] && [ -x "$binary" ]; then
+    nohup "$binary" --socket "$sock" >/dev/null 2>&1 &
+fi

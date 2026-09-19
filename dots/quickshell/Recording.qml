@@ -11,7 +11,7 @@ import "."
 //   - Tela Inteira, Aplicativo/Janela específica ou Região livre (slurp)
 //   - Áudio do Sistema (Desktop) e Microfone (Voz) com mixagem automática PipeWire
 //   - Paleta 100% dinâmica sincronizada com Wallust (Theme.tile, Theme.textColor, Theme.primary)
-//   - Gravações salvas em /home/val47/Vídeos/Gravações
+//   - Gravações salvas em ~/Vídeos/Gravações
 Item {
     id: root
 
@@ -27,6 +27,13 @@ Item {
     property int fpsRate: 60
     property var recentRecordings: []
     property var openWindows: []
+
+    function formatDuration(sec) {
+        const s = Math.max(0, Math.floor(sec || 0));
+        const m = Math.floor(s / 60);
+        const rem = s % 60;
+        return (m < 10 ? "0" + m : m) + ":" + (rem < 10 ? "0" + rem : rem);
+    }
 
     function refresh() {
         statusProc.running = true;
@@ -248,7 +255,7 @@ Item {
                             }
                         }
                         Text {
-                            text: root.isRecording ? "GRAVANDO TELA..." : "ESTÚDIO DE GRAVAÇÃO"
+                            text: root.isRecording ? Theme.t("recording.status_recording", "GRAVANDO TELA...") : Theme.t("recording.studio_title", "ESTÚDIO DE GRAVAÇÃO")
                             font.family: Theme.fontFamily
                             font.pixelSize: 11
                             font.weight: Font.DemiBold
@@ -258,45 +265,51 @@ Item {
                         // Badge da GPU em uso
                         Rectangle {
                             height: 18
-                            width: gpuText.implicitWidth + 12
+                            implicitWidth: gpuBadgeRow.implicitWidth + 12
                             radius: 9
-                            color: Theme.withAlpha(Theme.primary, 0.15)
-                            border.color: Theme.withAlpha(Theme.primary, 0.4)
+                            color: root.selectedCodec === "h264_nvenc" ? Theme.withAlpha("#10b981", 0.2) : Theme.withAlpha(Theme.primary, 0.2)
                             border.width: 1
+                            border.color: root.selectedCodec === "h264_nvenc" ? "#10b981" : Theme.primary
 
-                            Text {
-                                id: gpuText
+                            RowLayout {
+                                id: gpuBadgeRow
                                 anchors.centerIn: parent
-                                text: root.selectedCodec === "h264_nvenc" ? "⚡ dGPU NVENC (" + SysStats.gpuName + ")" : (root.selectedCodec === "h264_vaapi" ? "🎮 GPU (VAAPI)" : "💻 CPU")
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 9
-                                font.weight: Font.Bold
-                                color: Theme.primary
+                                spacing: 4
+                                Text {
+                                    text: root.selectedCodec === "h264_nvenc" ? "⚡ dGPU NVENC (" + SysStats.gpuName + ")" : (root.selectedCodec === "h264_vaapi" ? "🎮 GPU (VAAPI)" : "💻 CPU")
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 9
+                                    font.weight: Font.Bold
+                                    color: root.selectedCodec === "h264_nvenc" ? "#10b981" : Theme.primary
+                                }
                             }
+                        }
+
+                        // Timer
+                        Text {
+                            visible: root.isRecording
+                            text: root.formatDuration(root.elapsedSeconds)
+                            font.family: Theme.monoFamily
+                            font.pixelSize: 15
+                            font.weight: Font.Bold
+                            color: Theme.textColor
                         }
                     }
 
-                    Text {
-                        text: root.isRecording
-                            ? root.formatTime(root.elapsedSeconds)
-                            : "Pronto para gravar em /Vídeos/Gravações"
-                        font.family: root.isRecording ? "monospace" : Theme.fontFamily
-                        font.pixelSize: root.isRecording ? 24 : 13
-                        font.weight: Font.Bold
-                        color: Theme.textColor
-                    }
+                    Item { Layout.fillWidth: true }
                 }
 
-                // Botão de Abrir Pasta
+                // Botão Abrir Pasta de Gravações
                 Rectangle {
-                    Layout.preferredHeight: 42
-                    Layout.preferredWidth: 130
+                    Layout.preferredHeight: 36
+                    implicitWidth: folderBtnRow.implicitWidth + 24
                     radius: Theme.tileRadius
-                    color: openFolderArea.containsMouse ? Theme.withAlpha(Theme.textColor, 0.12) : Theme.tileHigh
-                    border.color: Theme.withAlpha(Theme.outline, 0.35)
+                    color: openFolderArea.containsMouse ? Theme.tileHigh : Theme.tile
                     border.width: 1
+                    border.color: Theme.withAlpha(Theme.outline, 0.3)
 
                     RowLayout {
+                        id: folderBtnRow
                         anchors.centerIn: parent
                         spacing: 6
                         Text {
@@ -306,7 +319,7 @@ Item {
                             color: Theme.textColor
                         }
                         Text {
-                            text: "Abrir Pasta"
+                            text: Theme.t("recording.open_folder", "Abrir Pasta")
                             font.family: Theme.fontFamily
                             font.pixelSize: 12
                             font.weight: Font.Medium

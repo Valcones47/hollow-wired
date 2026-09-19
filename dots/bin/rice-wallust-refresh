@@ -5,24 +5,54 @@ set -euo pipefail
 
 preview=$(python3 -c '
 import sqlite3, os, tomllib
+
 cfg_file = os.path.expanduser("~/.var/app/org.waywallen.waywallen/config/waywallen/config.toml")
 db_file = os.path.expanduser("~/.var/app/org.waywallen.waywallen/data/waywallen/waywallen-v2.db")
+
 last_id = None
-try:
-    with open(cfg_file, "rb") as f:
-        last_id = tomllib.load(f).get("global", {}).get("last_wallpaper")
-except Exception:
-    pass
-if not last_id:
-    last_id = "12"
-try:
-    conn = sqlite3.connect(f"file:{db_file}?mode=ro", uri=True)
-    conn.row_factory = sqlite3.Row
-    r = conn.execute("SELECT item.preview_path, library.path AS lib_path FROM item JOIN library ON library.id = item.library_id WHERE item.id = ?", (last_id,)).fetchone()
-    if r and r["preview_path"]:
-        print(os.path.join(r["lib_path"], r["preview_path"]))
-except Exception:
-    pass
+if os.path.isfile(cfg_file):
+    try:
+        with open(cfg_file, "rb") as f:
+            data = tomllib.load(f)
+            last_id = data.get("global", {}).get("last_wallpaper")
+            if not last_id:
+                for k, v in data.get("display", {}).items():
+                    if isinstance(v, dict) and v.get("last_wallpaper"):
+                        last_id = v["last_wallpaper"]
+                        break
+    except Exception:
+        pass
+
+preview_path = None
+if last_id and os.path.isfile(db_file):
+    try:
+        conn = sqlite3.connect(f"file:{db_file}?mode=ro", uri=True)
+        conn.row_factory = sqlite3.Row
+        r = conn.execute(
+            "SELECT item.preview_path, library.path AS lib_path FROM item JOIN library ON library.id = item.library_id WHERE item.id = ?",
+            (str(last_id),)
+        ).fetchone()
+        if r and r["preview_path"]:
+            p = os.path.join(r["lib_path"].rstrip("/"), r["preview_path"])
+            if os.path.isfile(p):
+                preview_path = p
+    except Exception:
+        pass
+
+if not preview_path:
+    fallbacks = [
+        os.path.expanduser("~/.config/quickshell/wallpaper.png"),
+        os.path.expanduser("~/Imagens/Wallpapers/wallpaper.png"),
+        os.path.expanduser("~/Imagens/Wallpapers/current.png"),
+        "/usr/share/sddm/themes/SilentSDDM/backgrounds/current.png"
+    ]
+    for fb in fallbacks:
+        if os.path.isfile(fb):
+            preview_path = fb
+            break
+
+if preview_path:
+    print(preview_path)
 ' 2>/dev/null || true)
 
 if ! command -v wallust >/dev/null 2>&1; then

@@ -26,7 +26,7 @@ Canvas {
 
     function resolveSource(s) {
         if (!s || s === "" || s.indexOf("user-default") !== -1 || s.indexOf("/faces/.face.icon") !== -1)
-            return "../icons/val47.png";
+            return "../icons/default-avatar.png";
         return s;
     }
 

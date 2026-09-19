@@ -249,7 +249,7 @@ hl.config({
             size              = 3,      -- mínimo visual viável pra Intel UHD
             passes            = 1,      -- 1 pass = custo mínimo de blur
             vibrancy          = 0.20,
-            xray              = true,
+            xray              = false,
             ignore_opacity    = true,
             new_optimizations = true,
         },
@@ -420,6 +420,9 @@ if io.open(home .. "/projetos/FischMacro/noisefish-linux/tray.py", "r") then
     hl.bind("CTRL + bracketleft", hl.dsp.exec_cmd(home .. "/projetos/FischMacro/noisefish-linux/.venv/bin/python " .. home .. "/projetos/FischMacro/noisefish-linux/tray.py"))
 end
 
+-- Ctrl + Alt + Delete = Menu de Energia / Desligar / Suspender
+hl.bind("CTRL + ALT + Delete", hl.dsp.exec_cmd("quickshell ipc call energy open"))
+
 hl.bind(mainMod .. " + mouse_down", hl.dsp.focus({ workspace = "e+1" }))
 hl.bind(mainMod .. " + mouse_up",   hl.dsp.focus({ workspace = "e-1" }))
 
@@ -575,3 +578,17 @@ hl.window_rule({
 -- background_opacity do próprio kitty.conf já deixa só o fundo da célula
 -- transparente e mantém o texto 100% opaco — o Hyprland ainda detecta a
 -- transparência nativa do kitty e borra atrás normalmente.
+
+-----------------------------------------------------------------------
+---- ATALHOS CUSTOMIZADOS DO USUÁRIO (~/.config/hypr/user-binds.lua) --
+-----------------------------------------------------------------------
+local userBindsFile = home .. "/.config/hypr/user-binds.lua"
+local uf = io.open(userBindsFile, "r")
+if uf then
+    uf:close()
+    local ok, err = pcall(dofile, userBindsFile)
+    if not ok then
+        print("Erro ao carregar user-binds.lua: " .. tostring(err))
+    end
+end
+

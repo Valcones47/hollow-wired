@@ -77,6 +77,7 @@ PanelWindow {
     property real monitorScale: 1.0
     property bool vrrEnabled: false
     property int screenBrightness: 40
+    property var availableHzList: [144, 60]
 
     // Áudio
     property var audioData: ({ sinks: [], sources: [], sink_volume: 100, source_volume: 80, sink_muted: false, source_muted: false })
@@ -285,6 +286,20 @@ PanelWindow {
                         win.monitorModel = (arr[0].make ? arr[0].make + " " : "") + (arr[0].model || "Display IPS");
                         if (arr[0].refreshRate) win.monitorHz = Math.round(arr[0].refreshRate);
                         if (arr[0].scale) win.monitorScale = parseFloat(arr[0].scale) || 1.0;
+
+                        const modes = arr[0].availableModes || [];
+                        const hzSet = {};
+                        for (let i = 0; i < modes.length; i++) {
+                            const m = modes[i].match(/@([0-9]+(?:\.[0-9]+)?)Hz/);
+                            if (m && m[1]) {
+                                const rounded = Math.round(parseFloat(m[1]));
+                                if (rounded > 0) hzSet[rounded] = true;
+                            }
+                        }
+                        if (win.monitorHz > 0) hzSet[win.monitorHz] = true;
+                        let hzList = Object.keys(hzSet).map(Number).sort((a, b) => b - a);
+                        if (hzList.length === 0) hzList = [144, 60];
+                        win.availableHzList = hzList;
                     }
                 } catch (e) {}
             }
@@ -938,6 +953,71 @@ PanelWindow {
                         color: Theme.withAlpha(Theme.outline, 0.15)
                     }
 
+                    // Campo de Busca de Configurações
+                    Rectangle {
+                        Layout.fillWidth: true
+                        implicitHeight: 34
+                        radius: 8
+                        color: Theme.withAlpha(Theme.background, 0.6)
+                        border.width: 1
+                        border.color: catSearchInput.activeFocus ? Theme.primary : Theme.withAlpha(Theme.outline, 0.2)
+
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: 10
+                            anchors.rightMargin: 8
+                            spacing: 6
+
+                            Text {
+                                text: Theme.icons.magnify
+                                font.family: Theme.iconFontFamily
+                                font.pixelSize: 13
+                                color: catSearchInput.activeFocus ? Theme.primary : Theme.subtext
+                            }
+
+                            TextInput {
+                                id: catSearchInput
+                                Layout.fillWidth: true
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 11
+                                color: Theme.textColor
+                                selectByMouse: true
+                                clip: true
+                                property string query: text.toLowerCase().trim()
+
+                                Text {
+                                    visible: !catSearchInput.text && !catSearchInput.activeFocus
+                                    text: Theme.t("settings.search_placeholder", "Buscar configurações...")
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 11
+                                    color: Theme.withAlpha(Theme.subtext, 0.6)
+                                }
+
+                                onAccepted: {
+                                    if (navRepeater.count > 0) {
+                                        const firstItem = navRepeater.itemAt(0);
+                                        if (firstItem && firstItem.targetTab !== undefined) {
+                                            win.currentTab = firstItem.targetTab;
+                                        }
+                                    }
+                                }
+                            }
+
+                            Text {
+                                visible: catSearchInput.text.length > 0
+                                text: Theme.icons.close
+                                font.family: Theme.iconFontFamily
+                                font.pixelSize: 12
+                                color: Theme.subtext
+                                MouseArea {
+                                    anchors.fill: parent
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: catSearchInput.text = ""
+                                }
+                            }
+                        }
+                    }
+
                     // Lista de Categorias
                     Flickable {
                         Layout.fillWidth: true
@@ -952,42 +1032,53 @@ PanelWindow {
                             spacing: 4
 
                             readonly property var navItems: [
-                                { name: Theme.t("settings.cat_fastfetch", "Fastfetch"), icon: Theme.icons.packages, desc: Theme.t("settings.desc_fastfetch", "Logo & Módulos") },
-                                { name: Theme.t("settings.cat_kitty", "Kitty Terminal"), icon: Theme.icons.console, desc: Theme.t("settings.desc_kitty", "Fonte & Opacidade") },
-                                { name: Theme.t("settings.cat_mako", "Notificações"), icon: Theme.icons.bell, desc: Theme.t("settings.desc_mako", "Posição & Estilo") },
-                                { name: Theme.t("settings.cat_monitors", "Tela & Monitores"), icon: Theme.icons.monitor, desc: Theme.t("settings.desc_monitors", "144Hz & Brilho") },
-                                { name: Theme.t("settings.cat_audio", "Áudio & Som"), icon: Theme.icons.volHigh, desc: Theme.t("settings.desc_audio", "Saída & Microfone") },
-                                { name: Theme.t("settings.cat_input", "Teclado & Mouse"), icon: Theme.icons.tune, desc: Theme.t("settings.desc_input", "Layout & Sensibilidade") },
-                                { name: Theme.t("settings.cat_power", "Energia & Bateria"), icon: Theme.icons.bat, desc: Theme.t("settings.desc_power", "Perfis & Saúde") },
-                                { name: Theme.t("settings.cat_boot", "Inicialização (Boot)"), icon: Theme.icons.speed, desc: Theme.t("settings.desc_boot", "Apps ao Iniciar") },
-                                { name: Theme.t("settings.cat_wallust", "Cores & Wallust"), icon: Theme.icons.palette, desc: Theme.t("settings.desc_wallust", "Paleta Dinâmica") },
-                                { name: Theme.t("settings.cat_effects", "Efeitos & Janelas"), icon: Theme.icons.laptop, desc: Theme.t("settings.desc_effects", "Bordas & SDDM") },
-                                { name: Theme.t("settings.cat_bluetooth", "Bluetooth"), icon: Theme.icons.bt, desc: Theme.t("settings.desc_bluetooth", "Controles & Fones") },
-                                { name: Theme.t("settings.cat_network", "Rede & Wi-Fi"), icon: Theme.icons.wifi4, desc: Theme.t("settings.desc_network", "Conexões & Latência") },
-                                { name: Theme.t("settings.cat_defaults", "Aplicativos Padrão"), icon: Theme.icons.dashboard, desc: Theme.t("settings.desc_defaults", "Navegador, Pastas & Vídeo") },
-                                { name: Theme.t("settings.cat_gaming", "Jogos & GPU"), icon: Theme.icons.gamepad, desc: Theme.t("settings.desc_gaming", "NVIDIA, GameMode & Steam") },
-                                { name: Theme.t("settings.cat_storage", "Armazenamento"), icon: Theme.icons.disk, desc: Theme.t("settings.desc_storage", "Limpeza Segura de Disco") },
-                                { name: Theme.t("settings.cat_shortcuts", "Guia de Atalhos"), icon: Theme.icons.magnify, desc: Theme.t("settings.desc_shortcuts", "Buscar Teclas do Rice") },
-                                { name: Theme.t("settings.cat_system", "Sistema & Reparo"), icon: Theme.icons.health, desc: Theme.t("settings.desc_system", "Snapshots & Auto-Reparo") },
-                                { name: Theme.t("settings.cat_store", "Loja & Atualizações"), icon: Theme.icons.packages, desc: Theme.t("settings.desc_store", "Apps & Updates do Sistema") },
-                                { name: Theme.t("settings.cat_presets", "Perfis & Backup"), icon: Theme.icons.palette, desc: Theme.t("settings.desc_presets", "Estilos & Restauração") },
-                                { name: Theme.t("settings.cat_shell_custom", "Customização do Shell"), icon: Theme.icons.palette, desc: Theme.t("settings.desc_shell_custom", "Hub, Sidebar & Dock") }
+                                { tabIndex: 0, name: Theme.t("settings.cat_fastfetch", "Fastfetch"), icon: Theme.icons.packages, desc: Theme.t("settings.desc_fastfetch", "Logo & Módulos"), keywords: "fastfetch neofetch logo distro terminal specs cpu ram hardware modelo" },
+                                { tabIndex: 1, name: Theme.t("settings.cat_kitty", "Kitty Terminal"), icon: Theme.icons.console, desc: Theme.t("settings.desc_kitty", "Fonte & Opacidade"), keywords: "kitty terminal console fonte font opacidade padding cursor audio blur som" },
+                                { tabIndex: 2, name: Theme.t("settings.cat_mako", "Notificações"), icon: Theme.icons.bell, desc: Theme.t("settings.desc_mako", "Posição & Estilo"), keywords: "mako notificacoes notifications som posicao borda alert toast banner" },
+                                { tabIndex: 3, name: Theme.t("settings.cat_monitors", "Tela & Monitores"), icon: Theme.icons.monitor, desc: Theme.t("settings.desc_monitors", "144Hz & Brilho"), keywords: "tela monitor refresh rate hz taxa atualizacao resolucao escala zoom scale hidpi brilho brightness vrr freesync g-sync frequencia" },
+                                { tabIndex: 4, name: Theme.t("settings.cat_audio", "Áudio & Som"), icon: Theme.icons.volHigh, desc: Theme.t("settings.desc_audio", "Saída & Microfone"), keywords: "audio som volume microfone mic fone speaker sink source pipewire dispositivos" },
+                                { tabIndex: 5, name: Theme.t("settings.cat_input", "Teclado & Mouse"), icon: Theme.icons.tune, desc: Theme.t("settings.desc_input", "Layout & Sensibilidade"), keywords: "teclado mouse keyboard layout abnt2 sensibilidade aceleração accel numlock atalhos velocidade" },
+                                { tabIndex: 6, name: Theme.t("settings.cat_power", "Energia & Bateria"), icon: Theme.icons.bat, desc: Theme.t("settings.desc_power", "Perfis & Saúde"), keywords: "energia bateria power perfis profiles saver balanced performance saude health suspenso sleep carga" },
+                                { tabIndex: 7, name: Theme.t("settings.cat_boot", "Inicialização (Boot)"), icon: Theme.icons.speed, desc: Theme.t("settings.desc_boot", "Apps ao Iniciar"), keywords: "boot inicializacao startup autostart apps servicos sddm limine login inicio" },
+                                { tabIndex: 8, name: Theme.t("settings.cat_wallust", "Cores & Wallust"), icon: Theme.icons.palette, desc: Theme.t("settings.desc_wallust", "Paleta Dinâmica"), keywords: "cores color colors wallust tema theme wallpaper paleta palette dinamica accent visual" },
+                                { tabIndex: 9, name: Theme.t("settings.cat_effects", "Efeitos & Janelas"), icon: Theme.icons.laptop, desc: Theme.t("settings.desc_effects", "Bordas & SDDM"), keywords: "efeitos effects janelas windows blur desfoque bordas borders sombras shadows sddm animacoes animations transparência" },
+                                { tabIndex: 10, name: Theme.t("settings.cat_bluetooth", "Bluetooth"), icon: Theme.icons.bt, desc: Theme.t("settings.desc_bluetooth", "Controles & Fones"), keywords: "bluetooth bt fones earbuds controle joystick pareamento connect conectar dispositivos" },
+                                { tabIndex: 11, name: Theme.t("settings.cat_network", "Rede & Wi-Fi"), icon: Theme.icons.wifi4, desc: Theme.t("settings.desc_network", "Conexões & Latência"), keywords: "rede network wifi wi-fi conexao ethernet ip dns ping latencia internet speed" },
+                                { tabIndex: 12, name: Theme.t("settings.cat_defaults", "Aplicativos Padrão"), icon: Theme.icons.dashboard, desc: Theme.t("settings.desc_defaults", "Navegador, Pastas & Vídeo"), keywords: "aplicativos padrao default apps navegador browser chrome firefox zen brave pasta dolphin nautilus video vlc player musica mpv email editor code text" },
+                                { tabIndex: 13, name: Theme.t("settings.cat_gaming", "Jogos & GPU"), icon: Theme.icons.gamepad, desc: Theme.t("settings.desc_gaming", "NVIDIA, GameMode & Steam"), keywords: "jogos games gaming gpu nvidia prime prime-run dgpu igpu intel gamemode steam mangohud fps desempenho" },
+                                { tabIndex: 14, name: Theme.t("settings.cat_storage", "Armazenamento"), icon: Theme.icons.disk, desc: Theme.t("settings.desc_storage", "Limpeza Segura de Disco"), keywords: "armazenamento storage disco disk espaco limpar limpeza cache lixeira logs btrfs free space" },
+                                { tabIndex: 15, name: Theme.t("settings.cat_shortcuts", "Guia de Atalhos"), icon: Theme.icons.magnify, desc: Theme.t("settings.desc_shortcuts", "Buscar Teclas do Rice"), keywords: "atalhos shortcuts teclas binds keybinds cheatsheet super mod custom user-binds" },
+                                { tabIndex: 16, name: Theme.t("settings.cat_system", "Sistema & Reparo"), icon: Theme.icons.health, desc: Theme.t("settings.desc_system", "Snapshots & Auto-Reparo"), keywords: "sistema system reparo repair snapshot timeshift btrfs auto-reparo diagnostico info logs status" },
+                                { tabIndex: 17, name: Theme.t("settings.cat_store", "Loja & Atualizações"), icon: Theme.icons.packages, desc: Theme.t("settings.desc_store", "Apps & Updates do Sistema"), keywords: "loja store updates atualizacoes pacotes packages arch pacman aur yay flatpak programas instalar" },
+                                { tabIndex: 18, name: Theme.t("settings.cat_presets", "Perfis & Backup"), icon: Theme.icons.palette, desc: Theme.t("settings.desc_presets", "Estilos & Restauração"), keywords: "perfis presets backup restore salvar restaurar estilos styles config exportar importar" },
+                                { tabIndex: 19, name: Theme.t("settings.cat_shell_custom", "Customização do Shell"), icon: Theme.icons.palette, desc: Theme.t("settings.desc_shell_custom", "Hub, Sidebar & Dock"), keywords: "shell quickshell customizacao dock topbar sidebar hub aparencia widgets glass solid glow borderless escala" }
                             ]
 
                             Repeater {
-                                model: navCol.navItems
+                                id: navRepeater
+                                model: {
+                                    const q = catSearchInput.query;
+                                    if (!q) return navCol.navItems;
+                                    return navCol.navItems.filter(item => {
+                                        const nameMatch = (item.name || "").toLowerCase().includes(q);
+                                        const descMatch = (item.desc || "").toLowerCase().includes(q);
+                                        const keyMatch = (item.keywords || "").toLowerCase().includes(q);
+                                        return nameMatch || descMatch || keyMatch;
+                                    });
+                                }
                                 delegate: Rectangle {
                                     id: navDelegate
                                     required property var modelData
                                     required property int index
+                                    readonly property int targetTab: navDelegate.modelData.tabIndex
 
                                     Layout.fillWidth: true
                                     implicitHeight: 44
                                     radius: 10
-                                    color: win.currentTab === index
+                                    color: win.currentTab === navDelegate.targetTab
                                         ? Theme.withAlpha(Theme.primary, 0.22)
                                         : (navItemArea.containsMouse ? Theme.tileHigh : "transparent")
-                                    border.width: win.currentTab === index ? 1 : 0
+                                    border.width: win.currentTab === navDelegate.targetTab ? 1 : 0
                                     border.color: Theme.primary
 
                                     Behavior on color { ColorAnimation { duration: 120 } }
@@ -1000,7 +1091,7 @@ PanelWindow {
                                         anchors.left: parent.left
                                         anchors.leftMargin: 2
                                         anchors.verticalCenter: parent.verticalCenter
-                                        visible: win.currentTab === index
+                                        visible: win.currentTab === navDelegate.targetTab
                                     }
 
                                     RowLayout {
@@ -1013,7 +1104,7 @@ PanelWindow {
                                             text: navDelegate.modelData.icon
                                             font.family: Theme.iconFontFamily
                                             font.pixelSize: 16
-                                            color: win.currentTab === index ? Theme.primary : Theme.subtext
+                                            color: win.currentTab === navDelegate.targetTab ? Theme.primary : Theme.subtext
                                         }
 
                                         ColumnLayout {
@@ -1024,8 +1115,8 @@ PanelWindow {
                                                 text: navDelegate.modelData.name
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: 12
-                                                font.weight: win.currentTab === index ? Font.Bold : Font.Normal
-                                                color: win.currentTab === index ? Theme.textColor : Theme.subtext
+                                                font.weight: win.currentTab === navDelegate.targetTab ? Font.Bold : Font.Normal
+                                                color: win.currentTab === navDelegate.targetTab ? Theme.textColor : Theme.subtext
                                                 elide: Text.ElideRight
                                             }
 
@@ -1044,7 +1135,31 @@ PanelWindow {
                                         anchors.fill: parent
                                         hoverEnabled: true
                                         cursorShape: Qt.PointingHandCursor
-                                        onClicked: win.currentTab = navDelegate.index
+                                        onClicked: win.currentTab = navDelegate.targetTab
+                                    }
+                                }
+                            }
+
+                            Item {
+                                Layout.fillWidth: true
+                                implicitHeight: 70
+                                visible: navRepeater.count === 0
+                                ColumnLayout {
+                                    anchors.centerIn: parent
+                                    spacing: 4
+                                    Text {
+                                        Layout.alignment: Qt.AlignHCenter
+                                        text: Theme.icons.alert
+                                        font.family: Theme.iconFontFamily
+                                        font.pixelSize: 20
+                                        color: Theme.subtext
+                                    }
+                                    Text {
+                                        Layout.alignment: Qt.AlignHCenter
+                                        text: Theme.t("settings.no_categories", "Nenhuma categoria encontrada")
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 10
+                                        color: Theme.subtext
                                     }
                                 }
                             }
@@ -1289,7 +1404,7 @@ PanelWindow {
                                     ActionBtn {
                                         icon: Theme.icons.laptop
                                         text: "Abrir Pasta"
-                                        onClicked: Quickshell.execDetached(["dolphin", "/home/val47/Imagens/FastFetch"])
+                                        onClicked: Quickshell.execDetached(["dolphin", (Quickshell.env("HOME") || "") + "/Imagens/FastFetch"])
                                     }
                                 }
 
@@ -1885,110 +2000,101 @@ PanelWindow {
                                 }
 
                                 SectionHeader {
-                                    title: "Taxa de Atualização da Tela (Frequência)"
-                                    subtitle: "Alterne instantaneamente entre máxima fluidez para jogos ou economia de energia"
+                                    title: Theme.t("monitor.hz_section", "Taxa de Atualização da Tela (Frequência)")
+                                    subtitle: Theme.t("monitor.hz_section_desc", "Alterne instantaneamente entre todas as taxas suportadas pelo seu monitor")
                                 }
 
-                                RowLayout {
+                                GridLayout {
                                     Layout.fillWidth: true
-                                    spacing: 12
+                                    columns: Math.min(win.availableHzList.length, 3)
+                                    rowSpacing: 10
+                                    columnSpacing: 10
 
-                                    Rectangle {
-                                        Layout.fillWidth: true
-                                        implicitHeight: 72
-                                        radius: 12
-                                        color: win.monitorHz === 144 ? Theme.withAlpha(Theme.primary, 0.22) : (hz144Area.containsMouse ? Theme.tileHigh : Theme.tile)
-                                        border.width: win.monitorHz === 144 ? 1.5 : 0
-                                        border.color: Theme.primary
+                                    Repeater {
+                                        model: win.availableHzList
+                                        delegate: Rectangle {
+                                            id: hzCard
+                                            required property int modelData
+                                            required property int index
 
-                                        RowLayout {
-                                            anchors.fill: parent
-                                            anchors.margins: 12
-                                            spacing: 12
-                                            Text {
-                                                text: Theme.icons.lightning
-                                                font.family: Theme.iconFontFamily
-                                                font.pixelSize: 22
-                                                color: win.monitorHz === 144 ? Theme.primary : Theme.subtext
-                                            }
-                                            ColumnLayout {
-                                                Layout.fillWidth: true
-                                                spacing: 1
+                                            readonly property bool isSelected: win.monitorHz === hzCard.modelData
+                                            readonly property bool isMax: hzCard.index === 0
+                                            readonly property bool isMin: hzCard.index === (win.availableHzList.length - 1)
+
+                                            Layout.fillWidth: true
+                                            implicitHeight: 72
+                                            radius: 12
+                                            color: isSelected ? Theme.withAlpha(Theme.primary, 0.22) : (hzCardArea.containsMouse ? Theme.tileHigh : Theme.tile)
+                                            border.width: isSelected ? 1.5 : 0
+                                            border.color: Theme.primary
+
+                                            Behavior on color { ColorAnimation { duration: 120 } }
+
+                                            RowLayout {
+                                                anchors.fill: parent
+                                                anchors.margins: 12
+                                                spacing: 12
+
                                                 Text {
-                                                    text: "144 Hz (Ultra Suave & Jogos)"
-                                                    font.family: Theme.fontFamily
-                                                    font.pixelSize: 13
-                                                    font.weight: Font.DemiBold
-                                                    color: Theme.textColor
+                                                    text: hzCard.modelData >= 120 ? Theme.icons.lightning : (hzCard.modelData >= 75 ? Theme.icons.speed : Theme.icons.saver)
+                                                    font.family: Theme.iconFontFamily
+                                                    font.pixelSize: 22
+                                                    color: hzCard.isSelected ? Theme.primary : Theme.subtext
                                                 }
-                                                Text {
-                                                    text: "Máxima fluidez de animações e menor latência de entrada."
-                                                    font.family: Theme.fontFamily
-                                                    font.pixelSize: 10
-                                                    color: Theme.subtext
-                                                }
-                                            }
-                                        }
 
-                                        MouseArea {
-                                            id: hz144Area
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            cursorShape: Qt.PointingHandCursor
-                                            onClicked: {
-                                                win.monitorHz = 144;
-                                                Quickshell.execDetached(["rice-hypr-prefs", "set", "monitor_hz", "144"]);
-                                                win.showToast("Taxa ajustada para 144 Hz");
-                                            }
-                                        }
-                                    }
+                                                ColumnLayout {
+                                                    Layout.fillWidth: true
+                                                    spacing: 1
 
-                                    Rectangle {
-                                        Layout.fillWidth: true
-                                        implicitHeight: 72
-                                        radius: 12
-                                        color: win.monitorHz === 60 ? Theme.withAlpha(Theme.primary, 0.22) : (hz60Area.containsMouse ? Theme.tileHigh : Theme.tile)
-                                        border.width: win.monitorHz === 60 ? 1.5 : 0
-                                        border.color: Theme.primary
+                                                    RowLayout {
+                                                        spacing: 6
+                                                        Text {
+                                                            text: hzCard.modelData + " Hz"
+                                                            font.family: Theme.fontFamily
+                                                            font.pixelSize: 13
+                                                            font.weight: Font.DemiBold
+                                                            color: Theme.textColor
+                                                        }
+                                                        Rectangle {
+                                                            visible: hzCard.isSelected
+                                                            implicitHeight: 16
+                                                            implicitWidth: activeHzBadge.implicitWidth + 8
+                                                            radius: 4
+                                                            color: Theme.primary
+                                                            Text {
+                                                                id: activeHzBadge
+                                                                anchors.centerIn: parent
+                                                                text: Theme.t("common.active", "Ativo")
+                                                                font.family: Theme.fontFamily
+                                                                font.pixelSize: 9
+                                                                font.weight: Font.Bold
+                                                                color: Theme.background
+                                                            }
+                                                        }
+                                                    }
 
-                                        RowLayout {
-                                            anchors.fill: parent
-                                            anchors.margins: 12
-                                            spacing: 12
-                                            Text {
-                                                text: Theme.icons.saver
-                                                font.family: Theme.iconFontFamily
-                                                font.pixelSize: 22
-                                                color: win.monitorHz === 60 ? Theme.primary : Theme.subtext
-                                            }
-                                            ColumnLayout {
-                                                Layout.fillWidth: true
-                                                spacing: 1
-                                                Text {
-                                                    text: "60 Hz (Economia de Energia)"
-                                                    font.family: Theme.fontFamily
-                                                    font.pixelSize: 13
-                                                    font.weight: Font.DemiBold
-                                                    color: Theme.textColor
-                                                }
-                                                Text {
-                                                    text: "Reduz o consumo da GPU integrada e poupa bateria."
-                                                    font.family: Theme.fontFamily
-                                                    font.pixelSize: 10
-                                                    color: Theme.subtext
+                                                    Text {
+                                                        text: hzCard.isMax
+                                                            ? Theme.t("monitor.hz_max_desc", "Máxima fluidez e menor latência")
+                                                            : (hzCard.isMin ? Theme.t("monitor.hz_min_desc", "Economia de energia e bateria") : Theme.t("monitor.hz_bal_desc", "Fluidez intermediária balanceada"))
+                                                        font.family: Theme.fontFamily
+                                                        font.pixelSize: 10
+                                                        color: Theme.subtext
+                                                        elide: Text.ElideRight
+                                                    }
                                                 }
                                             }
-                                        }
 
-                                        MouseArea {
-                                            id: hz60Area
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            cursorShape: Qt.PointingHandCursor
-                                            onClicked: {
-                                                win.monitorHz = 60;
-                                                Quickshell.execDetached(["rice-hypr-prefs", "set", "monitor_hz", "60"]);
-                                                win.showToast("Taxa ajustada para 60 Hz");
+                                            MouseArea {
+                                                id: hzCardArea
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: {
+                                                    win.monitorHz = hzCard.modelData;
+                                                    Quickshell.execDetached(["rice-hypr-prefs", "set", "monitor_hz", hzCard.modelData.toString()]);
+                                                    win.showToast("Taxa ajustada para " + hzCard.modelData + " Hz");
+                                                }
                                             }
                                         }
                                     }
@@ -3911,7 +4017,7 @@ PanelWindow {
                                         onClicked: {
                                             Quickshell.execDetached([
                                                 "kitty", "--title", "Configuração de Login & Bootloader",
-                                                "bash", "-c", "echo '==> Digite sua senha para configurar o SDDM e Limine:'; sudo /home/val47/.local/bin/rice-apply-boot-login; echo; read -n 1 -s -r -p '✔ Concluído! Pressione qualquer tecla para fechar...'"
+                                                "bash", "-c", "echo '==> Digite sua senha para configurar o SDDM e Limine:'; sudo rice-apply-boot-login; echo; read -n 1 -s -r -p '✔ Concluído! Pressione qualquer tecla para fechar...'"
                                             ]);
                                         }
                                     }
@@ -5628,6 +5734,72 @@ PanelWindow {
                                     }
                                 }
 
+                                // Banner de Personalização de Atalhos do Usuário
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    implicitHeight: customBindsCol.implicitHeight + 24
+                                    radius: 12
+                                    color: Theme.tile
+                                    border.width: 1
+                                    border.color: Theme.withAlpha(Theme.primary, 0.4)
+
+                                    ColumnLayout {
+                                        id: customBindsCol
+                                        anchors.fill: parent
+                                        anchors.margins: 14
+                                        spacing: 10
+
+                                        RowLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 10
+
+                                            Rectangle {
+                                                implicitWidth: 36
+                                                implicitHeight: 36
+                                                radius: 10
+                                                color: Theme.withAlpha(Theme.primary, 0.2)
+                                                Text {
+                                                    anchors.centerIn: parent
+                                                    text: Theme.icons.tune
+                                                    font.family: Theme.iconFontFamily
+                                                    font.pixelSize: 18
+                                                    color: Theme.primary
+                                                }
+                                            }
+
+                                            ColumnLayout {
+                                                Layout.fillWidth: true
+                                                spacing: 2
+                                                Text {
+                                                    text: Theme.t("binds.custom_title", "Personalizar Atalhos Próprios (~/.config/hypr/user-binds.lua)")
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 13
+                                                    font.weight: Font.Bold
+                                                    color: Theme.textColor
+                                                }
+                                                Text {
+                                                    text: Theme.t("binds.custom_desc", "Adicione ou altere qualquer atalho do Hyprland sem perder suas customizações em atualizações futuras.")
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 10
+                                                    color: Theme.subtext
+                                                    wrapMode: Text.WordWrap
+                                                    Layout.fillWidth: true
+                                                }
+                                            }
+
+                                            ActionBtn {
+                                                icon: Theme.icons.pencil
+                                                text: Theme.t("binds.custom_btn", "Editar Atalhos Customizados")
+                                                primary: true
+                                                onClicked: {
+                                                    Quickshell.execDetached(["bash", "-c", "f=\"$HOME/.config/hypr/user-binds.lua\"; if [ ! -f \"$f\" ]; then for p in \"$HOME/.hollow-wired/dots/hypr/user-binds.lua.example\" \"$HOME/projetos/hyprland-setup/dots/hypr/user-binds.lua.example\" \"$HOME/hyprland-setup/dots/hypr/user-binds.lua.example\"; do if [ -f \"$p\" ]; then cp \"$p\" \"$f\" && break; fi; done; if [ ! -f \"$f\" ]; then echo '-- ~/.config/hypr/user-binds.lua\n-- Adicione seus atalhos personalizados aqui!\n-- hl.bind(\"CTRL + ALT + Delete\", hl.dsp.exec_cmd(\"quickshell ipc call energy open\"))\n' > \"$f\"; fi; fi; xdg-open \"$f\" || kate \"$f\" || kitty -e micro \"$f\""]);
+                                                    win.showToast(Theme.t("binds.opened_toast", "Abrindo user-binds.lua..."));
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
                                 Repeater {
                                     model: [
                                         {
@@ -5649,11 +5821,13 @@ PanelWindow {
                                         {
                                             cat: "Aplicativos & Ferramentas do Rice",
                                             binds: [
+                                                { key: "Ctrl + Alt + Del", action: "Menu de Energia / Desligar / Suspender" },
                                                 { key: "Super / Super + R", action: "Menu de Aplicativos (Launcher Quickshell)" },
                                                 { key: "Super + E", action: "Gerenciador de Pastas (Dolphin)" },
                                                 { key: "Super + I", action: "Painel de Controle Rice (Esta Central Gráfica)" },
                                                 { key: "Super + S", action: "Trocar Papel de Parede (Waywallen Switcher)" },
                                                 { key: "Super + V", action: "Histórico da Área de Transferência" },
+                                                { key: "Super + B", action: "Alternar Desfoque de Janelas (Blur On/Off)" },
                                                 { key: "Super + W", action: "Editar Widgets da Área de Trabalho" },
                                                 { key: "Super + N", action: "Abrir Central de Notificações" },
                                                 { key: "Super + Shift + N", action: "Alternar Não Perturbe (DND)" },
@@ -7334,7 +7508,7 @@ PanelWindow {
                                                     width: 36; height: 36
                                                     source: {
                                                         const p = DockConfig.launcherIcon;
-                                                        if (!p) return "file:///home/val47/Imagens/Ícones/icons8-arch-linux-96(2).png";
+                                                        if (!p) return "file:///usr/share/pixmaps/archlinux-logo.png";
                                                         return p.startsWith("/") ? "file://" + p : p;
                                                     }
                                                     fillMode: Image.PreserveAspectFit

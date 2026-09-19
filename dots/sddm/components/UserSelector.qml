@@ -91,7 +91,7 @@ Item {
             Avatar {
                 width: parent.width
                 height: parent.height
-                source: (!model.icon || model.icon.indexOf("/usr/share/sddm/faces/.face.icon") !== -1) ? "../icons/val47.png" : model.icon
+                source: (!model.icon || model.icon.indexOf("/usr/share/sddm/faces/.face.icon") !== -1) ? "../icons/default-avatar.png" : model.icon
                 active: index === userList.currentIndex
                 opacity: active ? 1.0 : Config.avatarInactiveOpacity
                 enabled: userModel.rowCount() > 1 // No need to open the selector if there's only one user

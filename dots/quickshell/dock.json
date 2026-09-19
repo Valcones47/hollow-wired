@@ -1,35 +1,16 @@
 {
+  "launcherIcon": "/usr/share/pixmaps/archlinux-logo.png",
   "pins": [
-    "org.manjaro.pamac.manager",
-    "crunchyroll",
-    "youtube-music-desktop-app",
+    "zen",
+    "firefox",
+    "kitty",
+    "dolphin",
     "discord",
-    "zen"
+    "steam"
   ],
   "games": [
     "steam",
-    "heroic",
-    "r2modman",
-    "com.hypixel.HytaleLauncher",
-    "eden",
-    "org.freesmlauncher.FreesmLauncher",
-    "Waydroid",
-    "osu-lazer",
-    "org.vinegarhq.Sober"
+    "heroic"
   ],
-  "usage": {
-    "discord": 8,
-    "youtube-music-desktop-app": 5,
-    "zen": 25,
-    "osu-lazer": 6,
-    "org.kde.plasma-systemmonitor": 8,
-    "org.vinegarhq.Sober": 2,
-    "org.kde.kwrite": 1,
-    "org.manjaro.pamac.manager": 3,
-    "antigravity": 8,
-    "crunchyroll": 1,
-    "steam": 4,
-    "kitty": 1,
-    "lstopo": 1
-  }
+  "usage": {}
 }

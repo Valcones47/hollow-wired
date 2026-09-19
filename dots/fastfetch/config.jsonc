@@ -1,12 +1,9 @@
 {
     "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
     "logo": {
-        "type": "kitty-icat",
-        "source": "/home/val47/Imagens/FastFetch/lain5.gif",
-        "width": 32,
-        "height": 14,
+        "type": "auto",
         "padding": {
-            "top": 2,
+            "top": 1,
             "right": 2
         }
     },

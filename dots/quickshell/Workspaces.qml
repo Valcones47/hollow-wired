@@ -63,7 +63,7 @@ Item {
                         color: Theme.primary
                     }
                     Text {
-                        text: (Hyprland.focusedWorkspace ? ("Workspace " + Hyprland.focusedWorkspace.id) : "Workspace 1") + " Ativo"
+                        text: (Hyprland.focusedWorkspace ? ("Workspace " + Hyprland.focusedWorkspace.id) : "Workspace 1") + " " + Theme.t("common.active", "Ativo")
                         font.family: Theme.fontFamily
                         font.pixelSize: 11
                         font.weight: Font.Bold
@@ -91,7 +91,7 @@ Item {
                         color: Theme.subtext
                     }
                     Text {
-                        text: root.totalWindows + " " + (root.totalWindows === 1 ? "janela aberta" : "janelas abertas")
+                        text: root.totalWindows + " " + (root.totalWindows === 1 ? Theme.t("workspaces.win_single", "janela aberta") : Theme.t("workspaces.win_plural", "janelas abertas"))
                         font.family: Theme.fontFamily
                         font.pixelSize: 11
                         color: Theme.subtext
@@ -102,7 +102,7 @@ Item {
             Item { Layout.fillWidth: true }
 
             Text {
-                text: "Dica: Clique para alternar ou use Super + 1..9"
+                text: Theme.t("workspaces.hint", "Dica: Clique para alternar ou use Super + 1..9")
                 font.family: Theme.fontFamily
                 font.pixelSize: 10
                 color: Theme.withAlpha(Theme.subtext, 0.7)
@@ -189,7 +189,7 @@ Item {
                                     id: statusTxt
                                     anchors.centerIn: parent
                                     text: modelData.focused
-                                        ? "Ativo"
+                                        ? Theme.t("workspaces.focused", "Ativo")
                                         : (modelData.windowCount + (modelData.windowCount === 1 ? " app" : " apps"))
                                     font.family: Theme.fontFamily
                                     font.pixelSize: 9
@@ -220,7 +220,7 @@ Item {
 
                             Text {
                                 visible: modelData.windowCount > 2
-                                text: "+" + (modelData.windowCount - 2) + " mais..."
+                                text: "+" + (modelData.windowCount - 2) + " " + Theme.t("workspaces.more", "mais...")
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 9
                                 color: Theme.withAlpha(Theme.subtext, 0.6)
@@ -234,7 +234,7 @@ Item {
                             Text {
                                 visible: !modelData.hasWindows
                                 Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
-                                text: "Livre"
+                                text: Theme.t("workspaces.empty", "Livre")
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 10
                                 font.italic: true

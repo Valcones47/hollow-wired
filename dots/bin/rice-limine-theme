@@ -22,7 +22,7 @@ fi
 
 WALLPAPER_SRC="/usr/share/sddm/themes/SilentSDDM/backgrounds/current.png"
 if [ ! -f "$WALLPAPER_SRC" ]; then
-  WALLPAPER_SRC="/home/val47/.config/quickshell/wallpaper.png"
+  WALLPAPER_SRC="${USER_HOME:-$HOME}/.config/quickshell/wallpaper.png"
 fi
 
 if [ -f "$WALLPAPER_SRC" ]; then

@@ -41,7 +41,7 @@ ColumnLayout {
 
     Text {
         visible: root.item !== null && !root.item.hasMenu
-        text: "Clique no ícone para abrir"
+        text: Theme.t("tray.click_to_open", "Clique no ícone para abrir")
         font.family: Theme.fontFamily
         font.pixelSize: 12
         color: Theme.subtext
@@ -50,7 +50,7 @@ ColumnLayout {
     // ---------- voltar (dentro de submenu) ----------
     MenuRow {
         visible: root.stack.length > 0
-        label: "Voltar"
+        label: Theme.t("common.back", "Voltar")
         leadingIcon: "\u{F0141}"
         onClicked: root.stack = root.stack.slice(0, -1)
     }

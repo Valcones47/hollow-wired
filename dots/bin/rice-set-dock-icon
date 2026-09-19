@@ -4,7 +4,7 @@
 # ==============================================================================
 set -euo pipefail
 
-DEFAULT_ICON="/home/val47/Imagens/Ícones/icons8-arch-linux-96(2).png"
+DEFAULT_ICON="/usr/share/pixmaps/archlinux-logo.png"
 TARGET_FILE="${1:-}"
 
 if [ "$TARGET_FILE" = "--reset" ]; then

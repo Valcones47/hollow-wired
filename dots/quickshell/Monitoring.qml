@@ -323,7 +323,7 @@ Item {
                 // Conteúdo explicativo
                 Text {
                     Layout.fillWidth: true
-                    text: "Essa RAM \"usada\" é <b>cache de página do kernel</b> — arquivos que já foram lidos do disco e ficaram guardados na memória pra não precisar ler de novo. Não é memória alocada por nenhum processo, é <b>RAM livre sendo reaproveitada</b>."
+                    text: Theme.t("monitoring.why_p1", "Essa RAM \"usada\" é <b>cache de página do kernel</b> — arquivos que já foram lidos do disco e ficaram guardados na memória pra não precisar ler de novo. Não é memória alocada por nenhum processo, é <b>RAM livre sendo reaproveitada</b>.")
                     font.family: Theme.fontFamily
                     font.pixelSize: 11
                     lineHeight: 1.35
@@ -334,7 +334,7 @@ Item {
 
                 Text {
                     Layout.fillWidth: true
-                    text: "Quando algum programa pede mais memória, o kernel libera esse cache <b>automaticamente e na hora</b>, antes de precisar usar swap. Não tem cenário onde limpar isso manualmente ajuda — só descarta o cache e força o próximo acesso a disco de novo, o que deixa as coisas mais lentas, não mais rápidas."
+                    text: Theme.t("monitoring.why_p2", "Quando algum programa pede mais memória, o kernel libera esse cache <b>automaticamente e na hora</b>, antes de precisar usar swap. Não tem cenário onde limpar isso manualmente ajuda — só descarta o cache e força o próximo acesso a disco de novo, o que deixa as coisas mais lentas, não mais rápidas.")
                     font.family: Theme.fontFamily
                     font.pixelSize: 11
                     lineHeight: 1.35
@@ -355,7 +355,7 @@ Item {
                         id: noteText
                         anchors.fill: parent
                         anchors.margins: 10
-                        text: "O botão fica disponível mesmo assim para testes, mas não faz o que o nome sugere."
+                        text: Theme.t("monitoring.why_note", "O Linux gerencia a memória de forma inteligente. RAM não utilizada é RAM desperdiçada.")
                         font.family: Theme.fontFamily
                         font.pixelSize: 10
                         font.italic: true

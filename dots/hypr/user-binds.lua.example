@@ -1,0 +1,34 @@
+-- ~/.config/hypr/user-binds.lua
+-- ==============================================================================
+-- ATALHOS CUSTOMIZADOS DO USUÁRIO
+-- ==============================================================================
+-- Este arquivo é lido automaticamente pelo Hyprland no final de hyprland.lua.
+-- Qualquer atalho que você definir aqui NUNCA será sobrescrito pelo rice-update!
+-- Você pode criar novos atalhos ou substituir atalhos existentes.
+--
+-- Sintaxe:
+--   hl.bind("MODIFICADORES + TECLA", hl.dsp.exec_cmd("comando"))
+--
+-- Exemplos de Modificadores:
+--   SUPER, CTRL, ALT, SHIFT (podem ser combinados com " + ")
+--
+-- Exemplos Práticos:
+--
+-- 1. ABRIR APPS FAVORITOS:
+-- hl.bind("SUPER + Return", hl.dsp.exec_cmd("kitty"))
+-- hl.bind("SUPER + B", hl.dsp.exec_cmd("brave || zen-browser || firefox"))
+-- hl.bind("SUPER + E", hl.dsp.exec_cmd("dolphin"))
+-- hl.bind("SUPER + D", hl.dsp.exec_cmd("discord"))
+--
+-- 2. ENERGIA / SAÍDA DO SISTEMA:
+-- hl.bind("CTRL + ALT + Delete", hl.dsp.exec_cmd("quickshell ipc call energy open"))
+-- hl.bind("CTRL + ALT + L", hl.dsp.exec_cmd("hyprlock"))
+--
+-- 3. UTILITÁRIOS:
+-- hl.bind("CTRL + ALT + T", hl.dsp.exec_cmd("kitty"))
+-- hl.bind("SUPER + V", hl.dsp.exec_cmd("quickshell ipc call clipboard toggle"))
+--
+-- 4. CONTROLE DE JANELAS:
+-- hl.bind("SUPER + C", hl.dsp.killactive())
+-- hl.bind("SUPER + F", hl.dsp.fullscreen())
+-- hl.bind("SUPER + Space", hl.dsp.togglefloating())

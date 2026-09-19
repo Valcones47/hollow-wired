@@ -13,11 +13,18 @@ echo "    Aplicador de Tema: Bootloader Limine & SDDM Login     "
 echo "=========================================================="
 echo ""
 
+TARGET_HOME="${HOME}"
+if [ -n "${SUDO_USER:-}" ]; then
+  TARGET_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6 || echo "$HOME")
+fi
+
 # 1. Configura o SDDM
 if [ -f "$SCRIPT_DIR/rice-sddm-install" ]; then
   bash "$SCRIPT_DIR/rice-sddm-install"
-elif [ -f "/home/val47/.local/bin/rice-sddm-install" ]; then
-  bash "/home/val47/.local/bin/rice-sddm-install"
+elif [ -f "$TARGET_HOME/.local/bin/rice-sddm-install" ]; then
+  bash "$TARGET_HOME/.local/bin/rice-sddm-install"
+elif command -v rice-sddm-install >/dev/null 2>&1; then
+  rice-sddm-install
 else
   echo "AVISO: rice-sddm-install não encontrado."
 fi
@@ -27,8 +34,10 @@ echo ""
 # 2. Configura o Limine com blur no wallpaper
 if [ -f "$SCRIPT_DIR/rice-limine-theme" ]; then
   bash "$SCRIPT_DIR/rice-limine-theme"
-elif [ -f "/home/val47/.local/bin/rice-limine-theme" ]; then
-  bash "/home/val47/.local/bin/rice-limine-theme"
+elif [ -f "$TARGET_HOME/.local/bin/rice-limine-theme" ]; then
+  bash "$TARGET_HOME/.local/bin/rice-limine-theme"
+elif command -v rice-limine-theme >/dev/null 2>&1; then
+  rice-limine-theme
 else
   echo "AVISO: rice-limine-theme não encontrado."
 fi

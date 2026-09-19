@@ -328,7 +328,7 @@ PanelWindow {
                         height: dock.iconSize
                         source: {
                             const p = DockConfig.launcherIcon;
-                            if (!p) return "file:///home/val47/Imagens/Ícones/icons8-arch-linux-96(2).png";
+                            if (!p) return "file:///usr/share/pixmaps/archlinux-logo.png";
                             return p.startsWith("/") ? "file://" + p : p;
                         }
                         fillMode: Image.PreserveAspectFit

@@ -897,8 +897,8 @@ PanelWindow {
                         Layout.fillWidth: true
                         PopTitle {
                             Layout.fillWidth: true
-                            text: !Networking.wifiEnabled ? "Wi-Fi desligado"
-                                : bar.activeNetwork ? bar.activeNetwork.name : "Wi-Fi sem conexão"
+                            text: !Networking.wifiEnabled ? Theme.t("topbar.wifi_off", "Wi-Fi desligado")
+                                : bar.activeNetwork ? bar.activeNetwork.name : "Wi-Fi"
                         }
                         Rectangle {
                             implicitWidth: 40
@@ -919,7 +919,7 @@ PanelWindow {
                             }
                         }
                     }
-                    PopText { text: "Clique numa rede para conectar"; visible: Networking.wifiEnabled }
+                    PopText { text: Theme.t("topbar.wifi_hint", "Clique numa rede para conectar"); visible: Networking.wifiEnabled }
 
                     Repeater {
                         model: !bar.wifiDevice || !Networking.wifiEnabled ? [] : bar.wifiDevice.networks.values
@@ -965,7 +965,7 @@ PanelWindow {
                         Layout.fillWidth: true
                         PopTitle {
                             Layout.fillWidth: true
-                            text: !bar.btAdapter ? "Sem adaptador" : bar.btAdapter.enabled ? "Bluetooth" : "Bluetooth desligado"
+                            text: !bar.btAdapter ? Theme.t("topbar.no_bt_adapter", "Sem adaptador") : bar.btAdapter.enabled ? "Bluetooth" : Theme.t("topbar.bt_off", "Bluetooth desligado")
                         }
                         Rectangle {
                             visible: bar.btAdapter !== null
@@ -990,7 +990,7 @@ PanelWindow {
 
                     PopText {
                         visible: bar.btAdapter && bar.btAdapter.enabled && bar.btDevices.length === 0
-                        text: "Nenhum dispositivo"
+                        text: Theme.t("topbar.no_devices", "Nenhum dispositivo")
                     }
 
                     Repeater {

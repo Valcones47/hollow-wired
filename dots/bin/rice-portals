@@ -29,16 +29,18 @@ if command -v systemctl >/dev/null 2>&1; then
         QT_QPA_PLATFORMTHEME \
         2>/dev/null || true
 
-    # 2. Desativa e mascara o xdg-desktop-portal-gnome se presente
-    # (Causa congelamento crônico de 25s fora do ambiente GNOME Shell)
-    if systemctl --user list-unit-files 2>/dev/null | grep -q "xdg-desktop-portal-gnome"; then
-        systemctl --user stop xdg-desktop-portal-gnome 2>/dev/null || true
-        systemctl --user mask xdg-desktop-portal-gnome 2>/dev/null || true
-    fi
+    # 2. Desativa e mascara portais conflitantes (GNOME e KDE causam timeout de 25s fora de seus ambientes)
+    for p in xdg-desktop-portal-gnome xdg-desktop-portal-kde; do
+        if systemctl --user list-unit-files 2>/dev/null | grep -q "$p"; then
+            systemctl --user stop "$p" 2>/dev/null || true
+            systemctl --user mask "$p" 2>/dev/null || true
+        fi
+    done
 
     # 3. Reinicia os serviços de portal na ordem correta
-    systemctl --user stop xdg-desktop-portal-hyprland xdg-desktop-portal-gtk xdg-desktop-portal-kde xdg-desktop-portal 2>/dev/null || true
+    systemctl --user stop xdg-desktop-portal-hyprland xdg-desktop-portal-gtk xdg-desktop-portal 2>/dev/null || true
     sleep 0.5
     systemctl --user start xdg-desktop-portal-hyprland 2>/dev/null || true
+    systemctl --user start xdg-desktop-portal-gtk 2>/dev/null || true
     systemctl --user start xdg-desktop-portal 2>/dev/null || true
 fi

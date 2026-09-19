@@ -17,9 +17,13 @@ import "."
 Item {
     id: root
 
-    readonly property var dayNames: ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"]
-    readonly property var monthNames: ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-        "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
+    readonly property var dayNames: Theme.locale === "en"
+        ? ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+        : ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"]
+    readonly property var monthNames: Theme.locale === "en"
+        ? ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+        : ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+           "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
 
     property date now: new Date()
     Timer {
@@ -309,7 +313,7 @@ Item {
                                 model: [
                                     { icon: Theme.icons.arch, text: root.distroText },
                                     { icon: Theme.icons.monitor, text: "Hyprland" },
-                                    { icon: Theme.icons.clock, text: "ligado há " + root.uptimeText }
+                                    { icon: Theme.icons.clock, text: Theme.t("dashboard.uptime", "ligado há ") + root.uptimeText }
                                 ]
                                 delegate: RowLayout {
                                     required property var modelData
@@ -411,7 +415,7 @@ Item {
                             columnSpacing: 0
 
                             Repeater {
-                                model: ["D", "S", "T", "Q", "Q", "S", "S"]
+                                model: Theme.locale === "en" ? ["S", "M", "T", "W", "T", "F", "S"] : ["D", "S", "T", "Q", "Q", "S", "S"]
                                 delegate: Text {
                                     required property string modelData
                                     Layout.fillWidth: true

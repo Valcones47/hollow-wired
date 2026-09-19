@@ -230,7 +230,7 @@ Item {
                         color: Theme.primary
                     }
                     Text {
-                        text: "Geometria & Janelas"
+                        text: Theme.t("appearance.geom_title", "Geometria & Janelas")
                         font.family: Theme.fontFamily
                         font.pixelSize: 13
                         font.weight: Font.DemiBold
@@ -242,21 +242,21 @@ Item {
 
                 // Arredondamento
                 SettingSlider {
-                    title: "Arredondamento das Janelas"
+                    title: Theme.t("appearance.rounding", "Arredondamento das Janelas")
                     minVal: 0; maxVal: 24; value: root.rounding; unit: "px"
                     onChanged: v => { root.rounding = v; root.setPref("rounding", v); }
                 }
 
                 // Espaçamento interno (Gaps In)
                 SettingSlider {
-                    title: "Espaçamento Interno (Gaps In)"
+                    title: Theme.t("appearance.gaps_in", "Espaçamento Interno (Gaps In)")
                     minVal: 0; maxVal: 20; value: root.gapsIn; unit: "px"
                     onChanged: v => { root.gapsIn = v; root.setPref("gaps_in", v); }
                 }
 
                 // Espaçamento externo (Gaps Out)
                 SettingSlider {
-                    title: "Espaçamento Externo (Gaps Out)"
+                    title: Theme.t("appearance.gaps_out", "Espaçamento Externo (Gaps Out)")
                     minVal: 0; maxVal: 30; value: root.gapsOut; unit: "px"
                     onChanged: v => { root.gapsOut = v; root.setPref("gaps_out", v); }
                 }
@@ -266,7 +266,7 @@ Item {
                     Layout.fillWidth: true
                     spacing: 4
                     Text {
-                        text: "Espessura da Borda"
+                        text: Theme.t("appearance.border_size", "Espessura da Borda")
                         font.family: Theme.fontFamily
                         font.pixelSize: 12
                         color: Theme.textColor
@@ -331,7 +331,7 @@ Item {
                         color: Theme.primary
                     }
                     Text {
-                        text: "Efeitos, Animações & Wallust"
+                        text: Theme.t("appearance.effects_title", "Efeitos, Animações & Wallust")
                         font.family: Theme.fontFamily
                         font.pixelSize: 13
                         font.weight: Font.DemiBold
@@ -343,15 +343,15 @@ Item {
 
                 // Opacidade de Janelas Inativas
                 SettingSlider {
-                    title: "Opacidade de Janelas Inativas"
+                    title: Theme.t("appearance.inactive_opacity", "Opacidade de Janelas Inativas")
                     minVal: 0.5; maxVal: 1.0; decimals: 2; value: root.inactiveOpacity; unit: ""
                     onChanged: v => { root.inactiveOpacity = v; root.setPref("inactive_opacity", v); }
                 }
 
                 // Escurecer Janelas Inativas (Dim)
                 SettingToggle {
-                    title: "Escurecer Janelas Inativas"
-                    subtitle: "Destaca visualmente a janela em foco"
+                    title: Theme.t("appearance.dim_inactive", "Escurecer Janelas Inativas")
+                    subtitle: Theme.t("appearance.dim_desc", "Destaca visualmente a janela em foco")
                     checked: root.dimInactive
                     onToggled: v => { root.dimInactive = v; root.setPref("dim_inactive", v); }
                 }
@@ -361,7 +361,7 @@ Item {
                     Layout.fillWidth: true
                     spacing: 4
                     Text {
-                        text: "Estilo & Curvas de Animação"
+                        text: Theme.t("appearance.anim_style", "Estilo & Curvas de Animação")
                         font.family: Theme.fontFamily
                         font.pixelSize: 12
                         color: Theme.textColor
@@ -371,9 +371,9 @@ Item {
                         spacing: 6
                         Repeater {
                             model: [
-                                { id: "snappy", name: "Rápido", desc: "Snap" },
-                                { id: "smooth", name: "Suave", desc: "Padrão" },
-                                { id: "bouncy", name: "Elástico", desc: "Caelestia" }
+                                { id: "snappy", name: Theme.t("appearance.anim_snappy", "Rápido"), desc: Theme.t("appearance.anim_snappy_desc", "Snap") },
+                                { id: "smooth", name: Theme.t("appearance.anim_smooth", "Suave"), desc: Theme.t("appearance.anim_smooth_desc", "Padrão") },
+                                { id: "bouncy", name: Theme.t("appearance.anim_bouncy", "Elástico"), desc: Theme.t("appearance.anim_bouncy_desc", "Caelestia") }
                             ]
                             delegate: Rectangle {
                                 required property var modelData
@@ -439,7 +439,7 @@ Item {
                                 color: Theme.primary
                             }
                             Text {
-                                text: "Wallpapers (Super+S)"
+                                text: Theme.t("appearance.wallpapers", "Wallpapers (Super+S)")
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 11
                                 color: Theme.textColor
