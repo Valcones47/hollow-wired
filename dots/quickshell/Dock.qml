@@ -106,16 +106,22 @@ PanelWindow {
     readonly property var items: {
         const _ = dock._appsLoaded;
         const out = [];
+        const seen = {};
         for (const id of DockConfig.pins) {
             const e = dock.entryFor(id);
-            if (e) out.push({ key: e.id, entry: e, pinned: true });
+            if (e && !seen[e.id]) {
+                seen[e.id] = true;
+                out.push({ key: e.id, entry: e, pinned: true });
+            }
         }
         for (const t of ToplevelManager.toplevels.values) {
             if (t.appId === "dropterm" || t.appId === "") continue;
             const e = dock.entryFor(t.appId);
             const key = e ? e.id : t.appId;
-            if (!out.some(o => o.key === key))
+            if (!seen[key]) {
+                seen[key] = true;
                 out.push({ key: key, entry: e, pinned: false, appId: t.appId });
+            }
         }
         return out;
     }
@@ -689,7 +695,16 @@ PanelWindow {
                     spacing: 6
                     readonly property var entries: {
                         const _ = dock._appsLoaded;
-                        return DockConfig.games.map(id => dock.entryFor(id)).filter(e => e);
+                        const seen = {};
+                        const res = [];
+                        for (const id of DockConfig.games) {
+                            const e = dock.entryFor(id);
+                            if (e && !seen[e.id]) {
+                                seen[e.id] = true;
+                                res.push(e);
+                            }
+                        }
+                        return res;
                     }
                     readonly property int cols: 3
                     property int dragFrom: -1

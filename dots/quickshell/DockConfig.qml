@@ -3,6 +3,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import Quickshell.Hyprland
+import Quickshell.Widgets
 
 // Estado compartilhado entre Dock e Launcher: apps fixados, jogos e
 // contagem de uso (pra ordenar o launcher). Persistido em
@@ -11,8 +12,8 @@ QtObject {
     id: root
 
     property string launcherIcon: "/usr/share/pixmaps/archlinux-logo.png"
-    property var pins: ["zen", "kitty", "org.kde.dolphin", "com.anthropic.Claude", "discord", "spotify"]
-    property var games: ["steam", "heroic", "osu-lazer", "r2modman", "com.hypixel.HytaleLauncher"]
+    property var pins: ["zen", "discord", "steam"]
+    property var games: ["steam", "heroic"]
     property var usage: ({})
 
     property FileView file: FileView {
@@ -55,15 +56,50 @@ QtObject {
         save();
     }
 
-    function isPinned(id) { return pins.includes(id); }
-    function isGame(id) { return games.includes(id); }
+    function canonicalId(id) {
+        if (!id) return "";
+        const clean = id.endsWith(".desktop") ? id.slice(0, -8) : id;
+        try {
+            if (typeof DesktopEntries !== "undefined") {
+                const e = DesktopEntries.byId(clean)
+                    || DesktopEntries.byId(id)
+                    || DesktopEntries.heuristicLookup(clean)
+                    || DesktopEntries.heuristicLookup(id);
+                if (e && e.id) return e.id;
+            }
+        } catch (err) {}
+        return clean;
+    }
+
+    function isPinned(id) {
+        if (!id) return false;
+        const target = canonicalId(id);
+        return pins.some(p => p === id || canonicalId(p) === target);
+    }
+    function isGame(id) {
+        if (!id) return false;
+        const target = canonicalId(id);
+        return games.some(g => g === id || canonicalId(g) === target);
+    }
 
     function togglePin(id) {
-        pins = isPinned(id) ? pins.filter(p => p !== id) : pins.concat([id]);
+        if (!id) return;
+        const target = canonicalId(id);
+        if (isPinned(id)) {
+            pins = pins.filter(p => p !== id && canonicalId(p) !== target);
+        } else {
+            pins = pins.concat([target || id]);
+        }
         save();
     }
     function toggleGame(id) {
-        games = isGame(id) ? games.filter(g => g !== id) : games.concat([id]);
+        if (!id) return;
+        const target = canonicalId(id);
+        if (isGame(id)) {
+            games = games.filter(g => g !== id && canonicalId(g) !== target);
+        } else {
+            games = games.concat([target || id]);
+        }
         save();
     }
     function move(list, from, to) {
@@ -83,13 +119,47 @@ QtObject {
         save();
     }
 
-    // Reordena a partir da ordem visível (ids sem .desktop instalado ficam no fim).
+    // Reordena a partir da ordem visível sem duplicatas e com IDs canônicos.
     function setPinsOrder(ids) {
-        pins = ids.concat(pins.filter(p => !ids.includes(p)));
+        if (!Array.isArray(ids)) return;
+        const result = [];
+        const seen = {};
+        for (const raw of ids) {
+            const c = canonicalId(raw);
+            if (c && !seen[c]) {
+                seen[c] = true;
+                result.push(c);
+            }
+        }
+        for (const p of pins) {
+            const c = canonicalId(p);
+            if (c && !seen[c]) {
+                seen[c] = true;
+                result.push(p);
+            }
+        }
+        pins = result;
         save();
     }
     function setGamesOrder(ids) {
-        games = ids.concat(games.filter(g => !ids.includes(g)));
+        if (!Array.isArray(ids)) return;
+        const result = [];
+        const seen = {};
+        for (const raw of ids) {
+            const c = canonicalId(raw);
+            if (c && !seen[c]) {
+                seen[c] = true;
+                result.push(c);
+            }
+        }
+        for (const g of games) {
+            const c = canonicalId(g);
+            if (c && !seen[c]) {
+                seen[c] = true;
+                result.push(g);
+            }
+        }
+        games = result;
         save();
     }
 

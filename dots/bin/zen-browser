@@ -1,0 +1,3 @@
+#!/bin/bash
+
+exec game-run /opt/zen-browser-bin/zen-bin "$@"

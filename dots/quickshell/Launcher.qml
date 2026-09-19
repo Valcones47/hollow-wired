@@ -111,7 +111,7 @@ PanelWindow {
                 .sort((a, b) => (b.s - a.s) || ((use[b.e.id] || 0) - (use[a.e.id] || 0)) || (a.e.name || "").localeCompare(b.e.name || ""))
                 .map(x => x.e);
         }
-        return r.slice(0, 60);
+        return r;
     }
     onResultsChanged: {
         list.currentIndex = 0;
@@ -305,7 +305,7 @@ PanelWindow {
                         }
                         Text {
                             visible: launcher.results.length > 0
-                            text: launcher.results.length + (launcher.results.length >= 60 ? "+" : "")
+                            text: launcher.results.length
                             font.family: Theme.fontFamily
                             font.pixelSize: 11
                             color: Theme.subtext
