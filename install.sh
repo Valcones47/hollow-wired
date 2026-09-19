@@ -95,13 +95,13 @@ show_lain_gif() {
     echo -e "${PURPLE}╰──────────────────────────────────────────────────────────────╯${NC}"
 
     if [ -f "$gif_file" ] && command -v chafa >/dev/null 2>&1; then
-        if [ -t 1 ]; then
-            # Terminal interativo: anima o gif no tamanho ideal
-            chafa --duration "$duration" --speed 1.2 --size "$size" --symbols vhalf+quad --color-space rgb "$gif_file" 2>/dev/null || \
-            chafa --size "$size" "$gif_file" 2>/dev/null || true
+        # Terminal interativo ou /dev/tty disponível: anima o GIF com máxima performance
+        if [ -w /dev/tty ] || [ -t 1 ]; then
+            chafa --probe=off --duration "$duration" --speed 1.2 --size "$size" --symbols vhalf+quad --color-space rgb "$gif_file" 2>/dev/null || \
+            chafa --probe=off --size "$size" "$gif_file" 2>/dev/null || true
         else
             # Saída não-interativa / log: renderiza frame estático
-            chafa --animate=off --size "$size" "$gif_file" 2>/dev/null || true
+            chafa --probe=off --animate=off --size "$size" "$gif_file" 2>/dev/null || true
         fi
     else
         # Fallback ASCII estético caso gif ou chafa não estejam disponíveis
@@ -356,7 +356,7 @@ mkdir -p "$HOME/.config" \
 # 3. Cópia dos dotfiles para o usuário (preservando preferências pessoais se já existirem)
 gear_msg "Copiando configurações do Quickshell, Hyprland Lua, Kitty e Temas..."
 
-local saved_dock="" saved_widgets="" saved_shell="" saved_locale="" saved_kitty="" saved_user_binds="" saved_user_prefs=""
+saved_dock="" saved_widgets="" saved_shell="" saved_locale="" saved_kitty="" saved_user_binds="" saved_user_prefs=""
 [ -f "$HOME/.config/quickshell/dock.json" ] && saved_dock=$(cat "$HOME/.config/quickshell/dock.json")
 [ -f "$HOME/.config/quickshell/desktop-widgets.json" ] && saved_widgets=$(cat "$HOME/.config/quickshell/desktop-widgets.json")
 [ -f "$HOME/.config/quickshell/shell-customization.json" ] && saved_shell=$(cat "$HOME/.config/quickshell/shell-customization.json")
