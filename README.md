@@ -119,8 +119,17 @@ Legacy tools like Waybar, Rofi, SwayOSD, and Wofi are completely omitted. Every 
 - **GPU:** Intel / AMD / NVIDIA (Hybrid GPU fully supported)
 - **Display Server:** Wayland
 
-### Quick Setup
-Clone the repository and run the automated cyberpunk installer:
+### One-Line Install (Curl)
+Install directly with a single command in your terminal:
+
+```bash
+curl -sS https://raw.githubusercontent.com/Valcones47/hollow-wired/main/install.sh | bash
+```
+
+---
+
+### Manual Setup
+Or clone the repository and run the automated cyberpunk installer locally:
 
 ```bash
 git clone https://github.com/Valcones47/hollow-wired.git

@@ -26,8 +26,28 @@ BOLD='\033[1m'
 DIM='\033[2m'
 NC='\033[0m'
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd || echo "")"
 BACKUP_DIR="$HOME/.config/rice-backup-$(date +%Y%m%d_%H%M%S)"
+
+# Suporte à execução via curl / pipe (ex: curl -sS https://... | bash)
+# Se o script estiver sendo executado via stdin ou fora da pasta clonada, clona automaticamente
+if [ -z "$SCRIPT_DIR" ] || [ ! -d "$SCRIPT_DIR/dots" ]; then
+    TARGET_REPO="$HOME/projetos/hollow-wired"
+    echo -e "\033[38;2;34;211;238m[*] Execução remota detectada. Clonando repositório hollow-wired...\033[0m"
+    if ! command -v git >/dev/null 2>&1; then
+        echo -e "\033[38;2;248;113;113m[!] Git não encontrado. Instalando git...\033[0m"
+        sudo pacman -S --needed --noconfirm git
+    fi
+    mkdir -p "$HOME/projetos"
+    if [ -d "$TARGET_REPO/.git" ]; then
+        echo -e "\033[38;2;52;211;153m[*] Repositório existente em $TARGET_REPO. Atualizando...\033[0m"
+        git -C "$TARGET_REPO" pull --ff-only origin main || true
+    else
+        git clone https://github.com/Valcones47/hollow-wired.git "$TARGET_REPO"
+    fi
+    # Reexecuta com terminal interativo (/dev/tty) para suportar animações e prompts
+    exec bash "$TARGET_REPO/install.sh" "$@" </dev/tty
+fi
 
 # ------------------------------------------------------------------------------
 # FUNÇÕES DE INTERFACE DO TERMINAL
@@ -333,8 +353,18 @@ mkdir -p "$HOME/.config" \
          "$HOME/Imagens/Capturas de tela" \
          "$HOME/Imagens/FastFetch"
 
-# 3. Cópia dos dotfiles para o usuário
+# 3. Cópia dos dotfiles para o usuário (preservando preferências pessoais se já existirem)
 gear_msg "Copiando configurações do Quickshell, Hyprland Lua, Kitty e Temas..."
+
+local saved_dock="" saved_widgets="" saved_shell="" saved_locale="" saved_kitty="" saved_user_binds="" saved_user_prefs=""
+[ -f "$HOME/.config/quickshell/dock.json" ] && saved_dock=$(cat "$HOME/.config/quickshell/dock.json")
+[ -f "$HOME/.config/quickshell/desktop-widgets.json" ] && saved_widgets=$(cat "$HOME/.config/quickshell/desktop-widgets.json")
+[ -f "$HOME/.config/quickshell/shell-customization.json" ] && saved_shell=$(cat "$HOME/.config/quickshell/shell-customization.json")
+[ -f "$HOME/.config/quickshell/locale.json" ] && saved_locale=$(cat "$HOME/.config/quickshell/locale.json")
+[ -f "$HOME/.config/kitty/kitty.conf" ] && saved_kitty=$(cat "$HOME/.config/kitty/kitty.conf")
+[ -f "$HOME/.config/hypr/user-binds.lua" ] && saved_user_binds=$(cat "$HOME/.config/hypr/user-binds.lua")
+[ -f "$HOME/.config/hypr/user-prefs.json" ] && saved_user_prefs=$(cat "$HOME/.config/hypr/user-prefs.json")
+
 cp -a "$SCRIPT_DIR/dots/hypr" "$HOME/.config/"
 cp -a "$SCRIPT_DIR/dots/quickshell" "$HOME/.config/"
 cp -a "$SCRIPT_DIR/dots/kitty" "$HOME/.config/"
@@ -344,6 +374,15 @@ cp -a "$SCRIPT_DIR/dots/kitty" "$HOME/.config/"
 [ -d "$SCRIPT_DIR/dots/swappy" ] && cp -a "$SCRIPT_DIR/dots/swappy" "$HOME/.config/"
 [ -d "$SCRIPT_DIR/dots/gtk-3.0" ] && cp -a "$SCRIPT_DIR/dots/gtk-3.0" "$HOME/.config/"
 [ -d "$SCRIPT_DIR/dots/gtk-4.0" ] && cp -a "$SCRIPT_DIR/dots/gtk-4.0" "$HOME/.config/"
+
+# Restaura preferências pessoais pré-existentes
+[ -n "$saved_dock" ] && echo "$saved_dock" > "$HOME/.config/quickshell/dock.json"
+[ -n "$saved_widgets" ] && echo "$saved_widgets" > "$HOME/.config/quickshell/desktop-widgets.json"
+[ -n "$saved_shell" ] && echo "$saved_shell" > "$HOME/.config/quickshell/shell-customization.json"
+[ -n "$saved_locale" ] && echo "$saved_locale" > "$HOME/.config/quickshell/locale.json"
+[ -n "$saved_kitty" ] && echo "$saved_kitty" > "$HOME/.config/kitty/kitty.conf"
+[ -n "$saved_user_binds" ] && echo "$saved_user_binds" > "$HOME/.config/hypr/user-binds.lua"
+[ -n "$saved_user_prefs" ] && echo "$saved_user_prefs" > "$HOME/.config/hypr/user-prefs.json"
 
 # 4. Cópia dos atalhos .desktop e binários
 gear_msg "Instalando utilitários do rice em ~/.local/bin/..."
