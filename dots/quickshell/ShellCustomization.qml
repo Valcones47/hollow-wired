@@ -15,6 +15,12 @@ QtObject {
 
     signal updated()
 
+    // Fica false até shell-customization.json terminar de carregar (leitura é
+    // assíncrona). Sem isso, mexer num slider/estilo logo após o Quickshell
+    // (re)iniciar pode disparar save() com os valores padrão acima ainda em
+    // memória, sobrescrevendo as customizações reais salvas no arquivo.
+    property bool ready: false
+
     function getStyle(comp) {
         return (config[comp] && config[comp].style) ? config[comp].style : "glass";
     }
@@ -72,14 +78,18 @@ QtObject {
                 }
             } catch (e) {
                 console.log("ShellCustomization: erro ao carregar:", e);
+            } finally {
+                root.ready = true;
             }
         }
         onLoadFailed: (error) => {
             console.log("ShellCustomization: erro ao carregar arquivo:", error);
+            root.ready = true;
         }
     }
 
     function save() {
+        if (!root.ready) return;
         file.setText(JSON.stringify(config, null, 2) + "\n");
         updated();
     }

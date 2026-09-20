@@ -29,25 +29,53 @@ PanelWindow {
 
     WlrLayershell.namespace: "quickshell-launcher"
     WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: open ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    // OnDemand em vez de Exclusive: com foco exclusivo o Hyprland entrega TODO o
+    // ponteiro para esta camada, e barra, dock e sidebar paravam de responder a
+    // hover e clique enquanto o launcher estivesse aberto.
+    WlrLayershell.keyboardFocus: open ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
 
-    // Libera a TopBar (topo), Sidebar (direita) e Dock (base) para receberem mouse normalmente
+    // Estado da dock e da sidebar, vindos do shell.qml. Enquanto elas estão
+    // abertas, a área que ocupam sai da máscara de input do launcher.
+    property bool dockShown: false
+    property bool sidebarOpen: false
+    property bool barPopupOpen: false
+
+    // Libera a TopBar (topo), Sidebar (direita) e Dock (base) para receberem mouse.
+    //
+    // [fix] Antes a máscara reservava só os 10px da moldura em cada borda: dava
+    // pra encostar o mouse e revelar a dock/sidebar, mas o corpo delas (64px)
+    // ficava DENTRO da área de clique do launcher. O clique caía no "clicar fora
+    // fecha" do launcher em vez de ir para o botão embaixo do cursor — daí a
+    // sensação de que, com o launcher aberto, nenhuma interface respondia.
     mask: launcher.open ? activeMask : emptyMask
 
     Region { id: emptyMask }
     Region {
         id: activeMask
         x: 0
-        y: Theme.waybarHeight
-        width: launcher.width - Theme.frameThickness
-        height: launcher.height - Theme.waybarHeight - Theme.frameThickness
+        // Popup da TopBar aberto (áudio, wi-fi, bateria...) desce da barra: a
+        // área dele também precisa ficar fora da máscara do launcher.
+        y: Theme.waybarHeight + (launcher.barPopupOpen ? 420 : 0)
+        width: launcher.width - (launcher.sidebarOpen
+            ? Theme.sidebarWidth + Theme.frameThickness + Theme.gap * 2
+            : Theme.frameThickness)
+        height: launcher.height - Theme.waybarHeight - (launcher.barPopupOpen ? 420 : 0) - (launcher.dockShown
+            ? Theme.dockHeight + Theme.frameThickness + Theme.gap * 2
+            : Theme.frameThickness)
     }
 
     readonly property int panelW: 660
     readonly property int rowH: 54
     readonly property int maxRows: 8
     readonly property int searchH: 58
-    readonly property real edgeY: height - Theme.frameThickness
+    // Base do painel. Sobe quando a dock aparece: o painel do launcher é
+    // desenhado exatamente em cima do lugar da dock (ambos na base, centrados),
+    // então sem esse deslocamento os dois ficavam sobrepostos e a dock virava
+    // uma faixa inalcançável atrás do launcher.
+    property real edgeY: height - Theme.frameThickness
+        - (launcher.dockShown ? Theme.dockHeight + Theme.gap : 0)
+    Behavior on edgeY { NumberAnimation { duration: 240; easing.type: Easing.OutCubic } }
+    onEdgeYChanged: shape.requestPaint()
 
     onOpenChanged: {
         if (open) {
@@ -571,5 +599,9 @@ PanelWindow {
     IpcHandler {
         target: "launcher"
         function toggle(): void { launcher.open = !launcher.open; }
+        function state(): string {
+            return "open=" + launcher.open + " inputFocus=" + input.activeFocus + " dockShown=" + launcher.dockShown
+                + " sidebarOpen=" + launcher.sidebarOpen + " barPopup=" + launcher.barPopupOpen;
+        }
     }
 }

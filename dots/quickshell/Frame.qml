@@ -15,8 +15,15 @@ import "."
 // outros lados) — superfícies com exclusive zone nas laterais faziam a
 // waybar encolher pra não sobrepor elas.
 Scope {
+    id: frameScope
+
+    // Esconde a moldura sem quebrar o binding de visibilidade (usado pelo IPC
+    // "frame" e pelo modo de captura limpa do shell.qml — ver "capture" lá).
+    property bool hidden: false
+
     PanelWindow {
         id: frame
+        visible: !frameScope.hidden
         color: "transparent"
         focusable: false
         anchors { top: true; bottom: true; left: true; right: true }
@@ -67,7 +74,7 @@ Scope {
 
         IpcHandler {
             target: "frame"
-            function setVisible(v: bool): void { frame.visible = v; }
+            function setVisible(v: bool): void { frameScope.hidden = !v; }
         }
     }
 }

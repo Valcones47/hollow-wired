@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Guia de Boas-vindas
+Name[en]=Welcome Guide
+Comment=Atalhos essenciais para quem está chegando do Windows
+Comment[en]=Essential shortcuts for people coming from Windows
+Exec=quickshell ipc call welcome open
+Icon=help-about
+Terminal=false
+Type=Application
+Categories=System;Utility;

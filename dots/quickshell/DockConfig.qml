@@ -12,9 +12,19 @@ QtObject {
     id: root
 
     property string launcherIcon: "/usr/share/pixmaps/archlinux-logo.png"
-    property var pins: ["zen", "discord", "steam"]
+    // Padrão com o que o instalador garante (kitty e dolphin) + os apps comuns;
+    // pins de programas não instalados são simplesmente ignorados pela dock.
+    // Antes o padrão era só zen/discord/steam, e num PC recém-instalado a dock
+    // nascia vazia.
+    property var pins: ["kitty", "dolphin", "zen", "discord", "steam"]
     property var games: ["steam", "heroic"]
     property var usage: ({})
+
+    // Fica false até o dock.json terminar de carregar do disco (leitura é assíncrona).
+    // Sem isso, um clique num app logo após o Quickshell (re)iniciar dispara save()
+    // com os valores padrão acima ainda em memória, sobrescrevendo o dock.json real
+    // (ícone customizado, pins e jogos) antes mesmo dele ser lido.
+    property bool ready: false
 
     property FileView file: FileView {
         path: Quickshell.env("HOME") + "/.config/quickshell/dock.json"
@@ -23,7 +33,10 @@ QtObject {
         onLoaded: {
             try {
                 const t = text().trim();
-                if (!t) return;
+                if (!t) {
+                    root.ready = true;
+                    return;
+                }
                 const d = JSON.parse(t);
                 if (typeof d.launcherIcon === "string" && d.launcherIcon.length > 0) {
                     root.launcherIcon = d.launcherIcon;
@@ -38,14 +51,20 @@ QtObject {
                 }
             } catch (e) {
                 console.log("DockConfig: dock.json inválido:", e);
+            } finally {
+                root.ready = true;
             }
         }
         onLoadFailed: error => {
             console.log("DockConfig: erro ao carregar dock.json:", error);
+            // Arquivo pode simplesmente não existir ainda (primeira execução) — libera
+            // o save() pra criar um novo, em vez de travar "ready" pra sempre.
+            root.ready = true;
         }
     }
 
     function save() {
+        if (!root.ready) return;
         const u = Object.assign({}, usage);
         delete u["undefined"];
         file.setText(JSON.stringify({ launcherIcon: launcherIcon, pins: pins, games: games, usage: u }, null, 2) + "\n");

@@ -342,6 +342,19 @@ PanelWindow {
                         asynchronous: true
                     }
 
+                    // Se a imagem do botão não carregar (ícone customizado
+                    // apagado, ou distro sem /usr/share/pixmaps/archlinux-logo.png),
+                    // desenha um glifo em vez de deixar um botão invisível.
+                    Text {
+                        anchors.centerIn: parent
+                        anchors.verticalCenterOffset: -3
+                        visible: launcherImg.status === Image.Error || launcherImg.status === Image.Null
+                        text: Theme.icons.arch
+                        font.family: Theme.iconFontFamily
+                        font.pixelSize: dock.iconSize * 0.8
+                        color: Theme.primary
+                    }
+
                     MouseArea {
                         id: launcherArea
                         anchors.fill: parent

@@ -41,10 +41,37 @@ ShellRoot {
     }
 
     DesktopWidgets { id: dw }
-    Frame {}
+    Frame { id: frameScope }
+
+    // ---------- modo de captura limpa ----------
+    // `qs ipc call capture hide` esconde tudo que o Quickshell desenha por cima
+    // do wallpaper (barra, moldura, dock e widgets) para que o
+    // rice-sddm-sync-wallpaper capture o papel de parede puro, sem nenhum
+    // pedaço da interface nem conteúdo de janelas na foto da tela de login.
+    // `qs ipc call capture restore` devolve tudo ao estado anterior.
+    property bool captureMode: false
+
+    Binding { target: topbar; property: "visible"; value: false; when: shellRoot.captureMode; restoreMode: Binding.RestoreBindingOrValue }
+    Binding { target: dock;   property: "visible"; value: false; when: shellRoot.captureMode; restoreMode: Binding.RestoreBindingOrValue }
+    Binding { target: dw;     property: "visible"; value: false; when: shellRoot.captureMode; restoreMode: Binding.RestoreBindingOrValue }
+    Binding { target: frameScope; property: "hidden"; value: true; when: shellRoot.captureMode; restoreMode: Binding.RestoreBindingOrValue }
+
+    IpcHandler {
+        target: "capture"
+
+        // "show" não pode ser usado como nome aqui: `qs ipc call <alvo> show`
+        // é engolido pelo próprio CLI do Quickshell e só lista as funções.
+        function hide(): void { shellRoot.captureMode = true; }
+        function restore(): void { shellRoot.captureMode = false; }
+        function state(): string { return shellRoot.captureMode ? "hidden" : "shown"; }
+    }
 
     Launcher {
         id: launcher
+        // Sem isso o launcher engole os cliques destinados à dock e à sidebar.
+        dockShown: dock.shown
+        sidebarOpen: sidebar.open
+        barPopupOpen: topbar.pop !== ""
     }
 
     TopBar {
@@ -87,6 +114,7 @@ ShellRoot {
     OSD {}
     Cheatsheet {}
     Clipboard {}
+    Welcome {}
 
     PanelWindow {
         id: hub

@@ -21,7 +21,26 @@ Item {
     property string captureMode: "screen" // "screen", "window", "region"
     property string selectedWindowGeom: ""
     property string selectedWindowTitle: ""
-    property string selectedCodec: "h264_nvenc" // "h264_nvenc" (NVIDIA dGPU), "h264_vaapi" (Intel), "libx264" (CPU)
+    // "auto" deixa o rice-record escolher o encoder que a máquina realmente tem.
+    // Fixar NVENC como padrão quebrava a gravação em qualquer PC sem NVIDIA.
+    property string selectedCodec: "auto" // auto | h264_nvenc (NVIDIA) | h264_vaapi (Intel/AMD) | libx264 (CPU)
+
+    // Qual encoder o modo automático vai escolher nesta máquina (só pro rótulo;
+    // quem decide de verdade é o detect_codec() do rice-record).
+    readonly property string effectiveCodec: {
+        if (selectedCodec !== "auto") return selectedCodec;
+        const gpu = (SysStats.gpuName || "").toLowerCase();
+        if (gpu.indexOf("nvidia") !== -1 || gpu.indexOf("geforce") !== -1 || gpu.indexOf("rtx") !== -1 || gpu.indexOf("gtx") !== -1)
+            return "h264_nvenc";
+        return "h264_vaapi";
+    }
+    readonly property bool codecIsHardware: effectiveCodec !== "libx264"
+    readonly property string codecBadgeText: {
+        const prefix = selectedCodec === "auto" ? "⚙ " : "";
+        if (effectiveCodec === "h264_nvenc") return prefix + "⚡ NVENC (" + SysStats.gpuName + ")";
+        if (effectiveCodec === "h264_vaapi") return prefix + "🎮 GPU (VAAPI)";
+        return prefix + "💻 CPU";
+    }
     property bool audioDesktop: true
     property bool audioMic: false
     property int fpsRate: 60
@@ -267,20 +286,20 @@ Item {
                             height: 18
                             implicitWidth: gpuBadgeRow.implicitWidth + 12
                             radius: 9
-                            color: root.selectedCodec === "h264_nvenc" ? Theme.withAlpha("#10b981", 0.2) : Theme.withAlpha(Theme.primary, 0.2)
+                            color: root.codecIsHardware ? Theme.withAlpha("#10b981", 0.2) : Theme.withAlpha(Theme.primary, 0.2)
                             border.width: 1
-                            border.color: root.selectedCodec === "h264_nvenc" ? "#10b981" : Theme.primary
+                            border.color: root.codecIsHardware ? "#10b981" : Theme.primary
 
                             RowLayout {
                                 id: gpuBadgeRow
                                 anchors.centerIn: parent
                                 spacing: 4
                                 Text {
-                                    text: root.selectedCodec === "h264_nvenc" ? "⚡ dGPU NVENC (" + SysStats.gpuName + ")" : (root.selectedCodec === "h264_vaapi" ? "🎮 GPU (VAAPI)" : "💻 CPU")
+                                    text: root.codecBadgeText
                                     font.family: Theme.fontFamily
                                     font.pixelSize: 9
                                     font.weight: Font.Bold
-                                    color: root.selectedCodec === "h264_nvenc" ? "#10b981" : Theme.primary
+                                    color: root.codecIsHardware ? "#10b981" : Theme.primary
                                 }
                             }
                         }
@@ -577,6 +596,7 @@ Item {
 
                         Repeater {
                             model: [
+                                { id: "auto", label: Theme.t("rec.codec_auto", "Automático") },
                                 { id: "h264_nvenc", label: "NVIDIA (" + SysStats.gpuName + ")" },
                                 { id: "h264_vaapi", label: "VAAPI (GPU)" },
                                 { id: "libx264", label: "CPU" }

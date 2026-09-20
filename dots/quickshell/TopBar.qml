@@ -498,12 +498,17 @@ PanelWindow {
                 Module {
                     id: wifiMod
                     kind: "wifi"
+                    // Desktop ligado só no cabo não tem placa Wi-Fi: mostrar um
+                    // ícone de "Wi-Fi desligado" pra sempre só confundia.
+                    visible: bar.wifiDevice !== null
                     BarIcon { text: bar.wifiIcon() }
                 }
 
                 Module {
                     id: btMod
                     kind: "bt"
+                    // Idem para máquinas sem adaptador Bluetooth.
+                    visible: bar.btAdapter !== null
                     BarIcon {
                         text: !bar.btAdapter || !bar.btAdapter.enabled ? Theme.icons.btOff
                             : bar.btConnected > 0 ? Theme.icons.btConnected : Theme.icons.bt

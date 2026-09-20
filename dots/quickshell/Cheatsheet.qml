@@ -240,6 +240,7 @@ PanelWindow {
                                 { keys: ["Super", "Ctrl", "Shift", "R"], desc: Theme.t("cheatsheet.desc_record_screen", "Gravar tela inteira") },
                                 { keys: ["Super", "Shift", "C"], desc: Theme.t("cheatsheet.desc_picker", "Conta-gotas de cores") },
                                 { keys: ["Super", "V"], desc: Theme.t("cheatsheet.desc_clipboard", "Histórico da área de transferência") },
+                                { keys: ["Super", "Ctrl", "V"], desc: Theme.t("cheatsheet.desc_clipboard_fav", "Favoritos da área de transferência") },
                                 { keys: ["Num Lock"], desc: Theme.t("cheatsheet.desc_mic", "Mute / Unmute do microfone") },
                                 { keys: ["Vol + / -"], desc: Theme.t("cheatsheet.desc_vol", "Ajustar volume no OSD flutuante") },
                                 { keys: ["Brilho + / -"], desc: Theme.t("cheatsheet.desc_bright", "Ajustar brilho no OSD flutuante") }

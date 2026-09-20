@@ -1,6 +1,8 @@
 {
   "launcherIcon": "/usr/share/pixmaps/archlinux-logo.png",
   "pins": [
+    "kitty",
+    "dolphin",
     "zen",
     "discord",
     "steam"
