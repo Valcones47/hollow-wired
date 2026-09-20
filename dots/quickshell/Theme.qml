@@ -104,6 +104,7 @@ QtObject {
         logout: "\u{F0343}", restart: "\u{F0709}", power: "\u{F0425}", update: "\u{F03D4}",
         account: "\u{F0009}", arch: "\u{F08C7}", monitor: "\u{F0379}", clock: "\u{F0150}",
         prev: "\u{F04AE}", play: "\u{F040A}", pause: "\u{F03E4}", next: "\u{F04AD}",
+        shuffle: "\u{F049D}", repeat: "\u{F0456}", repeatOne: "\u{F0458}", repeatOff: "\u{F0457}",
         cpu: "\u{F0EE0}", memory: "\u{F035B}", disk: "\u{F02CA}", gpu: "\u{F08AE}",
         music: "\u{F0387}", confirm: "\u{F012C}",
         sunny: "\u{F0599}", night: "\u{F0594}", partly: "\u{F0595}", cloudy: "\u{F0590}",
