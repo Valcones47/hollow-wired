@@ -314,6 +314,11 @@ PanelWindow {
     property string bindCombo: ""
     property string bindConflict: ""
     property bool bindCapturing: false
+    property bool bindsSubPage: false
+    // Qual programa está esperando uma tecla. Com isso a gravação já salva
+    // sozinha ao capturar, em vez de exigir um terceiro clique.
+    property string bindRecordingFor: ""
+    property string bindRecordingName: ""
     readonly property var bindAppsFiltered: {
         const q = win.bindAppQuery.trim().toLowerCase();
         const all = win.availableApps || [];
@@ -490,9 +495,18 @@ PanelWindow {
                     if (d.status === "ok") {
                         win.bindCombo = d.key || "";
                         win.bindConflict = d.conflict || "";
+                        if (win.bindRecordingFor !== "" && win.bindCombo !== "") {
+                            saveAppBindProc.command = ["rice-app-binds", "add", win.bindCombo,
+                                                       win.bindRecordingFor, "--name", win.bindRecordingName];
+                            saveAppBindProc.running = true;
+                            win.showToast(win.bindRecordingName + ": " + win.bindCombo);
+                            win.bindRecordingFor = "";
+                        }
                     } else if (d.status === "timeout") {
+                        win.bindRecordingFor = "";
                         win.showToast(Theme.t("toast.bind_timeout", "Nenhuma tecla detectada"));
                     } else if (d.status === "cancelled") {
+                        win.bindRecordingFor = "";
                         win.showToast(Theme.t("toast.bind_cancelled", "Gravação cancelada"));
                     } else {
                         win.showToast(Theme.t("toast.bind_error", "Não consegui ler o teclado"));
@@ -6644,7 +6658,7 @@ PanelWindow {
                         // ==================== ABA 15: GUIA DE ATALHOS ====================
                         Flickable {
                             anchors.fill: parent
-                            visible: win.currentTab === 15
+                            visible: win.currentTab === 15 && !win.bindsSubPage
                             contentHeight: bindsCol.implicitHeight
                             clip: true
                             boundsBehavior: Flickable.StopAtBounds
@@ -6668,261 +6682,6 @@ PanelWindow {
                                         }
                                     }
                                     Item { Layout.fillWidth: true }
-                                }
-
-                                // ---------- Atalhos de aplicativos (estilo KDE) ----------
-                                // Antes, "personalizar atalhos" abria o user-binds.lua num
-                                // editor de texto e esperava que a pessoa soubesse escrever
-                                // Lua. Aqui é escolher o programa, apertar a combinação e
-                                // pronto — o rice-app-binds cuida do arquivo.
-                                SectionHeader {
-                                    title: Theme.t("binds.app_title", "Atalhos para Abrir Programas")
-                                    subtitle: Theme.t("binds.app_sub", "Escolha um programa, aperte a combinação de teclas que quiser e ela passa a funcionar na hora")
-                                }
-
-                                // Linha de criação
-                                Rectangle {
-                                    Layout.fillWidth: true
-                                    radius: 12
-                                    color: Theme.tile
-                                    border.width: 1
-                                    border.color: win.bindCapturing ? Theme.primary : Theme.withAlpha(Theme.outline, 0.2)
-                                    implicitHeight: newBindCol.implicitHeight + 28
-
-                                    ColumnLayout {
-                                        id: newBindCol
-                                        anchors.fill: parent
-                                        anchors.margins: 14
-                                        spacing: 10
-
-                                        RowLayout {
-                                            Layout.fillWidth: true
-                                            spacing: 10
-
-                                            // 1. programa
-                                            Rectangle {
-                                                Layout.fillWidth: true
-                                                implicitHeight: 34
-                                                radius: 8
-                                                color: Theme.background
-                                                border.width: 1
-                                                border.color: bindAppInput.activeFocus ? Theme.primary : Theme.withAlpha(Theme.outline, 0.2)
-
-                                                RowLayout {
-                                                    anchors.fill: parent
-                                                    anchors.margins: 8
-                                                    spacing: 6
-                                                    Text {
-                                                        text: Theme.icons.magnify
-                                                        font.family: Theme.iconFontFamily
-                                                        font.pixelSize: 13
-                                                        color: Theme.subtext
-                                                    }
-                                                    TextInput {
-                                                        id: bindAppInput
-                                                        Layout.fillWidth: true
-                                                        verticalAlignment: TextInput.AlignVCenter
-                                                        font.family: Theme.fontFamily
-                                                        font.pixelSize: 12
-                                                        color: Theme.textColor
-                                                        selectByMouse: true
-                                                        onTextChanged: {
-                                                            win.bindAppQuery = text;
-                                                            win.bindAppCommand = "";
-                                                            win.bindAppName = "";
-                                                        }
-                                                        Text {
-                                                            anchors.fill: parent
-                                                            verticalAlignment: Text.AlignVCenter
-                                                            visible: bindAppInput.text === ""
-                                                            text: Theme.t("binds.app_ph", "1. Procure o programa...")
-                                                            font.family: Theme.fontFamily
-                                                            font.pixelSize: 12
-                                                            color: Theme.subtext
-                                                        }
-                                                    }
-                                                }
-                                            }
-
-                                            // 2. combinação
-                                            ActionBtn {
-                                                icon: Theme.icons.cursor
-                                                primary: win.bindCapturing
-                                                text: win.bindCapturing
-                                                    ? Theme.t("binds.app_press", "Aperte a combinação agora...")
-                                                    : (win.bindCombo !== "" ? win.bindCombo
-                                                        : Theme.t("binds.app_record", "2. Gravar tecla"))
-                                                onClicked: {
-                                                    win.bindCapturing = true;
-                                                    win.bindConflict = "";
-                                                    recordAppBindProc.running = true;
-                                                }
-                                            }
-
-                                            // 3. salvar
-                                            ActionBtn {
-                                                icon: Theme.icons.check
-                                                primary: true
-                                                enabled: win.bindAppCommand !== "" && win.bindCombo !== ""
-                                                opacity: enabled ? 1 : 0.45
-                                                text: Theme.t("binds.app_save", "3. Criar atalho")
-                                                onClicked: {
-                                                    if (win.bindAppCommand === "" || win.bindCombo === "") return;
-                                                    saveAppBindProc.command = ["rice-app-binds", "add", win.bindCombo,
-                                                                              win.bindAppCommand, "--name", win.bindAppName];
-                                                    saveAppBindProc.running = true;
-                                                    win.showToast(Theme.t("toast.bind_saved", "Atalho criado: ") + win.bindCombo);
-                                                    win.bindCombo = "";
-                                                    win.bindConflict = "";
-                                                    bindAppInput.text = "";
-                                                }
-                                            }
-                                        }
-
-                                        // Aviso de conflito
-                                        Text {
-                                            Layout.fillWidth: true
-                                            visible: win.bindConflict !== ""
-                                            wrapMode: Text.WordWrap
-                                            text: Theme.t("binds.app_conflict", "Atenção: essa combinação já é usada por outro atalho do sistema. Criar mesmo assim vai substituí-la.")
-                                            font.family: Theme.fontFamily
-                                            font.pixelSize: 11
-                                            color: "#ffb347"
-                                        }
-
-                                        // Resultados da busca de programas
-                                        Flow {
-                                            Layout.fillWidth: true
-                                            visible: win.bindAppQuery.trim() !== "" && win.bindAppCommand === ""
-                                            spacing: 6
-
-                                            Repeater {
-                                                model: win.bindAppsFiltered
-                                                delegate: Rectangle {
-                                                    id: bindAppChip
-                                                    required property var modelData
-                                                    implicitHeight: 28
-                                                    implicitWidth: bindChipText.implicitWidth + 20
-                                                    radius: 7
-                                                    color: bindChipArea.containsMouse ? Theme.primary : Theme.background
-                                                    border.width: 1
-                                                    border.color: Theme.withAlpha(Theme.outline, 0.2)
-
-                                                    Text {
-                                                        id: bindChipText
-                                                        anchors.centerIn: parent
-                                                        text: bindAppChip.modelData.name
-                                                        font.family: Theme.fontFamily
-                                                        font.pixelSize: 11
-                                                        color: bindChipArea.containsMouse ? Theme.background : Theme.textColor
-                                                    }
-
-                                                    MouseArea {
-                                                        id: bindChipArea
-                                                        anchors.fill: parent
-                                                        hoverEnabled: true
-                                                        cursorShape: Qt.PointingHandCursor
-                                                        onClicked: {
-                                                            win.bindAppCommand = bindAppChip.modelData.exec || bindAppChip.modelData.name;
-                                                            win.bindAppName = bindAppChip.modelData.name;
-                                                            bindAppInput.text = bindAppChip.modelData.name;
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-
-                                // Lista dos atalhos já criados
-                                Text {
-                                    Layout.fillWidth: true
-                                    visible: win.appBinds.length === 0
-                                    text: Theme.t("binds.app_empty", "Você ainda não criou nenhum atalho de programa.")
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: 11
-                                    color: Theme.subtext
-                                }
-
-                                Repeater {
-                                    model: win.appBinds
-                                    delegate: Rectangle {
-                                        id: appBindCard
-                                        required property var modelData
-                                        Layout.fillWidth: true
-                                        implicitHeight: 48
-                                        radius: 10
-                                        color: Theme.tile
-                                        border.width: 1
-                                        border.color: Theme.withAlpha(Theme.outline, 0.2)
-
-                                        RowLayout {
-                                            anchors.fill: parent
-                                            anchors.margins: 10
-                                            spacing: 12
-
-                                            Rectangle {
-                                                implicitWidth: Math.max(96, comboLabel.implicitWidth + 18)
-                                                implicitHeight: 26
-                                                radius: 6
-                                                color: Theme.withAlpha(Theme.primary, 0.18)
-                                                Text {
-                                                    id: comboLabel
-                                                    anchors.centerIn: parent
-                                                    text: appBindCard.modelData.combo
-                                                    font.family: Theme.monoFamily
-                                                    font.pixelSize: 11
-                                                    font.weight: Font.DemiBold
-                                                    color: Theme.primary
-                                                }
-                                            }
-
-                                            ColumnLayout {
-                                                Layout.fillWidth: true
-                                                spacing: 1
-                                                Text {
-                                                    text: appBindCard.modelData.name
-                                                    font.family: Theme.fontFamily
-                                                    font.pixelSize: 12
-                                                    font.weight: Font.DemiBold
-                                                    color: Theme.textColor
-                                                }
-                                                Text {
-                                                    text: appBindCard.modelData.command
-                                                    font.family: Theme.monoFamily
-                                                    font.pixelSize: 10
-                                                    color: Theme.subtext
-                                                    elide: Text.ElideMiddle
-                                                    Layout.fillWidth: true
-                                                }
-                                            }
-
-                                            Rectangle {
-                                                implicitWidth: 28
-                                                implicitHeight: 28
-                                                radius: 8
-                                                color: rmBindArea.containsMouse ? Theme.critical : "transparent"
-                                                Text {
-                                                    anchors.centerIn: parent
-                                                    text: Theme.icons.trash
-                                                    font.family: Theme.iconFontFamily
-                                                    font.pixelSize: 14
-                                                    color: rmBindArea.containsMouse ? "#ffffff" : Theme.subtext
-                                                }
-                                                MouseArea {
-                                                    id: rmBindArea
-                                                    anchors.fill: parent
-                                                    hoverEnabled: true
-                                                    cursorShape: Qt.PointingHandCursor
-                                                    onClicked: {
-                                                        saveAppBindProc.command = ["rice-app-binds", "remove", appBindCard.modelData.combo];
-                                                        saveAppBindProc.running = true;
-                                                        win.showToast(Theme.t("toast.bind_removed", "Atalho removido"));
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
                                 }
 
                                 RowLayout {
@@ -7026,11 +6785,11 @@ PanelWindow {
 
                                             ActionBtn {
                                                 icon: Theme.icons.pencil
-                                                text: Theme.t("binds.custom_btn", "Editar Atalhos Customizados")
+                                                text: Theme.t("binds.custom_btn", "Gerenciar Atalhos dos Programas")
                                                 primary: true
                                                 onClicked: {
-                                                    Quickshell.execDetached(["rice-edit-user-binds"]);
-                                                    win.showToast(Theme.t("binds.opened_toast", "Abrindo user-binds.lua..."));
+                                                    loadAppBindsProc.running = true;
+                                                    win.bindsSubPage = true;
                                                 }
                                             }
                                         }
@@ -7162,6 +6921,321 @@ PanelWindow {
                                                         }
                                                     }
                                                 }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // ============ ABA 15b: GERENCIAR ATALHOS DOS PROGRAMAS ============
+                        // Sub-aba aberta pelo botão do guia. Aqui a lista é por
+                        // programa: cada linha mostra o atalho que ele tem (ou
+                        // que não tem) e deixa gravar, trocar ou apagar na hora.
+                        Flickable {
+                            anchors.fill: parent
+                            visible: win.currentTab === 15 && win.bindsSubPage
+                            contentHeight: subBindsCol.implicitHeight
+                            clip: true
+                            boundsBehavior: Flickable.StopAtBounds
+
+                            ColumnLayout {
+                                id: subBindsCol
+                                width: parent.width
+                                spacing: 14
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 12
+
+                                    ActionBtn {
+                                        icon: Theme.icons.chevronRight
+                                        text: Theme.t("binds.sub_back", "Voltar ao guia")
+                                        onClicked: {
+                                            win.bindsSubPage = false;
+                                            win.bindRecordingFor = "";
+                                            win.bindCapturing = false;
+                                        }
+                                    }
+                                    Item { Layout.fillWidth: true }
+                                    ActionBtn {
+                                        icon: Theme.icons.console
+                                        text: Theme.t("binds.sub_advanced", "Editar o arquivo (avançado)")
+                                        onClicked: {
+                                            Quickshell.execDetached(["rice-edit-user-binds"]);
+                                            win.showToast(Theme.t("binds.opened_toast", "Abrindo user-binds.lua..."));
+                                        }
+                                    }
+                                }
+
+                                SectionHeader {
+                                    title: Theme.t("binds.sub_title", "Atalhos dos Programas")
+                                    subtitle: Theme.t("binds.sub_desc", "Clique em Definir atalho, aperte a combinação de teclas e pronto. Esc cancela.")
+                                }
+
+                                // Faixa de captura em andamento
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    visible: win.bindCapturing
+                                    radius: 12
+                                    color: Qt.rgba(1, 0.65, 0.2, 0.12)
+                                    border.width: 1
+                                    border.color: Theme.primary
+                                    implicitHeight: 54
+
+                                    RowLayout {
+                                        anchors.fill: parent
+                                        anchors.margins: 14
+                                        spacing: 12
+                                        Text {
+                                            text: Theme.icons.cursor
+                                            font.family: Theme.iconFontFamily
+                                            font.pixelSize: 18
+                                            color: Theme.primary
+                                        }
+                                        ColumnLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 1
+                                            Text {
+                                                text: Theme.t("binds.sub_capturing", "Aperte a combinação de teclas agora...")
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: 13
+                                                font.weight: Font.DemiBold
+                                                color: Theme.textColor
+                                            }
+                                            Text {
+                                                text: win.bindRecordingName + " · " + Theme.t("binds.sub_capturing_hint", "Esc cancela")
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: 11
+                                                color: Theme.subtext
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    visible: win.bindConflict !== ""
+                                    wrapMode: Text.WordWrap
+                                    text: Theme.t("binds.app_conflict", "Atenção: essa combinação já era usada por outro atalho do sistema.")
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 11
+                                    color: "#ffb347"
+                                }
+
+                                // ---- programas que já têm atalho ----
+                                Text {
+                                    Layout.fillWidth: true
+                                    visible: win.appBinds.length > 0
+                                    text: Theme.t("binds.sub_with", "Com atalho definido")
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 11
+                                    font.weight: Font.DemiBold
+                                    color: Theme.subtext
+                                }
+
+                                Repeater {
+                                    model: win.appBinds
+                                    delegate: Rectangle {
+                                        id: boundRow
+                                        required property var modelData
+                                        Layout.fillWidth: true
+                                        implicitHeight: 52
+                                        radius: 10
+                                        color: Theme.tile
+                                        border.width: 1
+                                        border.color: Theme.withAlpha(Theme.primary, 0.35)
+
+                                        RowLayout {
+                                            anchors.fill: parent
+                                            anchors.margins: 10
+                                            spacing: 12
+
+                                            ColumnLayout {
+                                                Layout.fillWidth: true
+                                                spacing: 1
+                                                Text {
+                                                    text: boundRow.modelData.name
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 12
+                                                    font.weight: Font.DemiBold
+                                                    color: Theme.textColor
+                                                }
+                                                Text {
+                                                    Layout.fillWidth: true
+                                                    text: boundRow.modelData.command
+                                                    font.family: Theme.monoFamily
+                                                    font.pixelSize: 10
+                                                    color: Theme.subtext
+                                                    elide: Text.ElideMiddle
+                                                }
+                                            }
+
+                                            Rectangle {
+                                                implicitWidth: Math.max(100, boundCombo.implicitWidth + 20)
+                                                implicitHeight: 28
+                                                radius: 7
+                                                color: Theme.withAlpha(Theme.primary, 0.18)
+                                                Text {
+                                                    id: boundCombo
+                                                    anchors.centerIn: parent
+                                                    text: boundRow.modelData.combo
+                                                    font.family: Theme.monoFamily
+                                                    font.pixelSize: 11
+                                                    font.weight: Font.DemiBold
+                                                    color: Theme.primary
+                                                }
+                                            }
+
+                                            ActionBtn {
+                                                icon: Theme.icons.pencil
+                                                text: Theme.t("binds.sub_change", "Trocar")
+                                                onClicked: win.startBindCapture(boundRow.modelData.command, boundRow.modelData.name)
+                                            }
+
+                                            Rectangle {
+                                                implicitWidth: 28
+                                                implicitHeight: 28
+                                                radius: 8
+                                                color: rmRowArea.containsMouse ? Theme.critical : "transparent"
+                                                Text {
+                                                    anchors.centerIn: parent
+                                                    text: Theme.icons.trash
+                                                    font.family: Theme.iconFontFamily
+                                                    font.pixelSize: 14
+                                                    color: rmRowArea.containsMouse ? "#ffffff" : Theme.subtext
+                                                }
+                                                MouseArea {
+                                                    id: rmRowArea
+                                                    anchors.fill: parent
+                                                    hoverEnabled: true
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    onClicked: {
+                                                        saveAppBindProc.command = ["rice-app-binds", "remove", boundRow.modelData.combo];
+                                                        saveAppBindProc.running = true;
+                                                        win.showToast(Theme.t("toast.bind_removed", "Atalho removido"));
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // ---- procurar um programa para dar atalho ----
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    Layout.topMargin: 6
+                                    spacing: 12
+
+                                    Text {
+                                        text: Theme.t("binds.sub_add", "Dar atalho a outro programa")
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 11
+                                        font.weight: Font.DemiBold
+                                        color: Theme.subtext
+                                    }
+                                    Item { Layout.fillWidth: true }
+
+                                    Rectangle {
+                                        implicitWidth: 260
+                                        implicitHeight: 32
+                                        radius: 8
+                                        color: Theme.background
+                                        border.width: 1
+                                        border.color: subBindSearch.activeFocus ? Theme.primary : Theme.withAlpha(Theme.outline, 0.2)
+
+                                        RowLayout {
+                                            anchors.fill: parent
+                                            anchors.margins: 6
+                                            spacing: 6
+                                            Text {
+                                                text: Theme.icons.magnify
+                                                font.family: Theme.iconFontFamily
+                                                font.pixelSize: 13
+                                                color: Theme.subtext
+                                            }
+                                            TextInput {
+                                                id: subBindSearch
+                                                Layout.fillWidth: true
+                                                verticalAlignment: TextInput.AlignVCenter
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: 12
+                                                color: Theme.textColor
+                                                selectByMouse: true
+                                                onTextChanged: win.bindAppQuery = text
+                                                Text {
+                                                    anchors.fill: parent
+                                                    verticalAlignment: Text.AlignVCenter
+                                                    visible: subBindSearch.text === ""
+                                                    text: Theme.t("binds.app_ph2", "Procurar programa...")
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 12
+                                                    color: Theme.subtext
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    visible: win.bindAppQuery.trim() === ""
+                                    text: Theme.t("binds.sub_search_hint", "Digite o nome de um programa acima para dar um atalho a ele.")
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 11
+                                    color: Theme.subtext
+                                }
+
+                                Repeater {
+                                    model: win.bindAppsFiltered
+                                    delegate: Rectangle {
+                                        id: freeRow
+                                        required property var modelData
+                                        readonly property string cmd: freeRow.modelData.exec || freeRow.modelData.name
+                                        Layout.fillWidth: true
+                                        implicitHeight: 48
+                                        radius: 10
+                                        color: Theme.tile
+                                        border.width: 1
+                                        border.color: Theme.withAlpha(Theme.outline, 0.2)
+
+                                        RowLayout {
+                                            anchors.fill: parent
+                                            anchors.margins: 10
+                                            spacing: 12
+
+                                            ColumnLayout {
+                                                Layout.fillWidth: true
+                                                spacing: 1
+                                                Text {
+                                                    text: freeRow.modelData.name
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 12
+                                                    font.weight: Font.DemiBold
+                                                    color: Theme.textColor
+                                                }
+                                                Text {
+                                                    Layout.fillWidth: true
+                                                    text: freeRow.cmd
+                                                    font.family: Theme.monoFamily
+                                                    font.pixelSize: 10
+                                                    color: Theme.subtext
+                                                    elide: Text.ElideMiddle
+                                                }
+                                            }
+
+                                            Text {
+                                                text: Theme.t("binds.sub_none", "sem atalho")
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: 11
+                                                color: Theme.subtext
+                                            }
+
+                                            ActionBtn {
+                                                icon: Theme.icons.plus
+                                                primary: true
+                                                text: Theme.t("binds.sub_set", "Definir atalho")
+                                                onClicked: win.startBindCapture(freeRow.cmd, freeRow.modelData.name)
                                             }
                                         }
                                     }
@@ -8592,6 +8666,14 @@ PanelWindow {
         const c = win.pickerColor;
         const h = n => ("0" + Math.round(n * 255).toString(16)).slice(-2).toUpperCase();
         return "#" + h(c.r) + h(c.g) + h(c.b);
+    }
+
+    function startBindCapture(command, name) {
+        win.bindRecordingFor = command;
+        win.bindRecordingName = name;
+        win.bindConflict = "";
+        win.bindCapturing = true;
+        recordAppBindProc.running = true;
     }
 
     function openColorPicker(key, label, hex) {
