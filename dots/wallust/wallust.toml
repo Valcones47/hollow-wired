@@ -9,7 +9,10 @@
 
 backend = "full"
 palette = "salience"
-style = "dark"
+# A chave `style` existia ate o wallust 3 e nao faz mais nada no 4.x —
+# um wallpaper claro gerava fundo claro sem avisar. Quem garante que o
+# fundo nunca fica claro agora e o rice-colors (enforce_dark_background),
+# que roda logo depois do wallust e mexe so no fundo.
 
 salience = { sampling = "high", intensity = "vibrant" }
 

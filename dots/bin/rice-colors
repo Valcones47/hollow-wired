@@ -97,13 +97,73 @@ def norm(value):
     return "#" + v.lstrip("#").upper()
 
 
+# ------------------------------------------------- fundo sempre escuro
+
+# O rice é um tema escuro: fundo claro deixa o painel, a barra e as
+# notificações ilegíveis, porque todo o resto do shell assume texto claro.
+# O wallust não resolve isso sozinho — a chave `style = "dark"` existia até o
+# wallust 3 e virou no-op no 4.x (as paletas agora são só salience/ansi/kmeans),
+# então um wallpaper branco produzia um fundo branco sem reclamar de nada.
+# Só o fundo é forçado; as cores de destaque continuam saindo do wallpaper.
+MAX_BG_LUM = 0.16
+DARK_BG_VALUE = 0.075
+MIN_FG_LUM = 0.55
+
+
+def _rgb(hex_color):
+    h = hex_color.lstrip("#")
+    return tuple(int(h[i:i + 2], 16) / 255.0 for i in (0, 2, 4))
+
+
+def _hex(rgb):
+    return "#%02X%02X%02X" % tuple(max(0, min(255, int(round(c * 255)))) for c in rgb)
+
+
+def luminance(hex_color):
+    """Luminância relativa (WCAG) — 0 = preto, 1 = branco."""
+    out = []
+    for c in _rgb(hex_color):
+        out.append(c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4)
+    return 0.2126 * out[0] + 0.7152 * out[1] + 0.0722 * out[2]
+
+
+def _set_value(hex_color, value):
+    """Reescala a cor para um brilho alvo, preservando matiz e saturação."""
+    r, g, b = _rgb(hex_color)
+    peak = max(r, g, b)
+    if peak <= 0:
+        return _hex((value, value, value))
+    k = value / peak
+    return _hex((r * k, g * k, b * k))
+
+
+def enforce_dark_background(data):
+    """Escurece o fundo quando o wallpaper é claro, sem mexer nos destaques."""
+    if not isinstance(data, dict):
+        return data
+    bg = norm(data.get("background", ""))
+    if bg and luminance(bg) > MAX_BG_LUM:
+        data["background"] = _set_value(bg, DARK_BG_VALUE)
+        # color0 é o "preto" do terminal; num tema claro ele vem quase branco e
+        # sumiria contra o fundo novo.
+        c0 = norm(data.get("color0", ""))
+        if c0 and luminance(c0) > MAX_BG_LUM:
+            data["color0"] = _set_value(c0, DARK_BG_VALUE + 0.06)
+        # Com o fundo escuro, um texto escuro fica ilegível.
+        fg = norm(data.get("foreground", ""))
+        if fg and luminance(fg) < MIN_FG_LUM:
+            data["foreground"] = _set_value(fg, 0.93)
+    return data
+
+
 def base_palette():
     """Paleta vinda do wallpaper, sem as trocas do usuário."""
-    data = load_json(BASE)
+    data = enforce_dark_background(load_json(BASE))
     if not data:
         # Primeira execução: a saída atual do wallust ainda é limpa.
         data = load_json(WALLUST_JSON)
         if data:
+            enforce_dark_background(data)
             save_json(BASE, data)
     out = dict(FALLBACK)
     for k in KEYS:
@@ -223,6 +283,7 @@ def main():
         if not data:
             print("sem paleta do wallust para guardar", file=sys.stderr)
             return 1
+        enforce_dark_background(data)
         save_json(BASE, data)
         print("OK")
         return 0

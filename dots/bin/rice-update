@@ -171,7 +171,43 @@ apply_updates() {
     cp -a --remove-destination "$REPO_DIR/dots/kitty" "$HOME/.config/"
     [ -d "$REPO_DIR/dots/wallust" ] && cp -a "$REPO_DIR/dots/wallust" "$HOME/.config/"
     [ -d "$REPO_DIR/dots/xdg-desktop-portal" ] && cp -a "$REPO_DIR/dots/xdg-desktop-portal" "$HOME/.config/"
-    [ -d "$REPO_DIR/dots/fastfetch" ] && cp -a "$REPO_DIR/dots/fastfetch" "$HOME/.config/"
+    # fastfetch: o repositório traz módulos e cores novos, mas o bloco "logo"
+    # é escolha do usuário (imagem, tamanho, padding). Um `cp -a` direto jogava
+    # o config.jsonc do repo por cima e o ícone voltava pro padrão da distro a
+    # cada atualização — e, como o repo não grava width/height, o logo
+    # reaparecia no tamanho nativo, ocupando o terminal inteiro.
+    if [ -d "$REPO_DIR/dots/fastfetch" ]; then
+        local ff_user="$HOME/.config/fastfetch/config.jsonc"
+        local ff_logo=""
+        [ -f "$ff_user" ] && ff_logo=$(python3 - "$ff_user" <<'PYFF' 2>/dev/null || true
+import json, re, sys
+try:
+    raw = open(sys.argv[1], encoding="utf-8").read()
+    raw = re.sub(r'^\s*//.*$', '', raw, flags=re.MULTILINE)
+    logo = json.loads(raw).get("logo")
+    if logo and logo.get("source"):
+        print(json.dumps(logo))
+except Exception:
+    pass
+PYFF
+)
+        cp -a "$REPO_DIR/dots/fastfetch" "$HOME/.config/"
+        if [ -n "$ff_logo" ]; then
+            FF_LOGO="$ff_logo" python3 - "$ff_user" <<'PYFF' 2>/dev/null || true
+import json, os, re, sys
+try:
+    path = sys.argv[1]
+    raw = open(path, encoding="utf-8").read()
+    raw = re.sub(r'^\s*//.*$', '', raw, flags=re.MULTILINE)
+    cfg = json.loads(raw)
+    cfg["logo"] = json.loads(os.environ["FF_LOGO"])
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(cfg, f, indent=4, ensure_ascii=False)
+except Exception:
+    pass
+PYFF
+        fi
+    fi
     # mako: só instala se ainda não existir, pra não apagar os ajustes que o
     # usuário fez pela aba de Notificações do painel (rice-mako-apply).
     if [ -d "$REPO_DIR/dots/mako" ] && [ ! -f "$HOME/.config/mako/config" ]; then
