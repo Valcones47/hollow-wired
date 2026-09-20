@@ -86,6 +86,23 @@ hl.monitor({
 -- Layout de teclado: lê o do próprio sistema (/etc/vconsole.conf, escrito pelo
 -- localectl/instalador da distro). Antes era "br" fixo, o que dava acentos e
 -- símbolos errados pra quem instalasse o rice com teclado de outro país.
+-- Lê uma preferência booleana salva pelo painel em user-prefs.json.
+--
+-- Sem isso, o blur voltava sozinho a ligado a cada `hyprctl reload`: o valor
+-- estava fixo em `true` aqui, e a preferência do usuário só era aplicada uma
+-- vez, no autostart (`rice-hypr-prefs apply`). Quem desligava o blur via
+-- sidebar o via reaparecer em qualquer recarga da configuração.
+local function prefBool(key, default)
+    local f = io.open(home .. "/.config/hypr/user-prefs.json", "r")
+    if not f then return default end
+    local txt = f:read("*a")
+    f:close()
+    local v = txt:match('"' .. key .. '"%s*:%s*(%a+)')
+    if v == "true" then return true end
+    if v == "false" then return false end
+    return default
+end
+
 local function systemKbLayout()
     local f = io.open("/etc/vconsole.conf", "r")
     if f then
@@ -300,8 +317,9 @@ hl.config({
         },
 
         blur = {
-            enabled           = true,   -- desativado automaticamente em tela
-            -- cheia pelo script blur-fullscreen-toggle.sh (ver AUTOSTART).
+            -- Respeita o que ficou salvo no painel; desativado automaticamente
+            -- em tela cheia pelo blur-fullscreen-toggle.sh (ver AUTOSTART).
+            enabled           = prefBool("blur", true),
             size              = 3,      -- mínimo visual viável pra Intel UHD
             passes            = 1,      -- 1 pass = custo mínimo de blur
             vibrancy          = 0.20,
@@ -460,14 +478,14 @@ hl.bind(mainMod .. " + L", hl.dsp.exec_cmd("hyprlock"))
 -- moviam só o foco entre janelas — algo que quem vem do Windows não procura,
 -- enquanto trocar de workspace é a ação do dia a dia (e já existia escondida
 -- na roda do mouse). Mover o foco continua disponível em Super + Alt + setas.
-hl.bind(mainMod .. " + left",  hl.dsp.focus({ workspace = "e-1" }))
-hl.bind(mainMod .. " + right", hl.dsp.focus({ workspace = "e+1" }))
+hl.bind(mainMod .. " + left",  hl.dsp.focus({ workspace = "-1" }))
+hl.bind(mainMod .. " + right", hl.dsp.focus({ workspace = "+1" }))
 hl.bind(mainMod .. " + up",    hl.dsp.focus({ direction = "up" }))
 hl.bind(mainMod .. " + down",  hl.dsp.focus({ direction = "down" }))
 
 -- Levar a janela atual junto para a área de trabalho do lado.
-hl.bind(mainMod .. " + SHIFT + left",  hl.dsp.window.move({ workspace = "e-1" }))
-hl.bind(mainMod .. " + SHIFT + right", hl.dsp.window.move({ workspace = "e+1" }))
+hl.bind(mainMod .. " + SHIFT + left",  hl.dsp.window.move({ workspace = "-1" }))
+hl.bind(mainMod .. " + SHIFT + right", hl.dsp.window.move({ workspace = "+1" }))
 
 -- Foco entre janelas, que era o papel antigo do Super + setas.
 hl.bind(mainMod .. " + ALT + left",  hl.dsp.focus({ direction = "left" }))
@@ -515,8 +533,11 @@ end
 hl.bind("CTRL + ALT + Delete", hl.dsp.exec_cmd("quickshell ipc call sidebar toggle"))
 hl.bind("CTRL + ALT + delete", hl.dsp.exec_cmd("quickshell ipc call sidebar toggle"))
 
-hl.bind(mainMod .. " + mouse_down", hl.dsp.focus({ workspace = "e+1" }))
-hl.bind(mainMod .. " + mouse_up",   hl.dsp.focus({ workspace = "e-1" }))
+-- "e+1"/"e-1" são aceitos sem erro mas não movem nada neste provider Lua:
+-- o Super + roda do mouse estava quebrado em silêncio. O relativo que funciona
+-- é "+1"/"-1" (confirmado por teste).
+hl.bind(mainMod .. " + mouse_down", hl.dsp.focus({ workspace = "+1" }))
+hl.bind(mainMod .. " + mouse_up",   hl.dsp.focus({ workspace = "-1" }))
 
 hl.bind(mainMod .. " + mouse:272", hl.dsp.window.drag(),   { mouse = true })
 hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
