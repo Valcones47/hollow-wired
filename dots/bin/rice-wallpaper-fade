@@ -32,6 +32,12 @@ qs_call() {
 }
 
 PREFS="$HOME/.config/hypr/user-prefs.json"
+LOG="/tmp/rice-wallfade.log"
+
+# Sem isto, "a transição não funciona" vira adivinhação: não dá para saber se o
+# problema é quem chama, a imagem, o IPC ou o tempo. Mesma ideia do log dos
+# atalhos do Discord.
+trace() { printf '%s %s\n' "$(date '+%H:%M:%S')" "$*" >> "$LOG" 2>/dev/null || true; }
 
 # Grava a preferência sem depender de jq: o arquivo é o mesmo dos gaps/blur e
 # não pode ser reescrito do zero, senão o resto das preferências se perde.
@@ -94,7 +100,12 @@ case "${1:-}" in
 
         # Um instante a mais depois de o processo aparecer: ele ainda precisa
         # desenhar o primeiro quadro, e revelar antes disso mostra preto.
-        [ "$ready" = "1" ] && sleep 0.45
+        if [ "$ready" = "1" ]; then
+            trace "renderizador novo no ar: $target"
+            sleep 0.45
+        else
+            trace "renderizador novo NÃO apareceu em 8s: $target"
+        fi
         qs_call reveal >/dev/null 2>&1 || true
         exit 0
         ;;
@@ -106,10 +117,17 @@ case "${1:-}" in
         # Cobre a tela e imprime, em ms, quanto o chamador deve esperar antes de
         # trocar o wallpaper de verdade. Imprime 0 quando não houve transição.
         [ -n "${2:-}" ] || { echo "uso: rice-wallpaper-fade --cover <preview>" >&2; exit 2; }
-        if [ ! -f "$2" ] || ! qs_call cover "$2" >/dev/null; then
+        if [ ! -f "$2" ]; then
+            trace "cover FALHOU: imagem inexistente: $2"
             echo 0
             exit 0
         fi
+        if ! qs_call cover "$2" >/dev/null; then
+            trace "cover FALHOU: IPC do quickshell não respondeu (qs_bin='$qs_bin')"
+            echo 0
+            exit 0
+        fi
+        trace "cover ok: $2"
         d=$(qs_call coverDelay 2>/dev/null | tr -cd '0-9')
         [ -n "$d" ] || d=820
         echo "$d"
