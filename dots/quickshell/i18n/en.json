@@ -930,11 +930,13 @@
   "binds.sub_desc": "Click Set shortcut, press the key combination and you are done. Esc cancels.",
   "binds.sub_capturing": "Press the key combination now...",
   "binds.sub_capturing_hint": "Esc cancels",
-  "binds.sub_with": "With a shortcut",
+  "binds.sub_with": "Programs with a shortcut",
   "binds.sub_add": "Give a shortcut to another program",
   "binds.sub_search_hint": "Type a program name above to give it a shortcut.",
   "binds.sub_none": "no shortcut",
   "binds.sub_set": "Set shortcut",
   "binds.sub_change": "Change",
-  "binds.app_ph2": "Search program..."
+  "binds.app_ph2": "Search program...",
+  "binds.sub_from_rice": "rice shortcut",
+  "binds.sub_from_file": "hand-written"
 }

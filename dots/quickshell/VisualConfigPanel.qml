@@ -7027,7 +7027,7 @@ PanelWindow {
                                 Text {
                                     Layout.fillWidth: true
                                     visible: win.appBinds.length > 0
-                                    text: Theme.t("binds.sub_with", "Com atalho definido")
+                                    text: Theme.t("binds.sub_with", "Programas com atalho")
                                     font.family: Theme.fontFamily
                                     font.pixelSize: 11
                                     font.weight: Font.DemiBold
@@ -7039,12 +7039,18 @@ PanelWindow {
                                     delegate: Rectangle {
                                         id: boundRow
                                         required property var modelData
+                                        // "managed" = criado por aqui, então dá para trocar e
+                                        // apagar. Os outros vêm do hyprland.lua do rice ou de
+                                        // linhas que a pessoa escreveu à mão: aparecem para ela
+                                        // saber que existem, mas não são mexidos daqui.
+                                        readonly property bool managed: (boundRow.modelData.source || "managed") === "managed"
                                         Layout.fillWidth: true
                                         implicitHeight: 52
                                         radius: 10
                                         color: Theme.tile
                                         border.width: 1
-                                        border.color: Theme.withAlpha(Theme.primary, 0.35)
+                                        border.color: boundRow.managed ? Theme.withAlpha(Theme.primary, 0.35)
+                                                                       : Theme.withAlpha(Theme.outline, 0.2)
 
                                         RowLayout {
                                             anchors.fill: parent
@@ -7087,13 +7093,25 @@ PanelWindow {
                                                 }
                                             }
 
+                                            Text {
+                                                visible: !boundRow.managed
+                                                text: (boundRow.modelData.source === "system")
+                                                    ? Theme.t("binds.sub_from_rice", "atalho do rice")
+                                                    : Theme.t("binds.sub_from_file", "escrito à mão")
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: 10
+                                                color: Theme.subtext
+                                            }
+
                                             ActionBtn {
+                                                visible: boundRow.managed
                                                 icon: Theme.icons.pencil
                                                 text: Theme.t("binds.sub_change", "Trocar")
                                                 onClicked: win.startBindCapture(boundRow.modelData.command, boundRow.modelData.name)
                                             }
 
                                             Rectangle {
+                                                visible: boundRow.managed
                                                 implicitWidth: 28
                                                 implicitHeight: 28
                                                 radius: 8

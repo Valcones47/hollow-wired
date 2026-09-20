@@ -27,6 +27,7 @@ import sys
 
 HOME = os.path.expanduser("~")
 USER_BINDS = os.path.join(HOME, ".config/hypr/user-binds.lua")
+HYPR_LUA = os.path.join(HOME, ".config/hypr/hyprland.lua")
 
 BEGIN = "-- >>> rice-app-binds: atalhos criados pelo painel (Super + I) >>>"
 END = "-- <<< rice-app-binds <<<"
@@ -59,6 +60,81 @@ def split_block(text):
     if j == -1:
         return text[:i], text[i + len(BEGIN):], ""
     return text[:i], text[i + len(BEGIN):j], text[j + len(END):]
+
+
+# Atalhos que abrem programas e que NÃO foram criados por aqui: os que o rice
+# já traz no hyprland.lua e os que a pessoa escreveu à mão no user-binds.lua
+# fora do bloco gerenciado. Sem varrer os dois, o painel dizia "você ainda não
+# criou nenhum atalho" com três atalhos funcionando na máquina.
+SCAN_RE = re.compile(
+    r'hl\.bind\(\s*"(?P<combo>[^"]+)"\s*,\s*hl\.dsp\.exec_cmd\((?P<expr>.+?)\)\s*\)'
+)
+
+RUNTIMES = {"python", "python3", "bash", "sh", "node", "flatpak", "env"}
+
+
+def expr_to_command(expr):
+    """Transforma a expressão Lua num comando legível."""
+    parts = re.findall(r'"([^"]*)"|(\bhome\b)', expr)
+    out = []
+    for literal, is_home in parts:
+        out.append("~" if is_home else literal)
+    text = "".join(out).strip()
+    return re.sub(r"\s+", " ", text)
+
+
+def command_to_name(command):
+    tokens = [t for t in command.split(" ") if t]
+    if not tokens:
+        return command
+    first = os.path.basename(tokens[0])
+    # "python .../tray.py" fica mais claro como "tray" do que como "python".
+    if first in RUNTIMES and len(tokens) > 1:
+        for t in tokens[1:]:
+            if not t.startswith("-"):
+                first = os.path.basename(t)
+                break
+    return os.path.splitext(first)[0] or command
+
+
+def scan_external():
+    found = []
+    seen = set()
+
+    # user-binds.lua, só o que está FORA do bloco gerenciado
+    before, _, after = split_block(read_file())
+    sources = [(before + "\n" + after, "user")]
+    try:
+        with open(HYPR_LUA, "r", encoding="utf-8") as f:
+            sources.append((f.read(), "system"))
+    except OSError:
+        pass
+
+    for text, origin in sources:
+        for line in text.split("\n"):
+            stripped = line.strip()
+            if stripped.startswith("--"):
+                continue  # linha comentada (os exemplos do arquivo)
+            m = SCAN_RE.search(stripped)
+            if not m:
+                continue
+            command = expr_to_command(m.group("expr"))
+            if not command:
+                continue
+            # Só o que abre programa: comandos internos do shell não contam.
+            if command.startswith(("quickshell ", "hyprctl ", "rice-", "qs ")):
+                continue
+            combo = normalize(m.group("combo"))
+            if combo in seen:
+                continue
+            seen.add(combo)
+            found.append({
+                "combo": combo,
+                "command": command,
+                "name": command_to_name(command),
+                "source": origin,
+            })
+    return found
 
 
 def load_binds():
@@ -123,7 +199,13 @@ def main():
     cmd = args[0] if args else "list"
 
     if cmd == "list":
-        print(json.dumps({"binds": load_binds(), "file": USER_BINDS}, ensure_ascii=False))
+        mine = load_binds()
+        for b in mine:
+            b["source"] = "managed"
+        taken = {b["combo"] for b in mine}
+        others = [b for b in scan_external() if b["combo"] not in taken]
+        print(json.dumps({"binds": mine + others, "file": USER_BINDS},
+                         ensure_ascii=False))
         return 0
 
     if cmd == "record":

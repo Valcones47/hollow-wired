@@ -930,11 +930,13 @@
   "binds.sub_desc": "Clique em Definir atalho, aperte a combinação de teclas e pronto. Esc cancela.",
   "binds.sub_capturing": "Aperte a combinação de teclas agora...",
   "binds.sub_capturing_hint": "Esc cancela",
-  "binds.sub_with": "Com atalho definido",
+  "binds.sub_with": "Programas com atalho",
   "binds.sub_add": "Dar atalho a outro programa",
   "binds.sub_search_hint": "Digite o nome de um programa acima para dar um atalho a ele.",
   "binds.sub_none": "sem atalho",
   "binds.sub_set": "Definir atalho",
   "binds.sub_change": "Trocar",
-  "binds.app_ph2": "Procurar programa..."
+  "binds.app_ph2": "Procurar programa...",
+  "binds.sub_from_rice": "atalho do rice",
+  "binds.sub_from_file": "escrito à mão"
 }
