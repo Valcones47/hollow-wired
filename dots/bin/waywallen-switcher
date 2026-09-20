@@ -514,11 +514,28 @@ class SwitcherWindow(Gtk.ApplicationWindow):
             return
         wallpaper = self.wallpapers[self.selected]
 
-        # Transição suave: cobre a tela com o preview estático do wallpaper que
-        # está entrando ANTES de mandar trocar. O wallpaper antigo continua
-        # animando por baixo enquanto a imagem aparece, e o engasgo do
-        # renderizador (de alguns quadros a quase um segundo, dependendo do
-        # wallpaper) acontece com a tela já coberta. Ver rice-wallpaper-fade.
+        # O carrossel sai da frente ANTES da transição começar.
+        #
+        # Na primeira versão a ordem era: cobre a tela, espera, troca, fecha o
+        # carrossel. Só que o carrossel é uma superfície de overlay no meio da
+        # tela: a varredura inteira acontecia atrás dele, e quando ele saía a
+        # cobertura já tinha terminado. O usuário via uma imagem parada e
+        # depois a mesma imagem viva — nenhuma transição, que foi exatamente o
+        # relato.
+        self.applying = True
+        self.close_animated()
+        # close_animated() agenda `_quit` para quando o painel terminar de
+        # sumir — com um timer paralelo, o processo morria antes de a transição
+        # começar. Trocar o gancho faz a cobertura começar exatamente quando o
+        # carrossel sai da tela, que é o instante certo.
+        self._on_disappeared = lambda: self._cover_then_apply(wallpaper)
+
+    def _cover_then_apply(self, wallpaper):
+        """Cobre a tela com a imagem do wallpaper novo e agenda a troca.
+
+        A troca de verdade só é mandada depois que a tela está coberta, senão o
+        engasgo do renderizador aparece no meio da varredura.
+        """
         still = self._still_for(wallpaper)
 
         delay = 0
@@ -534,7 +551,6 @@ class SwitcherWindow(Gtk.ApplicationWindow):
                 delay = 0
 
         if delay > 0:
-            self.applying = True
             GLib.timeout_add(delay, self._apply_now, wallpaper)
         else:
             self._apply_now(wallpaper)
@@ -645,7 +661,10 @@ class SwitcherWindow(Gtk.ApplicationWindow):
                 start_new_session=True,
             )
 
-        self.close_animated()
+        # O carrossel já saiu lá no começo; aqui só resta encerrar o processo,
+        # e sem pressa: a espera pela revelação foi destacada e segue sozinha.
+        self.applying = False
+        GLib.timeout_add(120, self._quit)
         return GLib.SOURCE_REMOVE
 
     def close_animated(self):
