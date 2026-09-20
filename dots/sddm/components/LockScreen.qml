@@ -7,9 +7,34 @@ Item {
     id: lockScreen
     signal loginRequested
 
-    // TODO: Support for weather info?
+    // Véu escuro em degradê partindo da base: garante que o relógio, a data e o
+    // aviso "pressione qualquer tecla" continuem legíveis em qualquer wallpaper,
+    // inclusive nos claros, sem precisar escurecer a imagem inteira.
+    Rectangle {
+        anchors.fill: parent
+        z: -2
+        gradient: Gradient {
+            GradientStop { position: 0.0; color: Qt.rgba(0, 0, 0, 0.45) }
+            GradientStop { position: 0.45; color: Qt.rgba(0, 0, 0, 0.12) }
+            GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, 0.55) }
+        }
+    }
+
+    // Animação de entrada: o conteúdo sobe e aparece suavemente quando a tela
+    // de bloqueio surge, em vez de simplesmente piscar na tela.
+    property real introProgress: 0.0
+    NumberAnimation on introProgress {
+        running: true
+        from: 0.0
+        to: 1.0
+        duration: Config.enableAnimations ? 650 : 0
+        easing.type: Easing.OutCubic
+    }
+
     ColumnLayout {
         id: timePositioner
+        opacity: lockScreen.introProgress
+        transform: Translate { y: (1.0 - lockScreen.introProgress) * 18 }
         spacing: Config.dateMarginTop
         Text {
             id: time
@@ -35,7 +60,10 @@ Item {
             color: Config.dateColor
 
             function updateDate() {
-                var dStr = new Date().toLocaleString(Qt.locale("pt_BR"), Config.dateFormat);
+                // Qt.locale() = idioma do sistema. Fixar "pt_BR" aqui fazia a
+                // tela de login de quem instala o rice em outro idioma mostrar
+                // a data em português.
+                var dStr = new Date().toLocaleString(Qt.locale(), Config.dateFormat);
                 if (dStr && dStr.length > 0) {
                     text = dStr.charAt(0).toUpperCase() + dStr.slice(1);
                 } else {
@@ -71,6 +99,21 @@ Item {
         id: messagePositioner
         visible: Config.lockMessageDisplay
         spacing: Config.lockMessageSpacing
+
+        // "Respiração" no aviso de destravar: deixa claro que a tela está viva
+        // e esperando uma tecla — especialmente pra quem vem do Windows e não
+        // sabe que basta apertar qualquer coisa.
+        opacity: Config.enableAnimations ? 0 : 1
+        SequentialAnimation on opacity {
+            running: Config.enableAnimations
+            PauseAnimation { duration: 400 }
+            NumberAnimation { to: 1.0; duration: 500; easing.type: Easing.OutCubic }
+            SequentialAnimation {
+                loops: Animation.Infinite
+                NumberAnimation { to: 0.55; duration: 1600; easing.type: Easing.InOutSine }
+                NumberAnimation { to: 1.0;  duration: 1600; easing.type: Easing.InOutSine }
+            }
+        }
         Image {
             id: lockIcon
             source: Config.getIcon(Config.lockMessageIcon)

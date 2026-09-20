@@ -1,0 +1,193 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# rice-wallpaper-set — define o papel de parede estático do desktop.
+#
+# O rice nasceu em cima do Waywallen (Wallpaper Engine via Flatpak), que exige
+# ter comprado o Wallpaper Engine na Steam. Quem instala o rice sem isso ficava
+# com a área de trabalho totalmente preta e, de quebra, sem paleta de cores
+# (o wallust é alimentado pelo wallpaper). Este script resolve os dois: aplica
+# uma imagem com o hyprpaper, regenera as cores e atualiza a tela de login.
+#
+# Uso:
+#   rice-wallpaper-set                 # abre o seletor gráfico de arquivos
+#   rice-wallpaper-set /caminho/img    # aplica a imagem informada
+#   rice-wallpaper-set --generate      # cria e aplica um fundo gerado do zero
+#   rice-wallpaper-set --ensure        # só aplica algo se ainda não há wallpaper
+#   rice-wallpaper-set --reload        # reaplica o wallpaper salvo (autostart)
+# ==============================================================================
+
+set -uo pipefail
+
+CONF_DIR="$HOME/.config/hypr"
+POINTER="$CONF_DIR/wallpaper.path"
+HYPRPAPER_CONF="$CONF_DIR/hyprpaper.conf"
+WALL_DIR="$HOME/.local/share/hollow-wired/wallpapers"
+GENERATED="$WALL_DIR/hollow-wired-default.png"
+
+log() { echo "$@"; }
+have() { command -v "$1" >/dev/null 2>&1; }
+
+notify() {
+    have notify-send && notify-send -a "Papel de Parede" -i preferences-desktop-wallpaper -t 3000 "$1" "${2:-}" 2>/dev/null
+}
+
+# ------------------------------------------------------------------ gerador
+# Fundo gerado a partir da paleta atual do wallust: degradê diagonal + brilho
+# suave no canto + granulado leve, pra não parecer um degradê chapado.
+generate_wallpaper() {
+    have magick || { echo "[✗] imagemagick não instalado" >&2; return 1; }
+
+    local colors_file="$CONF_DIR/colors.conf"
+    local bg="#12100F" accent="#3A2C2B"
+    if [ -f "$colors_file" ]; then
+        bg="$(awk -F'= *' '/^\$wallust_background/{print $2; exit}' "$colors_file" 2>/dev/null || echo "$bg")"
+        accent="$(awk -F'= *' '/^\$wallust_accent1/{print $2; exit}' "$colors_file" 2>/dev/null || echo "$accent")"
+    fi
+    [ -z "$bg" ] && bg="#12100F"
+    [ -z "$accent" ] && accent="#3A2C2B"
+
+    local w h
+    read -r w h < <(hyprctl monitors -j 2>/dev/null \
+        | jq -r '[.[] | select(.focused == true)][0] | "\(.width) \(.height)"' 2>/dev/null \
+        | grep -E '^[0-9]+ [0-9]+$' || true)
+    [ -z "${w:-}" ] && w=1920
+    [ -z "${h:-}" ] && h=1080
+
+    mkdir -p "$WALL_DIR"
+    # Camadas: degradê diagonal → brilho radial deslocado (dá profundidade) →
+    # anel suave de destaque → granulado fino. Tudo em cima da paleta do wallust.
+    magick -size "${w}x${h}" -define gradient:angle=145 "gradient:${accent}-${bg}" \
+        \( -size "${w}x${h}" radial-gradient:"${accent}"-"${bg}" \
+           -resize 170% -gravity southeast -extent "${w}x${h}" \) \
+        -compose overlay -composite \
+        \( -size "${w}x${h}" xc:black -fill none -stroke "$accent" -strokewidth 2 \
+           -draw "circle $((w * 72 / 100)),$((h * 30 / 100)) $((w * 72 / 100)),$((h * 30 / 100 - h * 34 / 100))" \
+           -blur 0x26 \) \
+        -compose screen -composite \
+        \( -size "${w}x${h}" xc:gray50 +noise Gaussian -colorspace Gray -attenuate 0.5 \) \
+        -compose softlight -composite \
+        -brightness-contrast -6x5 \
+        "$GENERATED" 2>/dev/null || return 1
+
+    echo "$GENERATED"
+}
+
+# ------------------------------------------------------------------ seletor
+pick_file() {
+    local start
+    start="$(xdg-user-dir PICTURES 2>/dev/null || echo "$HOME")"
+    if have zenity; then
+        zenity --file-selection --title="Escolha o papel de parede" \
+            --filename="$start/" \
+            --file-filter="Imagens (*.png *.jpg *.jpeg *.webp *.bmp) | *.png *.jpg *.jpeg *.webp *.bmp *.PNG *.JPG *.JPEG *.WEBP *.BMP" \
+            2>/dev/null
+    elif have kdialog; then
+        kdialog --getopenfilename "$start" "Imagens (*.png *.jpg *.jpeg *.webp *.bmp)" 2>/dev/null
+    fi
+}
+
+# ------------------------------------------------------------------- aplica
+write_hyprpaper_conf() {
+    local img="$1"
+    mkdir -p "$CONF_DIR"
+    {
+        echo "# Gerado por rice-wallpaper-set — não edite à mão."
+        echo "preload = $img"
+        # Sem nome de monitor = vale para todos (inclusive os que forem plugados depois).
+        echo "wallpaper = ,$img"
+        echo "splash = false"
+        echo "ipc = on"
+    } > "$HYPRPAPER_CONF"
+}
+
+apply_wallpaper() {
+    local img="$1"
+    [ -f "$img" ] || { echo "[✗] Arquivo não encontrado: $img" >&2; return 1; }
+    img="$(realpath "$img")"
+
+    mkdir -p "$CONF_DIR"
+    printf '%s\n' "$img" > "$POINTER"
+    write_hyprpaper_conf "$img"
+
+    if ! have hyprpaper; then
+        echo "[!] hyprpaper não instalado. Instale com: sudo pacman -S hyprpaper"
+        return 1
+    fi
+
+    if pgrep -x hyprpaper >/dev/null 2>&1; then
+        # Troca ao vivo, sem reiniciar o daemon.
+        hyprctl hyprpaper unload all >/dev/null 2>&1
+        hyprctl hyprpaper preload "$img" >/dev/null 2>&1
+        hyprctl hyprpaper wallpaper ",$img" >/dev/null 2>&1
+    else
+        (setsid hyprpaper >/dev/null 2>&1 &)
+    fi
+
+    # Paleta do sistema a partir da nova imagem.
+    if have wallust; then
+        wallust run "$img" >/dev/null 2>&1 || true
+    fi
+    # Fundo da tela de login.
+    if have rice-sddm-sync-wallpaper; then
+        rice-sddm-sync-wallpaper --quiet >/dev/null 2>&1 || true
+    fi
+
+    log "[✓] Papel de parede aplicado: $img"
+    notify "Papel de parede aplicado" "$(basename "$img")"
+}
+
+waywallen_active() {
+    # Quem usa o Wallpaper Engine não deve ter o hyprpaper brigando pelo fundo.
+    pgrep -f "waywallen" >/dev/null 2>&1
+}
+
+MODE="${1:-pick}"
+case "$MODE" in
+    --generate)
+        IMG="$(generate_wallpaper)" || exit 1
+        apply_wallpaper "$IMG"
+        ;;
+
+    --ensure)
+        # Chamado pelo instalador e pelo autostart: só age se não houver
+        # nenhum wallpaper configurado e nenhum Wallpaper Engine rodando.
+        if waywallen_active; then
+            exit 0
+        fi
+        if [ -f "$POINTER" ] && [ -f "$(cat "$POINTER" 2>/dev/null)" ]; then
+            exit 0
+        fi
+        EXISTING="$(rice-wallpaper-current 2>/dev/null || true)"
+        if [ -n "$EXISTING" ] && [ -f "$EXISTING" ]; then
+            W="$(ffprobe -v error -select_streams v:0 -show_entries stream=width -of csv=p=0 "$EXISTING" 2>/dev/null || echo 0)"
+            if [ "${W:-0}" -ge 1280 ]; then
+                apply_wallpaper "$EXISTING"
+                exit $?
+            fi
+        fi
+        IMG="$(generate_wallpaper)" || exit 1
+        apply_wallpaper "$IMG"
+        ;;
+
+    --reload)
+        if waywallen_active; then exit 0; fi
+        if [ -f "$POINTER" ]; then
+            IMG="$(cat "$POINTER" 2>/dev/null)"
+            [ -f "$IMG" ] && apply_wallpaper "$IMG"
+        fi
+        ;;
+
+    -h|--help)
+        sed -n '2,19p' "$0"
+        ;;
+
+    pick)
+        SEL="$(pick_file)"
+        [ -z "$SEL" ] && exit 0
+        apply_wallpaper "$SEL"
+        ;;
+
+    *)
+        apply_wallpaper "$MODE"
+        ;;
+esac

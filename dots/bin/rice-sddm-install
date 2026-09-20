@@ -1,5 +1,28 @@
 #!/bin/bash
+# ==============================================================================
+# rice-sddm-install — instala e configura a tela de login (SDDM + SilentSDDM).
+#
+# Precisa rodar como root (o rice-apply-boot-login já cuida do sudo).
+#
+# O que ele garante, em ordem:
+#   1. O pacote do SDDM está instalado e é ele o gerenciador de login ativo.
+#   2. O tema base SilentSDDM existe de verdade em /usr/share/sddm/themes —
+#      antes só as customizações do rice eram copiadas, então numa máquina
+#      nova faltava o Main.qml e a tela de login caía no tema padrão feio.
+#   3. As customizações do rice (componentes, cores, ícones) por cima.
+#   4. A foto do usuário aparece no login (o greeter roda como usuário "sddm"
+#      e não consegue ler /home/fulano quando a pasta é 700, que é o padrão
+#      em várias distros — por isso a foto é copiada pra um lugar legível).
+#   5. A sessão padrão do primeiro login é o Hyprland (antes vinha a primeira
+#      da lista em ordem alfabética, que costuma ser "Gamescope").
+#   6. Um fundo de tela bonito já gerado a partir do wallpaper atual.
+# ==============================================================================
 set -e
+
+if [ "$(id -u)" -ne 0 ]; then
+  echo "Este script precisa rodar como root. Use: sudo rice-sddm-install"
+  exit 1
+fi
 
 # Detect target real user and HOME (even if run under sudo)
 REAL_USER="${SUDO_USER:-$USER}"
@@ -7,6 +30,10 @@ USER_HOME=$(getent passwd "$REAL_USER" | cut -d: -f6)
 if [ -z "$USER_HOME" ]; then
   USER_HOME="$HOME"
 fi
+
+THEME_NAME="SilentSDDM"
+THEME_DIR="/usr/share/sddm/themes/$THEME_NAME"
+UPSTREAM_URL="https://github.com/uiriansan/SilentSDDM/releases/latest/download/SilentSDDM.tar.gz"
 
 echo "========================================================="
 echo "   Configurando SDDM (SilentSDDM + Hyprland + Wallust)   "
@@ -25,26 +52,106 @@ for candidate in \
   fi
 done
 
-THEME_DIR="/usr/share/sddm/themes/SilentSDDM"
-if [ ! -d "$THEME_DIR" ]; then
-  echo "==> Criando diretório de tema em $THEME_DIR..."
-  mkdir -p "$THEME_DIR"
+# ---------------------------------------------------------------- 1. pacote
+if ! command -v sddm >/dev/null 2>&1; then
+  echo "==> SDDM não está instalado. Instalando..."
+  pacman -S --needed --noconfirm sddm qt6-svg qt6-declarative qt6-multimedia || {
+    echo "[✗] Não consegui instalar o SDDM. Instale manualmente: sudo pacman -S sddm"
+    exit 1
+  }
 fi
 
+# ------------------------------------------------------------ 2. tema base
+# O tema é mais do que os arquivos customizados daqui: precisa do Main.qml,
+# dos componentes originais (PasswordInput, Spinner, PowerMenu...) e das fontes.
+install_base_theme() {
+  # (a) já instalado?
+  if [ -f "$THEME_DIR/Main.qml" ]; then
+    return 0
+  fi
+
+  # (b) outra cópia do mesmo tema já presente no sistema (ex.: pacote AUR
+  #     sddm-silent-theme, que instala em .../themes/silent)
+  local found=""
+  for dir in /usr/share/sddm/themes/*/; do
+    [ -f "$dir/Main.qml" ] || continue
+    case "$(basename "$dir")" in
+      silent|Silent|silent-sddm|SilentSDDM) found="$dir" ;;
+    esac
+    [ -n "$found" ] && break
+  done
+  if [ -n "$found" ] && [ "$(realpath "$found")" != "$(realpath "$THEME_DIR" 2>/dev/null)" ]; then
+    echo "==> Copiando tema base de $found..."
+    mkdir -p "$THEME_DIR"
+    cp -r "$found"/* "$THEME_DIR/" 2>/dev/null || true
+    [ -f "$THEME_DIR/Main.qml" ] && return 0
+  fi
+
+  # (c) pacote do AUR, instalado como o usuário real (makepkg não roda em root)
+  if command -v paru >/dev/null 2>&1 || command -v yay >/dev/null 2>&1; then
+    local helper
+    helper=$(command -v paru || command -v yay)
+    echo "==> Instalando o tema base pelo AUR ($(basename "$helper") sddm-silent-theme)..."
+    sudo -u "$REAL_USER" "$helper" -S --needed --noconfirm sddm-silent-theme >/dev/null 2>&1 || true
+    for dir in /usr/share/sddm/themes/*/; do
+      if [ -f "$dir/Main.qml" ] && [ "$(basename "$dir")" != "$THEME_NAME" ]; then
+        case "$(basename "$dir")" in
+          silent|Silent|silent-sddm)
+            mkdir -p "$THEME_DIR"
+            cp -r "$dir"/* "$THEME_DIR/" 2>/dev/null || true
+            ;;
+        esac
+      fi
+    done
+    [ -f "$THEME_DIR/Main.qml" ] && return 0
+  fi
+
+  # (d) último recurso: baixa o release oficial
+  if command -v curl >/dev/null 2>&1 && command -v tar >/dev/null 2>&1; then
+    echo "==> Baixando o tema base do GitHub..."
+    local tmp
+    tmp=$(mktemp -d)
+    if curl -fsSL "$UPSTREAM_URL" -o "$tmp/theme.tar.gz" 2>/dev/null; then
+      mkdir -p "$THEME_DIR"
+      tar -xzf "$tmp/theme.tar.gz" -C "$tmp" 2>/dev/null || true
+      local src
+      src=$(find "$tmp" -maxdepth 3 -name Main.qml -printf '%h\n' 2>/dev/null | head -1)
+      [ -n "$src" ] && cp -r "$src"/* "$THEME_DIR/" 2>/dev/null || true
+    fi
+    rm -rf "$tmp"
+    [ -f "$THEME_DIR/Main.qml" ] && return 0
+  fi
+
+  return 1
+}
+
+if ! install_base_theme; then
+  echo ""
+  echo "[✗] Não consegui instalar o tema base SilentSDDM (sem internet ou sem AUR helper)."
+  echo "    Instale com:  paru -S sddm-silent-theme"
+  echo "    e rode este script de novo. Nada foi alterado no gerenciador de login."
+  exit 1
+fi
+
+# --------------------------------------------- 3. customizações do rice
 if [ -n "$DOTS_DIR" ] && [ -d "$DOTS_DIR/sddm" ]; then
   echo "==> Instalando componentes customizados a partir de $DOTS_DIR..."
   mkdir -p "$THEME_DIR/components" "$THEME_DIR/configs" "$THEME_DIR/icons" "$THEME_DIR/backgrounds"
   cp -r "$DOTS_DIR/sddm/components/"* "$THEME_DIR/components/" 2>/dev/null || true
+  # Main.qml do rice (zoom e fade do fundo na transição bloqueio → login).
+  [ -f "$DOTS_DIR/sddm/Main.qml" ] && cp "$DOTS_DIR/sddm/Main.qml" "$THEME_DIR/Main.qml" 2>/dev/null || true
   cp -r "$DOTS_DIR/sddm/configs/"* "$THEME_DIR/configs/" 2>/dev/null || true
   cp -r "$DOTS_DIR/sddm/icons/"* "$THEME_DIR/icons/" 2>/dev/null || true
-  
-  if [ -f "$DOTS_DIR/bin/rice-sddm-sync-wallpaper" ]; then
-    mkdir -p "$USER_HOME/.local/bin"
-    cp "$DOTS_DIR/bin/rice-sddm-sync-wallpaper" "$USER_HOME/.local/bin/"
-    chmod +x "$USER_HOME/.local/bin/rice-sddm-sync-wallpaper"
-    chown "$REAL_USER:$REAL_USER" "$USER_HOME/.local/bin/rice-sddm-sync-wallpaper" 2>/dev/null || true
-  fi
-  
+
+  for helper in rice-sddm-sync-wallpaper rice-wallpaper-current; do
+    if [ -f "$DOTS_DIR/bin/$helper" ]; then
+      mkdir -p "$USER_HOME/.local/bin"
+      cp "$DOTS_DIR/bin/$helper" "$USER_HOME/.local/bin/"
+      chmod +x "$USER_HOME/.local/bin/$helper"
+      chown "$REAL_USER:$REAL_USER" "$USER_HOME/.local/bin/$helper" 2>/dev/null || true
+    fi
+  done
+
   if [ -f "$DOTS_DIR/wallust/templates/sddm-theme.conf" ]; then
     mkdir -p "$USER_HOME/.config/wallust/templates"
     cp "$DOTS_DIR/wallust/templates/sddm-theme.conf" "$USER_HOME/.config/wallust/templates/"
@@ -52,38 +159,107 @@ if [ -n "$DOTS_DIR" ] && [ -d "$DOTS_DIR/sddm" ]; then
   fi
 fi
 
-# Ensure backgrounds directory and current.png exist
-mkdir -p "$THEME_DIR/backgrounds"
-if [ ! -f "$THEME_DIR/backgrounds/current.png" ]; then
-  if [ -f "$USER_HOME/.config/quickshell/wallpaper.png" ]; then
-    cp "$USER_HOME/.config/quickshell/wallpaper.png" "$THEME_DIR/backgrounds/current.png"
+# Aponta o metadata pro nosso arquivo de configuração (o do upstream sobrescreve
+# esse campo a cada atualização do tema).
+if [ -f "$THEME_DIR/metadata.desktop" ] && [ -f "$THEME_DIR/configs/default-left.conf" ]; then
+  sed -i 's|^ConfigFile=.*|ConfigFile=configs/default-left.conf|' "$THEME_DIR/metadata.desktop"
+fi
+
+# ------------------------------------------------------- 4. foto do usuário
+# O greeter roda como o usuário "sddm" e não enxerga dentro de /home/fulano
+# quando a pasta é 0700 (padrão em CachyOS/Fedora e em quem usa criptografia).
+echo "==> Sincronizando a foto do usuário para a tela de login..."
+AVATAR_SRC=""
+for candidate in "$USER_HOME/.face" "$USER_HOME/.face.icon" "$USER_HOME/.face.png"; do
+  [ -f "$candidate" ] && AVATAR_SRC="$candidate" && break
+done
+if [ -n "$AVATAR_SRC" ]; then
+  mkdir -p /var/lib/AccountsService/icons
+  install -m 644 "$AVATAR_SRC" "/var/lib/AccountsService/icons/$REAL_USER" 2>/dev/null || true
+  install -m 644 "$AVATAR_SRC" "$THEME_DIR/icons/user-$REAL_USER.png" 2>/dev/null || true
+  mkdir -p /var/lib/AccountsService/users
+  if [ ! -f "/var/lib/AccountsService/users/$REAL_USER" ]; then
+    printf '[User]\nIcon=/var/lib/AccountsService/icons/%s\n' "$REAL_USER" \
+      > "/var/lib/AccountsService/users/$REAL_USER"
+    chmod 600 "/var/lib/AccountsService/users/$REAL_USER"
   fi
 fi
 
-# Switch display-manager service
-echo "==> Desativando plasmalogin.service e habilitando sddm.service com --force..."
+# ----------------------------------------------- 5. serviço e sessão padrão
+echo "==> Desativando plasmalogin.service e habilitando sddm.service..."
 systemctl disable plasmalogin.service 2>/dev/null || true
+systemctl disable gdm.service lightdm.service lxdm.service 2>/dev/null || true
 systemctl enable --force sddm.service
 
-# Configure SDDM theme drop-in
 echo "==> Escrevendo /etc/sddm.conf.d/theme.conf.user..."
 mkdir -p /etc/sddm.conf.d
-cat << 'EOF' > /etc/sddm.conf.d/theme.conf.user
+cat << EOF > /etc/sddm.conf.d/theme.conf.user
 [Theme]
-Current=SilentSDDM
+Current=$THEME_NAME
 
 [General]
 InputMethod=
 EOF
 
-# Fix /etc/sddm.conf if Session=plasma was set
+# Sessão padrão do primeiro login. Sem isso o SDDM abre na primeira sessão em
+# ordem alfabética — costuma ser "Gamescope", e o amigo leigo loga no lugar
+# errado sem entender o porquê.
+HYPR_SESSION=""
+for s in /usr/share/wayland-sessions/hyprland.desktop /usr/share/wayland-sessions/hyprland-uwsm.desktop; do
+  [ -f "$s" ] && HYPR_SESSION="$(basename "$s")" && break
+done
+if [ -n "$HYPR_SESSION" ]; then
+  mkdir -p /var/lib/sddm
+  if [ -f /var/lib/sddm/state.conf ]; then
+    grep -q '^\[Last\]' /var/lib/sddm/state.conf || printf '\n[Last]\n' >> /var/lib/sddm/state.conf
+    if grep -q '^Session=' /var/lib/sddm/state.conf; then
+      sed -i "s|^Session=.*|Session=/usr/share/wayland-sessions/$HYPR_SESSION|" /var/lib/sddm/state.conf
+    else
+      sed -i "/^\[Last\]/a Session=/usr/share/wayland-sessions/$HYPR_SESSION" /var/lib/sddm/state.conf
+    fi
+    grep -q "^User=$REAL_USER$" /var/lib/sddm/state.conf || \
+      sed -i "/^\[Last\]/a User=$REAL_USER" /var/lib/sddm/state.conf
+  else
+    printf '[Last]\nUser=%s\nSession=/usr/share/wayland-sessions/%s\n' "$REAL_USER" "$HYPR_SESSION" \
+      > /var/lib/sddm/state.conf
+  fi
+  chown sddm:sddm /var/lib/sddm/state.conf 2>/dev/null || true
+  echo "    Sessão padrão do login: $HYPR_SESSION"
+fi
+
+# Corrige /etc/sddm.conf herdado de outra instalação (Session=plasma)
 if [ -f /etc/sddm.conf ]; then
   sed -i 's/Session=plasma/Session=hyprland/g' /etc/sddm.conf 2>/dev/null || true
+fi
+
+# ------------------------------------------------------------ 6. permissões
+# Tema pertence ao root (o greeter executa esse QML — deixar a pasta inteira
+# gravável pelo usuário permitiria injetar código na tela de login). Só a
+# pasta de fundos fica gravável, pra troca de wallpaper não precisar de senha.
+chown -R root:root "$THEME_DIR" 2>/dev/null || true
+find "$THEME_DIR" -type d -exec chmod 755 {} + 2>/dev/null || true
+find "$THEME_DIR" -type f -exec chmod 644 {} + 2>/dev/null || true
+chown "$REAL_USER":"$(id -gn "$REAL_USER" 2>/dev/null || echo "$REAL_USER")" "$THEME_DIR/backgrounds" 2>/dev/null || true
+chmod 775 "$THEME_DIR/backgrounds" 2>/dev/null || true
+
+# --------------------------------------------------------- 7. fundo inicial
+echo "==> Gerando o fundo da tela de login a partir do wallpaper atual..."
+if [ -x "$USER_HOME/.local/bin/rice-sddm-sync-wallpaper" ]; then
+  sudo -u "$REAL_USER" env HOME="$USER_HOME" PATH="$USER_HOME/.local/bin:$PATH" \
+    "$USER_HOME/.local/bin/rice-sddm-sync-wallpaper" --quiet 2>/dev/null || true
+fi
+# Nunca deixa a tela de login sem imagem nenhuma.
+if [ ! -f "$THEME_DIR/backgrounds/current.png" ]; then
+  if command -v magick >/dev/null 2>&1; then
+    magick -size 1920x1080 -define gradient:angle=150 'gradient:#2A1A19-#12100F' \
+      "$THEME_DIR/backgrounds/current.png" 2>/dev/null || true
+  fi
 fi
 
 echo ""
 echo "========================================================="
 echo "  ✔ SDDM configurado e ativado com sucesso no sistema!   "
-echo "  ✔ Tema SilentSDDM definido como padrão.                "
-echo "  ✔ Próximo boot entrará diretamente na tela do SDDM!   "
+echo "  ✔ Tema $THEME_NAME instalado e definido como padrão.  "
+echo "  ✔ Sessão padrão: Hyprland                             "
+echo "  ✔ Próximo boot entrará direto na tela de login.       "
 echo "========================================================="

@@ -23,7 +23,36 @@ Item {
     property bool showKeyboard: !Config.virtualKeyboardStartHidden
 
     // Login info
+    // A sessão usada no login. Ver initialSessionIndex(): precisa ser
+    // inicializada aqui porque o seletor de sessão mora dentro de um Popup e
+    // só informa o índice quando o menu é aberto pela primeira vez.
     property int sessionIndex: 0
+
+    // Índice da sessão que deve vir marcada ao abrir a tela de login:
+    //   1. a última sessão realmente usada (SDDM guarda em /var/lib/sddm/state.conf
+    //      e expõe como sessionModel.lastIndex);
+    //   2. senão, a primeira sessão Hyprland encontrada;
+    //   3. senão, a primeira da lista.
+    //
+    // Sem isso o login ia sempre com o índice 0 — a primeira sessão em ordem
+    // alfabética, que neste sistema é o "gamescope-session". E como o SDDM
+    // grava a sessão escolhida como "última usada", o Gamescope se reeleria
+    // para sempre, mesmo depois de escolher o Hyprland na mão.
+    function initialSessionIndex() {
+        if (typeof sessionModel === "undefined" || !sessionModel)
+            return 0;
+        if (sessionModel.lastIndex !== undefined && sessionModel.lastIndex >= 0)
+            return sessionModel.lastIndex;
+        const total = sessionModel.rowCount();
+        for (let i = 0; i < total; i++) {
+            const name = ("" + sessionModel.data(sessionModel.index(i, 0), 260)).toLowerCase();
+            if (name.indexOf("hyprland") !== -1)
+                return i;
+        }
+        return 0;
+    }
+
+    Component.onCompleted: loginScreen.sessionIndex = loginScreen.initialSessionIndex()
     property int userIndex: 0
     property string userName: ""
     property string userRealName: ""

@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# rice-sddm-preview — abre a tela de login numa janela de teste, sem reiniciar.
+#
+# Usa o modo de teste do próprio SDDM (`sddm-greeter --test-mode`), que desenha
+# o tema exatamente como ele aparece no boot. Dá pra apertar qualquer tecla pra
+# ver a transição da tela de bloqueio para a de login, mexer no seletor de
+# sessão e no menu de energia. O login em si não funciona em modo de teste —
+# é só visual.
+#
+# Uso:
+#   rice-sddm-preview            # abre a prévia
+#   rice-sddm-preview --lock     # abre direto na tela de bloqueio (padrão)
+#   rice-sddm-preview --login    # abre direto na tela de senha
+#
+# Fechar: Esc, ou Super + C (fecha a janela como qualquer outra).
+# ==============================================================================
+
+set -uo pipefail
+
+THEME_DIR="/usr/share/sddm/themes/SilentSDDM"
+GREETER="$(command -v sddm-greeter-qt6 || command -v sddm-greeter || true)"
+
+if [ -z "$GREETER" ]; then
+    echo "[✗] SDDM não está instalado (sddm-greeter não encontrado)." >&2
+    echo "    Instale com: sudo pacman -S sddm" >&2
+    exit 1
+fi
+
+if [ ! -f "$THEME_DIR/Main.qml" ]; then
+    echo "[✗] Tema SilentSDDM não instalado em $THEME_DIR." >&2
+    echo "    Rode: sudo rice-apply-boot-login" >&2
+    exit 1
+fi
+
+MODE="lock"
+case "${1:-}" in
+    --login) MODE="login" ;;
+    --lock) MODE="lock" ;;
+    -h|--help) sed -n '2,18p' "$0"; exit 0 ;;
+esac
+
+# O modo de teste lê a configuração apontada pelo metadata.desktop. Pra abrir
+# direto na tela de senha, roda sobre uma cópia temporária com a tela de
+# bloqueio desligada — o tema instalado não é tocado.
+RUN_DIR="$THEME_DIR"
+TMP_DIR=""
+if [ "$MODE" = "login" ]; then
+    TMP_DIR="$(mktemp -d -t rice-sddm-preview-XXXXXX)"
+    cp -r "$THEME_DIR/." "$TMP_DIR/" 2>/dev/null
+    CONF="$(awk -F= '/^ConfigFile=/{print $2; exit}' "$TMP_DIR/metadata.desktop" 2>/dev/null)"
+    CONF="${CONF:-configs/default-left.conf}"
+    if [ -f "$TMP_DIR/$CONF" ]; then
+        # Só a primeira ocorrência, que é a da seção [LockScreen].
+        sed -i '0,/^display = true/s//display = false/' "$TMP_DIR/$CONF"
+    fi
+    RUN_DIR="$TMP_DIR"
+fi
+
+echo "[·] Abrindo a prévia da tela de login (modo: $MODE)."
+echo "    Aperte Esc para fechar. O login não funciona em modo de teste."
+
+cd "$RUN_DIR" || exit 1
+QT_IM_MODULE=qtvirtualkeyboard QML2_IMPORT_PATH=./components/ \
+    "$GREETER" --test-mode --theme . >/dev/null 2>&1
+
+[ -n "$TMP_DIR" ] && rm -rf "$TMP_DIR"
+exit 0

@@ -1,21 +1,275 @@
 #!/usr/bin/env bash
-# rice-sddm-sync-wallpaper: Captura o frame estático em 1080p do wallpaper
-# ativo do Waywallen e aplica na tela de login (SDDM / SilentSDDM).
+# ==============================================================================
+# rice-sddm-sync-wallpaper — gera o fundo da tela de login (SDDM / SilentSDDM)
+# a partir do wallpaper ativo do desktop.
+#
+# A versão antiga simplesmente rodava `grim` na tela inteira: como o dispatcher
+# usado pra trocar de workspace estava com sintaxe inválida (era código Lua
+# passado pro `hyprctl dispatch`, que ele nunca entendeu), a troca nunca
+# acontecia e a foto saía com as janelas abertas — a tela de login virava
+# literalmente um print do desktop (com e-mail, conversa, código, o que
+# estivesse aberto ficando visível pra qualquer um antes do login).
+#
+# Agora o fundo sai SEMPRE da imagem do wallpaper (rice-wallpaper-current),
+# nunca de um print do desktop:
+#   1. Wallpaper estático ou preview grande: desfoque suave, só pra dar
+#      profundidade atrás do relógio.
+#   2. Cena animada do Wallpaper Engine (preview é uma miniatura de 160x160):
+#      vira um fundo abstrato bem desfocado com as cores do wallpaper.
+#   3. Sem wallpaper nenhum: degradê gerado com as cores do wallust.
+# Captura de tela virou opção explícita (--capture) e, mesmo assim, só é aceita
+# num workspace comprovadamente sem janelas e sai com desfoque forte.
+#
+# Uso:
+#   rice-sddm-sync-wallpaper              # sincroniza com o wallpaper ativo
+#   rice-sddm-sync-wallpaper --file IMG   # usa uma imagem específica
+#   rice-sddm-sync-wallpaper --capture    # permite capturar a tela como último recurso
+# ==============================================================================
 
-TARGET_DIR="/usr/share/sddm/themes/SilentSDDM/backgrounds"
+set -uo pipefail
+
+THEME_DIR="/usr/share/sddm/themes/SilentSDDM"
+TARGET_DIR="$THEME_DIR/backgrounds"
 TARGET_IMG="$TARGET_DIR/current.png"
+CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/hollow-wired"
+WORK_IMG="$CACHE_DIR/sddm-background.png"
 
-mkdir -p "$TARGET_DIR" 2>/dev/null || true
+SOURCE_FILE=""
+ALLOW_CAPTURE=0
+QUIET=0
 
-CURRENT_WS=$(hyprctl activeworkspace -j 2>/dev/null | jq -r '.id // 1')
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --file) SOURCE_FILE="${2:-}"; shift 2 ;;
+        --capture) ALLOW_CAPTURE=1; shift ;;
+        --no-capture) ALLOW_CAPTURE=0; shift ;;  # compatibilidade: já é o padrão
+        --quiet|-q) QUIET=1; shift ;;
+        -h|--help) sed -n '2,30p' "$0"; exit 0 ;;
+        *) echo "Opção desconhecida: $1" >&2; exit 2 ;;
+    esac
+done
 
-qs ipc call bar setBarVisible false 2>/dev/null || true
-hyprctl dispatch "hl.dsp.focus({ workspace = 99 })" >/dev/null 2>&1
-sleep 0.25
+log() { [ "$QUIET" = 1 ] || echo "$@"; }
+die() { echo "[✗] $*" >&2; exit 1; }
 
-grim "$TARGET_IMG"
+mkdir -p "$CACHE_DIR" 2>/dev/null || true
 
-hyprctl dispatch "hl.dsp.focus({ workspace = $CURRENT_WS })" >/dev/null 2>&1
-qs ipc call bar setBarVisible true 2>/dev/null || true
+# ------------------------------------------------------------------ resolução
+# Tamanho de saída = resolução do monitor principal (fallback 1080p).
+read -r OUT_W OUT_H < <(
+    hyprctl monitors -j 2>/dev/null \
+        | jq -r '[.[] | select(.focused == true)][0] | "\(.width) \(.height)"' 2>/dev/null \
+        | grep -E '^[0-9]+ [0-9]+$' || true
+)
+[ -z "${OUT_W:-}" ] && OUT_W=1920
+[ -z "${OUT_H:-}" ] && OUT_H=1080
 
-echo "[✓] Wallpaper do SDDM sincronizado com o Waywallen: $TARGET_IMG"
+# --------------------------------------------------------- imagem de origem
+if [ -z "$SOURCE_FILE" ]; then
+    SOURCE_FILE="$(rice-wallpaper-current 2>/dev/null || true)"
+fi
+
+img_width() {
+    magick identify -format "%w" "$1[0]" 2>/dev/null \
+        || ffprobe -v error -select_streams v:0 -show_entries stream=width -of csv=p=0 "$1" 2>/dev/null \
+        || echo 0
+}
+
+SRC_W=0
+if [ -n "$SOURCE_FILE" ] && [ -f "$SOURCE_FILE" ]; then
+    SRC_W="$(img_width "$SOURCE_FILE")"
+    [ -z "$SRC_W" ] && SRC_W=0
+fi
+
+# ----------------------------------------------------------- captura limpa
+# Só entra em cena quando não há imagem boa: wallpaper animado do Wallpaper
+# Engine, cujo "preview" é uma miniatura de 160x160.
+capture_clean_frame() {
+    command -v grim >/dev/null 2>&1 || return 1
+    command -v hyprctl >/dev/null 2>&1 || return 1
+    [ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ] || return 1
+
+    local out="$1"
+    local prev_ws restore_ws=0
+
+    prev_ws="$(hyprctl activeworkspace -j 2>/dev/null | jq -r '.id // empty')"
+
+    # Esconde barra, moldura, dock e widgets do Quickshell.
+    qs ipc call capture hide >/dev/null 2>&1 || true
+
+    # Vai pro primeiro workspace vazio (dispatcher correto: "workspace empty").
+    if [ -n "$prev_ws" ] && hyprctl dispatch workspace empty >/dev/null 2>&1; then
+        restore_ws=1
+    fi
+    sleep 0.45
+
+    # `.windows` do workspace ativo não conta janelas fixadas (pinned) nem as de
+    # workspace especial, que continuam desenhadas por cima — conta direto na
+    # lista de clientes do monitor ativo pra não fotografar nada por engano.
+    local windows active_mon active_ws
+    active_mon="$(hyprctl activeworkspace -j 2>/dev/null | jq -r '.monitor // empty')"
+    active_ws="$(hyprctl activeworkspace -j 2>/dev/null | jq -r '.id // empty')"
+    windows="$(hyprctl clients -j 2>/dev/null | jq --arg mon "$active_mon" --argjson ws "${active_ws:-0}" \
+        '[.[] | select(.mapped == true and .hidden == false and .monitor != null)
+             | select(.monitor == ($mon | tonumber? // .monitor) or .workspace.id == $ws or .pinned == true)] | length' 2>/dev/null)"
+    [ -z "$windows" ] && windows=1
+
+    local ok=1
+    if [ "${windows:-1}" != "0" ]; then
+        # Não conseguiu uma área limpa — não arrisca fotografar janelas.
+        ok=0
+    elif ! grim -t png "$out" >/dev/null 2>&1; then
+        ok=0
+    fi
+
+    [ "$restore_ws" = 1 ] && hyprctl dispatch workspace "$prev_ws" >/dev/null 2>&1
+    qs ipc call capture restore >/dev/null 2>&1 || true
+
+    [ "$ok" = 1 ] || return 1
+
+    # Tela toda preta (wallpaper não estava rodando) não serve de fundo.
+    local mean
+    mean="$(magick "$out" -colorspace Gray -format "%[fx:int(mean*255)]" info: 2>/dev/null || echo 99)"
+    if [ "${mean:-99}" -lt 6 ]; then
+        return 1
+    fi
+    return 0
+}
+
+CAPTURE_PATH="$CACHE_DIR/sddm-capture.png"
+USED_CAPTURE=0
+CHOSEN=""
+
+if [ "$SRC_W" -ge 1280 ]; then
+    CHOSEN="$SOURCE_FILE"
+    log "[·] Usando a imagem do wallpaper: $SOURCE_FILE (${SRC_W}px)"
+elif [ -n "$SOURCE_FILE" ] && [ -f "$SOURCE_FILE" ] && [ "$SRC_W" -gt 0 ]; then
+    CHOSEN="$SOURCE_FILE"
+    log "[·] Wallpaper animado: gerando fundo desfocado a partir do preview (${SRC_W}px)"
+elif [ "$ALLOW_CAPTURE" = 1 ] && capture_clean_frame "$CAPTURE_PATH"; then
+    CHOSEN="$CAPTURE_PATH"
+    USED_CAPTURE=1
+    log "[·] Frame da tela capturado com a interface escondida"
+fi
+
+# --------------------------------------------------- processamento da imagem
+# Fonte pequena (preview de cena do Wallpaper Engine, 160x160) vira um fundo
+# abstrato bem desfocado com as cores do wallpaper — parece proposital, ao
+# contrário de uma miniatura esticada. Fonte grande leva um desfoque suave só
+# pra dar profundidade atrás do relógio. Captura de tela leva desfoque forte,
+# garantindo que nenhum texto de janela sobreviva na imagem.
+if [ "$USED_CAPTURE" = 1 ]; then
+    BLUR_SIGMA=45
+elif [ "$SRC_W" -lt 1280 ]; then
+    BLUR_SIGMA=60
+else
+    BLUR_SIGMA=18
+fi
+
+build_with_ffmpeg() {
+    ffmpeg -y -loglevel error -i "$1" -frames:v 1 \
+        -vf "scale=${OUT_W}:${OUT_H}:force_original_aspect_ratio=increase,crop=${OUT_W}:${OUT_H},gblur=sigma=${BLUR_SIGMA},eq=brightness=-0.10:saturation=0.88,vignette=PI/5" \
+        "$2" 2>/dev/null
+}
+
+build_with_magick() {
+    magick "$1[0]" \
+        -resize "${OUT_W}x${OUT_H}^" -gravity center -extent "${OUT_W}x${OUT_H}" \
+        -blur "0x${BLUR_SIGMA}" \
+        -modulate 100,88 \
+        -brightness-contrast "-10x4" \
+        -quality 92 "$2" 2>/dev/null
+}
+
+build_fallback_gradient() {
+    # Sem wallpaper nenhum (amigo que ainda não escolheu um): gera um fundo
+    # degradê com as cores do wallust, pra tela de login nunca ficar preta.
+    local colors_file="$HOME/.config/hypr/colors.conf"
+    local bg="#12100F" accent="#3A2C2B"
+    if [ -f "$colors_file" ]; then
+        bg="$(awk -F'= *' '/^\$wallust_background/{print $2; exit}' "$colors_file" 2>/dev/null || echo "$bg")"
+        accent="$(awk -F'= *' '/^\$wallust_accent1/{print $2; exit}' "$colors_file" 2>/dev/null || echo "$accent")"
+    fi
+    magick -size "${OUT_W}x${OUT_H}" \
+        -define gradient:angle=150 "gradient:${accent}-${bg}" \
+        -blur 0x40 "$1" 2>/dev/null
+}
+
+# ffmpeg vem primeiro de propósito: o ImageMagick de várias distros sai sem o
+# decodificador de GIF/WebP (é o caso do CachyOS aqui), e os previews do
+# Wallpaper Engine são justamente GIFs animados.
+BUILT=0
+if [ -n "$CHOSEN" ]; then
+    if command -v ffmpeg >/dev/null 2>&1 && build_with_ffmpeg "$CHOSEN" "$WORK_IMG"; then
+        BUILT=1
+    elif command -v magick >/dev/null 2>&1 && build_with_magick "$CHOSEN" "$WORK_IMG"; then
+        BUILT=1
+    fi
+fi
+
+if [ "$BUILT" = 0 ]; then
+    if command -v magick >/dev/null 2>&1 && build_fallback_gradient "$WORK_IMG"; then
+        BUILT=1
+        log "[·] Nenhum wallpaper utilizável — gerado degradê com as cores do tema"
+    else
+        die "não consegui gerar o fundo (instale ffmpeg ou imagemagick)"
+    fi
+fi
+
+[ "$USED_CAPTURE" = 1 ] && rm -f "$CAPTURE_PATH" 2>/dev/null
+
+# ------------------------------------------------- escurecimento adaptativo
+# Wallpapers claros deixavam o relógio e o "digite a senha" ilegíveis, e os
+# fixo, mede o brilho médio do fundo pronto e escurece só o que falta pro
+# alvo (~0.15). Nunca clareia: fundo escuro é proposital numa tela de login.
+if command -v magick >/dev/null 2>&1; then
+    MEAN="$(magick "$WORK_IMG" -colorspace Gray -format "%[fx:mean]" info: 2>/dev/null || echo "")"
+    if [ -n "$MEAN" ]; then
+        FACTOR="$(awk -v m="$MEAN" 'BEGIN {
+            if (m <= 0.001) { print 1; exit }
+            f = 0.15 / m;            # alvo: escuro o bastante pro texto claro
+            if (f > 1) f = 1;        # nunca clareia: fundo escuro é proposital
+            if (f < 0.35) f = 0.35;  # fundo estourado: nunca apaga de vez
+            printf "%.3f", f
+        }')"
+        if [ -n "$FACTOR" ] && [ "$FACTOR" != "1" ] && [ "$FACTOR" != "1.000" ]; then
+            magick "$WORK_IMG" -evaluate multiply "$FACTOR" "$WORK_IMG.tmp" 2>/dev/null \
+                && mv -f "$WORK_IMG.tmp" "$WORK_IMG"
+            log "[·] Brilho ajustado para legibilidade (fator $FACTOR)"
+        fi
+    fi
+fi
+
+# ------------------------------------------------------------- publicação
+publish() {
+    local src="$1" dst="$2" dir
+    dir="$(dirname "$dst")"
+
+    if mkdir -p "$dir" 2>/dev/null && [ -w "$dir" ]; then
+        cp -f "$src" "$dst" && chmod 644 "$dst" 2>/dev/null
+        return $?
+    fi
+    # Sem permissão de escrita no tema (instalação feita como root): tenta
+    # elevar sem pedir senha, e só então cai no pkexec (que abre diálogo).
+    if sudo -n true 2>/dev/null; then
+        sudo install -Dm644 "$src" "$dst" 2>/dev/null && return 0
+    fi
+    if command -v pkexec >/dev/null 2>&1 && [ -t 0 ]; then
+        pkexec install -Dm644 "$src" "$dst" 2>/dev/null && return 0
+    fi
+    return 1
+}
+
+if [ ! -d "$THEME_DIR" ]; then
+    log "[!] Tema SilentSDDM não instalado — fundo pronto em $WORK_IMG"
+    log "    Rode 'rice-apply-boot-login' para instalar a tela de login."
+    exit 0
+fi
+
+if publish "$WORK_IMG" "$TARGET_IMG"; then
+    log "[✓] Fundo da tela de login atualizado: $TARGET_IMG"
+else
+    log "[!] Sem permissão para escrever em $TARGET_IMG"
+    log "    Rode: sudo install -Dm644 '$WORK_IMG' '$TARGET_IMG'"
+    exit 1
+fi

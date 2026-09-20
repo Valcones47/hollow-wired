@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Papel de Parede
+Name[en]=Wallpaper
+Comment=Escolher a imagem de fundo da área de trabalho
+Comment[en]=Choose the desktop background image
+Exec=rice-wallpaper-set
+Icon=preferences-desktop-wallpaper
+Terminal=false
+Type=Application
+Categories=Settings;DesktopSettings;

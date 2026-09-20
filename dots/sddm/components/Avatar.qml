@@ -60,6 +60,18 @@ Canvas {
             ctx.drawImage(actualSource, 0, 0, width, height);
         } else {
             avatar.loadImage(actualSource);
+            // Sem foto (usuário nunca escolheu uma, ou a pasta /home é 0700 e o
+            // greeter não consegue ler o ~/.face): desenha uma silhueta em vez
+            // de deixar um círculo vazio, que parecia um bug na tela de login.
+            ctx.fillStyle = Qt.rgba(1, 1, 1, 0.07);
+            ctx.fillRect(0, 0, width, height);
+            ctx.fillStyle = Qt.rgba(strokeColor.r, strokeColor.g, strokeColor.b, 0.55);
+            ctx.beginPath();
+            ctx.ellipse(width * 0.34, height * 0.20, width * 0.32, height * 0.32);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(width * 0.17, height * 0.60, width * 0.66, height * 0.62);
+            ctx.fill();
         }
 
         // Border

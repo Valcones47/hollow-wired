@@ -10,7 +10,12 @@ ColumnLayout {
     signal sessionChanged(sessionIndex: int, iconPath: string, label: string)
     signal close
 
-    property int currentSessionIndex: sessionModel.lastIndex >= 0 ? sessionModel.lastIndex : 0
+    // Sem binding de propósito: o onCurrentIndexChanged da ListView escreve
+    // nesta propriedade e, com um binding aqui, a primeira escrita (disparada
+    // com a lista ainda vazia, no índice 0) destruía o vínculo com o
+    // lastIndex — a sessão marcada travava na primeira da lista. O valor certo
+    // é definido no Component.onCompleted, quando o modelo já existe.
+    property int currentSessionIndex: 0
     property string sessionName: ""
     property string sessionIconPath: ""
 
@@ -163,8 +168,10 @@ ColumnLayout {
     }
 
     Component.onCompleted: {
-        const idx = selector.currentSessionIndex;
+        const idx = loginScreen.initialSessionIndex();
         if (sessionModel && sessionModel.rowCount() > idx) {
+            selector.currentSessionIndex = idx;
+            sessionList.currentIndex = idx;
             const session_name = sessionModel.data(sessionModel.index(idx, 0), 260);
             selector.sessionName = session_name;
             selector.sessionChanged(idx, getSessionIcon(session_name), session_name);
