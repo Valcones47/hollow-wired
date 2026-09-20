@@ -671,6 +671,17 @@ PanelWindow {
                         lockProc.running = true;
                     }
                 }
+                // Suspender: o equivalente ao "Suspensão" do Windows, que faltava
+                // no menu de energia (só havia bloquear, sair, reiniciar e desligar).
+                SideButton {
+                    id: suspendBtn
+                    kind: "suspend"
+                    icon: Theme.icons.sleep
+                    onActivated: {
+                        sidebar.open = false;
+                        Quickshell.execDetached(["rice-session-action", "suspend"]);
+                    }
+                }
                 SideButton {
                     id: logoutBtn
                     kind: "logout"
@@ -747,6 +758,7 @@ PanelWindow {
                     case "night": return nightPop;
                     case "gpu": return gpuPop;
                     case "lock": return lockPop;
+                    case "suspend": return suspendPop;
                     case "logout": case "reboot": case "power": return powerPop;
                     case "tray": return trayPop;
                     }
@@ -757,6 +769,14 @@ PanelWindow {
                 // um fade em vez de corte seco.
                 opacity: root.popTargetW > 0 && Math.abs(root.popW - root.popTargetW) < 24 ? 1 : 0
                 Behavior on opacity { NumberAnimation { duration: 140 } }
+
+                ColumnLayout {
+                    id: suspendPop
+                    visible: popContent.current === suspendPop
+                    spacing: 2
+                    PopTitle { text: Theme.t("sidebar.suspend", "Suspender") }
+                    PopText { text: Theme.t("sidebar.suspend_hint", "Bloqueia a tela e coloca o PC para dormir") }
+                }
 
                 ColumnLayout {
                     id: avatarPop
@@ -779,13 +799,25 @@ PanelWindow {
                         visible: sidebar.updateCount > 0
                         text: sidebar.repoUpdates + " repositório · " + sidebar.aurUpdates + " AUR" + (sidebar.riceUpdates > 0 ? " · " + sidebar.riceUpdates + " dotfiles" : "")
                     }
+                    // Antes esta ação só aparecia quando havia commits novos.
+                    // Como o rice-update também conserta o que ficou pela
+                    // metade numa atualização anterior, ela fica sempre à mão.
                     PopAction {
-                        visible: sidebar.riceUpdates > 0
                         Layout.topMargin: 4
                         icon: Theme.icons.palette
-                        label: "Atualizar Dotfiles (" + sidebar.riceUpdates + " novidades)"
+                        label: sidebar.riceUpdates > 0
+                            ? Theme.t("sidebar.rice_update_n", "Atualizar o rice (") + sidebar.riceUpdates + Theme.t("sidebar.rice_update_n_end", " novidades)")
+                            : Theme.t("sidebar.rice_update", "Atualizar o rice (hollow-wired)")
                         onActivated: {
                             Quickshell.execDetached(["rice-update", "gui"]);
+                            sidebar.open = false;
+                        }
+                    }
+                    PopAction {
+                        icon: Theme.icons.health
+                        label: Theme.t("sidebar.rice_fix", "Procurar e consertar problemas")
+                        onActivated: {
+                            Quickshell.execDetached(["rice-update", "fix-gui"]);
                             sidebar.open = false;
                         }
                     }

@@ -40,17 +40,47 @@ check_updates() {
     LOCAL_HASH=$(git -C "$REPO_DIR" rev-parse --short HEAD 2>/dev/null || echo "unknown")
     REMOTE_HASH=$(git -C "$REPO_DIR" rev-parse --short origin/main 2>/dev/null || echo "unknown")
 
+    # Data do commit instalado: o painel mostra "versão X · de DD/MM" pra pessoa
+    # saber de quando é a instalação dela, não só um hash solto.
+    LOCAL_DATE=$(git -C "$REPO_DIR" log -1 --format=%cd --date=format:'%d/%m/%Y' 2>/dev/null || echo "")
+
     if [ "$LOCAL_HASH" != "$REMOTE_HASH" ]; then
         COUNT=$(git -C "$REPO_DIR" rev-list --count HEAD..origin/main 2>/dev/null || echo 0)
-        COMMITS=$(git -C "$REPO_DIR" log --oneline -n 5 HEAD..origin/main 2>/dev/null | jq -R . | jq -s . 2>/dev/null || echo "[]")
-        echo "{\"status\": \"update_available\", \"count\": $COUNT, \"local\": \"$LOCAL_HASH\", \"remote\": \"$REMOTE_HASH\", \"commits\": $COMMITS}"
+        COMMITS=$(git -C "$REPO_DIR" log --format=%s -n 5 HEAD..origin/main 2>/dev/null | jq -R . | jq -s . 2>/dev/null || echo "[]")
+        REMOTE_DATE=$(git -C "$REPO_DIR" log -1 --format=%cd --date=format:'%d/%m/%Y' origin/main 2>/dev/null || echo "")
+        jq -n --argjson count "${COUNT:-0}" --arg local "$LOCAL_HASH" --arg remote "$REMOTE_HASH" \
+              --arg local_date "$LOCAL_DATE" --arg remote_date "$REMOTE_DATE" --argjson commits "$COMMITS" \
+              '{status: "update_available", count: $count, local: $local, remote: $remote,
+                local_date: $local_date, remote_date: $remote_date, hash: $local, commits: $commits}'
     else
-        echo "{\"status\": \"up_to_date\", \"count\": 0, \"hash\": \"$LOCAL_HASH\"}"
+        jq -n --arg hash "$LOCAL_HASH" --arg local_date "$LOCAL_DATE" \
+              '{status: "up_to_date", count: 0, hash: $hash, local: $hash, local_date: $local_date, commits: []}'
     fi
+}
+
+# Marcador da última sincronização que chegou ao fim. Se o HEAD do repositório
+# mudou mas este arquivo não, a atualização anterior morreu no meio (foi o que
+# aconteceu com o ETXTBSY do waywallen-layer-shell): o git já estava atualizado,
+# então o `rice-update` seguinte dizia "já está na versão mais recente" e nunca
+# terminava o serviço. Agora ele percebe e refaz a sincronização sozinho.
+SYNC_MARKER="$HOME/.config/hollow-wired/last-sync"
+
+needs_resync() {
+    [ -n "$REPO_DIR" ] || return 1
+    local head marked
+    head=$(git -C "$REPO_DIR" rev-parse HEAD 2>/dev/null || echo "")
+    marked=$(cat "$SYNC_MARKER" 2>/dev/null || echo "")
+    [ -n "$head" ] && [ "$head" != "$marked" ]
+}
+
+mark_synced() {
+    mkdir -p "$(dirname "$SYNC_MARKER")"
+    git -C "$REPO_DIR" rev-parse HEAD > "$SYNC_MARKER" 2>/dev/null || true
 }
 
 apply_updates() {
     local interactive="${1:-true}"
+    local force="${2:-false}"
 
     if [ -z "$REPO_DIR" ] || [ ! -d "$REPO_DIR/.git" ]; then
         echo -e "\e[1;31m[!] Erro: Diretório do repositório não encontrado.\e[0m" >&2
@@ -71,13 +101,19 @@ apply_updates() {
     REMOTE_HASH=$(git -C "$REPO_DIR" rev-parse --short origin/main)
     COUNT=$(git -C "$REPO_DIR" rev-list --count HEAD..origin/main 2>/dev/null || echo 0)
 
-    if [ "$COUNT" -eq 0 ]; then
+    if [ "$COUNT" -eq 0 ] && [ "$force" != "true" ] && ! needs_resync; then
         echo -e "\n\e[1;32m[✓] O seu rice já está na versão mais recente!\e[0m (Commit: $LOCAL_HASH)"
+        run_health_checks
         if [ "$interactive" = "true" ]; then
             echo ""
             read -r -p "Pressione ENTER para fechar..." _ || true
         fi
         return 0
+    fi
+
+    if [ "$COUNT" -eq 0 ]; then
+        echo -e "\n\e[1;33m[!] O código já está atualizado, mas a última sincronização"
+        echo -e "    não chegou ao fim. Refazendo agora.\e[0m"
     fi
 
     echo -e "\n\e[1;33m[!] Existem $COUNT nova(s) atualização(ões) disponíveis:\e[0m"
@@ -121,17 +157,58 @@ apply_updates() {
     [ -f "$HOME/.config/quickshell/locale.json" ] && saved_locale=$(cat "$HOME/.config/quickshell/locale.json")
     [ -f "$HOME/.config/kitty/kitty.conf" ] && saved_kitty=$(cat "$HOME/.config/kitty/kitty.conf")
     [ -f "$HOME/.config/hypr/user-binds.lua" ] && saved_user_binds=$(cat "$HOME/.config/hypr/user-binds.lua")
+    # colors.conf é gerado pelo wallust a partir do wallpaper do usuário; o
+    # repositório carrega uma cópia só pra primeira instalação. Sem salvar aqui,
+    # toda atualização jogava a paleta do autor por cima das cores do usuário.
+    local saved_colors=""
+    [ -f "$HOME/.config/hypr/colors.conf" ] && saved_colors=$(cat "$HOME/.config/hypr/colors.conf")
 
     # Copia as atualizações de componentes, temas e scripts
-    cp -a "$REPO_DIR/dots/hypr" "$HOME/.config/"
-    cp -a "$REPO_DIR/dots/quickshell" "$HOME/.config/"
-    cp -a "$REPO_DIR/dots/kitty" "$HOME/.config/"
+    # --remove-destination: sobrescrever um script que está rodando (como o
+    # blur-fullscreen-toggle.sh, que fica em loop) corrompe a execução em curso.
+    cp -a --remove-destination "$REPO_DIR/dots/hypr" "$HOME/.config/"
+    cp -a --remove-destination "$REPO_DIR/dots/quickshell" "$HOME/.config/"
+    cp -a --remove-destination "$REPO_DIR/dots/kitty" "$HOME/.config/"
     [ -d "$REPO_DIR/dots/wallust" ] && cp -a "$REPO_DIR/dots/wallust" "$HOME/.config/"
     [ -d "$REPO_DIR/dots/xdg-desktop-portal" ] && cp -a "$REPO_DIR/dots/xdg-desktop-portal" "$HOME/.config/"
     [ -d "$REPO_DIR/dots/fastfetch" ] && cp -a "$REPO_DIR/dots/fastfetch" "$HOME/.config/"
+    # mako: só instala se ainda não existir, pra não apagar os ajustes que o
+    # usuário fez pela aba de Notificações do painel (rice-mako-apply).
+    if [ -d "$REPO_DIR/dots/mako" ] && [ ! -f "$HOME/.config/mako/config" ]; then
+        cp -a "$REPO_DIR/dots/mako" "$HOME/.config/"
+    fi
     [ -d "$REPO_DIR/dots/applications" ] && cp -a "$REPO_DIR/dots/applications/"* "$HOME/.local/share/applications/" 2>/dev/null || true
-    cp -a "$REPO_DIR/dots/bin/"* "$HOME/.local/bin/"
-    chmod +x "$HOME/.local/bin/"*
+
+    # [fix] Antes era um `cp -a` direto na pasta inteira. Quando um dos binários
+    # estava EM EXECUÇÃO (o caso clássico é o waywallen-layer-shell, que fica
+    # rodando o tempo todo desenhando o wallpaper), o kernel recusa a escrita com
+    # "Área de texto ocupada" (ETXTBSY) — e, com `set -e`, a atualização inteira
+    # abortava ali: as configurações novas já tinham sido copiadas, mas os
+    # scripts de ~/.local/bin ficavam velhos e nem o `rice-hypr-prefs apply` nem
+    # o `rice-restart` do final chegavam a rodar. O resultado era um sistema meio
+    # atualizado, com toggles (blur, por exemplo) fora de sincronia.
+    #
+    # Apagar a entrada antiga antes de escrever resolve: o processo em execução
+    # continua usando o inode antigo e o arquivo novo entra no lugar.
+    mkdir -p "$HOME/.local/bin"
+    busy_files=""
+    for src in "$REPO_DIR/dots/bin/"*; do
+        [ -f "$src" ] || continue
+        name=$(basename "$src")
+        dest="$HOME/.local/bin/$name"
+        if ! install -m755 "$src" "$dest" 2>/dev/null; then
+            rm -f "$dest" 2>/dev/null || true
+            install -m755 "$src" "$dest" 2>/dev/null || busy_files="$busy_files $name"
+        fi
+    done
+    if [ -n "$busy_files" ]; then
+        echo -e "\e[1;33m[!] Não consegui atualizar agora:$busy_files\e[0m"
+        echo -e "\e[1;33m    (estavam em uso — o próprio rice-update tenta de novo depois)\e[0m"
+        mkdir -p "$HOME/.config/hollow-wired"
+        printf '%s\n' $busy_files > "$HOME/.config/hollow-wired/pending-bins"
+    else
+        rm -f "$HOME/.config/hollow-wired/pending-bins" 2>/dev/null || true
+    fi
 
     # Restaura imediatamente as configurações pessoais do usuário (NUNCA reseta o que foi customizado)
     [ -n "$saved_dock" ] && echo "$saved_dock" > "$HOME/.config/quickshell/dock.json"
@@ -140,6 +217,7 @@ apply_updates() {
     [ -n "$saved_locale" ] && echo "$saved_locale" > "$HOME/.config/quickshell/locale.json"
     [ -n "$saved_kitty" ] && echo "$saved_kitty" > "$HOME/.config/kitty/kitty.conf"
     [ -n "$saved_user_binds" ] && echo "$saved_user_binds" > "$HOME/.config/hypr/user-binds.lua"
+    [ -n "$saved_colors" ] && echo "$saved_colors" > "$HOME/.config/hypr/colors.conf"
 
     # 4. Correção automática de preferências (elimina flickering por VRR e bug de zoom 300%)
     for p_file in "$HOME/.config/hypr/user-prefs.json" "$HOME/.config/hypr/prefs.json"; do
@@ -162,6 +240,9 @@ apply_updates() {
     echo -e "\e[1;34m[*] Recarregando interface gráfica (Quickshell)...\e[0m"
     "$HOME/.local/bin/rice-restart" >/dev/null 2>&1 || true
 
+    run_health_checks
+    mark_synced
+
     notify-send -a "Rice Updater" -i system-software-update -r 91199 -t 4000 "Setup Atualizado com Sucesso!" "$COUNT novas melhorias foram aplicadas."
 
     echo -e "\n\e[1;32m════════════════════════════════════════════════════\e[0m"
@@ -176,6 +257,185 @@ apply_updates() {
     fi
 }
 
+# ==============================================================================
+# Passo de conserto (rice-doctor embutido).
+#
+# Pedido do usuário: "o rice-update tem que corrigir esse tipo de bug sozinho,
+# além de achar bugs quando usa ele; o rice-update tem que ser um fix de
+# problemas também". Cada verificação abaixo nasceu de um problema real
+# relatado por alguém usando o rice.
+#
+# Regra de ouro: nada aqui pode derrubar a atualização. Tudo roda com `|| true`.
+# ==============================================================================
+FIXED_LIST=""
+PROBLEM_LIST=""
+
+fix_note() { FIXED_LIST="$FIXED_LIST
+  \e[1;32m✓\e[0m $1"; }
+problem_note() { PROBLEM_LIST="$PROBLEM_LIST
+  \e[1;33m!\e[0m $1"; }
+
+# 1. Binários que estavam em uso na última atualização (ETXTBSY). Ficam
+#    anotados e são reinstalados assim que param de rodar.
+retry_pending_bins() {
+    local pend="$HOME/.config/hollow-wired/pending-bins"
+    [ -f "$pend" ] || return 0
+    local still=""
+    while read -r name; do
+        [ -n "$name" ] || continue
+        local src="$REPO_DIR/dots/bin/$name"
+        [ -f "$src" ] || continue
+        if install -m755 "$src" "$HOME/.local/bin/$name" 2>/dev/null; then
+            fix_note "utilitário pendente instalado: $name"
+        else
+            still="$still$name
+"
+        fi
+    done < "$pend"
+    printf '%s' "$still" > "$pend"
+}
+
+# 2. Notificações presas na tela / configuração do mako ignorada.
+fix_notifications() {
+    command -v rice-mako-apply >/dev/null 2>&1 || return 0
+    local out
+    out=$(rice-mako-apply doctor 2>/dev/null || true)
+    case "$out" in
+        *'"problems": []'*|"") return 0 ;;
+    esac
+    out=$(rice-mako-apply doctor --fix 2>/dev/null || true)
+    if command -v jq >/dev/null 2>&1; then
+        echo "$out" | jq -r '.fixed[]?' 2>/dev/null | while read -r line; do
+            [ -n "$line" ] && echo "  notificações: $line"
+        done
+    fi
+    fix_note "notificações verificadas e corrigidas"
+}
+
+# 3. Arquivos de estado do usuário corrompidos (JSON truncado depois de um
+#    desligamento no meio de uma escrita) — o shell subia sem dock/widgets.
+fix_broken_state() {
+    command -v jq >/dev/null 2>&1 || return 0
+    local f
+    for f in "$HOME/.config/quickshell/dock.json" \
+             "$HOME/.config/quickshell/desktop-widgets.json" \
+             "$HOME/.config/quickshell/shell-customization.json" \
+             "$HOME/.config/quickshell/locale.json" \
+             "$HOME/.config/hypr/user-prefs.json" \
+             "$HOME/.config/hypr/color-overrides.json"; do
+        [ -f "$f" ] || continue
+        if ! jq -e . "$f" >/dev/null 2>&1; then
+            mv "$f" "$f.corrompido" 2>/dev/null || true
+            local base="$REPO_DIR/dots/quickshell/$(basename "$f")"
+            if [ -f "$base" ]; then
+                cp "$base" "$f" 2>/dev/null || true
+            else
+                echo '{}' > "$f"
+            fi
+            fix_note "$(basename "$f") estava corrompido e foi restaurado"
+        fi
+    done
+}
+
+# 4. Scripts sem bit de execução (acontece ao copiar de FAT/pendrive ou ao
+#    restaurar um backup).
+fix_exec_bits() {
+    local f fixed=0
+    for f in "$HOME/.local/bin/rice-"* "$HOME/.config/hypr/scripts/"*.sh; do
+        [ -f "$f" ] || continue
+        if [ ! -x "$f" ]; then
+            chmod +x "$f" 2>/dev/null && fixed=$((fixed + 1))
+        fi
+    done
+    [ "$fixed" -gt 0 ] && fix_note "$fixed script(s) sem permissão de execução corrigidos"
+    return 0
+}
+
+# 5. ~/.local/bin fora do PATH: os comandos rice-* simplesmente "não existem".
+fix_path() {
+    case ":$PATH:" in
+        *":$HOME/.local/bin:"*) return 0 ;;
+    esac
+    local line='set -gx PATH $HOME/.local/bin $PATH'
+    local fishconf="$HOME/.config/fish/config.fish"
+    if [ -f "$fishconf" ] && ! grep -q '.local/bin' "$fishconf" 2>/dev/null; then
+        printf '\n# adicionado pelo rice-update\n%s\n' "$line" >> "$fishconf"
+        fix_note "~/.local/bin adicionado ao PATH do fish (reabra o terminal)"
+    fi
+    if [ -f "$HOME/.bashrc" ] && ! grep -q '.local/bin' "$HOME/.bashrc" 2>/dev/null; then
+        printf '\n# adicionado pelo rice-update\nexport PATH="$HOME/.local/bin:$PATH"\n' >> "$HOME/.bashrc"
+        fix_note "~/.local/bin adicionado ao PATH do bash"
+    fi
+}
+
+# 6. Serviços de fundo que caíram (ou foram mortos por uma atualização
+#    anterior no meio do caminho).
+fix_daemons() {
+    [ -n "${WAYLAND_DISPLAY:-}" ] || return 0
+
+    if command -v mako >/dev/null 2>&1 && ! pgrep -x mako >/dev/null 2>&1; then
+        setsid mako >/dev/null 2>&1 &
+        fix_note "serviço de notificações (mako) reiniciado"
+    fi
+    if command -v hypridle >/dev/null 2>&1 && ! pgrep -x hypridle >/dev/null 2>&1; then
+        setsid hypridle >/dev/null 2>&1 &
+        fix_note "hypridle reiniciado"
+    fi
+    # wl-clip-persist mantém o que foi copiado depois que o programa fecha.
+    if command -v wl-clip-persist >/dev/null 2>&1 && ! pgrep -f wl-clip-persist >/dev/null 2>&1; then
+        setsid wl-clip-persist --clipboard regular >/dev/null 2>&1 &
+        fix_note "persistência da área de transferência reativada"
+    fi
+    # O watcher de blur é o caso que quebrou na máquina de um usuário: ele fica
+    # em loop e foi sobrescrito em pleno voo por um `cp` antigo.
+    local blur="$HOME/.config/hypr/scripts/blur-fullscreen-toggle.sh"
+    if [ -f "$blur" ]; then
+        local blur_pid
+        blur_pid=$(pgrep -f blur-fullscreen-toggle.sh 2>/dev/null | head -1 || true)
+        if [ -z "$blur_pid" ]; then
+            setsid "$blur" >/dev/null 2>&1 &
+            fix_note "toggle de blur não estava rodando e foi iniciado"
+        elif [ "$blur" -nt "/proc/$blur_pid" ]; then
+            # O script foi atualizado depois que o processo subiu: o bash segue
+            # lendo o arquivo trocado a partir do ponto antigo e executa lixo.
+            pkill -f blur-fullscreen-toggle.sh >/dev/null 2>&1 || true
+            setsid "$blur" >/dev/null 2>&1 &
+            fix_note "toggle de blur reiniciado com a versão nova do script"
+        fi
+    fi
+    if ! pgrep -x quickshell >/dev/null 2>&1 && ! pgrep -x qs >/dev/null 2>&1; then
+        problem_note "a interface (Quickshell) não está rodando — tentando subir"
+        "$HOME/.local/bin/rice-restart" >/dev/null 2>&1 || true
+    fi
+}
+
+# 7. Paleta de cores ausente (o Hyprland sobe sem cores e tudo fica cinza).
+fix_colors() {
+    if [ ! -s "$HOME/.config/hypr/colors.conf" ] && command -v rice-colors >/dev/null 2>&1; then
+        rice-colors apply >/dev/null 2>&1 || true
+        fix_note "paleta de cores regenerada"
+    fi
+}
+
+run_health_checks() {
+    echo -e "\n\e[1;34m[*] Procurando e consertando problemas conhecidos...\e[0m"
+    retry_pending_bins || true
+    fix_notifications || true
+    fix_broken_state || true
+    fix_exec_bits || true
+    fix_path || true
+    fix_colors || true
+    fix_daemons || true
+
+    if [ -n "$FIXED_LIST" ]; then
+        echo -e "\e[1;32m[✓] Consertado:\e[0m$FIXED_LIST"
+    else
+        echo -e "\e[1;32m[✓] Nenhum problema encontrado.\e[0m"
+    fi
+    [ -n "$PROBLEM_LIST" ] && echo -e "\e[1;33m[!] Atenção:\e[0m$PROBLEM_LIST"
+    return 0
+}
+
 cmd="${1:-apply}"
 
 case "$cmd" in
@@ -188,12 +448,28 @@ case "$cmd" in
     apply-silent|auto)
         apply_updates false
         ;;
+    sync|repair-sync|force)
+        # Refaz a cópia das dotfiles mesmo sem commits novos (usado quando uma
+        # atualização anterior morreu no meio).
+        apply_updates true true
+        ;;
+    fix|doctor|conserta)
+        # Só o passo de conserto, sem mexer no git.
+        run_health_checks
+        if [ "${2:-}" != "--quiet" ]; then
+            echo ""
+            read -r -p "Pressione ENTER para fechar..." _ || true
+        fi
+        ;;
+    fix-gui)
+        kitty --title "Consertando o rice" -e "$HOME/.local/bin/rice-update" fix &
+        ;;
     gui)
         # Abre em janela dedicada do Kitty
         kitty --title "Atualizador de Dotfiles" -e "$HOME/.local/bin/rice-update" apply &
         ;;
     *)
-        echo "Uso: $(basename "$0") [check|status|apply|gui]"
+        echo "Uso: $(basename "$0") [check|apply|sync|fix|gui|fix-gui]"
         exit 1
         ;;
 esac

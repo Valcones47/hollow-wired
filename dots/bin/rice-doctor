@@ -68,23 +68,37 @@ else
   BAD_QS=1
 fi
 
-# 7. Placa Gráfica NVIDIA
-GPU_NAME=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -n 1)
-[ -z "$GPU_NAME" ] && GPU_NAME=$(lspci 2>/dev/null | grep -Ei "vga|3d" | grep -i "nvidia" | sed 's/.*: //g' | head -n 1)
-GPU_LABEL="${GPU_NAME:-NVIDIA GPU}"
-echo -ne "${C_BOLD}7. Placa Gráfica ($GPU_LABEL)... ${C_RESET}"
-if nvidia-smi &>/dev/null; then
-  echo -e "${C_GREEN}[✔ PRONTA (Driver Ativo)]${C_RESET}"
-  if [ -f /sys/module/nvidia_drm/parameters/modeset ]; then
-    MODESET=$(cat /sys/module/nvidia_drm/parameters/modeset 2>/dev/null)
-    if [ "$MODESET" = "Y" ]; then
-      echo -e "   ${C_CYAN}└─ DRM Kernel Modesetting (nvidia-drm.modeset=1): [✔ ATIVO]${C_RESET}"
-    else
-      echo -e "   ${C_YELLOW}└─ DRM Modeset: [⚠ INATIVO] (Configure nvidia-drm.modeset=1)${C_RESET}"
+# 7. Placa Gráfica
+# Só cobra driver NVIDIA em quem tem NVIDIA: antes a checagem era fixa e todo
+# PC AMD/Intel via um alarme vermelho de "driver não carregado" sem motivo.
+HAS_NVIDIA=0
+lspci 2>/dev/null | grep -Ei "vga|3d|display" | grep -qi "nvidia" && HAS_NVIDIA=1
+
+if [ "$HAS_NVIDIA" = "1" ]; then
+  GPU_NAME=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -n 1)
+  [ -z "$GPU_NAME" ] && GPU_NAME=$(lspci 2>/dev/null | grep -Ei "vga|3d" | grep -i "nvidia" | sed 's/.*: //g' | head -n 1)
+  echo -ne "${C_BOLD}7. Placa Gráfica (${GPU_NAME:-NVIDIA})... ${C_RESET}"
+  if nvidia-smi &>/dev/null; then
+    echo -e "${C_GREEN}[✔ PRONTA (Driver Ativo)]${C_RESET}"
+    if [ -f /sys/module/nvidia_drm/parameters/modeset ]; then
+      MODESET=$(cat /sys/module/nvidia_drm/parameters/modeset 2>/dev/null)
+      if [ "$MODESET" = "Y" ]; then
+        echo -e "   ${C_CYAN}└─ DRM Kernel Modesetting (nvidia-drm.modeset=1): [✔ ATIVO]${C_RESET}"
+      else
+        echo -e "   ${C_YELLOW}└─ DRM Modeset: [⚠ INATIVO] (Configure nvidia-drm.modeset=1)${C_RESET}"
+      fi
     fi
+  else
+    echo -e "${C_YELLOW}[⚠ DRIVER NÃO CARREGADO OU GPU SUSPENSA]${C_RESET}"
   fi
 else
-  echo -e "${C_YELLOW}[⚠ DRIVER NÃO CARREGADO OU GPU SUSPENSA]${C_RESET}"
+  GPU_NAME=$(lspci 2>/dev/null | grep -Ei "vga|3d|display" | sed 's/.*: //g' | head -n 1)
+  echo -ne "${C_BOLD}7. Placa Gráfica (${GPU_NAME:-integrada})... ${C_RESET}"
+  if [ -e /dev/dri/renderD128 ]; then
+    echo -e "${C_GREEN}[✔ ACELERAÇÃO ATIVA (Mesa)]${C_RESET}"
+  else
+    echo -e "${C_YELLOW}[⚠ SEM NÓ DE RENDER EM /dev/dri]${C_RESET}"
+  fi
 fi
 
 # 8. Tema de Ícones do Sistema
@@ -105,6 +119,39 @@ else
   BAD_PORTALS=1
 fi
 
+# 10. Papel de parede (área de trabalho preta é o problema nº 1 de quem instala
+# o rice sem o Wallpaper Engine)
+echo -ne "${C_BOLD}10. Papel de Parede... ${C_RESET}"
+if pgrep -f waywallen-layer-shell >/dev/null 2>&1; then
+  echo -e "${C_GREEN}[✔ WALLPAPER ENGINE ATIVO]${C_RESET}"
+elif pgrep -x hyprpaper >/dev/null 2>&1; then
+  echo -e "${C_GREEN}[✔ WALLPAPER ESTÁTICO ATIVO]${C_RESET}"
+else
+  echo -e "${C_YELLOW}[⚠ NENHUM WALLPAPER ATIVO]${C_RESET} (área de trabalho preta)"
+  BAD_WALLPAPER=1
+fi
+
+# 11. Agente de autenticação (sem ele, nada que pede senha de administrador abre)
+echo -ne "${C_BOLD}11. Janela de Senha (polkit)... ${C_RESET}"
+if pgrep -f "polkit-.*authentication-agent" >/dev/null 2>&1 || pgrep -f polkit-kde >/dev/null 2>&1; then
+  echo -e "${C_GREEN}[✔ ATIVO]${C_RESET}"
+else
+  echo -e "${C_YELLOW}[⚠ NÃO ESTÁ RODANDO]${C_RESET} (pedidos de senha podem falhar em silêncio)"
+  BAD_POLKIT=1
+fi
+
+# 12. Persistência da área de transferência
+echo -ne "${C_BOLD}12. Área de Transferência Persistente... ${C_RESET}"
+if pgrep -x wl-clip-persist >/dev/null 2>&1; then
+  echo -e "${C_GREEN}[✔ ATIVA]${C_RESET}"
+elif command -v wl-clip-persist >/dev/null 2>&1; then
+  echo -e "${C_YELLOW}[⚠ INSTALADA, MAS PARADA]${C_RESET}"
+  BAD_CLIP=1
+else
+  echo -e "${C_YELLOW}[⚠ NÃO INSTALADA]${C_RESET} (o que você copia some ao fechar o programa)"
+  BAD_CLIP=1
+fi
+
 echo ""
 echo -e "${C_CYAN}--------------------------------------------------------------${C_RESET}"
 echo -e "${C_BOLD}AÇÕES DE REPARAÇÃO RÁPIDA:${C_RESET}"
@@ -115,10 +162,12 @@ echo -e " [4] Configurar e ativar a tela de login SDDM + Limine"
 echo -e " [5] Reiniciar o Quickshell (recarregar barras e menus)"
 echo -e " [6] Reparar tema de ícones e compatibilidade de pixmaps"
 echo -e " [7] Reparar e reiniciar portais XDG (elimina delay de 25s em apps)"
+echo -e " [8] Definir um papel de parede (resolve área de trabalho preta)"
+echo -e " [9] Instalar/ativar área de transferência persistente e janela de senha"
 echo -e " [A] Executar limpeza e reparos recomendados automaticamente"
 echo -e " [0] Sair"
 echo -e "${C_CYAN}--------------------------------------------------------------${C_RESET}"
-echo -n "Escolha uma opção [0-7 / A]: "
+echo -n "Escolha uma opção [0-9 / A]: "
 read -r OPT
 
 case "$OPT" in
@@ -160,6 +209,21 @@ case "$OPT" in
     rice-portals
     echo -e "${C_GREEN}✔ Portais XDG reiniciados com sucesso!${C_RESET}"
     ;;
+  8)
+    echo -e "\n${C_BLUE}==> Abrindo o seletor de papel de parede...${C_RESET}"
+    if command -v rice-wallpaper-set >/dev/null 2>&1; then
+      rice-wallpaper-set || rice-wallpaper-set --generate
+    else
+      echo -e "${C_YELLOW}rice-wallpaper-set não encontrado (rode o install.sh de novo).${C_RESET}"
+    fi
+    ;;
+  9)
+    echo -e "\n${C_BLUE}==> Instalando e ativando serviços de sessão...${C_RESET}"
+    sudo pacman -S --needed --noconfirm wl-clip-persist polkit-kde-agent 2>/dev/null || true
+    pgrep -x wl-clip-persist >/dev/null 2>&1 || (setsid wl-clip-persist --clipboard regular >/dev/null 2>&1 &)
+    pgrep -f "polkit-.*authentication-agent" >/dev/null 2>&1 || (setsid /usr/lib/polkit-kde-authentication-agent-1 >/dev/null 2>&1 &)
+    echo -e "${C_GREEN}✔ Serviços de sessão ativos!${C_RESET}"
+    ;;
   [aA])
     echo -e "\n${C_BLUE}==> Executando rotina automática de reparos...${C_RESET}"
     systemctl --user restart pipewire pipewire-pulse wireplumber 2>/dev/null || true
@@ -175,6 +239,17 @@ case "$OPT" in
     if [ "$BAD_PORTALS" = "1" ]; then
       sudo pacman -S --needed --noconfirm xdg-desktop-portal-gtk 2>/dev/null || true
       rice-portals
+    fi
+    if [ "$BAD_CLIP" = "1" ]; then
+      sudo pacman -S --needed --noconfirm wl-clip-persist 2>/dev/null || true
+      pgrep -x wl-clip-persist >/dev/null 2>&1 || (setsid wl-clip-persist --clipboard regular >/dev/null 2>&1 &)
+    fi
+    if [ "$BAD_POLKIT" = "1" ]; then
+      sudo pacman -S --needed --noconfirm polkit-kde-agent 2>/dev/null || true
+      pgrep -f "polkit-.*authentication-agent" >/dev/null 2>&1 || (setsid /usr/lib/polkit-kde-authentication-agent-1 >/dev/null 2>&1 &)
+    fi
+    if [ "$BAD_WALLPAPER" = "1" ] && command -v rice-wallpaper-set >/dev/null 2>&1; then
+      rice-wallpaper-set --ensure >/dev/null 2>&1 || true
     fi
     echo -e "${C_GREEN}✔ Reparos automáticos concluídos!${C_RESET}"
     ;;
