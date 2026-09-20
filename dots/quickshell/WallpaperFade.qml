@@ -23,7 +23,7 @@ import "."
 //
 // Estilos de entrada (user-prefs.json > wallpaper_transition):
 //   fade   crossfade simples
-//   wipe   varredura em diagonal, como o swww
+//   wipe   varredura lateral
 //   wave   varredura com a borda ondulada
 //   grow   círculo que abre do centro
 //
@@ -50,9 +50,6 @@ Scope {
     property int hold: 6000
     property int revealMs: 450
 
-    // Ângulo da varredura, em graus, como o --transition-angle do swww.
-    readonly property real wipeAngle: 30
-
     property string source: ""
     property bool covering: false
 
@@ -72,6 +69,15 @@ Scope {
     // antes disso desperdiça o começo da animação desenhando nada.
     property bool pendingCover: false
 
+    // Duração da animação de opacidade. É definida ANTES de mexer em
+    // `covering`, de propósito: um `Behavior` avalia as próprias propriedades
+    // com o valor que elas tinham antes da mudança que o disparou, então
+    // amarrar a duração a `covering` dentro dele não funciona — medindo, a
+    // imagem subia de 0 a 1 em 450ms uniformemente pela tela, por cima da
+    // varredura, e era isso que aparecia como "meio transparente junto com o
+    // wallpaper antigo".
+    property int opDuration: 0
+
     function cover(path) {
         if (!path)
             return;
@@ -89,6 +95,9 @@ Scope {
             return;
         fadeScope.pendingCover = false;
         decodeGuard.stop();
+        // Nos estilos com máscara a opacidade salta para 1 e quem revela a
+        // imagem aos poucos é a máscara.
+        fadeScope.opDuration = fadeScope.masked ? 0 : fadeScope.coverMs;
         fadeScope.covering = true;
         // Sem o restart explícito, cobrir duas vezes seguidas deixaria a
         // animação de máscara parada no valor anterior.
@@ -110,6 +119,7 @@ Scope {
         if (!fadeScope.covering && !fadeScope.pendingCover)
             return;
         fadeScope.pendingCover = false;
+        fadeScope.opDuration = fadeScope.revealMs;
         fadeScope.covering = false;
         holdTimer.stop();
     }
@@ -199,89 +209,77 @@ Scope {
 
             // ---------------------------------------------- máscaras
             //
-            // Ficam FORA da área visível (x negativo), não escondidas.
+            // Três regras que custaram caro para descobrir, todas medidas:
             //
-            // Duas tentativas anteriores falharam por motivos diferentes, e as
-            // duas davam o mesmo sintoma — a imagem aparecia numa mistura meio
-            // transparente e parada, em vez de varrer:
-            //
-            //   1. `visible: false` — um item invisível não é desenhado, logo
-            //      não gera a textura que o OpacityMask consome;
-            //   2. declaradas dentro do próprio `layer.effect` — aí a textura
-            //      é capturada uma vez e nunca mais atualiza.
-            //
-            // Um item com `layer.enabled` é renderizado na própria FBO
-            // independentemente de onde esteja, e essa FBO acompanha as
-            // mudanças. Tirar da vista em vez de esconder resolve os dois.
-            // (Que a animação em si rodava já estava medido: o progresso ia de
-            // 0,1 a 1,0 enquanto o desenho ficava parado.)
+            // 1. a máscara fica FORA da área visível (x negativo), não
+            //    escondida: um item `visible: false` não é desenhado e não gera
+            //    a textura que o OpacityMask consome;
+            // 2. nada de `LinearGradient` do Qt5Compat aqui. Nesta superfície
+            //    ele devolve um valor uniforme igual ao progresso — o degradê
+            //    vira uma média só. Com Rectangle o alfa sai 1,0 de um lado e
+            //    0,0 do outro, como esperado. (O mesmo LinearGradient funciona
+            //    numa janela comum do `qml6`: é a combinação que falha.)
+            // 3. nada de contêiner girado. Com um `Item` girado por dentro da
+            //    máscara o resultado voltava a ser uniforme; sem ele, a
+            //    fronteira aparece. Por isso a varredura é horizontal e não
+            //    diagonal como a do swww.
 
-            // Varredura em diagonal, como o swww.
-            LinearGradient {
+            // Varredura: um retângulo branco que cresce, com uma faixa de
+            // degradê na ponta para a borda não ficar dura (o equivalente do
+            // --transition-step do swww).
+            Item {
                 id: wipeMask
                 width: fadeWin.width
                 height: fadeWin.height
                 x: -fadeWin.width - 64
                 layer.enabled: true
 
-                readonly property real rad: fadeScope.wipeAngle * Math.PI / 180
-                readonly property real dx: Math.cos(rad)
-                readonly property real dy: Math.sin(rad)
-                readonly property real span: Math.abs(width * dx) + Math.abs(height * dy)
-                // Borda macia, equivalente ao --transition-step do swww.
                 readonly property real feather: 0.16
-                // Empurra a faixa de -feather até 1 + feather, para que ela
-                // comece e termine inteiramente fora da tela.
-                readonly property real p: fadeScope.progress * (1 + 2 * feather) - feather
+                // Começa em -feather para a faixa entrar pela borda da tela.
+                readonly property real p: fadeScope.progress * (1 + feather) - feather
 
-                start: Qt.point(0, 0)
-                end: Qt.point(dx * span, dy * span)
+                Rectangle {
+                    width: Math.max(0, parent.width * wipeMask.p)
+                    height: parent.height
+                    color: "white"
+                }
 
-                gradient: Gradient {
-                    GradientStop { position: 0.0; color: "white" }
-                    GradientStop {
-                        position: Math.max(0, Math.min(1, wipeMask.p))
-                        color: "white"
+                Rectangle {
+                    x: Math.max(0, parent.width * wipeMask.p)
+                    width: parent.width * wipeMask.feather
+                    height: parent.height
+                    gradient: Gradient {
+                        orientation: Gradient.Horizontal
+                        GradientStop { position: 0.0; color: "white" }
+                        GradientStop { position: 1.0; color: "transparent" }
                     }
-                    GradientStop {
-                        position: Math.max(0, Math.min(1, wipeMask.p + wipeMask.feather))
-                        color: "transparent"
-                    }
-                    GradientStop { position: 1.0; color: "transparent" }
                 }
             }
 
-            // Círculo que abre do centro.
-            RadialGradient {
+            // Círculo que abre do centro. O `radius` recorta o alfa da
+            // textura, que é justamente o que o OpacityMask usa.
+            Item {
                 id: growMask
                 width: fadeWin.width
                 height: fadeWin.height
                 x: -fadeWin.width - 64
                 layer.enabled: true
 
-                readonly property real feather: 0.14
-                readonly property real p: fadeScope.progress * (1 + feather)
+                readonly property real diag: Math.sqrt(width * width + height * height)
 
-                horizontalRadius: Math.max(width, height) * 0.75
-                verticalRadius: horizontalRadius
-
-                gradient: Gradient {
-                    GradientStop { position: 0.0; color: "white" }
-                    GradientStop {
-                        position: Math.max(0, Math.min(1, growMask.p))
-                        color: "white"
-                    }
-                    GradientStop {
-                        position: Math.max(0, Math.min(1, growMask.p + growMask.feather))
-                        color: "transparent"
-                    }
-                    GradientStop { position: 1.0; color: "transparent" }
+                Rectangle {
+                    anchors.centerIn: parent
+                    width: growMask.diag * 1.08 * fadeScope.progress
+                    height: width
+                    radius: width / 2
+                    color: "white"
                 }
             }
 
-            // Varredura com a borda ondulada. O Canvas é pequeno de propósito:
-            // é uma máscara suave, a ampliação não aparece, e repintar
-            // 1920x1080 no CPU a cada quadro seria lento demais.
+            // Varredura com a borda ondulada. O Canvas desenha em coordenadas
+            // do próprio item — na primeira versão ele tinha `canvasSize` de
+            // 320x180 mas desenhava em coordenadas de 1920, então quase tudo
+            // caía fora da área pintada.
             Canvas {
                 id: waveMask
                 width: fadeWin.width
@@ -289,10 +287,9 @@ Scope {
                 x: -fadeWin.width - 64
                 layer.enabled: true
                 renderTarget: Canvas.FramebufferObject
-                canvasSize: Qt.size(320, 180)
 
-                readonly property real feather: 0.18
-                readonly property real p: fadeScope.progress * (1 + 2 * feather) - feather
+                readonly property real feather: 0.16
+                readonly property real p: fadeScope.progress * (1 + feather) - feather
 
                 onPChanged: requestPaint()
                 onWidthChanged: requestPaint()
@@ -306,9 +303,9 @@ Scope {
                     const h = height;
                     const edge = p * w;
                     const band = feather * w;
-                    const amp = w * 0.045;
+                    const amp = w * 0.04;
                     const cycles = 2.2;
-                    const steps = 64;
+                    const steps = 48;
 
                     // Cada fatia horizontal recebe o mesmo degradê, deslocado
                     // pela onda: é isso que dá a borda ondulada sem precisar de
@@ -317,13 +314,12 @@ Scope {
                     const sliceH = h / steps;
                     for (let i = 0; i < steps; i++) {
                         const t = (i + 0.5) / steps;
-                        const off = Math.sin(t * Math.PI * 2 * cycles) * amp;
-                        const x0 = edge + off;
+                        const x0 = edge + Math.sin(t * Math.PI * 2 * cycles) * amp;
                         const g = ctx.createLinearGradient(x0, 0, x0 + band, 0);
-                        g.addColorStop(0, "white");
-                        g.addColorStop(1, "transparent");
+                        g.addColorStop(0, "rgba(255,255,255,1)");
+                        g.addColorStop(1, "rgba(255,255,255,0)");
                         ctx.fillStyle = g;
-                        ctx.fillRect(0, i * sliceH, x0 + band, sliceH + 1);
+                        ctx.fillRect(0, i * sliceH, Math.max(0, x0 + band), sliceH + 1);
                     }
                 }
             }
@@ -349,8 +345,7 @@ Scope {
                 opacity: fadeScope.covering ? 1 : 0
                 Behavior on opacity {
                     NumberAnimation {
-                        duration: fadeScope.covering ? (fadeScope.masked ? 0 : fadeScope.coverMs)
-                                                     : fadeScope.revealMs
+                        duration: fadeScope.opDuration
                         easing.type: Easing.InOutQuad
                     }
                 }
