@@ -3,6 +3,20 @@
 
 set -euo pipefail
 
+# Toggle "as cores seguem o wallpaper" (painel > Cores & Wallust). Desligado,
+# trocar de papel de parede não mexe mais na paleta — quem escolheu as cores à
+# mão não perde tudo ao trocar o wallpaper. O botão "Regenerar Cores" do painel
+# passa --force e continua funcionando mesmo com o toggle desligado.
+FORCE="false"
+[ "${1:-}" = "--force" ] && FORCE="true"
+
+if [ "$FORCE" != "true" ] && command -v rice-colors >/dev/null 2>&1; then
+    if [ "$(rice-colors auto 2>/dev/null || echo 1)" = "0" ]; then
+        echo "[·] Cores travadas pelo usuário — wallpaper trocado sem mexer na paleta."
+        exit 0
+    fi
+fi
+
 preview=$(python3 -c '
 import sqlite3, os, tomllib
 
@@ -63,6 +77,13 @@ fi
 
 if [ -n "$preview" ] && [ -f "$preview" ]; then
     wallust run "$preview" >/dev/null 2>&1
+    # A paleta recém-extraída vira a "base". Em seguida o rice-colors regrava os
+    # mesmos arquivos aplicando as cores que o usuário trocou à mão no painel —
+    # sem isso, cada troca de wallpaper apagaria as escolhas dele.
+    if command -v rice-colors >/dev/null 2>&1; then
+        rice-colors snapshot >/dev/null 2>&1 || true
+        rice-colors apply >/dev/null 2>&1 || true
+    fi
     notify-send -a "Wallust" -i preferences-desktop-color -r 91199 -t 2500 "Paleta de Cores Atualizada" "Cores sincronizadas com o wallpaper ativo"
     echo "[✓] Wallust atualizado com: $preview"
 else

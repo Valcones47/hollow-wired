@@ -1,0 +1,274 @@
+#!/usr/bin/env python3
+"""rice-colors — permite trocar cores individuais da paleta do wallust.
+
+O wallust extrai a paleta do wallpaper e não tem como dizer "gostei de tudo,
+menos do vermelho". Este utilitário guarda substituições por cor e regenera os
+mesmos arquivos que o wallust geraria, usando os mesmos templates:
+
+    paleta efetiva = paleta extraída do wallpaper + cores trocadas à mão
+
+As trocas ficam em ~/.config/hypr/color-overrides.json (arquivo do usuário,
+nunca sobrescrito pelo rice) e sobrevivem a trocas de wallpaper: o que muda é
+só a base.
+
+Uso:
+    rice-colors get                    # JSON: base, overrides e paleta efetiva
+    rice-colors set color4 '#ff0055'   # troca uma cor
+    rice-colors unset color4           # volta a usar a cor do wallpaper
+    rice-colors reset                  # remove todas as trocas
+    rice-colors snapshot               # guarda a paleta atual como base
+    rice-colors apply                  # regenera os arquivos e recarrega tudo
+    rice-colors auto                   # 1 = cores seguem o wallpaper, 0 = travadas
+    rice-colors auto 0                 # congela a paleta atual
+"""
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+
+HOME = os.path.expanduser("~")
+BASE = os.path.join(HOME, ".config/hypr/colors-base.json")
+OVERRIDES = os.path.join(HOME, ".config/hypr/color-overrides.json")
+WALLUST_JSON = os.path.join(HOME, ".cache/wallust/colors-quickshell.json")
+TEMPLATES = os.path.join(HOME, ".config/wallust/templates")
+
+KEYS = ["background", "foreground", "cursor"] + ["color%d" % i for i in range(16)]
+
+# Mesmos destinos declarados em ~/.config/wallust/wallust.toml. Repetidos aqui
+# porque o wallust não expõe um "re-render" com paleta customizada.
+TARGETS = [
+    ("hyprland-colors.conf", os.path.join(HOME, ".config/hypr/colors.conf")),
+    ("waybar-colors.css", os.path.join(HOME, ".cache/wallust/colors-waybar.css")),
+    ("kitty-colors.conf", os.path.join(HOME, ".config/kitty/colors-wallust.conf")),
+    ("mako-colors", os.path.join(HOME, ".config/mako/colors")),
+    ("quickshell-colors.json", WALLUST_JSON),
+    ("sddm-theme.conf", "/usr/share/sddm/themes/SilentSDDM/configs/default-left.conf"),
+]
+
+FALLBACK = {
+    "background": "#111218", "foreground": "#e2e8f0", "cursor": "#e2e8f0",
+    "color0": "#181922", "color1": "#f43f5e", "color2": "#10b981", "color3": "#f59e0b",
+    "color4": "#3b82f6", "color5": "#d946ef", "color6": "#06b6d4", "color7": "#94a3b8",
+    "color8": "#475569", "color9": "#fb7185", "color10": "#ff2a85", "color11": "#ef4444",
+    "color12": "#60a5fa", "color13": "#e879f9", "color14": "#22d3ee", "color15": "#f8fafc",
+}
+
+HEX_RE = re.compile(r'^#?[0-9a-fA-F]{6}$')
+
+# Chave reservada dentro do color-overrides.json: quando falsa, trocar de
+# wallpaper deixa de mexer nas cores da interface (pedido de quem monta a
+# própria paleta à mão e não quer perdê-la ao trocar o papel de parede).
+AUTO_KEY = "__auto_from_wallpaper"
+
+
+def auto_enabled():
+    value = load_json(OVERRIDES).get(AUTO_KEY)
+    return True if value is None else bool(value)
+
+
+def set_auto(enabled):
+    ov = load_json(OVERRIDES)
+    ov[AUTO_KEY] = bool(enabled)
+    save_json(OVERRIDES, ov)
+
+
+def load_json(path):
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def save_json(path, data):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+        f.write("\n")
+
+
+def norm(value):
+    v = str(value).strip()
+    if not HEX_RE.match(v):
+        return None
+    return "#" + v.lstrip("#").upper()
+
+
+def base_palette():
+    """Paleta vinda do wallpaper, sem as trocas do usuário."""
+    data = load_json(BASE)
+    if not data:
+        # Primeira execução: a saída atual do wallust ainda é limpa.
+        data = load_json(WALLUST_JSON)
+        if data:
+            save_json(BASE, data)
+    out = dict(FALLBACK)
+    for k in KEYS:
+        v = norm(data.get(k, ""))
+        if v:
+            out[k] = v
+    if not norm(data.get("cursor", "")):
+        out["cursor"] = out["foreground"]
+    return out
+
+
+def effective():
+    palette = base_palette()
+    for k, v in load_json(OVERRIDES).items():
+        n = norm(v)
+        if k in KEYS and n:
+            palette[k] = n
+    return palette
+
+
+# ---------------------------------------------------------------- templates
+
+def lighten(hex_color, factor):
+    """Mesma conta do wallust: mistura a cor com branco em sRGB."""
+    h = hex_color.lstrip("#")
+    out = []
+    for i in (0, 2, 4):
+        c = int(h[i:i + 2], 16)
+        out.append(min(255, int(round(c + factor * (255 - c)))))
+    return "#%02X%02X%02X" % tuple(out)
+
+
+PLACEHOLDER = re.compile(r'\{\{\s*([a-zA-Z0-9_]+)\s*((?:\|[^}]*)?)\}\}')
+
+
+def render(text, palette):
+    def sub(m):
+        key, filters = m.group(1), m.group(2)
+        value = palette.get(key)
+        if value is None:
+            return m.group(0)
+        for f in [x.strip() for x in filters.split("|") if x.strip()]:
+            if f == "strip":
+                value = value.lstrip("#")
+            else:
+                lm = re.match(r'lighten\(\s*([0-9.]+)\s*\)', f)
+                if lm:
+                    value = lighten(value, float(lm.group(1)))
+                else:
+                    # Filtro desconhecido: melhor deixar a cor crua do que
+                    # escrever lixo num arquivo de configuração.
+                    pass
+        return value
+    return PLACEHOLDER.sub(sub, text)
+
+
+def write_target(path, content):
+    """Escreve o arquivo, usando sudo -n só quando for fora do $HOME."""
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(content)
+        return True
+    except OSError:
+        pass
+    if not path.startswith(HOME) and shutil.which("sudo"):
+        try:
+            r = subprocess.run(["sudo", "-n", "tee", path], input=content.encode(),
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return r.returncode == 0
+        except OSError:
+            return False
+    return False
+
+
+def reload_apps():
+    for cmd in (["pkill", "-SIGUSR1", "kitty"],
+                ["makoctl", "reload"],
+                ["hyprctl", "reload"]):
+        if shutil.which(cmd[0]):
+            subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def apply(quiet=False):
+    palette = effective()
+    written, skipped = [], []
+    for name, target in TARGETS:
+        tpl = os.path.join(TEMPLATES, name)
+        if not os.path.isfile(tpl):
+            skipped.append(name)
+            continue
+        with open(tpl, "r", encoding="utf-8") as f:
+            content = render(f.read(), palette)
+        (written if write_target(target, content) else skipped).append(os.path.basename(target))
+    reload_apps()
+    if not quiet:
+        print(json.dumps({"written": written, "skipped": skipped}, ensure_ascii=False))
+    return 0
+
+
+def main():
+    args = sys.argv[1:]
+    cmd = args[0] if args else "get"
+
+    if cmd == "get":
+        print(json.dumps({
+            "base": base_palette(),
+            "overrides": {k: v for k, v in load_json(OVERRIDES).items() if k in KEYS},
+            "effective": effective(),
+            "keys": KEYS,
+            "auto": auto_enabled(),
+        }, ensure_ascii=False))
+        return 0
+
+    if cmd == "snapshot":
+        data = load_json(WALLUST_JSON)
+        if not data:
+            print("sem paleta do wallust para guardar", file=sys.stderr)
+            return 1
+        save_json(BASE, data)
+        print("OK")
+        return 0
+
+    if cmd == "set":
+        if len(args) < 3:
+            print("Uso: rice-colors set <chave> <#RRGGBB>", file=sys.stderr)
+            return 2
+        key, value = args[1], norm(args[2])
+        if key not in KEYS:
+            print("chave desconhecida: %s" % key, file=sys.stderr)
+            return 2
+        if not value:
+            print("cor inválida: %s" % args[2], file=sys.stderr)
+            return 2
+        ov = load_json(OVERRIDES)
+        ov[key] = value
+        save_json(OVERRIDES, ov)
+        return apply(quiet=True) or (print("OK") or 0)
+
+    if cmd == "unset":
+        if len(args) < 2:
+            return 2
+        ov = load_json(OVERRIDES)
+        ov.pop(args[1], None)
+        save_json(OVERRIDES, ov)
+        return apply(quiet=True) or (print("OK") or 0)
+
+    if cmd == "reset":
+        save_json(OVERRIDES, {})
+        return apply(quiet=True) or (print("OK") or 0)
+
+    if cmd == "auto":
+        if len(args) < 2:
+            print("1" if auto_enabled() else "0")
+            return 0
+        set_auto(args[1] not in ("0", "false", "off", "nao", "não"))
+        print("1" if auto_enabled() else "0")
+        return 0
+
+    if cmd == "apply":
+        return apply()
+
+    print(__doc__)
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
