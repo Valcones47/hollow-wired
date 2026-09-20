@@ -1,82 +1,361 @@
 #!/usr/bin/env python3
+"""rice-mako-apply — controla as notificações (mako) do rice.
+
+Reescrita depois de dois bugs relatados por usuários:
+
+  • "as notificações não saem da tela até eu clicar" — o mako aceita
+    `default-timeout=0`, que significa "nunca fechar sozinho". Bastava o
+    arquivo vir assim de uma instalação antiga (ou o `include=` apontar para um
+    arquivo de cores inexistente, fazendo o mako descartar a configuração
+    inteira) para todas as notificações ficarem presas na tela.
+
+  • "o tempo sempre volta para 5" — o `get` devolvia 0 nesse caso e o painel
+    lia `d.timeout || 5`, transformando 0 em 5. O usuário mudava o valor, o
+    mako continuava em 0 e o painel mentia que estava em 5.
+
+Agora:
+  • a leitura e a escrita acontecem só na seção global (antes do primeiro
+    `[...]`), sem estragar os blocos `[urgency=...]`;
+  • `doctor` conserta sozinho os dois casos acima (usado pelo rice-update);
+  • nenhuma notificação pode ficar presa: crítica ganha tempo longo, não
+    infinito.
+
+Uso:
+    rice-mako-apply get                # JSON com o estado atual
+    rice-mako-apply set <chave> <val>  # anchor | timeout | radius | border_size
+    rice-mako-apply reset              # volta à configuração padrão do rice
+    rice-mako-apply doctor [--fix]     # diagnostica (e conserta) problemas
+    rice-mako-apply test               # dispara uma notificação de teste
+"""
 import sys
 import os
 import re
+import shutil
 import subprocess
 import json
 
-MAKO_CONF = os.path.expanduser("~/.config/mako/config")
+HOME = os.path.expanduser("~")
+MAKO_DIR = os.path.join(HOME, ".config/mako")
+MAKO_CONF = os.path.join(MAKO_DIR, "config")
+MAKO_COLORS = os.path.join(MAKO_DIR, "colors")
 
-def get_settings():
-    if not os.path.isfile(MAKO_CONF):
-        return {}
-    with open(MAKO_CONF, "r", encoding="utf-8") as f:
-        content = f.read()
+MIN_TIMEOUT = 2
+MAX_TIMEOUT = 60
+DEFAULT_TIMEOUT = 5
 
-    def find_val(pattern, default):
-        m = re.search(pattern, content, re.MULTILINE)
-        return m.group(1) if m else default
+DEFAULT_CONF = """# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# mako — notificações do hollow-wired (gerado pelo rice-mako-apply).
+# As cores vêm do wallust (arquivo colors, regenerado a cada troca de wallpaper).
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+include=~/.config/mako/colors
 
-    anchor = find_val(r'^anchor=([a-zA-Z-]+)', "top-right")
-    timeout = int(find_val(r'^default-timeout=([0-9]+)', "5000"))
-    radius = int(find_val(r'^border-radius=([0-9]+)', "6"))
-    border_size = int(find_val(r'^border-size=([0-9]+)', "1"))
+border-size=1
+border-radius=14
+padding=14
+margin=12,16
+font=Noto Sans 10
+width=380
+height=160
+icon-border-radius=10
+max-icon-size=48
+default-timeout=5000
+layer=overlay
+anchor=top-right
+max-history=100
+format=<b>%s</b>\\n%b
+markup=1
+actions=1
 
-    return {
-        "anchor": anchor,
-        "timeout": timeout // 1000,
-        "radius": radius,
-        "border_size": border_size
-    }
+[urgency=low]
+default-timeout=3000
 
-def set_setting(key, value):
-    if not os.path.isfile(MAKO_CONF):
-        return
-    with open(MAKO_CONF, "r", encoding="utf-8") as f:
-        content = f.read()
+# Crítica fica bem mais tempo, mas nunca para sempre: notificação que não sai
+# da tela sozinha é o bug número 1 relatado por quem vem do Windows.
+[urgency=critical]
+default-timeout=20000
+border-size=2
 
-    if key == "anchor":
-        repl = f"anchor={value}"
-        pat = r'^anchor=.*$'
-    elif key == "timeout":
-        ms = int(value) * 1000
-        repl = f"default-timeout={ms}"
-        pat = r'^default-timeout=.*$'
-    elif key == "radius":
-        repl = f"border-radius={int(value)}"
-        pat = r'^border-radius=.*$'
-    elif key == "border_size":
-        repl = f"border-size={int(value)}"
-        pat = r'^border-size=.*$'
-    else:
-        return
+# Modo "não perturbe" (Super + Shift + N): continuam no histórico, sem aparecer.
+[mode=do-not-disturb]
+invisible=1
+"""
 
-    if re.search(pat, content, re.MULTILINE):
-        content = re.sub(pat, repl, content, flags=re.MULTILINE)
-    else:
-        content += f"\n{repl}\n"
+FALLBACK_COLORS = """# Cores de emergência criadas pelo rice-mako-apply.
+# O wallust sobrescreve este arquivo a cada troca de wallpaper.
+background-color=#11121aee
+text-color=#cdd6f4ff
+border-color=#89b4faff
+progress-color=over #313244ff
+"""
 
+
+def read_conf():
+    try:
+        with open(MAKO_CONF, "r", encoding="utf-8") as f:
+            return f.read()
+    except OSError:
+        return ""
+
+
+def write_conf(content):
+    os.makedirs(MAKO_DIR, exist_ok=True)
     with open(MAKO_CONF, "w", encoding="utf-8") as f:
         f.write(content)
 
-    subprocess.run(["makoctl", "reload"], stderr=subprocess.DEVNULL)
+
+def split_global(content):
+    """Separa a seção global (antes do primeiro [bloco]) do resto."""
+    m = re.search(r'^\[', content, re.MULTILINE)
+    if not m:
+        return content, ""
+    return content[:m.start()], content[m.start():]
+
+
+def ensure_conf():
+    if not os.path.isfile(MAKO_CONF):
+        write_conf(DEFAULT_CONF)
+
+
+def get_in_global(content, key, default=None):
+    head, _ = split_global(content)
+    m = re.search(r'^%s\s*=\s*(.+?)\s*$' % re.escape(key), head, re.MULTILINE)
+    return m.group(1) if m else default
+
+
+def set_in_global(content, key, value):
+    head, tail = split_global(content)
+    line = "%s=%s" % (key, value)
+    pat = r'^%s\s*=.*$' % re.escape(key)
+    if re.search(pat, head, re.MULTILINE):
+        head = re.sub(pat, line, head, count=1, flags=re.MULTILINE)
+    else:
+        head = head.rstrip("\n") + "\n" + line + "\n\n"
+    return head + tail
+
+
+def set_in_section(content, section, key, value):
+    """Grava uma chave dentro de um bloco [section], criando o bloco se faltar."""
+    line = "%s=%s" % (key, value)
+    pat_section = r'^\[%s\]\s*$' % re.escape(section)
+    m = re.search(pat_section, content, re.MULTILINE)
+    if not m:
+        return content.rstrip("\n") + "\n\n[%s]\n%s\n" % (section, line)
+    start = m.end()
+    nxt = re.search(r'^\[', content[start:], re.MULTILINE)
+    end = start + (nxt.start() if nxt else len(content) - start)
+    block = content[start:end]
+    pat_key = r'^%s\s*=.*$' % re.escape(key)
+    if re.search(pat_key, block, re.MULTILINE):
+        block = re.sub(pat_key, line, block, count=1, flags=re.MULTILINE)
+    else:
+        block = "\n" + line + block.lstrip("\n")
+    return content[:start] + block + content[end:]
+
+
+def to_int(value, default):
+    try:
+        return int(str(value).strip())
+    except (TypeError, ValueError):
+        return default
+
+
+def mako_running():
+    return subprocess.run(["pgrep", "-x", "mako"], stdout=subprocess.DEVNULL,
+                          stderr=subprocess.DEVNULL).returncode == 0
+
+
+def reload_mako():
+    if not shutil.which("makoctl"):
+        return
+    r = subprocess.run(["makoctl", "reload"], stdout=subprocess.DEVNULL,
+                       stderr=subprocess.DEVNULL)
+    if r.returncode != 0 and shutil.which("mako") and not mako_running():
+        try:
+            subprocess.Popen(["mako"], stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL, start_new_session=True)
+        except OSError:
+            pass
+
+
+def get_settings():
+    ensure_conf()
+    content = read_conf()
+    timeout_ms = to_int(get_in_global(content, "default-timeout", DEFAULT_TIMEOUT * 1000),
+                        DEFAULT_TIMEOUT * 1000)
+    return {
+        "anchor": get_in_global(content, "anchor", "top-right"),
+        # Em segundos. 0 é devolvido como 0 mesmo — é o valor que prende a
+        # notificação na tela, e o painel precisa conseguir mostrar isso.
+        "timeout": timeout_ms // 1000,
+        "radius": to_int(get_in_global(content, "border-radius", 14), 14),
+        "border_size": to_int(get_in_global(content, "border-size", 1), 1),
+        "running": mako_running(),
+        "problems": diagnose()[0],
+    }
+
+
+def set_setting(key, value):
+    ensure_conf()
+    content = read_conf()
+
+    if key == "anchor":
+        content = set_in_global(content, "anchor", value)
+    elif key == "timeout":
+        secs = max(MIN_TIMEOUT, min(MAX_TIMEOUT, to_int(value, DEFAULT_TIMEOUT)))
+        content = set_in_global(content, "default-timeout", secs * 1000)
+        # Os blocos por urgência seguem o valor escolhido, senão o ajuste do
+        # painel não tinha efeito nenhum sobre metade das notificações.
+        content = set_in_section(content, "urgency=low", "default-timeout",
+                                 max(2, secs - 2) * 1000)
+        content = set_in_section(content, "urgency=critical", "default-timeout",
+                                 max(15, secs * 3) * 1000)
+    elif key == "radius":
+        content = set_in_global(content, "border-radius", to_int(value, 14))
+    elif key == "border_size":
+        content = set_in_global(content, "border-size", to_int(value, 1))
+    else:
+        print("chave desconhecida: %s" % key, file=sys.stderr)
+        return 2
+
+    write_conf(content)
+    reload_mako()
     print("OK")
+    return 0
+
+
+def diagnose():
+    """Devolve (problemas, conserto_possivel) sem alterar nada."""
+    problems = []
+    if not os.path.isfile(MAKO_CONF):
+        problems.append("config_missing")
+        return problems, True
+
+    content = read_conf()
+    inc = get_in_global(content, "include")
+    if inc:
+        path = os.path.expanduser(inc.strip())
+        if not os.path.isfile(path):
+            # O mako descarta a configuração inteira quando o include falha:
+            # o resultado é o visual padrão e o timeout padrão, sem aviso.
+            problems.append("include_missing")
+
+    raw = get_in_global(content, "default-timeout")
+    if raw is None:
+        problems.append("timeout_missing")
+    elif to_int(raw, -1) <= 0:
+        problems.append("timeout_zero")
+
+    for section in ("urgency=low", "urgency=critical"):
+        m = re.search(r'^\[%s\]\s*$' % re.escape(section), content, re.MULTILINE)
+        if not m:
+            continue
+        start = m.end()
+        nxt = re.search(r'^\[', content[start:], re.MULTILINE)
+        end = start + (nxt.start() if nxt else len(content) - start)
+        km = re.search(r'^default-timeout\s*=\s*(\d+)', content[start:end], re.MULTILINE)
+        if km and int(km.group(1)) == 0:
+            problems.append("timeout_zero_%s" % section.split("=")[1])
+
+    if shutil.which("mako") and not mako_running():
+        problems.append("not_running")
+
+    return problems, True
+
+
+def doctor(fix=False):
+    problems, _ = diagnose()
+    if not fix:
+        print(json.dumps({"problems": problems, "ok": not problems}))
+        return 0 if not problems else 1
+
+    fixed = []
+    if "config_missing" in problems:
+        write_conf(DEFAULT_CONF)
+        fixed.append("configuração do mako recriada")
+        problems = [p for p in problems if p != "config_missing"]
+
+    if "include_missing" in problems:
+        os.makedirs(MAKO_DIR, exist_ok=True)
+        with open(MAKO_COLORS, "w", encoding="utf-8") as f:
+            f.write(FALLBACK_COLORS)
+        fixed.append("arquivo de cores ausente recriado (o mako ignorava toda a configuração)")
+
+    content = read_conf()
+    changed = False
+    if "timeout_missing" in problems or "timeout_zero" in problems:
+        content = set_in_global(content, "default-timeout", DEFAULT_TIMEOUT * 1000)
+        changed = True
+        fixed.append("notificações presas na tela: tempo de exibição voltou para %ds" % DEFAULT_TIMEOUT)
+    if "timeout_zero_low" in problems:
+        content = set_in_section(content, "urgency=low", "default-timeout", 3000)
+        changed = True
+        fixed.append("notificações de baixa prioridade voltaram a fechar sozinhas")
+    if "timeout_zero_critical" in problems:
+        content = set_in_section(content, "urgency=critical", "default-timeout", 20000)
+        changed = True
+        fixed.append("notificações críticas voltaram a fechar sozinhas (20s)")
+    if changed:
+        write_conf(content)
+
+    if changed or fixed:
+        reload_mako()
+    if "not_running" in problems and not mako_running():
+        try:
+            subprocess.Popen(["mako"], stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL, start_new_session=True)
+            fixed.append("mako não estava rodando e foi iniciado")
+        except OSError:
+            pass
+
+    print(json.dumps({"fixed": fixed, "ok": True}, ensure_ascii=False))
+    return 0
+
+
+def reset():
+    if os.path.isfile(MAKO_CONF):
+        try:
+            shutil.copy2(MAKO_CONF, MAKO_CONF + ".bak")
+        except OSError:
+            pass
+    write_conf(DEFAULT_CONF)
+    doctor(fix=True)
+    reload_mako()
+    print("OK")
+    return 0
+
 
 def test_notification():
     subprocess.run([
         "notify-send",
-        "Ajuste Visual Aplicado!",
-        "Esta é uma notificação de teste das suas novas configurações.",
+        "Ajuste aplicado!",
+        "Esta notificação some sozinha no tempo que você escolheu.",
         "-i", "dialog-information",
-        "-a", "Configurações Visuais"
+        "-a", "Notificações",
     ])
+    return 0
+
+
+def main():
+    args = sys.argv[1:]
+    cmd = args[0] if args else "get"
+    if cmd == "get":
+        print(json.dumps(get_settings(), ensure_ascii=False))
+        return 0
+    if cmd == "set":
+        if len(args) < 3:
+            print("Uso: rice-mako-apply set <anchor|timeout|radius|border_size> <valor>",
+                  file=sys.stderr)
+            return 2
+        return set_setting(args[1], args[2])
+    if cmd == "doctor":
+        return doctor(fix="--fix" in args)
+    if cmd == "reset":
+        return reset()
+    if cmd == "test":
+        return test_notification()
+    print(__doc__)
+    return 1
+
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2 or sys.argv[1] == "get":
-        print(json.dumps(get_settings()))
-    elif sys.argv[1] == "set" and len(sys.argv) >= 4:
-        set_setting(sys.argv[2], sys.argv[3])
-    elif sys.argv[1] == "test":
-        test_notification()
-    else:
-        print("Usage: rice-mako-apply [get|set <key> <val>|test]")
+    sys.exit(main())

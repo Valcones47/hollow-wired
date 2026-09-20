@@ -1,0 +1,43 @@
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# mako — notificações do hollow-wired.
+# As cores vêm do wallust (arquivo colors, regenerado a cada troca de wallpaper).
+# Editar o template em: ~/.config/wallust/templates/mako-colors
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+include=~/.config/mako/colors
+
+# Visual alinhado com a TopBar/Hub do Quickshell
+border-size=1
+border-radius=14
+padding=14
+margin=12,16
+font=Noto Sans 10
+width=380
+height=160
+icon-border-radius=10
+max-icon-size=48
+default-timeout=5000
+layer=overlay
+anchor=top-right
+
+# histórico maior pra aba Notificações do hub (padrão do mako é 5)
+max-history=100
+
+# Título em destaque e corpo com marcação básica
+format=<b>%s</b>\n%b
+markup=1
+actions=1
+
+[urgency=low]
+default-timeout=3000
+
+# Crítica fica bem mais tempo, mas nunca para sempre: notificação que não sai
+# da tela sozinha é o bug número 1 relatado por quem vem do Windows.
+[urgency=critical]
+default-timeout=20000
+border-size=2
+
+# Modo "não perturbe", ligado pelo toggle do hub e por Super + Shift + N: as
+# notificações continuam sendo guardadas (makoctl history) mas não aparecem
+# na tela. Toggle: makoctl mode -t do-not-disturb
+[mode=do-not-disturb]
+invisible=1

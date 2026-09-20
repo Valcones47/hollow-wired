@@ -19,16 +19,24 @@ QtObject {
         onTriggered: root.refresh()
     }
 
+    // Fica false até notif-cleared terminar de carregar (leitura assíncrona).
+    // clearedUpTo começa em 0 por padrão; sem essa guarda, a checagem de
+    // rollover do syncProc (maxId < clearedUpTo) pode disparar setCleared(0)
+    // antes do valor real ser lido, marcando notificações já lidas como não-lidas.
+    property bool ready: false
+
     property FileView clearedFile: FileView {
         path: Quickshell.env("HOME") + "/.cache/quickshell/notif-cleared"
         watchChanges: true
         onFileChanged: reload()
         onLoaded: {
             root.clearedUpTo = parseInt(text()) || 0;
+            root.ready = true;
             root.refresh();
         }
         onLoadFailed: {
             root.clearedUpTo = 0;
+            root.ready = true;
         }
     }
 
@@ -41,7 +49,7 @@ QtObject {
                     root.dnd = !!data.dnd;
                     root.unreadCount = data.count || 0;
                     root.maxId = data.maxId || 0;
-                    if (root.maxId < root.clearedUpTo) {
+                    if (root.ready && root.maxId < root.clearedUpTo) {
                         root.setCleared(0);
                     }
                 } catch (e) {
