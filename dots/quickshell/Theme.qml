@@ -83,6 +83,9 @@ QtObject {
 
     // ---------- barra lateral de energia/updates/trays ----------
     // A faixa da moldura direita (frameThickness) é o gatilho do hover.
+    // Altura do corpo da dock — o Launcher usa para tirar a área da dock da sua
+    // máscara de clique enquanto ela está aberta (ver Launcher.qml).
+    readonly property int dockHeight: 64
     readonly property int sidebarWidth: 64
     readonly property int sidebarIconSize: 22
     readonly property int sidebarButtonSize: 46
@@ -125,7 +128,10 @@ QtObject {
         network: "\u{F0C9D}", batHealth: "\u{F120F}", restore: "\u{F099B}", alert: "\u{F002A}",
         fileCompare: "\u{F08AA}", close: "\u{F0156}", verified: "\u{F0791}", camera: "\u{F0D5D}",
         gamepad: "\u{F0297}", pin: "\u{F0403}", pencil: "\u{F0CB6}",
+        star: "\u{F04CE}", starOutline: "\u{F04D2}", content: "\u{F018F}",
+        sleep: "\u{F0904}",
         tune: "\u{F062E}", palette: "\u{F03D8}", settings: "\u{F08B8}",
+        check: "\u{F012C}",
         calendar: "\u{F00ED}", timer: "\u{F051B}", quote: "\u{F0281}", speed: "\u{F04C5}"
     })
 
