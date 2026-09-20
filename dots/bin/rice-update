@@ -113,11 +113,11 @@ apply_updates() {
 
     if [ "$COUNT" -eq 0 ]; then
         echo -e "\n\e[1;33m[!] O código já está atualizado, mas a última sincronização"
-        echo -e "    não chegou ao fim. Refazendo agora.\e[0m"
+        echo -e "    não chegou ao fim. Vou refazer a cópia dos arquivos agora.\e[0m"
+    else
+        echo -e "\n\e[1;33m[!] Existem $COUNT nova(s) atualização(ões) disponíveis:\e[0m"
+        git -C "$REPO_DIR" log --oneline --color=always -n 8 HEAD..origin/main
     fi
-
-    echo -e "\n\e[1;33m[!] Existem $COUNT nova(s) atualização(ões) disponíveis:\e[0m"
-    git -C "$REPO_DIR" log --oneline --color=always -n 8 HEAD..origin/main
     echo ""
 
     if [ "$interactive" = "true" ]; then
