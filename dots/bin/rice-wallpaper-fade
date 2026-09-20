@@ -67,6 +67,37 @@ case "${1:-}" in
         echo "OK"
         exit 0
         ;;
+    --reveal-when-ready)
+        # Tira a camada assim que o wallpaper novo estiver de fato no ar.
+        #
+        # Antes a camada saía por tempo fixo. Quando o backend demorava mais que
+        # isso, ela começava a sumir com o wallpaper antigo ainda desenhando, e
+        # os dois apareciam ao mesmo tempo meio transparentes. E quando o
+        # backend era rápido, a tela ficava coberta à toa.
+        #
+        # O waywallen sobe um processo por wallpaper —
+        # `waywallen-video-renderer --path <arquivo>` para vídeo e
+        # `waywallen-wescene-renderer --path <scene.pkg>` para cena — com o
+        # caminho do item na linha de comando. A presença dele é o sinal.
+        target="${2:-}"
+        [ -n "$target" ] || { qs_call reveal >/dev/null 2>&1; exit 0; }
+
+        deadline=$(( $(date +%s) + 8 ))
+        ready=0
+        while [ "$(date +%s)" -lt "$deadline" ]; do
+            if pgrep -f "waywallen-.*-renderer.*$target" >/dev/null 2>&1; then
+                ready=1
+                break
+            fi
+            sleep 0.12
+        done
+
+        # Um instante a mais depois de o processo aparecer: ele ainda precisa
+        # desenhar o primeiro quadro, e revelar antes disso mostra preto.
+        [ "$ready" = "1" ] && sleep 0.45
+        qs_call reveal >/dev/null 2>&1 || true
+        exit 0
+        ;;
     --dismiss)
         qs_call dismiss >/dev/null || true
         exit 0

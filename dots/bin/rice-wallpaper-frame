@@ -50,7 +50,11 @@ done
 
 mkdir -p "$CACHE"
 key=$(printf '%s' "$video" | sha256sum | cut -c1-32)
-out="$CACHE/$key.png"
+# JPEG, não PNG: o PNG do mesmo quadro sai com 1 a 4 MB e demora para o QML
+# decodificar bem na hora em que a transição precisa desenhar. Em JPEG de
+# qualidade alta o arquivo fica na casa das centenas de KB e a diferença não
+# aparece numa imagem que fica menos de dois segundos na tela.
+out="$CACHE/$key.jpg"
 
 # Reaproveita o cache, a menos que o vídeo tenha sido trocado por baixo.
 if [ -f "$out" ] && [ "$out" -nt "$video" ]; then
@@ -60,8 +64,8 @@ fi
 
 # 3s evita fade-in preto que muitos wallpapers têm no começo. Se o vídeo for
 # mais curto que isso o ffmpeg falha, e aí tenta de novo no primeiro quadro.
-if ! ffmpeg -y -ss 3 -i "$video" -frames:v 1 "$out" >/dev/null 2>&1 || [ ! -s "$out" ]; then
-    ffmpeg -y -i "$video" -frames:v 1 "$out" >/dev/null 2>&1
+if ! ffmpeg -y -ss 3 -i "$video" -frames:v 1 -q:v 3 "$out" >/dev/null 2>&1 || [ ! -s "$out" ]; then
+    ffmpeg -y -i "$video" -frames:v 1 -q:v 3 "$out" >/dev/null 2>&1
 fi
 
 if [ -s "$out" ]; then

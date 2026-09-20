@@ -34,9 +34,21 @@ Scope {
     id: fadeScope
 
     property string style: "wipe"
-    property int coverMs: 1300     // tempo até a imagem cobrir a tela
-    property int hold: 1200        // tela coberta: é aqui que a troca ocorre
-    property int revealMs: 550     // volta para o wallpaper novo já rodando
+
+    // Tempos. O que manda na sensação de "travou" é o coverMs: ele é tempo
+    // morto entre o clique e a troca começar de verdade, porque quem troca
+    // espera a tela estar coberta antes de mandar o comando. Era 1300 e, com o
+    // ~1s que o backend leva por conta própria, o wallpaper só mudava 3s
+    // depois do clique.
+    property int coverMs: 450
+
+    // `hold` deixou de ser o caminho normal e virou só o limite: quem revela é
+    // o `reveal()`, chamado assim que o renderizador novo aparece de verdade.
+    // Antes era um tempo fixo de 1200ms, e quando o backend demorava mais que
+    // isso a camada começava a sumir com o wallpaper antigo ainda na tela — os
+    // dois apareciam ao mesmo tempo, meio transparentes.
+    property int hold: 6000
+    property int revealMs: 450
 
     // Ângulo da varredura, em graus, como o --transition-angle do swww.
     readonly property real wipeAngle: 30
@@ -55,23 +67,58 @@ Scope {
 
     readonly property bool masked: style === "wipe" || style === "wave" || style === "grow"
 
+    // Espera a imagem estar decodificada antes de animar. Uma imagem de tela
+    // cheia leva algumas dezenas de ms para decodificar, e começar a varredura
+    // antes disso desperdiça o começo da animação desenhando nada.
+    property bool pendingCover: false
+
     function cover(path) {
         if (!path)
             return;
         fadeScope.source = path.startsWith("file://") ? path : "file://" + path;
         fadeScope.progress = 0;
+        fadeScope.pendingCover = true;
+        holdTimer.restart();
+        safetyTimer.restart();
+        decodeGuard.restart();
+        fadeScope.maybeStart();
+    }
+
+    function maybeStart() {
+        if (!fadeScope.pendingCover)
+            return;
+        fadeScope.pendingCover = false;
+        decodeGuard.stop();
         fadeScope.covering = true;
         // Sem o restart explícito, cobrir duas vezes seguidas deixaria a
         // animação de máscara parada no valor anterior.
         if (fadeScope.masked)
             coverAnim.restart();
-        holdTimer.restart();
-        safetyTimer.restart();
+    }
+
+    // Se a imagem não carregar (arquivo sumiu, formato estranho), a transição
+    // não pode ficar esperando para sempre.
+    Timer {
+        id: decodeGuard
+        interval: 250
+        onTriggered: fadeScope.maybeStart()
+    }
+
+    // Revela o wallpaper novo. Chamado quando o renderizador novo já está no ar
+    // (ver rice-wallpaper-fade --reveal-when-ready).
+    function reveal() {
+        if (!fadeScope.covering && !fadeScope.pendingCover)
+            return;
+        fadeScope.pendingCover = false;
+        fadeScope.covering = false;
+        holdTimer.stop();
     }
 
     function dismiss() {
+        fadeScope.pendingCover = false;
         fadeScope.covering = false;
         coverAnim.stop();
+        decodeGuard.stop();
         holdTimer.stop();
         safetyTimer.stop();
     }
@@ -89,11 +136,12 @@ Scope {
         easing.bezierCurve: [0.25, 0.1, 0.25, 1.0, 1.0, 1.0]
     }
 
-    // Fim do tempo coberto: começa a revelar o wallpaper novo.
+    // Limite: se o sinal de "renderizador novo no ar" nunca chegar, revela
+    // assim mesmo em vez de deixar a tela coberta.
     Timer {
         id: holdTimer
         interval: fadeScope.coverMs + fadeScope.hold
-        onTriggered: fadeScope.covering = false
+        onTriggered: fadeScope.reveal()
     }
 
     Timer {
@@ -306,6 +354,10 @@ Scope {
                 mipmap: true
                 asynchronous: true
                 cache: false
+                onStatusChanged: {
+                    if (status === Image.Ready || status === Image.Error)
+                        fadeScope.maybeStart();
+                }
 
                 // No `fade` quem anima é a opacidade; nos outros ela salta para
                 // 1 e quem revela a imagem é a máscara.
@@ -342,8 +394,10 @@ Scope {
         function cover(path: string): void { fadeScope.cover(path); }
         // Tira a camada na hora (usado quando a troca falhou).
         function dismiss(): void { fadeScope.dismiss(); }
+        // Revela o wallpaper novo, agora que o renderizador dele está no ar.
+        function reveal(): void { fadeScope.reveal(); }
         // Quanto tempo o chamador deve esperar antes de aplicar a troca.
-        function coverDelay(): string { return String(fadeScope.coverMs + 120); }
+        function coverDelay(): string { return String(fadeScope.coverMs + 180); }
         // Troca o estilo sem reiniciar o shell (usado pelo painel e para teste).
         function setStyle(name: string): void { fadeScope.style = name; }
         function currentStyle(): string { return fadeScope.style; }

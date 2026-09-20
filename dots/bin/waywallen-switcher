@@ -360,10 +360,13 @@ class SwitcherWindow(Gtk.ApplicationWindow):
         self.set_title_text(immediate=True)
         self.apply_appear()
         self.request_thumbnails()
+        self.prefetch_stills()
         self.schedule_gif()
         self.ensure_ticking()
 
     # --- preview loading (decoding happens off the UI thread) --------------
+
+    _stills = {}
 
     def request_thumbnails(self):
         order = sorted(range(len(self.cards)), key=lambda i: abs(i - self.selected))
@@ -536,6 +539,43 @@ class SwitcherWindow(Gtk.ApplicationWindow):
         else:
             self._apply_now(wallpaper)
 
+    # Quadros em resolução real, por id de wallpaper. Preenchido em segundo
+    # plano (ver prefetch_stills): extrair na hora do clique custava de 0,3 a
+    # 0,6s TRAVANDO a interface, o que aparecia como "cliquei e não aconteceu
+    # nada".
+    def _extract_still(self, wallpaper):
+        preview = wallpaper.get("preview") or ""
+        helper = os.path.expanduser("~/.local/bin/rice-wallpaper-frame")
+        if not preview or not os.path.isfile(helper):
+            return preview if preview and os.path.isfile(preview) else ""
+        try:
+            out = subprocess.run(
+                [helper, os.path.dirname(preview), preview],
+                capture_output=True, text=True, timeout=25,
+            ).stdout.strip()
+            if out and os.path.isfile(out):
+                return out
+        except Exception:
+            pass
+        return preview if os.path.isfile(preview) else ""
+
+    def prefetch_stills(self):
+        """Extrai os quadros enquanto o carrossel está aberto.
+
+        Roda no mesmo pool das miniaturas. Quando o usuário decide e aperta
+        Enter, o quadro já está pronto e o clique responde na hora.
+        """
+        for wp in self.wallpapers:
+            wid = wp.get("id")
+            if wid in self._stills:
+                continue
+            self._stills[wid] = None          # marca como em andamento
+            self.pool.submit(self._prefetch_one, wp)
+
+    def _prefetch_one(self, wallpaper):
+        still = self._extract_still(wallpaper)
+        self._stills[wallpaper.get("id")] = still or ""
+
     def _still_for(self, wallpaper):
         """Melhor imagem estática do wallpaper: quadro do vídeo, ou o preview.
 
@@ -544,18 +584,12 @@ class SwitcherWindow(Gtk.ApplicationWindow):
         borrados, e como paleta representam mal o wallpaper. Quando o item é
         vídeo, `rice-wallpaper-frame` extrai um quadro na resolução real.
         """
+        cached = self._stills.get(wallpaper.get("id"))
+        if cached:
+            return cached
+        # Ainda não ficou pronto: usa o preview e não segura o clique. O quadro
+        # entra na próxima vez que este wallpaper for escolhido.
         preview = wallpaper.get("preview") or ""
-        helper = os.path.expanduser("~/.local/bin/rice-wallpaper-frame")
-        if preview and os.path.isfile(helper):
-            try:
-                out = subprocess.run(
-                    [helper, os.path.dirname(preview), preview],
-                    capture_output=True, text=True, timeout=20,
-                ).stdout.strip()
-                if out and os.path.isfile(out):
-                    return out
-            except Exception:
-                pass
         return preview if preview and os.path.isfile(preview) else ""
 
     def _apply_now(self, wallpaper):
@@ -600,6 +634,17 @@ class SwitcherWindow(Gtk.ApplicationWindow):
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL,
                     )
+        # Tira a camada quando o wallpaper novo estiver realmente desenhando,
+        # em vez de por tempo fixo. Destacado: o switcher fecha logo em
+        # seguida, e a espera continua sozinha.
+        fader = os.path.expanduser("~/.local/bin/rice-wallpaper-fade")
+        if os.path.isfile(fader) and wallpaper.get("preview"):
+            subprocess.Popen(
+                [fader, "--reveal-when-ready", os.path.dirname(wallpaper["preview"])],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+
         self.close_animated()
         return GLib.SOURCE_REMOVE
 
