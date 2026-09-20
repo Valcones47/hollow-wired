@@ -583,7 +583,7 @@
   "storage.empty_btn": "Esvaziar",
   "storage.deep_clean_btn": "Executar Limpeza Profunda Completa",
   "binds.section_title": "Guia de Teclas & Atalhos",
-  "binds.section_sub": "Atalhos essenciais do Hyprland com busca instantânea",
+  "binds.section_sub": "Clique num atalho para trocar a combinação de teclas. Botão direito devolve a original.",
   "binds.search_placeholder": "Buscar atalho...",
   "binds.cat_windows": "Janelas & Navegação",
   "binds.cat_rice": "Aplicativos & Ferramentas do Rice",
@@ -938,5 +938,6 @@
   "binds.sub_change": "Trocar",
   "binds.app_ph2": "Procurar programa...",
   "binds.sub_from_rice": "atalho do rice",
-  "binds.sub_from_file": "escrito à mão"
+  "binds.sub_from_file": "escrito à mão",
+  "toast.bind_restored": "Atalho original restaurado"
 }

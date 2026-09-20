@@ -97,6 +97,123 @@ def command_to_name(command):
     return os.path.splitext(first)[0] or command
 
 
+# ---------------------------------------------------------------- overrides
+#
+# Trocar um atalho que o rice já traz. O hyprland.lua é do repositório e não
+# pode ser editado por usuário, então a troca vira duas linhas no bloco
+# gerenciado do user-binds.lua, lidas depois dele:
+#
+#     hl.unbind("SUPER + Q")
+#     hl.bind("SUPER + ALT + T", hl.dsp.exec_cmd("kitty"))
+#
+# A ação é copiada verbatim do hyprland.lua, então não existe tabela de
+# ações para manter em dia. O que não pode ser copiado é o que depende de
+# variáveis locais de lá (o comando do launcher, as funções do Discord) ou o
+# que nasce dentro de um laço (Super + 1..9): esses ficam marcados como não
+# customizáveis em vez de gerar um atalho quebrado.
+BIND_RE = re.compile(r'^hl\.bind\(\s*(?P<combo>"[^"]+"|mainMod\s*\.\.\s*"[^"]+")\s*,\s*(?P<action>.+?)\s*(?:,\s*\{.*\})?\s*\)\s*$')
+
+SAFE_IDENTS = {"hl", "home", "mainMod", "true", "false", "nil"}
+
+# `hl.dsp.exec_cmd(terminal)` não pode ser copiado assim para o user-binds.lua,
+# mas `local terminal = "kitty"` está logo ali no mesmo arquivo. Resolver essas
+# locais de texto simples transforma a maioria dos atalhos do rice em
+# customizáveis (12 viravam 60) sem tabela nenhuma para manter à mão.
+LOCAL_STR_RE = re.compile(r'^local\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*"([^"]*)"\s*$',
+                          re.MULTILINE)
+
+
+def lua_locals():
+    try:
+        with open(HYPR_LUA, "r", encoding="utf-8") as f:
+            return dict(LOCAL_STR_RE.findall(f.read()))
+    except OSError:
+        return {}
+
+
+def inline_locals(action, locals_map):
+    def sub(m):
+        name = m.group(0)
+        if name in locals_map:
+            return '"%s"' % locals_map[name]
+        return name
+    # só identificadores soltos: nada precedido por ponto, dois-pontos ou aspas
+    return re.sub(r'(?<![.:\w"])\b[A-Za-z_][A-Za-z0-9_]*\b', sub, action)
+IDENT_RE = re.compile(r'\b([A-Za-z_][A-Za-z0-9_]*)\b')
+
+
+def combo_from_lua(expr):
+    """`mainMod .. " + Q"` e `"CTRL + slash"` viram "SUPER + Q" / "CTRL + slash"."""
+    expr = expr.strip()
+    if expr.startswith("mainMod"):
+        m = re.search(r'"([^"]+)"', expr)
+        return normalize("SUPER " + m.group(1)) if m else None
+    m = re.match(r'^"([^"]+)"$', expr)
+    return normalize(m.group(1)) if m else None
+
+
+def action_is_portable(action):
+    """A ação só pode ir para o user-binds.lua se não depender de locais de lá."""
+    # Sem isso, o conteúdo das aspas ("kitty", "dolphin") era lido como nome de
+    # variável e praticamente tudo era marcado como não customizável.
+    action = re.sub(r'"[^"]*"', '""', action)
+    for ident in IDENT_RE.findall(action):
+        if ident in SAFE_IDENTS:
+            continue
+        # campos depois de ponto (hl.dsp.exec_cmd) e chaves de tabela não contam
+        if re.search(r'[.:]\s*' + re.escape(ident), action):
+            continue
+        if re.search(r'\b' + re.escape(ident) + r'\s*=', action):
+            continue
+        if ident.isdigit():
+            continue
+        return False
+    return True
+
+
+def system_binds():
+    try:
+        with open(HYPR_LUA, "r", encoding="utf-8") as f:
+            lines = f.read().split("\n")
+    except OSError:
+        return []
+    locals_map = lua_locals()
+    out = []
+    seen = set()
+    for raw in lines:
+        line = raw.strip()
+        if not line.startswith("hl.bind(") or line.startswith("--"):
+            continue
+        m = BIND_RE.match(line)
+        if not m:
+            continue
+        combo = combo_from_lua(m.group("combo"))
+        if not combo or combo in seen:
+            continue
+        seen.add(combo)
+        action = inline_locals(m.group("action").strip(), locals_map)
+        out.append({
+            "combo": combo,
+            "action": action,
+            "customizable": action_is_portable(action),
+        })
+    return out
+
+
+def load_overrides():
+    _, body, _ = split_block(read_file())
+    out = {}
+    for line in body.split("\n"):
+        m = re.match(r'^hl\.bind\("(?P<new>[^"]+)",\s*(?P<action>.+)\)\s*--\s*@override=(?P<old>.+)$',
+                     line.strip())
+        if m:
+            out[m.group("old").strip()] = {
+                "new": m.group("new"),
+                "action": m.group("action").strip(),
+            }
+    return out
+
+
 def scan_external():
     found = []
     seen = set()
@@ -151,7 +268,7 @@ def load_binds():
     return out
 
 
-def save_binds(binds):
+def save_binds(binds, overrides=None):
     before, _, after = split_block(read_file())
     if not before.strip() and not after.strip() and not os.path.isfile(USER_BINDS):
         before = ("-- ~/.config/hypr/user-binds.lua\n"
@@ -161,6 +278,9 @@ def save_binds(binds):
     for b in binds:
         lines.append('hl.bind("%s", hl.dsp.exec_cmd("%s")) -- @app=%s'
                      % (b["combo"], b["command"], b["name"]))
+    for old, ov in (overrides if overrides is not None else load_overrides()).items():
+        lines.append('hl.unbind("%s")' % old)
+        lines.append('hl.bind("%s", %s) -- @override=%s' % (ov["new"], ov["action"], old))
     lines.append(END)
 
     content = before.rstrip("\n") + "\n\n" + "\n".join(lines) + "\n" + after.lstrip("\n")
@@ -206,6 +326,54 @@ def main():
         others = [b for b in scan_external() if b["combo"] not in taken]
         print(json.dumps({"binds": mine + others, "file": USER_BINDS},
                          ensure_ascii=False))
+        return 0
+
+    if cmd == "system-list":
+        overrides = load_overrides()
+        out = []
+        for b in system_binds():
+            ov = overrides.get(b["combo"])
+            out.append({
+                "combo": b["combo"],
+                "current": ov["new"] if ov else b["combo"],
+                "customizable": b["customizable"],
+                "overridden": ov is not None,
+            })
+        print(json.dumps({"binds": out}, ensure_ascii=False))
+        return 0
+
+    if cmd == "override":
+        if len(args) < 3:
+            print("Uso: rice-app-binds override <combinação original> <nova>",
+                  file=sys.stderr)
+            return 2
+        old = normalize(args[1])
+        new = normalize(args[2])
+        target = None
+        for b in system_binds():
+            if b["combo"] == old:
+                target = b
+                break
+        if target is None:
+            print(json.dumps({"status": "error", "message": "atalho não encontrado"}))
+            return 1
+        if not target["customizable"]:
+            print(json.dumps({"status": "error", "message": "esse atalho não pode ser trocado daqui"}))
+            return 1
+        overrides = load_overrides()
+        overrides[old] = {"new": new, "action": target["action"]}
+        save_binds(load_binds(), overrides)
+        print(json.dumps({"status": "ok", "old": old, "new": new}, ensure_ascii=False))
+        return 0
+
+    if cmd == "override-reset":
+        if len(args) < 2:
+            return 2
+        old = normalize(args[1])
+        overrides = load_overrides()
+        overrides.pop(old, None)
+        save_binds(load_binds(), overrides)
+        print(json.dumps({"status": "ok"}, ensure_ascii=False))
         return 0
 
     if cmd == "record":

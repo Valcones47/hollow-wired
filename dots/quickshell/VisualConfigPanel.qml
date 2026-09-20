@@ -319,6 +319,33 @@ PanelWindow {
     // sozinha ao capturar, em vez de exigir um terceiro clique.
     property string bindRecordingFor: ""
     property string bindRecordingName: ""
+    // Atalhos que o rice define e que podem ser trocados (rice-app-binds system-list).
+    property var systemBinds: []
+    property string sysRecordingFor: ""
+
+    // O guia mostra "Super + Q"; o script devolve "SUPER + Q". A comparação é
+    // pelo texto normalizado, senão nada casaria.
+    function normCombo(text) {
+        return String(text).split("+").map(p => p.trim().toUpperCase()).filter(p => p !== "").join(" + ");
+    }
+
+    function systemBindInfo(key) {
+        const want = win.normCombo(key);
+        const list = win.systemBinds || [];
+        for (let i = 0; i < list.length; i++) {
+            if (win.normCombo(list[i].combo) === want) return list[i];
+        }
+        return null;
+    }
+
+    function startSysBindCapture(oldCombo, label) {
+        win.sysRecordingFor = oldCombo;
+        win.bindRecordingFor = "";
+        win.bindRecordingName = label;
+        win.bindConflict = "";
+        win.bindCapturing = true;
+        recordAppBindProc.running = true;
+    }
     readonly property var bindAppsFiltered: {
         const q = win.bindAppQuery.trim().toLowerCase();
         const all = win.availableApps || [];
@@ -467,6 +494,22 @@ PanelWindow {
     }
 
     Process {
+        id: loadSysBindsProc
+        command: ["rice-app-binds", "system-list"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try { win.systemBinds = (JSON.parse(text).binds) || []; } catch (e) {}
+            }
+        }
+    }
+
+    Process {
+        id: saveSysBindProc
+        command: ["rice-app-binds", "system-list"]
+        onExited: (code, status) => loadSysBindsProc.running = true
+    }
+
+    Process {
         id: loadAppBindsProc
         command: ["rice-app-binds", "list"]
         stdout: StdioCollector {
@@ -495,7 +538,13 @@ PanelWindow {
                     if (d.status === "ok") {
                         win.bindCombo = d.key || "";
                         win.bindConflict = d.conflict || "";
-                        if (win.bindRecordingFor !== "" && win.bindCombo !== "") {
+                        if (win.sysRecordingFor !== "" && win.bindCombo !== "") {
+                            saveSysBindProc.command = ["rice-app-binds", "override",
+                                                       win.sysRecordingFor, win.bindCombo];
+                            saveSysBindProc.running = true;
+                            win.showToast(win.bindRecordingName + ": " + win.bindCombo);
+                            win.sysRecordingFor = "";
+                        } else if (win.bindRecordingFor !== "" && win.bindCombo !== "") {
                             saveAppBindProc.command = ["rice-app-binds", "add", win.bindCombo,
                                                        win.bindRecordingFor, "--name", win.bindRecordingName];
                             saveAppBindProc.running = true;
@@ -504,9 +553,11 @@ PanelWindow {
                         }
                     } else if (d.status === "timeout") {
                         win.bindRecordingFor = "";
+                        win.sysRecordingFor = "";
                         win.showToast(Theme.t("toast.bind_timeout", "Nenhuma tecla detectada"));
                     } else if (d.status === "cancelled") {
                         win.bindRecordingFor = "";
+                        win.sysRecordingFor = "";
                         win.showToast(Theme.t("toast.bind_cancelled", "Gravação cancelada"));
                     } else {
                         win.showToast(Theme.t("toast.bind_error", "Não consegui ler o teclado"));
@@ -928,6 +979,7 @@ PanelWindow {
         loadWallustColorsProc.running = true;
         loadColorOverridesProc.running = true;
         loadAppBindsProc.running = true;
+        loadSysBindsProc.running = true;
         loadAudioProc.running = true;
         loadPowerProc.running = true;
         loadAutostartProc.running = true;
@@ -6688,7 +6740,7 @@ PanelWindow {
                                     Layout.fillWidth: true
                                     SectionHeader {
                                         title: Theme.t("binds.section_title", "Guia de Teclas & Atalhos")
-                                        subtitle: Theme.t("binds.section_sub", "Atalhos essenciais do Hyprland com busca instantânea")
+                                        subtitle: Theme.t("binds.section_sub", "Clique num atalho para trocar a combinação de teclas. Botão direito devolve a original.")
                                     }
                                     Item { Layout.fillWidth: true }
 
@@ -6882,13 +6934,22 @@ PanelWindow {
                                             Repeater {
                                                 model: catBindsCol.filteredBinds
                                                 delegate: Rectangle {
+                                                    id: guideBind
                                                     required property var modelData
+                                                    // O guia era só leitura. Agora cada atalho que o
+                                                    // rice define numa linha sozinha pode ser trocado
+                                                    // daqui: o rice-app-binds desfaz o original e
+                                                    // religa a mesma ação na tecla nova.
+                                                    readonly property var info: win.systemBindInfo(guideBind.modelData.key)
+                                                    readonly property bool editable: guideBind.info !== null && guideBind.info.customizable
+                                                    readonly property bool changed: guideBind.info !== null && guideBind.info.overridden
                                                     implicitHeight: 34
                                                     implicitWidth: bindRow.implicitWidth + 20
                                                     radius: 8
-                                                    color: Theme.tile
+                                                    color: guideArea.containsMouse && guideBind.editable ? Theme.tileHigh : Theme.tile
                                                     border.width: 1
-                                                    border.color: Theme.withAlpha(Theme.outline, 0.2)
+                                                    border.color: guideBind.changed ? Theme.primary
+                                                                                    : Theme.withAlpha(Theme.outline, 0.2)
 
                                                     RowLayout {
                                                         id: bindRow
@@ -6905,7 +6966,12 @@ PanelWindow {
                                                             Text {
                                                                 id: keyTxt
                                                                 anchors.centerIn: parent
-                                                                text: parent.parent.parent.modelData.key
+                                                                // Só troca o texto quando a combinação
+                                                                // foi realmente alterada: senão o guia
+                                                                // perderia a grafia amigável ("Super +
+                                                                // Setas") em favor do formato interno.
+                                                                text: guideBind.changed ? guideBind.info.current
+                                                                                        : guideBind.modelData.key
                                                                 font.family: Theme.monoFamily
                                                                 font.pixelSize: 10
                                                                 font.weight: Font.Bold
@@ -6914,10 +6980,38 @@ PanelWindow {
                                                         }
 
                                                         Text {
-                                                            text: parent.parent.modelData.action
+                                                            text: guideBind.modelData.action
                                                             font.family: Theme.fontFamily
                                                             font.pixelSize: 11
                                                             color: Theme.textColor
+                                                        }
+
+                                                        Text {
+                                                            visible: guideBind.editable
+                                                            text: guideBind.changed ? Theme.icons.restore : Theme.icons.pencil
+                                                            font.family: Theme.iconFontFamily
+                                                            font.pixelSize: 12
+                                                            color: guideArea.containsMouse ? Theme.primary : Theme.subtext
+                                                        }
+                                                    }
+
+                                                    MouseArea {
+                                                        id: guideArea
+                                                        anchors.fill: parent
+                                                        hoverEnabled: true
+                                                        enabled: guideBind.editable
+                                                        acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                                        cursorShape: Qt.PointingHandCursor
+                                                        onClicked: mouse => {
+                                                            if (mouse.button === Qt.RightButton || guideBind.changed) {
+                                                                // botão direito (ou um já trocado) devolve o original
+                                                                saveSysBindProc.command = ["rice-app-binds", "override-reset",
+                                                                                           guideBind.modelData.key];
+                                                                saveSysBindProc.running = true;
+                                                                win.showToast(Theme.t("toast.bind_restored", "Atalho original restaurado"));
+                                                            } else {
+                                                                win.startSysBindCapture(guideBind.modelData.key, guideBind.modelData.action);
+                                                            }
                                                         }
                                                     }
                                                 }

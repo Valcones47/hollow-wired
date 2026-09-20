@@ -583,7 +583,7 @@
   "storage.empty_btn": "Empty",
   "storage.deep_clean_btn": "Run Full Deep Cleanup",
   "binds.section_title": "Keybinding & Shortcut Guide",
-  "binds.section_sub": "Essential Hyprland shortcuts with instant search",
+  "binds.section_sub": "Click a shortcut to change its key combination. Right-click restores the original.",
   "binds.search_placeholder": "Search shortcut...",
   "binds.cat_windows": "Windows & Navigation",
   "binds.cat_rice": "Rice Applications & Tools",
@@ -938,5 +938,6 @@
   "binds.sub_change": "Change",
   "binds.app_ph2": "Search program...",
   "binds.sub_from_rice": "rice shortcut",
-  "binds.sub_from_file": "hand-written"
+  "binds.sub_from_file": "hand-written",
+  "toast.bind_restored": "Original shortcut restored"
 }
