@@ -456,10 +456,24 @@ hl.bind(mainMod .. " + J", hl.dsp.layout("togglesplit"))
 hl.bind(mainMod .. " + F", hl.dsp.window.fullscreen({ mode = "fullscreen", action = "toggle" }))
 hl.bind(mainMod .. " + L", hl.dsp.exec_cmd("hyprlock"))
 
-hl.bind(mainMod .. " + left",  hl.dsp.focus({ direction = "left" }))
-hl.bind(mainMod .. " + right", hl.dsp.focus({ direction = "right" }))
+-- Super + esquerda/direita troca de área de trabalho. Antes as quatro setas
+-- moviam só o foco entre janelas — algo que quem vem do Windows não procura,
+-- enquanto trocar de workspace é a ação do dia a dia (e já existia escondida
+-- na roda do mouse). Mover o foco continua disponível em Super + Alt + setas.
+hl.bind(mainMod .. " + left",  hl.dsp.focus({ workspace = "e-1" }))
+hl.bind(mainMod .. " + right", hl.dsp.focus({ workspace = "e+1" }))
 hl.bind(mainMod .. " + up",    hl.dsp.focus({ direction = "up" }))
 hl.bind(mainMod .. " + down",  hl.dsp.focus({ direction = "down" }))
+
+-- Levar a janela atual junto para a área de trabalho do lado.
+hl.bind(mainMod .. " + SHIFT + left",  hl.dsp.window.move({ workspace = "e-1" }))
+hl.bind(mainMod .. " + SHIFT + right", hl.dsp.window.move({ workspace = "e+1" }))
+
+-- Foco entre janelas, que era o papel antigo do Super + setas.
+hl.bind(mainMod .. " + ALT + left",  hl.dsp.focus({ direction = "left" }))
+hl.bind(mainMod .. " + ALT + right", hl.dsp.focus({ direction = "right" }))
+hl.bind(mainMod .. " + ALT + up",    hl.dsp.focus({ direction = "up" }))
+hl.bind(mainMod .. " + ALT + down",  hl.dsp.focus({ direction = "down" }))
 
 for i = 1, 10 do
     local key = i % 10 -- 10 mapeia pra tecla 0
