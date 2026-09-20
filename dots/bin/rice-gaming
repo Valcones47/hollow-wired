@@ -11,6 +11,8 @@ import sys
 import os
 import subprocess
 import json
+import shutil
+import re
 
 def notify(title, msg="", icon="input-gaming"):
     try:
@@ -18,9 +20,30 @@ def notify(title, msg="", icon="input-gaming"):
     except Exception:
         pass
 
+def detect_gpu_fallback():
+    """Nome da GPU quando não há NVIDIA (ou o nvidia-smi não responde).
+
+    Sem isso a interface mostrava "NVIDIA GPU" em qualquer máquina — inclusive
+    nos PCs AMD e Intel dos amigos, que nunca tiveram uma NVIDIA.
+    """
+    try:
+        out = subprocess.check_output(["lspci", "-mm"], text=True, stderr=subprocess.DEVNULL)
+    except Exception:
+        return "GPU integrada"
+    for line in out.splitlines():
+        if '"VGA compatible controller"' in line or '"Display controller"' in line or '"3D controller"' in line:
+            parts = [p.strip('"') for p in re.findall(r'"[^"]*"|\S+', line)]
+            vendor = parts[2] if len(parts) > 2 else ""
+            model = parts[3] if len(parts) > 3 else ""
+            name = f"{vendor} {model}".strip()
+            if name:
+                return name
+    return "GPU integrada"
+
+
 def get_status():
     gpu_data = {
-        "name": "NVIDIA GPU",
+        "name": "GPU",
         "driver": "Desconhecido",
         "temp": 0,
         "vram_used": 0,
@@ -49,6 +72,9 @@ def get_status():
     except Exception:
         pass
 
+    if not gpu_data["available"]:
+        gpu_data["name"] = detect_gpu_fallback()
+
     # Gamemode status
     gamemode_active = False
     try:
@@ -74,12 +100,16 @@ def toggle_gamemode():
     return new_state == "on"
 
 def copy_param(preset):
+    # game-run vale para qualquer máquina: em laptop híbrido manda o jogo pra
+    # GPU dedicada, e em PC sem NVIDIA simplesmente executa direto. O
+    # "prime-run" fixo de antes quebrava o jogo em quem não tem NVIDIA.
+    runner = "game-run" if shutil.which("game-run") else "prime-run"
     presets = {
-        "nvidia": "prime-run %command%",
-        "gamemode": "gamemoderun prime-run %command%",
-        "compat": "PROTON_DISABLE_NVAPI=1 prime-run %command%"
+        "nvidia": f"{runner} %command%",
+        "gamemode": f"gamemoderun {runner} %command%",
+        "compat": f"PROTON_DISABLE_NVAPI=1 {runner} %command%"
     }
-    val = presets.get(preset, "prime-run %command%")
+    val = presets.get(preset, f"{runner} %command%")
     try:
         p = subprocess.Popen(["wl-copy"], stdin=subprocess.PIPE, text=True)
         p.communicate(input=val)

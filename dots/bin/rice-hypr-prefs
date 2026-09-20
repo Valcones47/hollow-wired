@@ -7,10 +7,24 @@ set -euo pipefail
 
 PREFS_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/user-prefs.json"
 
+# Layout de teclado do próprio sistema (/etc/vconsole.conf). O padrão fixo "br"
+# fazia quem instalasse o rice com teclado de outro país perder acentuação e
+# símbolos assim que o Quickshell aplicasse as preferências no autostart.
+system_kb_layout() {
+    local layout=""
+    if [ -f /etc/vconsole.conf ]; then
+        layout=$(sed -n 's/^XKBLAYOUT=\"\?\([^\"]*\)\"\?/\1/p' /etc/vconsole.conf | head -1)
+    fi
+    if [ -z "$layout" ] && command -v localectl >/dev/null 2>&1; then
+        layout=$(localectl status 2>/dev/null | sed -n 's/.*X11 Layout: *//p' | head -1)
+    fi
+    echo "${layout:-br}"
+}
+
 ensure_prefs_file() {
     if [ ! -f "$PREFS_FILE" ]; then
         mkdir -p "$(dirname "$PREFS_FILE")"
-        cat <<'JSON' > "$PREFS_FILE"
+        cat <<JSON > "$PREFS_FILE"
 {
   "rounding": 8,
   "border_size": 2,
@@ -21,14 +35,14 @@ ensure_prefs_file() {
   "dim_strength": 0.2,
   "anim_enabled": true,
   "anim_preset": "smooth",
-  "kb_layout": "br",
+  "kb_layout": "$(system_kb_layout)",
   "kb_variant": "",
   "mouse_sensitivity": 0.0,
   "mouse_accel": "flat",
   "numlock": true,
   "vrr": 0,
   "blur": true,
-  "monitor_hz": 144,
+  "monitor_hz": 0,
   "monitor_scale": 1
 }
 JSON
@@ -61,12 +75,19 @@ apply_all() {
     anim_preset=$(jq -r '.anim_preset // "smooth"' "$PREFS_FILE")
 
     local kb_layout kb_variant mouse_sensitivity mouse_accel numlock vrr monitor_hz monitor_scale
+    local repeat_rate repeat_delay touchpad_tap touchpad_natural touchpad_dwt
 
-    kb_layout=$(jq -r '.kb_layout // "br"' "$PREFS_FILE")
+    kb_layout=$(jq -r ".kb_layout // \"$(system_kb_layout)\"" "$PREFS_FILE")
     kb_variant=$(jq -r '.kb_variant // ""' "$PREFS_FILE")
     mouse_sensitivity=$(jq -r '.mouse_sensitivity // 0.0' "$PREFS_FILE")
     mouse_accel=$(jq -r '.mouse_accel // "flat"' "$PREFS_FILE")
     numlock=$(jq -r '.numlock // true' "$PREFS_FILE")
+    # Teclado e touchpad: antes só dava pra mudar a disposição do teclado.
+    repeat_rate=$(jq -r '.repeat_rate // 25' "$PREFS_FILE")
+    repeat_delay=$(jq -r '.repeat_delay // 600' "$PREFS_FILE")
+    touchpad_tap=$(jq -r '.touchpad_tap // true' "$PREFS_FILE")
+    touchpad_natural=$(jq -r '.touchpad_natural_scroll // false' "$PREFS_FILE")
+    touchpad_dwt=$(jq -r '.touchpad_dwt // false' "$PREFS_FILE")
     vrr=$(jq -r '.vrr // 0' "$PREFS_FILE")
     blur=$(jq -r '.blur // true' "$PREFS_FILE")
     local run="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
@@ -75,7 +96,9 @@ apply_all() {
     else
         rm -f "$run/rice-blur-disabled" 2>/dev/null || true
     fi
-    monitor_hz=$(jq -r '.monitor_hz // 144' "$PREFS_FILE")
+    # 0 = usa a taxa preferida do próprio monitor. O padrão antigo (144) vinha do
+    # notebook do autor e era aplicado à força em telas de 60Hz.
+    monitor_hz=$(jq -r '.monitor_hz // 0' "$PREFS_FILE")
     monitor_scale=$(jq -r '.monitor_scale // 1' "$PREFS_FILE")
 
     local gaps_out_sides=$(( gaps_out + 10 ))
@@ -108,7 +131,15 @@ hl.config({
         kb_variant = '$kb_variant',
         numlock_by_default = $numlock,
         accel_profile = '$mouse_accel',
-        sensitivity = $mouse_sensitivity
+        sensitivity = $mouse_sensitivity,
+        repeat_rate = $repeat_rate,
+        repeat_delay = $repeat_delay,
+
+        touchpad = {
+            natural_scroll = $touchpad_natural,
+            tap_to_click = $touchpad_tap,
+            disable_while_typing = $touchpad_dwt
+        }
     }
 })
 " &>/dev/null
@@ -126,20 +157,46 @@ hl.device({
     # Aplica escala global para qualquer monitor (evita o bug de zoom 300% do 'auto')
     hyprctl eval "hl.monitor({ output = '', mode = 'preferred', position = 'auto', scale = '$monitor_scale' })" &>/dev/null || true
 
+    # Configuração por monitor (resolução, taxa, escala e rotação), salva pelo
+    # painel em .monitors["<nome>"]. Tem prioridade sobre o ajuste global antigo,
+    # que só sabia mexer na taxa de atualização de uma tela.
+    local saved_monitors
+    saved_monitors=$(jq -r '.monitors // {} | keys[]?' "$PREFS_FILE" 2>/dev/null || true)
+    if [ -n "$saved_monitors" ]; then
+        local connected
+        connected=$(hyprctl monitors -j 2>/dev/null | jq -r '.[].name' 2>/dev/null || true)
+        while IFS= read -r mon; do
+            [ -z "$mon" ] && continue
+            # Não tenta configurar monitor que não está conectado agora.
+            printf '%s\n' "$connected" | grep -qx "$mon" || continue
+            local m_mode m_scale m_transform
+            m_mode=$(jq -r --arg m "$mon" '.monitors[$m].mode // "preferred"' "$PREFS_FILE")
+            m_scale=$(jq -r --arg m "$mon" '.monitors[$m].scale // 1' "$PREFS_FILE")
+            m_transform=$(jq -r --arg m "$mon" '.monitors[$m].transform // 0' "$PREFS_FILE")
+            hyprctl eval "hl.monitor({ output = '$mon', mode = '$m_mode', position = 'auto', scale = '$m_scale', transform = $m_transform })" &>/dev/null || true
+        done <<< "$saved_monitors"
+        apply_anim_preset "$anim_preset"
+        return 0
+    fi
+
     local mon_name
-    mon_name=$(hyprctl monitors -j 2>/dev/null | jq -r '.[0].name // empty' 2>/dev/null || true)
+    mon_name=$(hyprctl monitors -j 2>/dev/null | jq -r '[.[] | select(.focused == true)][0].name // .[0].name // empty' 2>/dev/null || true)
     if [ -n "$mon_name" ]; then
         local mode_str="preferred"
         if [ -n "$monitor_hz" ] && [ "$monitor_hz" != "0" ] && [ "$monitor_hz" != "null" ]; then
             local matched_mode
-            matched_mode=$(hyprctl monitors -j 2>/dev/null | jq -r --arg hz "$monitor_hz" '.[0].availableModes[]? | select(test("@" + $hz + "(\\.[0-9]+)?Hz"))' 2>/dev/null | head -1 || true)
+            matched_mode=$(hyprctl monitors -j 2>/dev/null | jq -r --arg name "$mon_name" --arg hz "$monitor_hz" \
+                '.[] | select(.name == $name) | .availableModes[]? | select(test("@" + $hz + "(\\.[0-9]+)?Hz"))' 2>/dev/null | head -1 || true)
             if [ -n "$matched_mode" ]; then
                 mode_str="$matched_mode"
-            else
-                mode_str="preferred@${monitor_hz}Hz"
             fi
+            # Sem modo compatível, fica em "preferred": forçar "preferred@144Hz"
+            # numa tela que não tem 144Hz fazia o Hyprland recusar o modo (e em
+            # alguns monitores dava tela preta até religar).
         fi
-        hyprctl eval "hl.monitor({ output = '$mon_name', mode = '$mode_str', position = '0x0', scale = '$monitor_scale' })" &>/dev/null || true
+        # position continua 'auto': fixar '0x0' empilhava monitores em quem usa
+        # mais de uma tela.
+        hyprctl eval "hl.monitor({ output = '$mon_name', mode = '$mode_str', position = 'auto', scale = '$monitor_scale' })" &>/dev/null || true
     fi
 
     # 4. Preset de animação
@@ -210,6 +267,44 @@ case "$cmd" in
             command -v rice-wallpaper-reload >/dev/null 2>&1 && rice-wallpaper-reload >/dev/null 2>&1 &
         fi
         ;;
+    monitor)
+        # rice-hypr-prefs monitor <nome> <modo> [escala] [rotação]
+        #   modo:    1920x1080@144.03  |  preferred
+        #   escala:  1 | 1.25 | 1.5 ...
+        #   rotação: 0 (normal) | 1 (90°) | 2 (180°) | 3 (270°)
+        mon="${2:-}"
+        mode="${3:-preferred}"
+        scale="${4:-1}"
+        transform="${5:-0}"
+        if [ -z "$mon" ]; then
+            echo "Uso: $(basename "$0") monitor <nome> <modo> [escala] [rotação]" >&2
+            exit 1
+        fi
+        ensure_prefs_file
+        get_instance
+        # Aplica primeiro: se o modo não existir, o Hyprland recusa e mantém o
+        # atual — aí nem chega a ser salvo como preferência.
+        if ! hyprctl eval "hl.monitor({ output = '$mon', mode = '$mode', position = 'auto', scale = '$scale', transform = $transform })" &>/dev/null; then
+            echo "[!] Hyprland recusou o modo $mode em $mon" >&2
+            exit 1
+        fi
+        tmp=$(jq --arg m "$mon" --arg mode "$mode" --argjson scale "$scale" --argjson tr "$transform" \
+            '.monitors = ((.monitors // {}) | .[$m] = { mode: $mode, scale: $scale, transform: $tr })' "$PREFS_FILE")
+        [ -n "$tmp" ] && echo "$tmp" > "$PREFS_FILE"
+        echo "OK"
+        ;;
+    monitor-forget)
+        # Volta o monitor para a configuração automática (usado pelo "reverter").
+        mon="${2:-}"
+        ensure_prefs_file
+        if [ -n "$mon" ]; then
+            tmp=$(jq --arg m "$mon" 'if .monitors then .monitors |= del(.[$m]) else . end' "$PREFS_FILE")
+            [ -n "$tmp" ] && echo "$tmp" > "$PREFS_FILE"
+            get_instance
+            hyprctl eval "hl.monitor({ output = '$mon', mode = 'preferred', position = 'auto', scale = '1', transform = 0 })" &>/dev/null || true
+        fi
+        echo "OK"
+        ;;
     preset)
         p="${2:-smooth}"
         ensure_prefs_file
@@ -220,7 +315,7 @@ case "$cmd" in
         ;;
     reset)
         ensure_prefs_file
-        cat <<'JSON' > "$PREFS_FILE"
+        cat <<JSON > "$PREFS_FILE"
 {
   "rounding": 8,
   "border_size": 2,
@@ -231,14 +326,14 @@ case "$cmd" in
   "dim_strength": 0.2,
   "anim_enabled": true,
   "anim_preset": "smooth",
-  "kb_layout": "br",
+  "kb_layout": "$(system_kb_layout)",
   "kb_variant": "",
   "mouse_sensitivity": 0.0,
   "mouse_accel": "flat",
   "numlock": true,
   "vrr": 0,
   "blur": true,
-  "monitor_hz": 144,
+  "monitor_hz": 0,
   "monitor_scale": 1
 }
 JSON
@@ -246,7 +341,7 @@ JSON
         notify-send -a "Hyprland" -i view-refresh -r 91196 -t 2000 "Aparência Redefinida" "Padrões do rice restaurados"
         ;;
     *)
-        echo "Uso: $(basename "$0") [get|set <key> <val>|apply|preset <name>|reset]" >&2
+        echo "Uso: $(basename "$0") [get|set <key> <val>|apply|monitor <nome> <modo> [escala] [rotação]|monitor-forget <nome>|preset <name>|reset]" >&2
         exit 1
         ;;
 esac

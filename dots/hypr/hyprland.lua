@@ -51,6 +51,25 @@ end
 
 local wallust = loadWallustColors(home .. "/.config/hypr/colors.conf")
 
+-- Valores de emergência: numa instalação nova o wallust ainda não rodou (ou o
+-- usuário não tem wallpaper nenhum), e o colors.conf pode não existir. Sem isso
+-- o parseGradient recebia nil e a configuração INTEIRA do Hyprland quebrava —
+-- o usuário caía numa sessão sem bordas, sem binds e sem autostart.
+local wallustDefaults = {
+    wallust_background      = "#12100F",
+    wallust_foreground      = "#C2A6A5",
+    wallust_accent1         = "#5D1D1D",
+    wallust_accent2         = "#64231F",
+    wallust_active_border   = "rgba(5D1D1Dee) rgba(64231Fee) 45deg",
+    wallust_inactive_border = "rgba(12100F88)",
+    wallust_shadow_color    = "rgba(12100Fee)",
+}
+for key, value in pairs(wallustDefaults) do
+    if not wallust[key] or wallust[key] == "" then
+        wallust[key] = value
+    end
+end
+
 -----------------
 ---- MONITORES --
 -----------------
@@ -64,6 +83,25 @@ hl.monitor({
 --------------------------
 ---- PROGRAMAS BASE ------
 --------------------------
+-- Layout de teclado: lê o do próprio sistema (/etc/vconsole.conf, escrito pelo
+-- localectl/instalador da distro). Antes era "br" fixo, o que dava acentos e
+-- símbolos errados pra quem instalasse o rice com teclado de outro país.
+local function systemKbLayout()
+    local f = io.open("/etc/vconsole.conf", "r")
+    if f then
+        for line in f:lines() do
+            local layout = line:match("^XKBLAYOUT=\"?([%w_,%-]+)\"?")
+            if layout and layout ~= "" then
+                f:close()
+                return layout
+            end
+        end
+        f:close()
+    end
+    return "br"
+end
+local kbLayout = systemKbLayout()
+
 local terminal = "kitty"
 local fileManager = "dolphin"
 -- Launcher em Quickshell (Launcher.qml). O rofi antigo continua instalado
@@ -184,9 +222,16 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("wl-paste --type text --watch cliphist store")
     hl.exec_cmd("wl-paste --type image --watch cliphist store")
 
-    -- Luz noturna: 6500K de dia, 4000K à noite, horário do sol calculado pra
-    -- Mandaguaçu/PR. Liga/desliga pela sidebar do Quickshell.
-    hl.exec_cmd("wlsunset -l -23.35 -L -52.10 -t 4000 -T 6500")
+    -- No Wayland quem copiou é "dono" do conteúdo: ao fechar o programa de
+    -- origem, o que estava copiado some e o Ctrl+V não cola mais nada. O
+    -- wl-clip-persist segura o conteúdo na sessão mesmo depois do app fechar.
+    hl.exec_cmd("wl-clip-persist --clipboard regular")
+
+    -- Luz noturna: controlada pela sidebar/painel do Quickshell via rice-nightlight
+    -- (hyprsunset). O autostart do wlsunset foi removido: ele vinha com as
+    -- coordenadas da cidade do autor fixas no código (luz noturna no horário
+    -- errado pra qualquer outra pessoa) e ainda brigava pelo gamma com o
+    -- hyprsunset que a interface liga e desliga.
 
     -- Aplica preferências de aparência salvas pelo Hub do Quickshell
     hl.exec_cmd(home .. "/.local/bin/rice-hypr-prefs apply")
@@ -194,8 +239,8 @@ hl.on("hyprland.start", function()
     -- Remove modificador Mod2 do Num_Lock no XWayland (evita que Discord/jogos detectem NumLock indevidamente)
     hl.exec_cmd(home .. "/.local/bin/rice-fix-xwayland-numlock")
 
-    -- Autostarts genéricos
-    hl.exec_cmd("arch-update --tray")
+    -- Autostarts genéricos (só o que existe na máquina: o arch-update é opcional)
+    hl.exec_cmd("sh -c 'command -v arch-update >/dev/null 2>&1 && arch-update --tray'")
     if io.open("/usr/local/bin/limitar_cpu.sh", "r") then
         hl.exec_cmd("/usr/local/bin/limitar_cpu.sh")
     end
@@ -205,8 +250,19 @@ hl.on("hyprland.start", function()
     -- waywallen-layer-shell (instalado em ~/.local/bin, baixado de
     -- github.com/waywallen/waywallen-display) rodando fora do Flatpak e
     -- falando com o daemon via socket unix.
-    hl.exec_cmd("flatpak run org.waywallen.waywallen --no-ui")
-    hl.exec_cmd([[sh -c 'for i in $(seq 1 30); do [ -S "$XDG_RUNTIME_DIR/waywallen/display.sock" ] && exec "]] .. home .. [[/.local/bin/waywallen-layer-shell" --socket "$XDG_RUNTIME_DIR/waywallen/display.sock"; sleep 0.5; done']])
+    -- Sem o Wallpaper Engine instalado (ele é pago, na Steam), o Waywallen não
+    -- sobe e a área de trabalho ficava simplesmente preta — e sem wallpaper o
+    -- wallust também não gera paleta nenhuma. Agora, quando o Waywallen não
+    -- está presente, o rice aplica um wallpaper estático com o hyprpaper.
+    hl.exec_cmd([[sh -c 'if flatpak info org.waywallen.waywallen >/dev/null 2>&1; then
+    flatpak run org.waywallen.waywallen --no-ui >/dev/null 2>&1 &
+    for i in $(seq 1 30); do
+        [ -S "$XDG_RUNTIME_DIR/waywallen/display.sock" ] && exec "$HOME/.local/bin/waywallen-layer-shell" --socket "$XDG_RUNTIME_DIR/waywallen/display.sock"
+        sleep 0.5
+    done
+else
+    "$HOME/.local/bin/rice-wallpaper-set" --ensure >/dev/null 2>&1
+fi']])
 end)
 
 -----------------------------
@@ -336,7 +392,7 @@ hl.config({
 --   touchpad ELAN0521:01 04F3:31B1: Enabled=false (desabilitado no Plasma)
 hl.config({
     input = {
-        kb_layout = "br",
+        kb_layout = kbLayout,
 
         numlock_by_default = true,
         follow_mouse       = 1,
@@ -385,6 +441,8 @@ hl.bind(mainMod .. " + F1", hl.dsp.exec_cmd("quickshell ipc call cheatsheet togg
 hl.bind(mainMod .. " + I", hl.dsp.exec_cmd("quickshell ipc call visualconfig toggle"))
 -- Super+V = histórico do clipboard nativo no Quickshell (Clipboard.qml)
 hl.bind(mainMod .. " + V", hl.dsp.exec_cmd("quickshell ipc call clipboard toggle"))
+-- Super+Ctrl+V = abre direto na aba de Favoritos da área de transferência
+hl.bind(mainMod .. " + CTRL + V", hl.dsp.exec_cmd("quickshell ipc call clipboard favoritesTab"))
 -- Super+W = Editor de Widgets no desktop por workspace (DesktopWidgets.qml)
 hl.bind(mainMod .. " + W", hl.dsp.exec_cmd("quickshell ipc call desktopwidgets toggleEdit"))
 -- Super+N = Notificações / Super+Shift+N = Alternar Não Perturbe (DND)
@@ -412,10 +470,29 @@ end
 hl.bind(mainMod .. " + A",         hl.dsp.workspace.toggle_special("magic"))
 hl.bind(mainMod .. " + SHIFT + A", hl.dsp.window.move({ workspace = "special:magic" }))
 
--- Atalhos pessoais trazidos do kglobalshortcutsrc do KDE (Plasma + Krohnkite)
-hl.bind(mainMod .. " + S", hl.dsp.exec_cmd(home .. "/.local/bin/waywallen-switcher"))
-hl.bind("CTRL + slash",         hl.dsp.exec_cmd("claude-desktop"))
-hl.bind("CTRL + bracketright",  hl.dsp.exec_cmd("zapzap"))
+-- Atalhos pessoais trazidos do kglobalshortcutsrc do KDE (Plasma + Krohnkite).
+-- Só são registrados quando o programa existe: numa máquina sem eles, o atalho
+-- ficava ocupado e não fazia nada (e o usuário achava que estava quebrado).
+-- os.execute não é confiável dentro do interpretador Lua do Hyprland (devolve
+-- nil e os binds sumiam sem aviso); io.popen funciona e já é usado aqui em cima
+-- pra detecção de GPU.
+local function hasCommand(cmd)
+    local pipe = io.popen("command -v " .. cmd .. " 2>/dev/null")
+    if not pipe then return false end
+    local out = pipe:read("*l")
+    pipe:close()
+    return out ~= nil and out ~= ""
+end
+
+-- Super+S: seletor de wallpaper. Com o Wallpaper Engine instalado abre o
+-- carrossel do Waywallen; sem ele, abre o seletor de imagem estática.
+hl.bind(mainMod .. " + S", hl.dsp.exec_cmd([[sh -c 'if flatpak info org.waywallen.waywallen >/dev/null 2>&1; then exec "$HOME/.local/bin/waywallen-switcher"; else exec "$HOME/.local/bin/rice-wallpaper-set"; fi']]))
+if hasCommand("claude-desktop") then
+    hl.bind("CTRL + slash", hl.dsp.exec_cmd("claude-desktop"))
+end
+if hasCommand("zapzap") then
+    hl.bind("CTRL + bracketright", hl.dsp.exec_cmd("zapzap"))
+end
 if io.open(home .. "/projetos/FischMacro/noisefish-linux/tray.py", "r") then
     hl.bind("CTRL + bracketleft", hl.dsp.exec_cmd(home .. "/projetos/FischMacro/noisefish-linux/.venv/bin/python " .. home .. "/projetos/FischMacro/noisefish-linux/tray.py"))
 end

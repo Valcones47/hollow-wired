@@ -1,3 +1,26 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# zen-browser — abre o Zen Browser na GPU dedicada quando ela existe.
+#
+# O caminho do binário era fixo em /opt/zen-browser-bin/zen-bin (instalação por
+# AUR do autor): em quem instalou por Flatpak ou por outro pacote, o atalho do
+# dock simplesmente não abria nada. Agora procura as instalações conhecidas.
 
-exec game-run /opt/zen-browser-bin/zen-bin "$@"
+for candidate in \
+    /opt/zen-browser-bin/zen-bin \
+    /opt/zen-browser/zen-bin \
+    /usr/lib/zen-browser/zen-bin \
+    /usr/bin/zen-browser \
+    /usr/bin/zen; do
+    if [ -x "$candidate" ]; then
+        exec game-run "$candidate" "$@"
+    fi
+done
+
+if command -v flatpak >/dev/null 2>&1 && flatpak info app.zen_browser.zen >/dev/null 2>&1; then
+    exec game-run flatpak run app.zen_browser.zen "$@"
+fi
+
+notify-send -a "Zen Browser" -i dialog-error "Zen Browser não encontrado" \
+    "Instale pelo Central de Aplicativos do painel do rice (Super + I)." 2>/dev/null
+echo "zen-browser: nenhuma instalação encontrada" >&2
+exit 1

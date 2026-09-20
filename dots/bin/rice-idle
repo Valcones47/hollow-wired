@@ -1,0 +1,183 @@
+#!/usr/bin/env python3
+"""rice-idle: controla o que acontece quando o computador fica ocioso.
+
+Reescreve o ~/.config/hypr/hypridle.conf a partir de quatro tempos (em minutos,
+0 = desligado) e reinicia o hypridle para valer na hora:
+
+    escurecer   — reduz o brilho da tela pela metade
+    desligar    — desliga a tela (DPMS)
+    bloquear    — pede a senha (hyprlock)
+    suspender   — coloca o PC para dormir
+
+Antes esses tempos só existiam escritos à mão dentro do hypridle.conf: quem
+quisesse mudar (ou quem reclamasse que a tela desliga cedo demais / nunca)
+precisava editar o arquivo no terminal.
+
+Uso:
+    rice-idle get                 # JSON com os tempos atuais
+    rice-idle set <chave> <min>   # chave: dim | screen_off | lock | suspend
+    rice-idle apply               # regrava o arquivo e reinicia o hypridle
+"""
+import json
+import os
+import re
+import subprocess
+import sys
+
+HOME = os.path.expanduser("~")
+CONF = os.path.join(HOME, ".config/hypr/hypridle.conf")
+STATE = os.path.join(HOME, ".config/hypr/idle.json")
+
+DEFAULTS = {"dim": 5, "screen_off": 10, "lock": 0, "suspend": 30}
+ORDER = ["dim", "screen_off", "lock", "suspend"]
+
+HEADER = """# hypridle.conf — gerado pelo rice-idle (painel do rice, aba Energia).
+# NÃO EDITE À MÃO: o arquivo é regravado toda vez que os tempos mudam.
+# Tempos atuais (minutos, 0 = desligado): {summary}
+
+general {{
+    lock_cmd = pidof hyprlock || hyprlock
+    before_sleep_cmd = loginctl lock-session
+    after_sleep_cmd = hyprctl dispatch dpms on
+}}
+"""
+
+LISTENERS = {
+    "dim": """
+# Escurece a tela pela metade do brilho atual (volta sozinho ao mexer no PC).
+listener {{
+    timeout = {secs}
+    on-timeout = bash -c 'h=$(( $(brightnessctl get) * 50 / $(brightnessctl max) )); brightnessctl -s set ${{h}}%'
+    on-resume = brightnessctl -r
+}}
+""",
+    "screen_off": """
+# Desliga a tela (o computador continua ligado).
+listener {{
+    timeout = {secs}
+    on-timeout = hyprctl dispatch dpms off
+    on-resume = hyprctl dispatch dpms on
+}}
+""",
+    "lock": """
+# Bloqueia a sessão, pedindo a senha para voltar.
+listener {{
+    timeout = {secs}
+    on-timeout = loginctl lock-session
+}}
+""",
+    "suspend": """
+# Suspende o computador (dorme, gastando quase nada de bateria).
+listener {{
+    timeout = {secs}
+    on-timeout = systemctl suspend
+}}
+""",
+}
+
+
+def load_state():
+    values = dict(DEFAULTS)
+    try:
+        with open(STATE, "r", encoding="utf-8") as f:
+            saved = json.load(f)
+        for key in ORDER:
+            if isinstance(saved.get(key), (int, float)):
+                values[key] = int(saved[key])
+        return values
+    except (OSError, ValueError):
+        pass
+    # Sem estado salvo: tenta deduzir do hypridle.conf que já existe, pra não
+    # sobrescrever a configuração de quem ajustou o arquivo à mão.
+    try:
+        with open(CONF, "r", encoding="utf-8") as f:
+            text = f.read()
+    except OSError:
+        return values
+    found = {k: 0 for k in ORDER}
+    for block in re.findall(r"listener\s*{(.*?)}", text, re.S):
+        m = re.search(r"timeout\s*=\s*(\d+)", block)
+        if not m:
+            continue
+        minutes = max(0, int(m.group(1)) // 60)
+        if "brightnessctl" in block:
+            found["dim"] = minutes
+        elif "dpms off" in block:
+            found["screen_off"] = minutes
+        elif "lock-session" in block or "hyprlock" in block:
+            found["lock"] = minutes
+        elif "suspend" in block:
+            found["suspend"] = minutes
+    return found
+
+
+def save_state(values):
+    os.makedirs(os.path.dirname(STATE), exist_ok=True)
+    with open(STATE, "w", encoding="utf-8") as f:
+        json.dump(values, f, indent=2)
+        f.write("\n")
+
+
+def write_conf(values):
+    summary = ", ".join(f"{k}={values[k]}" for k in ORDER)
+    out = [HEADER.format(summary=summary)]
+    for key in ORDER:
+        minutes = values.get(key, 0)
+        if minutes and minutes > 0:
+            out.append(LISTENERS[key].format(secs=int(minutes) * 60))
+    os.makedirs(os.path.dirname(CONF), exist_ok=True)
+    with open(CONF, "w", encoding="utf-8") as f:
+        f.write("".join(out))
+
+
+def restart_hypridle():
+    subprocess.run(["pkill", "-x", "hypridle"], check=False,
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        subprocess.Popen(["hypridle"], stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL, start_new_session=True)
+    except OSError:
+        pass
+
+
+def main():
+    cmd = sys.argv[1] if len(sys.argv) > 1 else "get"
+    values = load_state()
+
+    if cmd == "get":
+        print(json.dumps(values, indent=2))
+        return 0
+
+    if cmd == "set":
+        if len(sys.argv) < 4:
+            print("Uso: rice-idle set <dim|screen_off|lock|suspend> <minutos>", file=sys.stderr)
+            return 2
+        key = sys.argv[2]
+        if key not in ORDER:
+            print(f"Chave desconhecida: {key}", file=sys.stderr)
+            return 2
+        try:
+            minutes = max(0, int(float(sys.argv[3])))
+        except ValueError:
+            print("Minutos inválidos", file=sys.stderr)
+            return 2
+        values[key] = minutes
+        save_state(values)
+        write_conf(values)
+        restart_hypridle()
+        print(json.dumps(values))
+        return 0
+
+    if cmd == "apply":
+        save_state(values)
+        write_conf(values)
+        restart_hypridle()
+        print("OK")
+        return 0
+
+    print(__doc__)
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

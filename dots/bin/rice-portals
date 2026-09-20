@@ -29,15 +29,26 @@ if command -v systemctl >/dev/null 2>&1; then
         QT_QPA_PLATFORMTHEME \
         2>/dev/null || true
 
-    # 2. Desativa e mascara portais conflitantes (GNOME e KDE causam timeout de 25s fora de seus ambientes)
-    for p in xdg-desktop-portal-gnome xdg-desktop-portal-kde; do
-        if systemctl --user list-unit-files 2>/dev/null | grep -q "$p"; then
-            systemctl --user stop "$p" 2>/dev/null || true
-            systemctl --user mask "$p" 2>/dev/null || true
+    # 2. Desativa e mascara o portal do GNOME (nunca usado neste rice, causa timeout de 25s)
+    if systemctl --user list-unit-files 2>/dev/null | grep -q xdg-desktop-portal-gnome; then
+        systemctl --user stop xdg-desktop-portal-gnome 2>/dev/null || true
+        systemctl --user mask xdg-desktop-portal-gnome 2>/dev/null || true
+    fi
+
+    # O portal do KDE é usado de propósito (FileChooser/AppChooser=kde em portals.conf
+    # para o seletor de arquivos abrir o Dolphin em vez do GTK claro) — garante que
+    # nunca fique mascarado, mesmo se uma versão antiga deste script já tiver mascarado.
+    # Atenção: o unit systemd real chama "plasma-xdg-desktop-portal-kde.service"
+    # (não "xdg-desktop-portal-kde.service" — esse nome nunca existiu como unit de verdade).
+    for kde_unit in plasma-xdg-desktop-portal-kde.service xdg-desktop-portal-kde.service; do
+        if systemctl --user list-unit-files 2>/dev/null | grep -q "^$kde_unit"; then
+            systemctl --user unmask "$kde_unit" 2>/dev/null || true
         fi
     done
 
     # 3. Reinicia os serviços de portal na ordem correta
+    # (o portal do KDE é ativado sob demanda via DBus quando um FileChooser é pedido,
+    # não precisa nem deve ser iniciado manualmente aqui)
     systemctl --user stop xdg-desktop-portal-hyprland xdg-desktop-portal-gtk xdg-desktop-portal 2>/dev/null || true
     sleep 0.5
     systemctl --user start xdg-desktop-portal-hyprland 2>/dev/null || true

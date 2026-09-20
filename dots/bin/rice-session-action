@@ -14,6 +14,21 @@ case "$ACTION" in
         sleep 0.5
         loginctl terminate-session "${XDG_SESSION_ID:-self}" 2>/dev/null || loginctl terminate-user "$USER" 2>/dev/null || true
         ;;
+    suspend|sleep)
+        # Bloqueia a tela antes de dormir — senão a sessão volta destravada.
+        if command -v hyprlock >/dev/null 2>&1 && ! pgrep -x hyprlock >/dev/null 2>&1; then
+            hyprlock &
+            sleep 0.3
+        fi
+        systemctl suspend
+        ;;
+    hibernate)
+        if command -v hyprlock >/dev/null 2>&1 && ! pgrep -x hyprlock >/dev/null 2>&1; then
+            hyprlock &
+            sleep 0.3
+        fi
+        systemctl hibernate
+        ;;
     reboot)
         systemctl reboot
         ;;
@@ -26,7 +41,7 @@ case "$ACTION" in
         fi
         ;;
     *)
-        echo "Uso: rice-session-action [logout|reboot|poweroff|lock]"
+        echo "Uso: rice-session-action [logout|suspend|hibernate|reboot|poweroff|lock]"
         exit 1
         ;;
 esac

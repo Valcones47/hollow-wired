@@ -5,8 +5,29 @@
 
 set -e
 
-DIR="$HOME/Vídeos/Gravações"
+# $XDG_VIDEOS_DIR nunca é exportado na sessão Hyprland — usa xdg-user-dir, que lê
+# ~/.config/user-dirs.dirs direto e resolve certo em qualquer idioma/locale.
+DIR="$(xdg-user-dir VIDEOS 2>/dev/null || echo "$HOME/Vídeos")/Gravações"
 RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$UID}"
+
+# Escolhe o melhor encoder disponível nesta máquina:
+#   NVIDIA com NVENC → h264_nvenc | Intel/AMD com VAAPI → h264_vaapi | resto → CPU
+detect_codec() {
+    local encoders=""
+    command -v ffmpeg >/dev/null 2>&1 && encoders="$(ffmpeg -hide_banner -encoders 2>/dev/null)"
+
+    if [ -e /dev/nvidiactl ] || [ -d /proc/driver/nvidia ]; then
+        if [ -z "$encoders" ] || printf '%s' "$encoders" | grep -q "h264_nvenc"; then
+            echo "h264_nvenc"; return
+        fi
+    fi
+    if ls /dev/dri/renderD* >/dev/null 2>&1; then
+        if [ -z "$encoders" ] || printf '%s' "$encoders" | grep -q "h264_vaapi"; then
+            echo "h264_vaapi"; return
+        fi
+    fi
+    echo "libx264"
+}
 PIDFILE="$RUNTIME_DIR/rice-record.pid"
 INFOFILE="$RUNTIME_DIR/rice-record.info"
 
@@ -178,7 +199,10 @@ do_start() {
     local audio_desktop="1"
     local audio_mic="0"
     local fps="60"
-    local codec="h264_nvenc"
+    # "auto" resolve pro melhor encoder da máquina em detect_codec(). O padrão
+    # antigo era h264_nvenc fixo: em PC sem NVIDIA (a maioria) o wf-recorder
+    # abortava na hora e a gravação simplesmente não acontecia, sem erro visível.
+    local codec="auto"
 
     while [ $# -gt 0 ]; do
         case "$1" in
@@ -195,9 +219,18 @@ do_start() {
 
     local wf_args=()
 
-    # Codec de Vídeo (padrão: NVIDIA RTX 3050 NVENC para gravação acelerada por hardware na dGPU)
+    # Codec de Vídeo: acelerado por hardware quando a máquina tem, CPU quando não.
+    if [ "$codec" = "auto" ] || [ -z "$codec" ]; then
+        codec="$(detect_codec)"
+    fi
     if [ -n "$codec" ]; then
         wf_args+=(-c "$codec")
+        # VAAPI (Intel/AMD) precisa saber qual nó de render usar.
+        if [ "$codec" = "h264_vaapi" ]; then
+            local render_node
+            render_node="$(ls /dev/dri/renderD* 2>/dev/null | head -1)"
+            [ -n "$render_node" ] && wf_args+=(-d "$render_node")
+        fi
     fi
 
     # Configuração de Geometria/Vídeo
