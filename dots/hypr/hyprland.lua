@@ -519,17 +519,44 @@ hl.bind("XF86AudioMicMute", hl.dsp.exec_cmd("quickshell ipc call osd micMute"), 
 -- ==============================================================================
 -- ATALHOS GLOBAIS DO DISCORD / VESKTOP (MUTE & DEAFEN)
 -- ==============================================================================
+-- Relato: "a primeira vez que uso depois de um tempo conta duas vezes; depois
+-- fica normal por um tempo e volta a fazer isso". O debounce de 200ms era curto
+-- demais para pegar um repique que chega mais tarde, e o timer que rearmava o
+-- estado não tinha proteção contra timers sobrepostos: um timer velho podia
+-- liberar a trava antes da hora e deixar o segundo evento passar.
+--
+-- Agora são 500ms e cada disparo carrega uma "geração"; só o timer da geração
+-- mais recente pode reabrir a trava. O log em /tmp/rice-discord-binds.log diz se
+-- um toggle duplicado veio de dois disparos do atalho (duas linhas ENVIADO) ou
+-- da entrega ao Discord (uma linha ENVIADO só) — sem isso é chute.
+local DISCORD_DEBOUNCE_MS = 500
+
+local function discord_log(tag)
+    local f = io.open("/tmp/rice-discord-binds.log", "a")
+    if f then
+        f:write(os.date("%H:%M:%S"), " ", tag, "\n")
+        f:close()
+    end
+end
+
 local discord_deafen_ready = true
+local discord_deafen_gen = 0
 local function toggle_discord_deafen()
     if not discord_deafen_ready then
+        discord_log("deafen IGNORADO (repique dentro de " .. DISCORD_DEBOUNCE_MS .. "ms)")
         return
     end
     discord_deafen_ready = false
+    discord_deafen_gen = discord_deafen_gen + 1
+    local gen = discord_deafen_gen
 
-    -- Reativa instantaneamente após 200ms (tempo real via timer do compositor)
     hl.timer(function()
-        discord_deafen_ready = true
-    end, { timeout = 200, type = "oneshot" })
+        if gen == discord_deafen_gen then
+            discord_deafen_ready = true
+        end
+    end, { timeout = DISCORD_DEBOUNCE_MS, type = "oneshot" })
+
+    discord_log("deafen ENVIADO")
 
     -- Envia Ctrl + Shift + d (minúsculo) para o Discord / Vesktop
     hl.dispatch(hl.dsp.send_shortcut({ mods = "CTRL SHIFT", key = "d", window = "class:^(discord|vesktop)$" }))
@@ -540,15 +567,23 @@ local function toggle_discord_deafen()
 end
 
 local discord_mute_ready = true
+local discord_mute_gen = 0
 local function toggle_discord_mute()
     if not discord_mute_ready then
+        discord_log("mute IGNORADO (repique dentro de " .. DISCORD_DEBOUNCE_MS .. "ms)")
         return
     end
     discord_mute_ready = false
+    discord_mute_gen = discord_mute_gen + 1
+    local gen = discord_mute_gen
 
     hl.timer(function()
-        discord_mute_ready = true
-    end, { timeout = 200, type = "oneshot" })
+        if gen == discord_mute_gen then
+            discord_mute_ready = true
+        end
+    end, { timeout = DISCORD_DEBOUNCE_MS, type = "oneshot" })
+
+    discord_log("mute ENVIADO")
 
     -- Envia Ctrl + Shift + m (minúsculo) para o Discord / Vesktop
     hl.dispatch(hl.dsp.send_shortcut({ mods = "CTRL SHIFT", key = "m", window = "class:^(discord|vesktop)$" }))
