@@ -22,6 +22,7 @@ saturation = 65
 
 [templates]
 hyprland   = { template = 'hyprland-colors.conf', target = '~/.config/hypr/colors.conf' }
+hyprlock   = { template = 'hyprlock-colors.conf', target = '~/.config/hypr/hyprlock-colors.conf' }
 waybar     = { template = 'waybar-colors.css',    target = '~/.cache/wallust/colors-waybar.css' }
 kitty      = { template = 'kitty-colors.conf',    target = '~/.config/kitty/colors-wallust.conf' }
 mako       = { template = 'mako-colors',          target = '~/.config/mako/colors' }

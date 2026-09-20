@@ -1,0 +1,125 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# rice-lock-info — linhas curtas de informação para a tela de bloqueio.
+#
+# O hyprlock chama cada label com `cmd[update:N]`, de forma síncrona: qualquer
+# comando lento aqui trava o desenho da tela inteira. Por isso tudo é local e
+# barato, e o clima (que depende de rede) sai de um cache atualizado em segundo
+# plano — nunca de uma requisição na hora de desenhar.
+#
+# Uso: rice-lock-info <cpu|ram|bat|media|host|uptime|weather|greeting>
+# ==============================================================================
+
+set -uo pipefail
+
+CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/hollow-wired"
+WEATHER_CACHE="$CACHE_DIR/weather.txt"
+WEATHER_MAX_AGE=1800   # 30 min
+
+have() { command -v "$1" >/dev/null 2>&1; }
+
+cpu_temp() {
+    local t=""
+    for zone in /sys/class/thermal/thermal_zone*/temp; do
+        [ -r "$zone" ] || continue
+        local type_file="${zone%/temp}/type"
+        case "$(cat "$type_file" 2>/dev/null)" in
+            x86_pkg_temp|acpitz|k10temp|coretemp)
+                t=$(cat "$zone" 2>/dev/null); break ;;
+        esac
+    done
+    [ -n "$t" ] || return 1
+    echo "$((t / 1000))"
+}
+
+cpu_usage() {
+    # Duas leituras de /proc/stat com 0.2s entre elas: rápido o bastante para
+    # não segurar o desenho e preciso o bastante para um indicador.
+    local a b
+    a=$(awk '/^cpu /{print $2+$3+$4+$5+$6+$7+$8, $5}' /proc/stat)
+    sleep 0.2
+    b=$(awk '/^cpu /{print $2+$3+$4+$5+$6+$7+$8, $5}' /proc/stat)
+    awk -v a="$a" -v b="$b" 'BEGIN {
+        split(a, x, " "); split(b, y, " ");
+        dt = y[1] - x[1]; di = y[2] - x[2];
+        if (dt <= 0) { print 0; exit }
+        printf "%d", (dt - di) * 100 / dt
+    }'
+}
+
+case "${1:-}" in
+    cpu)
+        temp=$(cpu_temp 2>/dev/null)
+        use=$(cpu_usage)
+        if [ -n "$temp" ]; then
+            echo "${temp}°C · ${use}%"
+        else
+            echo "${use}%"
+        fi
+        ;;
+    ram)
+        awk '/^MemTotal:/{t=$2} /^MemAvailable:/{a=$2} END {
+            if (t > 0) printf "%d%%", (t - a) * 100 / t; else print "--"
+        }' /proc/meminfo
+        ;;
+    bat)
+        bat=""
+        for b in /sys/class/power_supply/BAT*; do
+            [ -r "$b/capacity" ] && { bat="$b"; break; }
+        done
+        if [ -z "$bat" ]; then
+            echo "AC"
+        else
+            cap=$(cat "$bat/capacity" 2>/dev/null || echo "--")
+            status=$(cat "$bat/status" 2>/dev/null || echo "")
+            [ "$status" = "Charging" ] && echo "${cap}% ↑" || echo "${cap}%"
+        fi
+        ;;
+    media)
+        have playerctl || exit 0
+        # `playerctl metadata` devolve erro quando não há player; sem o 2>/dev/null
+        # a mensagem apareceria como se fosse o nome da música.
+        out=$(playerctl metadata --format '{{title}} · {{artist}}' 2>/dev/null) || exit 0
+        [ -n "$out" ] && [ "$out" != " · " ] && echo "$out"
+        ;;
+    host)
+        echo "$USER@$(hostnamectl --static 2>/dev/null || hostname 2>/dev/null)"
+        ;;
+    uptime)
+        awk '{
+            m = int($1 / 60); h = int(m / 60); d = int(h / 24);
+            if (d > 0) printf "%dd %dh", d, h % 24;
+            else if (h > 0) printf "%dh %dmin", h, m % 60;
+            else printf "%dmin", m
+        }' /proc/uptime
+        ;;
+    weather)
+        # Só lê o cache. Quem atualiza é `rice-lock-info weather-refresh`,
+        # disparado pelo hypridle antes de bloquear.
+        if [ -f "$WEATHER_CACHE" ]; then
+            cat "$WEATHER_CACHE"
+        fi
+        ;;
+    weather-refresh)
+        mkdir -p "$CACHE_DIR"
+        if [ -f "$WEATHER_CACHE" ]; then
+            age=$(( $(date +%s) - $(stat -c %Y "$WEATHER_CACHE" 2>/dev/null || echo 0) ))
+            [ "$age" -lt "$WEATHER_MAX_AGE" ] && exit 0
+        fi
+        have curl || exit 0
+        out=$(curl -fsS --max-time 6 'https://wttr.in/?format=%C+%t' 2>/dev/null) || exit 0
+        [ -n "$out" ] && printf '%s\n' "$out" > "$WEATHER_CACHE"
+        ;;
+    greeting)
+        h=$(date +%-H)
+        if   [ "$h" -lt 6 ]  ; then echo "Boa madrugada"
+        elif [ "$h" -lt 12 ] ; then echo "Bom dia"
+        elif [ "$h" -lt 18 ] ; then echo "Boa tarde"
+        else                        echo "Boa noite"
+        fi
+        ;;
+    *)
+        echo "uso: rice-lock-info <cpu|ram|bat|media|host|uptime|weather|weather-refresh|greeting>" >&2
+        exit 2
+        ;;
+esac

@@ -11,6 +11,7 @@ case "$ACTION" in
         # exatamente isso pelo D-Bus: um greeter novo num VT separado, com a
         # sessão atual intacta atrás dele. Entrando de novo, tudo volta como
         # estava. Fechar tudo de verdade virou uma ação separada (logout).
+        command -v rice-lock-info >/dev/null 2>&1 && (rice-lock-info weather-refresh >/dev/null 2>&1 &)
         if command -v hyprlock >/dev/null 2>&1 && ! pgrep -x hyprlock >/dev/null 2>&1; then
             hyprlock >/dev/null 2>&1 &
             sleep 0.3
@@ -80,6 +81,7 @@ case "$ACTION" in
         ;;
     suspend|sleep)
         # Bloqueia a tela antes de dormir — senão a sessão volta destravada.
+        command -v rice-lock-info >/dev/null 2>&1 && (rice-lock-info weather-refresh >/dev/null 2>&1 &)
         if command -v hyprlock >/dev/null 2>&1 && ! pgrep -x hyprlock >/dev/null 2>&1; then
             hyprlock &
             sleep 0.3
@@ -87,6 +89,7 @@ case "$ACTION" in
         systemctl suspend
         ;;
     hibernate)
+        command -v rice-lock-info >/dev/null 2>&1 && (rice-lock-info weather-refresh >/dev/null 2>&1 &)
         if command -v hyprlock >/dev/null 2>&1 && ! pgrep -x hyprlock >/dev/null 2>&1; then
             hyprlock &
             sleep 0.3
@@ -100,6 +103,7 @@ case "$ACTION" in
         systemctl poweroff
         ;;
     lock)
+        command -v rice-lock-info >/dev/null 2>&1 && (rice-lock-info weather-refresh >/dev/null 2>&1 &)
         if command -v hyprlock >/dev/null 2>&1; then
             hyprlock &
         fi

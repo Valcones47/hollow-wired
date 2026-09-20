@@ -44,6 +44,7 @@ TARGETS = [
     ("kitty-colors.conf", os.path.join(HOME, ".config/kitty/colors-wallust.conf")),
     ("mako-colors", os.path.join(HOME, ".config/mako/colors")),
     ("quickshell-colors.json", WALLUST_JSON),
+    ("hyprlock-colors.conf", os.path.join(HOME, ".config/hypr/hyprlock-colors.conf")),
     ("sddm-theme.conf", "/usr/share/sddm/themes/SilentSDDM/configs/default-left.conf"),
 ]
 

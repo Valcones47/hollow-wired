@@ -162,6 +162,11 @@ apply_updates() {
     # toda atualização jogava a paleta do autor por cima das cores do usuário.
     local saved_colors=""
     [ -f "$HOME/.config/hypr/colors.conf" ] && saved_colors=$(cat "$HOME/.config/hypr/colors.conf")
+    # Mesma história do colors.conf: o hyprlock-colors.conf é gerado pelo
+    # wallust a partir do wallpaper do usuário, e o repositório só carrega uma
+    # cópia pra primeira instalação.
+    local saved_lock_colors=""
+    [ -f "$HOME/.config/hypr/hyprlock-colors.conf" ] && saved_lock_colors=$(cat "$HOME/.config/hypr/hyprlock-colors.conf")
 
     # Copia as atualizações de componentes, temas e scripts
     # --remove-destination: sobrescrever um script que está rodando (como o
@@ -254,6 +259,7 @@ PYFF
     [ -n "$saved_kitty" ] && echo "$saved_kitty" > "$HOME/.config/kitty/kitty.conf"
     [ -n "$saved_user_binds" ] && echo "$saved_user_binds" > "$HOME/.config/hypr/user-binds.lua"
     [ -n "$saved_colors" ] && echo "$saved_colors" > "$HOME/.config/hypr/colors.conf"
+    [ -n "$saved_lock_colors" ] && echo "$saved_lock_colors" > "$HOME/.config/hypr/hyprlock-colors.conf"
 
     # 4. Correção automática de preferências (elimina flickering por VRR e bug de zoom 300%)
     for p_file in "$HOME/.config/hypr/user-prefs.json" "$HOME/.config/hypr/prefs.json"; do
