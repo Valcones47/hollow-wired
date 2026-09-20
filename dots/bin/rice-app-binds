@@ -1,0 +1,184 @@
+#!/usr/bin/env python3
+"""rice-app-binds — atalhos de teclado para abrir aplicativos, sem editar código.
+
+Até agora, "personalizar atalhos" abria o user-binds.lua num editor de texto e
+esperava que a pessoa soubesse escrever Lua. Quem vem do Windows ou do KDE
+espera outra coisa: escolher o programa, apertar a combinação de teclas e
+pronto.
+
+Este utilitário é o lado de trás disso. Ele mantém um bloco próprio dentro do
+~/.config/hypr/user-binds.lua, delimitado por marcadores, e nunca encosta no
+que a pessoa escreveu à mão fora dele.
+
+Uso:
+    rice-app-binds list                          # JSON com os atalhos
+    rice-app-binds add "SUPER + K" kitty --name Kitty
+    rice-app-binds remove "SUPER + K"
+    rice-app-binds record [--timeout 12]         # captura uma combinação
+
+A captura de teclas reaproveita o gravador do rice-discord-binds, que já lê o
+/dev/input e devolve a combinação pronta no formato do Hyprland.
+"""
+import json
+import os
+import re
+import subprocess
+import sys
+
+HOME = os.path.expanduser("~")
+USER_BINDS = os.path.join(HOME, ".config/hypr/user-binds.lua")
+
+BEGIN = "-- >>> rice-app-binds: atalhos criados pelo painel (Super + I) >>>"
+END = "-- <<< rice-app-binds <<<"
+
+HEADER = BEGIN + """
+-- Este bloco é reescrito pelo painel. Para atalhos seus, escreva FORA dele:
+-- o que estiver fora nunca é tocado.
+"""
+
+LINE_RE = re.compile(
+    r'^hl\.bind\("(?P<combo>[^"]+)",\s*hl\.dsp\.exec_cmd\("(?P<cmd>[^"]*)"\)\)'
+    r'\s*--\s*@app=(?P<name>.*)$'
+)
+
+
+def read_file():
+    try:
+        with open(USER_BINDS, "r", encoding="utf-8") as f:
+            return f.read()
+    except OSError:
+        return ""
+
+
+def split_block(text):
+    """Devolve (antes, corpo_do_bloco, depois)."""
+    i = text.find(BEGIN)
+    if i == -1:
+        return text, "", ""
+    j = text.find(END, i)
+    if j == -1:
+        return text[:i], text[i + len(BEGIN):], ""
+    return text[:i], text[i + len(BEGIN):j], text[j + len(END):]
+
+
+def load_binds():
+    _, body, _ = split_block(read_file())
+    out = []
+    for line in body.split("\n"):
+        m = LINE_RE.match(line.strip())
+        if m:
+            out.append({
+                "combo": m.group("combo"),
+                "command": m.group("cmd"),
+                "name": m.group("name").strip() or m.group("cmd"),
+            })
+    return out
+
+
+def save_binds(binds):
+    before, _, after = split_block(read_file())
+    if not before.strip() and not after.strip() and not os.path.isfile(USER_BINDS):
+        before = ("-- ~/.config/hypr/user-binds.lua\n"
+                  "-- Seus atalhos personalizados. Nunca é sobrescrito pelo rice-update.\n\n")
+
+    lines = [HEADER]
+    for b in binds:
+        lines.append('hl.bind("%s", hl.dsp.exec_cmd("%s")) -- @app=%s'
+                     % (b["combo"], b["command"], b["name"]))
+    lines.append(END)
+
+    content = before.rstrip("\n") + "\n\n" + "\n".join(lines) + "\n" + after.lstrip("\n")
+    os.makedirs(os.path.dirname(USER_BINDS), exist_ok=True)
+    with open(USER_BINDS, "w", encoding="utf-8") as f:
+        f.write(content)
+    subprocess.run(["hyprctl", "reload"], stdout=subprocess.DEVNULL,
+                   stderr=subprocess.DEVNULL)
+
+
+def normalize(combo):
+    parts = [p.strip() for p in str(combo).split("+") if p.strip()]
+    return " + ".join(parts)
+
+
+def conflict(combo):
+    """Atalho já usado pelo rice? Avisar é melhor do que sobrescrever calado."""
+    try:
+        raw = subprocess.run(["hyprctl", "binds", "-j"], capture_output=True,
+                             text=True, timeout=5).stdout
+        data = json.loads(raw)
+    except Exception:
+        return None
+    mods = {"SUPER": 64, "ALT": 8, "CTRL": 4, "SHIFT": 1}
+    parts = [p.strip().upper() for p in combo.split("+")]
+    key = parts[-1] if parts else ""
+    mask = sum(mods.get(p, 0) for p in parts[:-1])
+    for b in data:
+        if b.get("modmask") == mask and str(b.get("key", "")).lower() == key.lower():
+            return combo
+    return None
+
+
+def main():
+    args = sys.argv[1:]
+    cmd = args[0] if args else "list"
+
+    if cmd == "list":
+        print(json.dumps({"binds": load_binds(), "file": USER_BINDS}, ensure_ascii=False))
+        return 0
+
+    if cmd == "record":
+        timeout = "12"
+        if "--timeout" in args:
+            try:
+                timeout = args[args.index("--timeout") + 1]
+            except IndexError:
+                pass
+        r = subprocess.run(["rice-discord-binds", "record", "--timeout", timeout],
+                           capture_output=True, text=True)
+        out = (r.stdout or "").strip() or '{"status": "error"}'
+        try:
+            data = json.loads(out)
+        except ValueError:
+            data = {"status": "error"}
+        if data.get("status") == "ok":
+            data["conflict"] = conflict(normalize(data.get("key", "")))
+        print(json.dumps(data, ensure_ascii=False))
+        return 0
+
+    if cmd == "add":
+        if len(args) < 3:
+            print("Uso: rice-app-binds add <combinação> <comando> [--name Nome]",
+                  file=sys.stderr)
+            return 2
+        combo = normalize(args[1])
+        command = args[2]
+        name = command
+        if "--name" in args:
+            try:
+                name = args[args.index("--name") + 1]
+            except IndexError:
+                pass
+        if '"' in combo or '"' in command:
+            print("aspas não são aceitas", file=sys.stderr)
+            return 2
+        binds = [b for b in load_binds() if b["combo"] != combo]
+        binds.append({"combo": combo, "command": command, "name": name})
+        save_binds(binds)
+        print(json.dumps({"status": "ok", "combo": combo}, ensure_ascii=False))
+        return 0
+
+    if cmd == "remove":
+        if len(args) < 2:
+            return 2
+        combo = normalize(args[1])
+        binds = [b for b in load_binds() if b["combo"] != combo]
+        save_binds(binds)
+        print(json.dumps({"status": "ok"}, ensure_ascii=False))
+        return 0
+
+    print(__doc__)
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

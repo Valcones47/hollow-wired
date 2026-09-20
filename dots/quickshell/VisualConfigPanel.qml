@@ -301,6 +301,44 @@ PanelWindow {
     // Autostart
     property var autostartEntries: []
     property var availableApps: []
+    // A lista de "adicionar à inicialização" despejava os 160+ aplicativos
+    // instalados de uma vez, deixando a página quilométrica. Agora ela é
+    // filtrada por busca e limitada ao que cabe na tela.
+    property string bootAppQuery: ""
+
+    // ---------- Atalhos de aplicativos (aba Guia de Atalhos) ----------
+    property var appBinds: []
+    property string bindAppQuery: ""
+    property string bindAppCommand: ""
+    property string bindAppName: ""
+    property string bindCombo: ""
+    property string bindConflict: ""
+    property bool bindCapturing: false
+    readonly property var bindAppsFiltered: {
+        const q = win.bindAppQuery.trim().toLowerCase();
+        const all = win.availableApps || [];
+        if (q === "") return [];
+        const out = [];
+        for (let i = 0; i < all.length; i++) {
+            const a = all[i];
+            if (((a.name || "") + " " + (a.exec || "")).toLowerCase().indexOf(q) !== -1) out.push(a);
+            if (out.length >= 12) break;
+        }
+        return out;
+    }
+    readonly property var bootAppsFiltered: {
+        const q = win.bootAppQuery.trim().toLowerCase();
+        const all = win.availableApps || [];
+        if (q === "") return all.slice(0, 18);
+        const out = [];
+        for (let i = 0; i < all.length; i++) {
+            const a = all[i];
+            const hay = ((a.name || "") + " " + (a.exec || "")).toLowerCase();
+            if (hay.indexOf(q) !== -1) out.push(a);
+            if (out.length >= 40) break;
+        }
+        return out;
+    }
 
     // Cores & Wallust
     property var wallustColors: ({})
@@ -419,6 +457,47 @@ PanelWindow {
                     win.kittyCursor = d.cursor || "beam";
                     win.kittyBell = !!d.bell;
                 } catch (e) {}
+            }
+        }
+    }
+
+    Process {
+        id: loadAppBindsProc
+        command: ["rice-app-binds", "list"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try { win.appBinds = (JSON.parse(text).binds) || []; } catch (e) {}
+            }
+        }
+    }
+
+    Process {
+        id: saveAppBindProc
+        command: ["rice-app-binds", "list"]
+        onExited: (code, status) => loadAppBindsProc.running = true
+    }
+
+    Process {
+        // O gravador lê o /dev/input e devolve a combinação já no formato do
+        // Hyprland, avisando quando ela colide com um atalho existente.
+        id: recordAppBindProc
+        command: ["rice-app-binds", "record", "--timeout", "12"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                win.bindCapturing = false;
+                try {
+                    const d = JSON.parse(text);
+                    if (d.status === "ok") {
+                        win.bindCombo = d.key || "";
+                        win.bindConflict = d.conflict || "";
+                    } else if (d.status === "timeout") {
+                        win.showToast(Theme.t("toast.bind_timeout", "Nenhuma tecla detectada"));
+                    } else if (d.status === "cancelled") {
+                        win.showToast(Theme.t("toast.bind_cancelled", "Gravação cancelada"));
+                    } else {
+                        win.showToast(Theme.t("toast.bind_error", "Não consegui ler o teclado"));
+                    }
+                } catch (e) { win.bindCapturing = false; }
             }
         }
     }
@@ -834,6 +913,7 @@ PanelWindow {
         loadBrightnessProc.running = true;
         loadWallustColorsProc.running = true;
         loadColorOverridesProc.running = true;
+        loadAppBindsProc.running = true;
         loadAudioProc.running = true;
         loadPowerProc.running = true;
         loadAutostartProc.running = true;
@@ -4341,9 +4421,67 @@ PanelWindow {
                                     }
                                 }
 
-                                SectionHeader {
-                                    title: Theme.t("boot.section_quick_add", "Adicionar Aplicativo à Inicialização Rápida")
-                                    subtitle: Theme.t("boot.section_quick_add_sub", "Selecione qualquer aplicativo instalado para abrir junto com o Hyprland")
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 12
+
+                                    SectionHeader {
+                                        title: Theme.t("boot.section_quick_add", "Adicionar Aplicativo à Inicialização")
+                                        subtitle: Theme.t("boot.section_quick_add_sub", "Procure o programa pelo nome e clique para que ele abra junto com o sistema")
+                                    }
+                                    Item { Layout.fillWidth: true }
+
+                                    Rectangle {
+                                        implicitWidth: 240
+                                        implicitHeight: 32
+                                        radius: 8
+                                        color: Theme.background
+                                        border.width: 1
+                                        border.color: bootSearchInput.activeFocus ? Theme.primary : Theme.withAlpha(Theme.outline, 0.2)
+
+                                        RowLayout {
+                                            anchors.fill: parent
+                                            anchors.margins: 6
+                                            spacing: 6
+                                            Text {
+                                                text: Theme.icons.magnify
+                                                font.family: Theme.iconFontFamily
+                                                font.pixelSize: 13
+                                                color: Theme.subtext
+                                            }
+                                            TextInput {
+                                                id: bootSearchInput
+                                                Layout.fillWidth: true
+                                                verticalAlignment: TextInput.AlignVCenter
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: 12
+                                                color: Theme.textColor
+                                                selectByMouse: true
+                                                onTextChanged: win.bootAppQuery = text
+                                                Text {
+                                                    anchors.fill: parent
+                                                    verticalAlignment: Text.AlignVCenter
+                                                    visible: bootSearchInput.text === ""
+                                                    text: Theme.t("boot.search_ph", "Procurar aplicativo...")
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 12
+                                                    color: Theme.subtext
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: win.bootAppQuery.trim() === ""
+                                        ? Theme.t("boot.search_hint", "Mostrando alguns dos ") + (win.availableApps || []).length + Theme.t("boot.search_hint_end", " aplicativos instalados. Use a busca para achar o que você quer.")
+                                        : (win.bootAppsFiltered.length === 0
+                                            ? Theme.t("boot.search_none", "Nenhum aplicativo encontrado com esse nome.")
+                                            : win.bootAppsFiltered.length + Theme.t("boot.search_found", " aplicativo(s) encontrado(s)."))
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 11
+                                    color: Theme.subtext
                                 }
 
                                 Flow {
@@ -4351,7 +4489,7 @@ PanelWindow {
                                     spacing: 8
 
                                     Repeater {
-                                        model: win.availableApps
+                                        model: win.bootAppsFiltered
                                         delegate: Rectangle {
                                             id: appChip
                                             required property var modelData
@@ -6530,6 +6668,261 @@ PanelWindow {
                                         }
                                     }
                                     Item { Layout.fillWidth: true }
+                                }
+
+                                // ---------- Atalhos de aplicativos (estilo KDE) ----------
+                                // Antes, "personalizar atalhos" abria o user-binds.lua num
+                                // editor de texto e esperava que a pessoa soubesse escrever
+                                // Lua. Aqui é escolher o programa, apertar a combinação e
+                                // pronto — o rice-app-binds cuida do arquivo.
+                                SectionHeader {
+                                    title: Theme.t("binds.app_title", "Atalhos para Abrir Programas")
+                                    subtitle: Theme.t("binds.app_sub", "Escolha um programa, aperte a combinação de teclas que quiser e ela passa a funcionar na hora")
+                                }
+
+                                // Linha de criação
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    radius: 12
+                                    color: Theme.tile
+                                    border.width: 1
+                                    border.color: win.bindCapturing ? Theme.primary : Theme.withAlpha(Theme.outline, 0.2)
+                                    implicitHeight: newBindCol.implicitHeight + 28
+
+                                    ColumnLayout {
+                                        id: newBindCol
+                                        anchors.fill: parent
+                                        anchors.margins: 14
+                                        spacing: 10
+
+                                        RowLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 10
+
+                                            // 1. programa
+                                            Rectangle {
+                                                Layout.fillWidth: true
+                                                implicitHeight: 34
+                                                radius: 8
+                                                color: Theme.background
+                                                border.width: 1
+                                                border.color: bindAppInput.activeFocus ? Theme.primary : Theme.withAlpha(Theme.outline, 0.2)
+
+                                                RowLayout {
+                                                    anchors.fill: parent
+                                                    anchors.margins: 8
+                                                    spacing: 6
+                                                    Text {
+                                                        text: Theme.icons.magnify
+                                                        font.family: Theme.iconFontFamily
+                                                        font.pixelSize: 13
+                                                        color: Theme.subtext
+                                                    }
+                                                    TextInput {
+                                                        id: bindAppInput
+                                                        Layout.fillWidth: true
+                                                        verticalAlignment: TextInput.AlignVCenter
+                                                        font.family: Theme.fontFamily
+                                                        font.pixelSize: 12
+                                                        color: Theme.textColor
+                                                        selectByMouse: true
+                                                        onTextChanged: {
+                                                            win.bindAppQuery = text;
+                                                            win.bindAppCommand = "";
+                                                            win.bindAppName = "";
+                                                        }
+                                                        Text {
+                                                            anchors.fill: parent
+                                                            verticalAlignment: Text.AlignVCenter
+                                                            visible: bindAppInput.text === ""
+                                                            text: Theme.t("binds.app_ph", "1. Procure o programa...")
+                                                            font.family: Theme.fontFamily
+                                                            font.pixelSize: 12
+                                                            color: Theme.subtext
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            // 2. combinação
+                                            ActionBtn {
+                                                icon: Theme.icons.cursor
+                                                primary: win.bindCapturing
+                                                text: win.bindCapturing
+                                                    ? Theme.t("binds.app_press", "Aperte a combinação agora...")
+                                                    : (win.bindCombo !== "" ? win.bindCombo
+                                                        : Theme.t("binds.app_record", "2. Gravar tecla"))
+                                                onClicked: {
+                                                    win.bindCapturing = true;
+                                                    win.bindConflict = "";
+                                                    recordAppBindProc.running = true;
+                                                }
+                                            }
+
+                                            // 3. salvar
+                                            ActionBtn {
+                                                icon: Theme.icons.check
+                                                primary: true
+                                                enabled: win.bindAppCommand !== "" && win.bindCombo !== ""
+                                                opacity: enabled ? 1 : 0.45
+                                                text: Theme.t("binds.app_save", "3. Criar atalho")
+                                                onClicked: {
+                                                    if (win.bindAppCommand === "" || win.bindCombo === "") return;
+                                                    saveAppBindProc.command = ["rice-app-binds", "add", win.bindCombo,
+                                                                              win.bindAppCommand, "--name", win.bindAppName];
+                                                    saveAppBindProc.running = true;
+                                                    win.showToast(Theme.t("toast.bind_saved", "Atalho criado: ") + win.bindCombo);
+                                                    win.bindCombo = "";
+                                                    win.bindConflict = "";
+                                                    bindAppInput.text = "";
+                                                }
+                                            }
+                                        }
+
+                                        // Aviso de conflito
+                                        Text {
+                                            Layout.fillWidth: true
+                                            visible: win.bindConflict !== ""
+                                            wrapMode: Text.WordWrap
+                                            text: Theme.t("binds.app_conflict", "Atenção: essa combinação já é usada por outro atalho do sistema. Criar mesmo assim vai substituí-la.")
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: 11
+                                            color: "#ffb347"
+                                        }
+
+                                        // Resultados da busca de programas
+                                        Flow {
+                                            Layout.fillWidth: true
+                                            visible: win.bindAppQuery.trim() !== "" && win.bindAppCommand === ""
+                                            spacing: 6
+
+                                            Repeater {
+                                                model: win.bindAppsFiltered
+                                                delegate: Rectangle {
+                                                    id: bindAppChip
+                                                    required property var modelData
+                                                    implicitHeight: 28
+                                                    implicitWidth: bindChipText.implicitWidth + 20
+                                                    radius: 7
+                                                    color: bindChipArea.containsMouse ? Theme.primary : Theme.background
+                                                    border.width: 1
+                                                    border.color: Theme.withAlpha(Theme.outline, 0.2)
+
+                                                    Text {
+                                                        id: bindChipText
+                                                        anchors.centerIn: parent
+                                                        text: bindAppChip.modelData.name
+                                                        font.family: Theme.fontFamily
+                                                        font.pixelSize: 11
+                                                        color: bindChipArea.containsMouse ? Theme.background : Theme.textColor
+                                                    }
+
+                                                    MouseArea {
+                                                        id: bindChipArea
+                                                        anchors.fill: parent
+                                                        hoverEnabled: true
+                                                        cursorShape: Qt.PointingHandCursor
+                                                        onClicked: {
+                                                            win.bindAppCommand = bindAppChip.modelData.exec || bindAppChip.modelData.name;
+                                                            win.bindAppName = bindAppChip.modelData.name;
+                                                            bindAppInput.text = bindAppChip.modelData.name;
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Lista dos atalhos já criados
+                                Text {
+                                    Layout.fillWidth: true
+                                    visible: win.appBinds.length === 0
+                                    text: Theme.t("binds.app_empty", "Você ainda não criou nenhum atalho de programa.")
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 11
+                                    color: Theme.subtext
+                                }
+
+                                Repeater {
+                                    model: win.appBinds
+                                    delegate: Rectangle {
+                                        id: appBindCard
+                                        required property var modelData
+                                        Layout.fillWidth: true
+                                        implicitHeight: 48
+                                        radius: 10
+                                        color: Theme.tile
+                                        border.width: 1
+                                        border.color: Theme.withAlpha(Theme.outline, 0.2)
+
+                                        RowLayout {
+                                            anchors.fill: parent
+                                            anchors.margins: 10
+                                            spacing: 12
+
+                                            Rectangle {
+                                                implicitWidth: Math.max(96, comboLabel.implicitWidth + 18)
+                                                implicitHeight: 26
+                                                radius: 6
+                                                color: Theme.withAlpha(Theme.primary, 0.18)
+                                                Text {
+                                                    id: comboLabel
+                                                    anchors.centerIn: parent
+                                                    text: appBindCard.modelData.combo
+                                                    font.family: Theme.monoFamily
+                                                    font.pixelSize: 11
+                                                    font.weight: Font.DemiBold
+                                                    color: Theme.primary
+                                                }
+                                            }
+
+                                            ColumnLayout {
+                                                Layout.fillWidth: true
+                                                spacing: 1
+                                                Text {
+                                                    text: appBindCard.modelData.name
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 12
+                                                    font.weight: Font.DemiBold
+                                                    color: Theme.textColor
+                                                }
+                                                Text {
+                                                    text: appBindCard.modelData.command
+                                                    font.family: Theme.monoFamily
+                                                    font.pixelSize: 10
+                                                    color: Theme.subtext
+                                                    elide: Text.ElideMiddle
+                                                    Layout.fillWidth: true
+                                                }
+                                            }
+
+                                            Rectangle {
+                                                implicitWidth: 28
+                                                implicitHeight: 28
+                                                radius: 8
+                                                color: rmBindArea.containsMouse ? Theme.critical : "transparent"
+                                                Text {
+                                                    anchors.centerIn: parent
+                                                    text: Theme.icons.trash
+                                                    font.family: Theme.iconFontFamily
+                                                    font.pixelSize: 14
+                                                    color: rmBindArea.containsMouse ? "#ffffff" : Theme.subtext
+                                                }
+                                                MouseArea {
+                                                    id: rmBindArea
+                                                    anchors.fill: parent
+                                                    hoverEnabled: true
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    onClicked: {
+                                                        saveAppBindProc.command = ["rice-app-binds", "remove", appBindCard.modelData.combo];
+                                                        saveAppBindProc.running = true;
+                                                        win.showToast(Theme.t("toast.bind_removed", "Atalho removido"));
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
 
                                 RowLayout {
