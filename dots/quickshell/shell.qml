@@ -42,6 +42,7 @@ ShellRoot {
 
     DesktopWidgets { id: dw }
     Frame { id: frameScope }
+    WallpaperFade { id: wallFade }
 
     // ---------- modo de captura limpa ----------
     // `qs ipc call capture hide` esconde tudo que o Quickshell desenha por cima

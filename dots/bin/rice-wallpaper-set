@@ -115,6 +115,15 @@ apply_wallpaper() {
     fi
 
     if pgrep -x hyprpaper >/dev/null 2>&1; then
+        # Transição suave: cobre a tela com a imagem nova antes de o hyprpaper
+        # descarregar a antiga, senão a troca passa por um flash preto entre o
+        # `unload all` e o `wallpaper`. Aqui a própria imagem serve de preview.
+        # Sem o Quickshell rodando isso vira no-op e a troca segue direto.
+        if have rice-wallpaper-fade; then
+            delay=$(rice-wallpaper-fade --cover "$img" 2>/dev/null | tr -cd '0-9')
+            [ -n "$delay" ] && [ "$delay" -gt 0 ] 2>/dev/null &&
+                sleep "$(awk -v ms="$delay" 'BEGIN { printf "%.3f", ms / 1000 }')"
+        fi
         # Troca ao vivo, sem reiniciar o daemon.
         hyprctl hyprpaper unload all >/dev/null 2>&1
         hyprctl hyprpaper preload "$img" >/dev/null 2>&1

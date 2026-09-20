@@ -507,9 +507,35 @@ class SwitcherWindow(Gtk.ApplicationWindow):
             self.select(idx)
 
     def apply(self):
-        if self.closing:
+        if self.closing or getattr(self, "applying", False):
             return
         wallpaper = self.wallpapers[self.selected]
+
+        # Transição suave: cobre a tela com o preview estático do wallpaper que
+        # está entrando ANTES de mandar trocar. O wallpaper antigo continua
+        # animando por baixo enquanto a imagem aparece, e o engasgo do
+        # renderizador (de alguns quadros a quase um segundo, dependendo do
+        # wallpaper) acontece com a tela já coberta. Ver rice-wallpaper-fade.
+        delay = 0
+        fader = os.path.expanduser("~/.local/bin/rice-wallpaper-fade")
+        if wallpaper["preview"] and os.path.isfile(fader):
+            try:
+                out = subprocess.run(
+                    [fader, "--cover", wallpaper["preview"]],
+                    capture_output=True, text=True, timeout=3,
+                ).stdout.strip()
+                delay = int(out) if out.isdigit() else 0
+            except Exception:
+                delay = 0
+
+        if delay > 0:
+            self.applying = True
+            GLib.timeout_add(delay, self._apply_now, wallpaper)
+        else:
+            self._apply_now(wallpaper)
+
+    def _apply_now(self, wallpaper):
+        self.applying = False
         try:
             self.proxy.call_sync(
                 "ApplyById",
@@ -520,6 +546,10 @@ class SwitcherWindow(Gtk.ApplicationWindow):
             )
         except GLib.Error as e:
             print(f"Falha ao aplicar wallpaper: {e}", file=sys.stderr)
+            fader = os.path.expanduser("~/.local/bin/rice-wallpaper-fade")
+            if os.path.isfile(fader):
+                subprocess.Popen([fader, "--dismiss"],
+                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         else:
             # Regenera a paleta do sistema (hypr/waybar/kitty/mako) a partir
             # do preview do wallpaper recém-aplicado. Ver ~/.config/wallust/.
@@ -546,6 +576,7 @@ class SwitcherWindow(Gtk.ApplicationWindow):
                         stderr=subprocess.DEVNULL,
                     )
         self.close_animated()
+        return GLib.SOURCE_REMOVE
 
     def close_animated(self):
         if self.closing:

@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# rice-wallpaper-fade — esconde o engasgo da troca de papel de parede.
+#
+# Trocar um wallpaper animado mata o renderizador atual e sobe outro. Isso custa
+# de alguns quadros a quase um segundo, dependendo do wallpaper, e aparece como
+# travada ou flash preto.
+#
+# Este script cobre a tela com o preview estático do wallpaper que está entrando
+# ANTES de mandar trocar. O wallpaper antigo continua animando por baixo
+# enquanto a imagem aparece; a troca acontece com a tela já coberta; depois a
+# camada some e revela o novo wallpaper rodando.
+#
+# Uso:
+#   rice-wallpaper-fade <preview> -- <comando que troca o wallpaper...>
+#   rice-wallpaper-fade --cover <preview>     # só cobre (quem troca é o chamador)
+#   rice-wallpaper-fade --dismiss             # tira a camada na hora
+#
+# Sem o Quickshell rodando o comando é executado direto, sem transição.
+# ==============================================================================
+
+set -uo pipefail
+
+qs_bin=""
+for c in qs quickshell; do
+    command -v "$c" >/dev/null 2>&1 && { qs_bin="$c"; break; }
+done
+
+qs_call() {
+    [ -n "$qs_bin" ] || return 1
+    "$qs_bin" ipc call wallfade "$@" 2>/dev/null
+}
+
+case "${1:-}" in
+    --dismiss)
+        qs_call dismiss >/dev/null || true
+        exit 0
+        ;;
+    --cover)
+        # Cobre a tela e imprime, em ms, quanto o chamador deve esperar antes de
+        # trocar o wallpaper de verdade. Imprime 0 quando não houve transição.
+        [ -n "${2:-}" ] || { echo "uso: rice-wallpaper-fade --cover <preview>" >&2; exit 2; }
+        if [ ! -f "$2" ] || ! qs_call cover "$2" >/dev/null; then
+            echo 0
+            exit 0
+        fi
+        d=$(qs_call coverDelay 2>/dev/null | tr -cd '0-9')
+        [ -n "$d" ] || d=820
+        echo "$d"
+        exit 0
+        ;;
+esac
+
+preview="${1:-}"
+shift || true
+[ "${1:-}" = "--" ] && shift
+
+if [ "$#" -eq 0 ]; then
+    echo "uso: rice-wallpaper-fade <preview> -- <comando...>" >&2
+    exit 2
+fi
+
+# Sem preview utilizável não há o que desenhar: troca direto.
+if [ -z "$preview" ] || [ ! -f "$preview" ] || [ -z "$qs_bin" ]; then
+    exec "$@"
+fi
+
+if ! qs_call cover "$preview" >/dev/null; then
+    exec "$@"
+fi
+
+# O próprio painel diz quanto tempo leva pra imagem cobrir a tela, então mudar a
+# duração da animação no QML não exige mexer aqui.
+delay_ms=$(qs_call coverDelay 2>/dev/null | tr -cd '0-9')
+[ -n "$delay_ms" ] || delay_ms=820
+sleep "$(awk -v ms="$delay_ms" 'BEGIN { printf "%.3f", ms / 1000 }')"
+
+"$@"
+status=$?
+
+# A camada some sozinha por tempo (e tem um limite de segurança no QML), mas se
+# a troca falhou não faz sentido segurar a tela coberta.
+[ "$status" -ne 0 ] && qs_call dismiss >/dev/null
+
+exit "$status"
