@@ -383,6 +383,7 @@ PanelWindow {
     property int rounding: 8
     property int gapsIn: 6
     property string animPreset: "smooth"
+    property string wallTransition: "wipe"
 
     // Snapshots Btrfs
     property var snapshotsData: ({ snapshots: [] })
@@ -629,6 +630,7 @@ PanelWindow {
                     if (d.rounding !== undefined) win.rounding = d.rounding;
                     if (d.gaps_in !== undefined) win.gapsIn = d.gaps_in;
                     if (d.anim_preset !== undefined) win.animPreset = d.anim_preset;
+                    if (d.wallpaper_transition !== undefined) win.wallTransition = d.wallpaper_transition;
                     if (d.monitor_hz !== undefined) win.monitorHz = parseInt(d.monitor_hz) || 0;
                     if (d.monitor_scale !== undefined) win.monitorScale = parseFloat(d.monitor_scale) || 1.0;
                     if (d.vrr !== undefined) win.vrrEnabled = (d.vrr === 1 || d.vrr === true);
@@ -4792,6 +4794,69 @@ PanelWindow {
                                         setColorProc.running = true;
                                         win.showToast(next ? Theme.t("toast.colors_auto_on", "As cores vão acompanhar o wallpaper")
                                                            : Theme.t("toast.colors_auto_off", "Paleta travada: trocar o wallpaper não muda mais as cores"));
+                                    }
+                                }
+
+                                SectionHeader {
+                                    title: Theme.t("wallust.section_transition", "Transição ao trocar o wallpaper")
+                                    subtitle: Theme.t("wallust.section_transition_sub", "Como o papel de parede novo entra na tela. Enquanto a troca acontece por trás, o antigo continua em movimento.")
+                                }
+
+                                GridLayout {
+                                    Layout.fillWidth: true
+                                    columns: 4
+                                    columnSpacing: 12
+                                    rowSpacing: 12
+
+                                    Repeater {
+                                        model: [
+                                            { id: "fade", name: Theme.t("wallust.tr_fade", "Dissolver"), desc: Theme.t("wallust.tr_fade_desc", "Um aparece sobre o outro") },
+                                            { id: "wipe", name: Theme.t("wallust.tr_wipe", "Varredura"), desc: Theme.t("wallust.tr_wipe_desc", "Entra na diagonal") },
+                                            { id: "wave", name: Theme.t("wallust.tr_wave", "Onda"), desc: Theme.t("wallust.tr_wave_desc", "Varredura ondulada") },
+                                            { id: "grow", name: Theme.t("wallust.tr_grow", "Círculo"), desc: Theme.t("wallust.tr_grow_desc", "Abre do centro") }
+                                        ]
+                                        delegate: Rectangle {
+                                            required property var modelData
+                                            readonly property bool active: win.wallTransition === modelData.id
+                                            Layout.fillWidth: true
+                                            implicitHeight: 52
+                                            radius: 10
+                                            color: active ? Theme.withAlpha(Theme.primary, 0.22) : (trArea.containsMouse ? Theme.tileHigh : Theme.tile)
+                                            border.width: active ? 1.5 : 0
+                                            border.color: Theme.primary
+
+                                            ColumnLayout {
+                                                anchors.centerIn: parent
+                                                spacing: 2
+                                                Text {
+                                                    Layout.alignment: Qt.AlignHCenter
+                                                    text: parent.parent.modelData.name
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 12
+                                                    font.weight: parent.parent.active ? Font.DemiBold : Font.Normal
+                                                    color: Theme.textColor
+                                                }
+                                                Text {
+                                                    Layout.alignment: Qt.AlignHCenter
+                                                    text: parent.parent.modelData.desc
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 10
+                                                    color: parent.parent.active ? Theme.primary : Theme.subtext
+                                                }
+                                            }
+
+                                            MouseArea {
+                                                id: trArea
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: {
+                                                    win.wallTransition = parent.modelData.id;
+                                                    Quickshell.execDetached(["rice-wallpaper-fade", "--style", parent.modelData.id]);
+                                                    win.showToast(Theme.t("toast.wall_transition", "Transição: ") + parent.modelData.name);
+                                                }
+                                            }
+                                        }
                                     }
                                 }
 

@@ -31,7 +31,42 @@ qs_call() {
     "$qs_bin" ipc call wallfade "$@" 2>/dev/null
 }
 
+PREFS="$HOME/.config/hypr/user-prefs.json"
+
+# Grava a preferência sem depender de jq: o arquivo é o mesmo dos gaps/blur e
+# não pode ser reescrito do zero, senão o resto das preferências se perde.
+save_style() {
+    python3 -c '
+import json, os, sys
+path, style = sys.argv[1], sys.argv[2]
+try:
+    data = json.load(open(path, encoding="utf-8")) if os.path.isfile(path) else {}
+except Exception:
+    data = {}
+data["wallpaper_transition"] = style
+os.makedirs(os.path.dirname(path), exist_ok=True)
+with open(path, "w", encoding="utf-8") as f:
+    json.dump(data, f, indent=2, ensure_ascii=False)
+' "$PREFS" "$1"
+}
+
 case "${1:-}" in
+    --style)
+        # Sem argumento, só informa o estilo em uso.
+        if [ -z "${2:-}" ]; then
+            qs_call currentStyle 2>/dev/null || echo "fade"
+            exit 0
+        fi
+        case "$2" in
+            fade|wipe|wave|grow) ;;
+            *) echo "estilos: fade, wipe, wave, grow" >&2; exit 2 ;;
+        esac
+        save_style "$2" || { echo "não consegui gravar a preferência" >&2; exit 1; }
+        # O QML observa o arquivo, mas avisar direto faz valer na hora.
+        qs_call setStyle "$2" >/dev/null 2>&1 || true
+        echo "OK"
+        exit 0
+        ;;
     --dismiss)
         qs_call dismiss >/dev/null || true
         exit 0
