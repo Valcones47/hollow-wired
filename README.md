@@ -64,14 +64,21 @@ Legacy tools like Waybar, Rofi, SwayOSD, and Wofi are completely omitted. Every 
 - **Dynamic Island OSD (`OSD.qml`)**: Non-intrusive floating capsule below the top bar providing visual feedback for volume levels, microphone mute, and screen brightness.
 - **Energy Sidebar (`EnergySidebar.qml`)**: Slide-out right panel providing system tray icons, update count badges (Repo + AUR + Dotfiles), night light toggle, blur toggle, and two-step power options.
 - **Alt+Tab Task Switcher (`AltTab.qml`)**: Live window thumbnails rendered via Wayland screencopy buffers, sorted by MRU (most recently used) focus history. Quick close windows on the fly with `Q`.
-- **Native Clipboard (`Clipboard.qml`)**: Built-in clipboard manager invoked with `Super + V`, supporting quick search, image preview, and instant history clearing.
+- **Native Clipboard (`Clipboard.qml`)**: Built-in clipboard manager invoked with `Super + V`, supporting quick search, image preview, and instant history clearing. Copied content survives closing the source application (`wl-clip-persist`), and a dedicated **Favourites** tab keeps pinned entries out of the rolling history.
 - **Internationalization (i18n)**: Seamless bilingual localization (English & Brazilian Portuguese) across all shell components and settings via reactive JSON dictionaries and `Theme.t(...)`.
-- **Central Hub & Control Center (`VisualConfigPanel.qml` / `Super + I`)**: **20 comprehensive configuration tabs** covering display refresh rates (144Hz/60Hz), FreeSync/VRR, Kitty terminal parameters, Fastfetch animated GIFs, Mako notifications, system repair actions, Discord shortcut binds, shell customization, app store, and theme presets.
+- **Central Hub & Control Center (`VisualConfigPanel.qml` / `Super + I`)**: **19 configuration categories** grouped into Appearance, Hardware, System and Help, with a search box that finds individual settings rather than just categories. Highlights:
+  - **Display**: every mode the monitor actually reports — resolution, all supported refresh rates, scale and rotation — with a 15-second automatic revert (the way Windows does it) so an unsupported mode can never leave you staring at a black screen.
+  - **Notifications**: position, on-screen duration, corners and borders, plus a repair banner that appears when notification banners get stuck on screen or the service dies.
+  - **Colors**: the full wallpaper palette, with **any colour replaceable by hand on an HSV colour wheel** and a toggle to lock the palette against wallpaper changes.
+  - **Programs**: unified update count (official repos + AUR + Flatpak), a shortcut to whichever graphical package manager is installed, and the rice updater with the list of what is coming in the next update.
+  - Keyboard (10 layouts, repeat rate, touchpad), idle/power timings, gaming & GPU, storage, printers, and a first-run **Welcome guide** aimed at people arriving from Windows.
 
 ### Theming & Dynamic Colors
 - **Wallust Palette Engine**: Dynamic color palette extracted directly from the active wallpaper. Automatically updates Hyprland window borders, Quickshell UI surfaces, and Kitty terminal colors without requiring session restarts.
+- **Hand-picked colour overrides (`rice-colors`)**: any palette entry can be replaced by hand from the Control Center colour wheel. Overrides live in a separate user file and are re-applied on top of every freshly extracted palette, so they survive wallpaper changes. `rice-colors auto 0` freezes the palette entirely.
 - **Waywallen Integration**: Animated Wallpaper Engine scenes via Flatpak and a native layer-shell bridge. Wallpapers automatically pause when any application is in fullscreen to guarantee zero resource waste during games or video playback.
 - **Wallpaper Switcher (`Super + S`)**: Interactive carousel selector to browse and apply installed wallpapers instantly.
+- **Login Screen (SDDM + SilentSDDM)**: themed lock/login screen whose background is generated from the *actual wallpaper image* (adaptively darkened), never from a screenshot of your desktop. `rice-sddm-install` installs the theme, syncs your avatar and remembers the last session you logged into; `rice-sddm-preview` opens the whole thing in a test window so you can iterate without rebooting.
 
 ### Architecture & GPU Orchestration
 - **Mesa iGPU Compositor**: Hyprland and Quickshell run on the integrated Intel GPU to eliminate inter-GPU copy overhead and maintain rock-solid frametimes at 144Hz.
@@ -99,7 +106,7 @@ Legacy tools like Waybar, Rofi, SwayOSD, and Wofi are completely omitted. Every 
 | `Super + L` | Lock Screen (`hyprlock`) |
 | `Super + M` | Exit Hyprland Session |
 | `Alt + Tab` | Live Window Switcher |
-| `Print` or `Super + Shift + S` | Region Screenshot (Saves to pictures, copies to clipboard & notifies) |
+| `Print` or `Super + Shift + S` | Region Screenshot — saves, copies to clipboard and notifies. Cancelling the selection captures the **entire screen** instead of doing nothing |
 | `Super + Alt + S` | Interactive Screenshot with Annotation (Swappy) |
 | `Super + Shift + R` | Record Selected Screen Region |
 | `Super + Ctrl + Shift + R` | Record Entire Display |
@@ -156,6 +163,25 @@ rice-update
 - **Update Detection**: Background checks quietly query the upstream repository for new commits.
 - **UI Notifications**: When updates are available, the update badge in the **Energy Sidebar** and **Control Center** highlights the new commit count.
 - **Automated Backup**: Applying updates creates an automatic timestamped backup in `~/.config/rice-backup-<timestamp>`, pulls changes, syncs configurations, and hot-reloads Quickshell in place without interrupting open windows.
+- **Safe against running binaries**: helpers are installed with `install(1)`, which unlinks before writing. A binary that happens to be running (the wallpaper bridge, the blur watcher) can no longer abort the update halfway and leave the machine half-new, half-old.
+- **Resumes an interrupted update**: a marker records the last sync that actually *finished*. If the git tree moved but the marker did not, the next run redoes the sync instead of reporting "already up to date".
+
+### Repair mode
+
+```bash
+rice-update fix
+```
+
+Also reachable from the update icon in the Energy Sidebar and from the Programs tab. It looks for — and fixes — the problems that have actually been reported by users:
+
+| Check | Symptom it fixes |
+|---|---|
+| Notification config (`rice-mako-apply doctor`) | Banners that never leave the screen until clicked |
+| Stopped background services | Clipboard no longer persists, notifications gone, blur toggle broken |
+| Binaries left unwritten by a previous update | Helpers silently stuck on an old version |
+| Corrupted JSON state files | Dock, widgets or preferences coming up empty |
+| Missing execute bits / `~/.local/bin` off `$PATH` | `rice-*` commands "not found" |
+| Missing `colors.conf` | Everything rendering grey |
 
 ---
 
@@ -170,6 +196,8 @@ hollow-wired/
 │   ├── wallust/              # Dynamic palette templates and color schemes
 │   ├── xdg-desktop-portal/   # Wayland portal rules (KDE Breeze Dark file picker)
 │   ├── fastfetch/            # System fetch configuration and custom ASCII/GIFs
+│   ├── mako/                 # Notification daemon configuration
+│   ├── sddm/                 # Login screen theme (SilentSDDM)
 │   ├── applications/         # Desktop shortcut definitions (.desktop)
 │   └── bin/                  # Helper CLI utilities (rice-update, rice-record, etc.)
 ├── packaging/                # Turnkey PKGBUILD & AUR installation recipes
