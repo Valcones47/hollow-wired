@@ -459,6 +459,47 @@ fix_colors() {
     fi
 }
 
+fix_electron_gpu() {
+    # Aplicativos Electron (Discord, principalmente) travando na abertura sem
+    # mostrar nada.
+    #
+    # Dois problemas distintos, que juntos deixam o Discord rodando com 11
+    # processos e nenhuma janela:
+    #
+    # 1. o settings.json do Discord traz `ozone-platform` dentro de
+    #    chromiumSwitches. Junto com o que o Electron já passa por conta
+    #    própria, o Chromium recebe `--ozone-platform` SEM valor e morre com
+    #    "FATAL: Invalid ozone platform:";
+    # 2. em laptop híbrido, o Chromium escolhia a dGPU NVIDIA e o processo de
+    #    GPU morria com "GPU process isn't usable. Goodbye.". O DRI_PRIME=0 que
+    #    o hyprland.lua passou a definir resolve isso para sessões novas.
+    #
+    # Aqui só o (1) é consertável sem reiniciar a sessão.
+    local ds="$HOME/.config/discord/settings.json"
+    [ -f "$ds" ] || return 0
+    local out
+    out=$(python3 - "$ds" <<'PYFIX' 2>/dev/null || true
+import json, sys
+path = sys.argv[1]
+try:
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+except Exception:
+    sys.exit(0)
+switches = data.get("chromiumSwitches")
+if not isinstance(switches, dict) or "ozone-platform" not in switches:
+    sys.exit(0)
+switches.pop("ozone-platform", None)
+data["chromiumSwitches"] = switches
+with open(path, "w", encoding="utf-8") as f:
+    json.dump(data, f, indent=2, ensure_ascii=False)
+print("discord")
+PYFIX
+)
+    [ -n "$out" ] && fix_note "Discord: removida a flag de ozone que impedia a janela de abrir"
+    return 0
+}
+
 run_health_checks() {
     echo -e "\n\e[1;34m[*] Procurando e consertando problemas conhecidos...\e[0m"
     retry_pending_bins || true
@@ -468,6 +509,7 @@ run_health_checks() {
     fix_path || true
     fix_colors || true
     fix_daemons || true
+    fix_electron_gpu || true
 
     if [ -n "$FIXED_LIST" ]; then
         echo -e "\e[1;32m[✓] Consertado:\e[0m$FIXED_LIST"

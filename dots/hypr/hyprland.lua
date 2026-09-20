@@ -169,6 +169,14 @@ if hasNvidia and hasIgpu then
     -- eliminando overhead de cópia inter-GPU. Jogos usam dGPU via prime-run.
     hl.env("__NV_PRIME_RENDER_OFFLOAD", "0")
     hl.env("__GLX_VENDOR_LIBRARY_NAME", "mesa")
+    -- __GLX_VENDOR_LIBRARY_NAME só cobre GLX. Aplicativos Electron (Discord,
+    -- VS Code, Zen) desenham por EGL no Wayland e, sem isto, o Chromium
+    -- escolhia a dGPU NVIDIA sozinho — o processo de GPU morria com
+    -- "GPU process isn't usable. Goodbye." e a janela nunca abria, sem
+    -- nenhuma mensagem visível pro usuário. DRI_PRIME é variável do Mesa e
+    -- seleciona a iGPU; jogos não são afetados porque prime-run e game-run
+    -- usam __NV_PRIME_RENDER_OFFLOAD=1, que é o caminho da NVIDIA.
+    hl.env("DRI_PRIME", "0")
 elseif hasNvidia and not hasIgpu then
     -- PC Desktop com NVIDIA exclusiva (sem iGPU): aceleração direta por hardware
     -- NOTA: GBM_BACKEND=nvidia-drm NUNCA deve ser definido no Hyprland moderno pois causa flickering severo

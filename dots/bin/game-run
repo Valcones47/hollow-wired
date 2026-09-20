@@ -26,6 +26,10 @@ nvidia_id() {
 NVIDIA_PCI_ID="$(nvidia_id)"
 
 if [ -n "$NVIDIA_PCI_ID" ] && { [ -e /dev/nvidiactl ] || [ -d /proc/driver/nvidia ]; }; then
+    # A sessão roda com DRI_PRIME=0 para manter a interface na iGPU; aqui a
+    # dGPU é o objetivo, então a variável sai do caminho em vez de depender de
+    # qual delas tem precedência dentro do driver.
+    unset DRI_PRIME
     export __NV_PRIME_RENDER_OFFLOAD=1
     export __VK_LAYER_NV_optimus=NVIDIA_only
     export __GLX_VENDOR_LIBRARY_NAME=nvidia
