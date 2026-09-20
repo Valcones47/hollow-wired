@@ -181,8 +181,8 @@ Scope {
             // cima dela. Em Bottom, que é onde ficam a moldura e os widgets,
             // esta janela passaria por cima dos dois durante a troca.
             //
-            // Dentro da mesma camada vale a ordem de mapeamento, e esta janela
-            // só é mapeada na hora de trocar — bem depois do wallpaper subir.
+            // Confirmado por `hyprctl layers` durante uma troca de verdade: o
+            // waywallen mantém a mesma superfície e não remapeia por cima.
             WlrLayershell.layer: WlrLayer.Background
             WlrLayershell.namespace: "hollow-wallfade"
             exclusionMode: ExclusionMode.Ignore
@@ -198,16 +198,135 @@ Scope {
             visible: fadeScope.covering || fadeImage.opacity > 0.001
 
             // ---------------------------------------------- máscaras
-            // As máscaras ficam DENTRO do layer.effect. Declaradas como itens
-            // irmãos com `visible: false`, elas pareciam funcionar mas não
-            // mascaravam nada: um item invisível não é desenhado, logo não gera
-            // a textura que o OpacityMask consome, e o resultado era igual ao
-            // crossfade em todos os estilos. Medido lado a lado: `fade` e
-            // `wipe` davam exatamente a mesma curva de brilho.
             //
-            // Gradiente e Canvas são desenhados pela GPU e não precisam de
-            // shader compilado (.qsb), que obrigaria uma etapa de build no
-            // repositório.
+            // Ficam FORA da área visível (x negativo), não escondidas.
+            //
+            // Duas tentativas anteriores falharam por motivos diferentes, e as
+            // duas davam o mesmo sintoma — a imagem aparecia numa mistura meio
+            // transparente e parada, em vez de varrer:
+            //
+            //   1. `visible: false` — um item invisível não é desenhado, logo
+            //      não gera a textura que o OpacityMask consome;
+            //   2. declaradas dentro do próprio `layer.effect` — aí a textura
+            //      é capturada uma vez e nunca mais atualiza.
+            //
+            // Um item com `layer.enabled` é renderizado na própria FBO
+            // independentemente de onde esteja, e essa FBO acompanha as
+            // mudanças. Tirar da vista em vez de esconder resolve os dois.
+            // (Que a animação em si rodava já estava medido: o progresso ia de
+            // 0,1 a 1,0 enquanto o desenho ficava parado.)
+
+            // Varredura em diagonal, como o swww.
+            LinearGradient {
+                id: wipeMask
+                width: fadeWin.width
+                height: fadeWin.height
+                x: -fadeWin.width - 64
+                layer.enabled: true
+
+                readonly property real rad: fadeScope.wipeAngle * Math.PI / 180
+                readonly property real dx: Math.cos(rad)
+                readonly property real dy: Math.sin(rad)
+                readonly property real span: Math.abs(width * dx) + Math.abs(height * dy)
+                // Borda macia, equivalente ao --transition-step do swww.
+                readonly property real feather: 0.16
+                // Empurra a faixa de -feather até 1 + feather, para que ela
+                // comece e termine inteiramente fora da tela.
+                readonly property real p: fadeScope.progress * (1 + 2 * feather) - feather
+
+                start: Qt.point(0, 0)
+                end: Qt.point(dx * span, dy * span)
+
+                gradient: Gradient {
+                    GradientStop { position: 0.0; color: "white" }
+                    GradientStop {
+                        position: Math.max(0, Math.min(1, wipeMask.p))
+                        color: "white"
+                    }
+                    GradientStop {
+                        position: Math.max(0, Math.min(1, wipeMask.p + wipeMask.feather))
+                        color: "transparent"
+                    }
+                    GradientStop { position: 1.0; color: "transparent" }
+                }
+            }
+
+            // Círculo que abre do centro.
+            RadialGradient {
+                id: growMask
+                width: fadeWin.width
+                height: fadeWin.height
+                x: -fadeWin.width - 64
+                layer.enabled: true
+
+                readonly property real feather: 0.14
+                readonly property real p: fadeScope.progress * (1 + feather)
+
+                horizontalRadius: Math.max(width, height) * 0.75
+                verticalRadius: horizontalRadius
+
+                gradient: Gradient {
+                    GradientStop { position: 0.0; color: "white" }
+                    GradientStop {
+                        position: Math.max(0, Math.min(1, growMask.p))
+                        color: "white"
+                    }
+                    GradientStop {
+                        position: Math.max(0, Math.min(1, growMask.p + growMask.feather))
+                        color: "transparent"
+                    }
+                    GradientStop { position: 1.0; color: "transparent" }
+                }
+            }
+
+            // Varredura com a borda ondulada. O Canvas é pequeno de propósito:
+            // é uma máscara suave, a ampliação não aparece, e repintar
+            // 1920x1080 no CPU a cada quadro seria lento demais.
+            Canvas {
+                id: waveMask
+                width: fadeWin.width
+                height: fadeWin.height
+                x: -fadeWin.width - 64
+                layer.enabled: true
+                renderTarget: Canvas.FramebufferObject
+                canvasSize: Qt.size(320, 180)
+
+                readonly property real feather: 0.18
+                readonly property real p: fadeScope.progress * (1 + 2 * feather) - feather
+
+                onPChanged: requestPaint()
+                onWidthChanged: requestPaint()
+                onHeightChanged: requestPaint()
+                Component.onCompleted: requestPaint()
+
+                onPaint: {
+                    const ctx = getContext("2d");
+                    ctx.reset();
+                    const w = width;
+                    const h = height;
+                    const edge = p * w;
+                    const band = feather * w;
+                    const amp = w * 0.045;
+                    const cycles = 2.2;
+                    const steps = 64;
+
+                    // Cada fatia horizontal recebe o mesmo degradê, deslocado
+                    // pela onda: é isso que dá a borda ondulada sem precisar de
+                    // shader compilado (.qsb), que obrigaria uma etapa de build
+                    // no repositório.
+                    const sliceH = h / steps;
+                    for (let i = 0; i < steps; i++) {
+                        const t = (i + 0.5) / steps;
+                        const off = Math.sin(t * Math.PI * 2 * cycles) * amp;
+                        const x0 = edge + off;
+                        const g = ctx.createLinearGradient(x0, 0, x0 + band, 0);
+                        g.addColorStop(0, "white");
+                        g.addColorStop(1, "transparent");
+                        ctx.fillStyle = g;
+                        ctx.fillRect(0, i * sliceH, x0 + band, sliceH + 1);
+                    }
+                }
+            }
 
             Image {
                 id: fadeImage
@@ -238,126 +357,8 @@ Scope {
 
                 layer.enabled: fadeScope.masked
                 layer.effect: OpacityMask {
-                    maskSource: Item {
-                        width: fadeWin.width
-                        height: fadeWin.height
-
-                        // Varredura em diagonal, como o swww. A faixa de
-                        // transição percorre a tela no ângulo escolhido.
-                        LinearGradient {
-                            id: wipeMask
-                            anchors.fill: parent
-                            visible: fadeScope.style === "wipe"
-
-                            readonly property real rad: fadeScope.wipeAngle * Math.PI / 180
-                            readonly property real dx: Math.cos(rad)
-                            readonly property real dy: Math.sin(rad)
-                            readonly property real span: Math.abs(width * dx) + Math.abs(height * dy)
-                            // Largura da borda macia, equivalente ao
-                            // --transition-step do swww.
-                            readonly property real feather: 0.16
-                            // Empurra a faixa de -feather até 1 + feather, para
-                            // que ela comece e termine fora da tela.
-                            readonly property real p: fadeScope.progress * (1 + 2 * feather) - feather
-
-                            start: Qt.point(0, 0)
-                            end: Qt.point(dx * span, dy * span)
-
-                            gradient: Gradient {
-                                GradientStop { position: 0.0; color: "white" }
-                                GradientStop {
-                                    position: Math.max(0, Math.min(1, wipeMask.p))
-                                    color: "white"
-                                }
-                                GradientStop {
-                                    position: Math.max(0, Math.min(1, wipeMask.p + wipeMask.feather))
-                                    color: "transparent"
-                                }
-                                GradientStop { position: 1.0; color: "transparent" }
-                            }
-                        }
-
-                        // Círculo que abre do centro.
-                        RadialGradient {
-                            id: growMask
-                            anchors.fill: parent
-                            visible: fadeScope.style === "grow"
-
-                            readonly property real feather: 0.14
-                            readonly property real p: fadeScope.progress * (1 + feather)
-
-                            horizontalRadius: Math.max(width, height) * 0.75
-                            verticalRadius: horizontalRadius
-
-                            gradient: Gradient {
-                                GradientStop { position: 0.0; color: "white" }
-                                GradientStop {
-                                    position: Math.max(0, Math.min(1, growMask.p))
-                                    color: "white"
-                                }
-                                GradientStop {
-                                    position: Math.max(0, Math.min(1, growMask.p + growMask.feather))
-                                    color: "transparent"
-                                }
-                                GradientStop { position: 1.0; color: "transparent" }
-                            }
-                        }
-
-                        // Varredura com a borda ondulada. Desenhada num Canvas
-                        // deliberadamente pequeno e escalado: é uma máscara
-                        // suave, então a ampliação não aparece, e repintar
-                        // 1920x1080 no CPU a cada quadro seria lento demais.
-                        Canvas {
-                            id: waveMask
-                            anchors.fill: parent
-                            visible: fadeScope.style === "wave"
-                            renderTarget: Canvas.FramebufferObject
-                            canvasSize: Qt.size(320, 180)
-
-                            readonly property real feather: 0.18
-                            readonly property real p: fadeScope.progress * (1 + 2 * feather) - feather
-
-                            onPChanged: requestPaint()
-                            onWidthChanged: requestPaint()
-                            onHeightChanged: requestPaint()
-                            Component.onCompleted: requestPaint()
-
-                            onPaint: {
-                                const ctx = getContext("2d");
-                                ctx.reset();
-                                const w = width;
-                                const h = height;
-                                const edge = p * w;
-                                const band = feather * w;       // borda macia
-                                const amp = w * 0.045;          // altura da onda
-                                const cycles = 2.2;             // ondas na tela
-                                const steps = 64;
-
-                                // Cada fatia horizontal recebe o mesmo degradê,
-                                // deslocado pela onda: é isso que dá a borda
-                                // ondulada sem precisar de shader.
-                                const sliceH = h / steps;
-                                for (let i = 0; i < steps; i++) {
-                                    const t = (i + 0.5) / steps;
-                                    const off = Math.sin(t * Math.PI * 2 * cycles) * amp;
-                                    const x0 = edge + off;
-                                    const g = ctx.createLinearGradient(x0, 0, x0 + band, 0);
-                                    g.addColorStop(0, "white");
-                                    g.addColorStop(1, "transparent");
-                                    ctx.fillStyle = g;
-                                    ctx.fillRect(0, i * sliceH, x0 + band, sliceH + 1);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            Connections {
-                target: fadeScope
-                function onProgressChanged() {
-                    // O Canvas da onda desliza inteiro, então não precisa ser
-                    // repintado — só os gradientes reavaliam sozinhos.
+                    maskSource: fadeScope.style === "grow" ? growMask
+                              : (fadeScope.style === "wave" ? waveMask : wipeMask)
                 }
             }
         }
@@ -377,5 +378,10 @@ Scope {
         // Troca o estilo sem reiniciar o shell (usado pelo painel e para teste).
         function setStyle(name: string): void { fadeScope.style = name; }
         function currentStyle(): string { return fadeScope.style; }
+        // Diagnóstico: diz o progresso da varredura neste instante.
+        function progressNow(): string {
+            return fadeScope.progress.toFixed(3) + " covering=" + fadeScope.covering
+                 + " anim=" + coverAnim.running;
+        }
     }
 }
