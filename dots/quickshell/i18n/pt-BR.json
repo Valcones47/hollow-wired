@@ -900,5 +900,10 @@
   "wallust.auto_title": "Cores seguem o wallpaper",
   "wallust.auto_sub": "Ligado: trocar o papel de parede gera uma paleta nova. Desligado: as cores ficam como estão agora.",
   "toast.colors_auto_on": "As cores vão acompanhar o wallpaper",
-  "toast.colors_auto_off": "Paleta travada: trocar o wallpaper não muda mais as cores"
+  "toast.colors_auto_off": "Paleta travada: trocar o wallpaper não muda mais as cores",
+  "sidebar.switch_user": "Ir para a tela de login",
+  "sidebar.switch_user_desc": "Seus programas continuam abertos. Ao entrar de novo, tudo volta como estava.",
+  "sidebar.switch_user_btn": "Ir para a tela de login",
+  "sidebar.logout_full": "Fechar tudo e sair da sessão",
+  "sidebar.logout_full_desc": "Fecha todos os programas. Use para trocar de ambiente gráfico."
 }

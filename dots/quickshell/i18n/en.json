@@ -900,5 +900,10 @@
   "wallust.auto_title": "Colors follow the wallpaper",
   "wallust.auto_sub": "On: changing the wallpaper generates a new palette. Off: colors stay exactly as they are now.",
   "toast.colors_auto_on": "Colors will follow the wallpaper",
-  "toast.colors_auto_off": "Palette locked: changing the wallpaper no longer changes colors"
+  "toast.colors_auto_off": "Palette locked: changing the wallpaper no longer changes colors",
+  "sidebar.switch_user": "Go to the login screen",
+  "sidebar.switch_user_desc": "Your programs stay open. Log back in and everything is right where you left it.",
+  "sidebar.switch_user_btn": "Go to the login screen",
+  "sidebar.logout_full": "Close everything and log out",
+  "sidebar.logout_full_desc": "Closes every program. Use this to switch desktop environments."
 }

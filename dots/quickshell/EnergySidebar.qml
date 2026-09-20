@@ -682,14 +682,17 @@ PanelWindow {
                         Quickshell.execDetached(["rice-session-action", "suspend"]);
                     }
                 }
+                // Ir para a tela de login NÃO fecha o que está aberto: o SDDM
+                // abre um greeter num VT novo e a sessão continua atrás dele.
+                // Fechar tudo de verdade virou uma ação separada, dentro do
+                // popup — é o que se usa para trocar de ambiente gráfico.
                 SideButton {
                     id: logoutBtn
                     kind: "logout"
                     icon: Theme.icons.logout
-                    needsConfirm: true
                     onActivated: {
                         sidebar.open = false;
-                        Quickshell.execDetached(["rice-session-action", "logout"]);
+                        Quickshell.execDetached(["rice-session-action", "switch-user"]);
                     }
                 }
                 SideButton {
@@ -759,7 +762,8 @@ PanelWindow {
                     case "gpu": return gpuPop;
                     case "lock": return lockPop;
                     case "suspend": return suspendPop;
-                    case "logout": case "reboot": case "power": return powerPop;
+                    case "logout": return logoutPop;
+                    case "reboot": case "power": return powerPop;
                     case "tray": return trayPop;
                     }
                     return null;
@@ -886,12 +890,47 @@ PanelWindow {
                 }
 
                 ColumnLayout {
+                    id: logoutPop
+                    visible: popContent.current === logoutPop
+                    spacing: 2
+                    PopTitle { text: Theme.t("sidebar.switch_user", "Ir para a tela de login") }
+                    PopText {
+                        text: Theme.t("sidebar.switch_user_desc", "Seus programas continuam abertos. Ao entrar de novo, tudo volta como estava.")
+                        wrapMode: Text.Wrap
+                        Layout.maximumWidth: Theme.popoutMaxWidth - 40
+                    }
+                    PopAction {
+                        Layout.topMargin: 4
+                        icon: Theme.icons.lock
+                        label: Theme.t("sidebar.switch_user_btn", "Ir para a tela de login")
+                        onActivated: {
+                            sidebar.open = false;
+                            Quickshell.execDetached(["rice-session-action", "switch-user"]);
+                        }
+                    }
+                    PopAction {
+                        icon: Theme.icons.logout
+                        label: Theme.t("sidebar.logout_full", "Fechar tudo e sair da sessão")
+                        needsConfirm: true
+                        onActivated: {
+                            sidebar.open = false;
+                            Quickshell.execDetached(["rice-session-action", "logout"]);
+                        }
+                    }
+                    PopText {
+                        text: Theme.t("sidebar.logout_full_desc", "Fecha todos os programas. Use para trocar de ambiente gráfico.")
+                        wrapMode: Text.Wrap
+                        Layout.maximumWidth: Theme.popoutMaxWidth - 40
+                    }
+                }
+
+                ColumnLayout {
                     id: powerPop
                     visible: popContent.current === powerPop
                     spacing: 6
-                    readonly property var btn: sidebar.pop === "logout" ? logoutBtn : sidebar.pop === "reboot" ? rebootBtn : powerBtn
+                    readonly property var btn: sidebar.pop === "reboot" ? rebootBtn : powerBtn
                     PopTitle {
-                        text: sidebar.pop === "logout" ? Theme.t("sidebar.logout", "Sair da sessão") : sidebar.pop === "reboot" ? Theme.t("sidebar.reboot", "Reiniciar") : Theme.t("sidebar.shutdown", "Desligar")
+                        text: sidebar.pop === "reboot" ? Theme.t("sidebar.reboot", "Reiniciar") : Theme.t("sidebar.shutdown", "Desligar")
                     }
                     PopText {
                         visible: sidebar.pop === "reboot" && sidebar.rebootReason !== ""
@@ -912,7 +951,7 @@ PanelWindow {
 
                         Text {
                             anchors.centerIn: parent
-                            text: sidebar.pop === "logout" ? Theme.t("sidebar.confirm_logout", "Confirmar Saída") : sidebar.pop === "reboot" ? Theme.t("sidebar.confirm_reboot", "Confirmar Reinício") : Theme.t("sidebar.confirm_shutdown", "Confirmar Desligar")
+                            text: sidebar.pop === "reboot" ? Theme.t("sidebar.confirm_reboot", "Confirmar Reinício") : Theme.t("sidebar.confirm_shutdown", "Confirmar Desligar")
                             color: powerPop.btn && powerPop.btn.armed ? "#ffffff" : Theme.primary
                             font.family: Theme.fontFamily
                             font.pixelSize: 11

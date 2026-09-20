@@ -5,6 +5,38 @@
 ACTION="${1:-}"
 
 case "$ACTION" in
+    switch-user|greeter|login-screen)
+        # "Encerrar sessão" não deveria fechar o que está aberto — a expectativa
+        # (a mesma do Windows) é só voltar para a tela de login. O SDDM expõe
+        # exatamente isso pelo D-Bus: um greeter novo num VT separado, com a
+        # sessão atual intacta atrás dele. Entrando de novo, tudo volta como
+        # estava. Fechar tudo de verdade virou uma ação separada (logout).
+        if command -v hyprlock >/dev/null 2>&1 && ! pgrep -x hyprlock >/dev/null 2>&1; then
+            hyprlock >/dev/null 2>&1 &
+            sleep 0.3
+        fi
+
+        SEAT="${XDG_SEAT:-seat0}"
+        SEAT_PATH="/org/freedesktop/DisplayManager/Seat${SEAT#seat}"
+        if command -v busctl >/dev/null 2>&1 && busctl --system call \
+                org.freedesktop.DisplayManager "$SEAT_PATH" \
+                org.freedesktop.DisplayManager.Seat SwitchToGreeter >/dev/null 2>&1; then
+            exit 0
+        fi
+
+        # LightDM, para quem não usa SDDM.
+        if command -v dm-tool >/dev/null 2>&1 && dm-tool switch-to-greeter >/dev/null 2>&1; then
+            exit 0
+        fi
+
+        # Sem gerenciador de login que saiba trocar de sessão: a tela fica
+        # bloqueada, que é o mais próximo disso — e melhor do que fechar tudo
+        # sem a pessoa ter pedido.
+        loginctl lock-session "${XDG_SESSION_ID:-self}" 2>/dev/null || true
+        notify-send -a "Sessão" -i system-lock-screen -t 6000 \
+            "Tela bloqueada" \
+            "O gerenciador de login não permite trocar de usuário sem fechar a sessão." 2>/dev/null || true
+        ;;
     logout)
         # Encerrar a sessão deixava o PC numa tela preta para sempre, sem voltar
         # para a tela de login. O motivo estava aqui: o script mandava o
@@ -73,7 +105,7 @@ case "$ACTION" in
         fi
         ;;
     *)
-        echo "Uso: rice-session-action [logout|suspend|hibernate|reboot|poweroff|lock]"
+        echo "Uso: rice-session-action [switch-user|logout|suspend|hibernate|reboot|poweroff|lock]"
         exit 1
         ;;
 esac
