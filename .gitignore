@@ -32,3 +32,8 @@ quickshell-hub-progress.md
 
 # Cache de ferramentas de IA local
 .serena/
+
+# Script interno de automação (contém caminhos pessoais)
+run-hub-fixes.sh
+prompt-*.md
+hub-fixes-run-*.log

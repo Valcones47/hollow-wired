@@ -525,10 +525,6 @@ end
 if hasCommand("zapzap") then
     hl.bind("CTRL + bracketright", hl.dsp.exec_cmd("zapzap"))
 end
-if io.open(home .. "/projetos/FischMacro/noisefish-linux/tray.py", "r") then
-    hl.bind("CTRL + bracketleft", hl.dsp.exec_cmd(home .. "/projetos/FischMacro/noisefish-linux/.venv/bin/python " .. home .. "/projetos/FischMacro/noisefish-linux/tray.py"))
-end
-
 -- Ctrl + Alt + Delete = Menu de Energia / Desligar / Suspender
 hl.bind("CTRL + ALT + Delete", hl.dsp.exec_cmd("quickshell ipc call sidebar toggle"))
 hl.bind("CTRL + ALT + delete", hl.dsp.exec_cmd("quickshell ipc call sidebar toggle"))
@@ -734,9 +730,17 @@ local userBindsFile = home .. "/.config/hypr/user-binds.lua"
 local uf = io.open(userBindsFile, "r")
 if uf then
     uf:close()
+    -- `dofile` roda num escopo novo: as locais daqui (home, mainMod) não chegam
+    -- lá dentro. Quem escrevia um atalho usando `home` via o bind sumir sem
+    -- explicação, porque o erro era engolido pelo pcall abaixo. Exportar as
+    -- duas como globais deixa o arquivo pessoal se parecer com este aqui.
+    _G.home = home
+    _G.mainMod = mainMod
     local ok, err = pcall(dofile, userBindsFile)
     if not ok then
         print("Erro ao carregar user-binds.lua: " .. tostring(err))
+        hl.exec_cmd("notify-send -a 'Hyprland' -i dialog-error 'Erro nos seus atalhos personalizados' "
+            .. "'Veja ~/.config/hypr/user-binds.lua'")
     end
 end
 

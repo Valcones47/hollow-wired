@@ -32,3 +32,13 @@
 -- hl.bind("SUPER + C", hl.dsp.killactive())
 -- hl.bind("SUPER + F", hl.dsp.fullscreen())
 -- hl.bind("SUPER + Space", hl.dsp.togglefloating())
+--
+-- 5. VARIÁVEIS DISPONÍVEIS AQUI:
+--    home    = sua pasta pessoal (ex.: "/home/fulano")
+--    mainMod = o modificador principal do rice ("SUPER")
+--
+-- hl.bind("CTRL + bracketleft", hl.dsp.exec_cmd(home .. "/meus-scripts/algo.sh"))
+-- hl.bind(mainMod .. " + G", hl.dsp.exec_cmd("steam"))
+--
+-- Se algo aqui estiver errado, o Hyprland avisa com uma notificação em vez de
+-- ignorar seus atalhos em silêncio.
