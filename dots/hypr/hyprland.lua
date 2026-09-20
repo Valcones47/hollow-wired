@@ -218,6 +218,7 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("dbus-update-activation-environment --systemd WAYLAND_DISPLAY DISPLAY XDG_CURRENT_DESKTOP=Hyprland XDG_SESSION_TYPE=wayland QT_QPA_PLATFORMTHEME")
     hl.exec_cmd("systemctl --user import-environment WAYLAND_DISPLAY DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_TYPE QT_QPA_PLATFORMTHEME")
     hl.exec_cmd(home .. "/.local/bin/rice-portals")
+    hl.exec_cmd(home .. "/.local/bin/rice-fix-xwayland-socket")
 
     -- Desativa blur automaticamente quando a janela ativa está em tela cheia;
     -- reativa ao sair. Evita gastar ~70% da Intel UHD com blur inútil em jogo.

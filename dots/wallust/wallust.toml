@@ -1,24 +1,27 @@
 # wallust v4 — gera a paleta do sistema a partir do wallpaper atual do
 # waywallen. Documentação: man wallust.5 / man wallust.
 #
-# Ajustado pro estilo do usuário: wallpapers escuros com detalhes em
-# azul/ciano neon ("raio"). backend=full + palette=salience com
-# sampling=high/intensity=vibrant evita que esses acentos raros e vívidos
-# sejam diluídos numa média sem graça (o que aconteceria com backends que
-# fazem resize/thumb antes de amostrar).
+# palette=kmeans agrupa os pixels em Lab e usa os centroides, ou seja,
+# devolve as cores que o wallpaper realmente tem.
+#
+# Antes era salience com sampling=high/intensity=vibrant mais saturation=65,
+# afinado para wallpapers escuros com neon. O problema é que aquilo **fabrica**
+# cor: num wallpaper quase neutro (branco, cinza), empurrar a saturação ao
+# máximo aterrissa no vermelho, e a paleta inteira saía vermelha sem haver
+# vermelho nenhum na imagem. Em um dos wallpapers a combinação nem gerava
+# paleta. Com kmeans o branco sai branco e o acento forte continua aparecendo.
+#
+# Para voltar ao comportamento antigo: `rice-colors palette salience`.
+#
+# style=dark mantém fundo escuro e texto claro; o rice-colors ainda escurece o
+# fundo por conta própria se algum wallpaper passar por cima disso.
 
 backend = "full"
-palette = "salience"
-# A chave `style` existia ate o wallust 3 e nao faz mais nada no 4.x —
-# um wallpaper claro gerava fundo claro sem avisar. Quem garante que o
-# fundo nunca fica claro agora e o rice-colors (enforce_dark_background),
-# que roda logo depois do wallust e mexe so no fundo.
-
-salience = { sampling = "high", intensity = "vibrant" }
+palette = "kmeans"
+style = "dark"
 
 use16cols = true
 check_contrast = true
-saturation = 65
 
 [templates]
 hyprland   = { template = 'hyprland-colors.conf', target = '~/.config/hypr/colors.conf' }

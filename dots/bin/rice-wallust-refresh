@@ -75,6 +75,14 @@ if ! command -v wallust >/dev/null 2>&1; then
     exit 1
 fi
 
+# O preview do Wallpaper Engine é um thumbnail quadrado (140x140 a 1024x1024):
+# como fonte de paleta ele representa mal o wallpaper. Quando o item é vídeo,
+# usa um quadro na resolução real.
+if [ -n "$preview" ] && [ -f "$preview" ] && command -v rice-wallpaper-frame >/dev/null 2>&1; then
+    better=$(rice-wallpaper-frame "$(dirname "$preview")" "$preview" 2>/dev/null)
+    [ -n "$better" ] && [ -f "$better" ] && preview="$better"
+fi
+
 if [ -n "$preview" ] && [ -f "$preview" ]; then
     wallust run "$preview" >/dev/null 2>&1
     # A paleta recém-extraída vira a "base". Em seguida o rice-colors regrava os

@@ -265,6 +265,44 @@ def apply(quiet=False):
     return 0
 
 
+# ------------------------------------------------- algoritmo da paleta
+
+WALLUST_TOML = os.path.join(HOME, ".config/wallust/wallust.toml")
+
+# kmeans devolve as cores que a imagem realmente tem (inclusive branco);
+# salience caça as mais vívidas e, com intensity=vibrant, inventa saturação
+# onde não há — foi o que deixava wallpaper claro com paleta toda vermelha.
+PALETTES = {
+    "kmeans": 'palette = "kmeans"',
+    "salience": 'palette = "salience"\nsalience = { sampling = "high", intensity = "vibrant" }\nsaturation = 65',
+    "ansi": 'palette = "ansi"',
+}
+
+
+def palette_mode(new_mode=None):
+    if not os.path.isfile(WALLUST_TOML):
+        return None
+    with open(WALLUST_TOML, encoding="utf-8") as f:
+        content = f.read()
+
+    if new_mode is None:
+        m = re.search(r'^palette\s*=\s*"(\w+)"', content, re.MULTILINE)
+        return m.group(1) if m else None
+
+    if new_mode not in PALETTES:
+        return None
+
+    # Tira as linhas do modo anterior antes de escrever o novo, senão um
+    # `salience = {...}` órfão fica valendo junto com o kmeans.
+    content = re.sub(r'^salience\s*=.*$\n?', '', content, flags=re.MULTILINE)
+    content = re.sub(r'^saturation\s*=.*$\n?', '', content, flags=re.MULTILINE)
+    content = re.sub(r'^palette\s*=\s*"\w+"$', PALETTES[new_mode], content,
+                     count=1, flags=re.MULTILINE)
+    with open(WALLUST_TOML, "w", encoding="utf-8") as f:
+        f.write(content)
+    return new_mode
+
+
 def main():
     args = sys.argv[1:]
     cmd = args[0] if args else "get"
@@ -277,6 +315,17 @@ def main():
             "keys": KEYS,
             "auto": auto_enabled(),
         }, ensure_ascii=False))
+        return 0
+
+    if cmd == "palette":
+        if len(args) < 2:
+            print(palette_mode() or "desconhecido")
+            return 0
+        chosen = palette_mode(args[1])
+        if not chosen:
+            print("modos: %s" % ", ".join(sorted(PALETTES)), file=sys.stderr)
+            return 2
+        print("OK")
         return 0
 
     if cmd == "snapshot":

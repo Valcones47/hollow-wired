@@ -1,0 +1,5 @@
+#!/bin/sh
+# Garante que o socket do Xwayland tenha o symlink correto se criado como X1_
+if [ -e /tmp/.X11-unix/X1_ ] && [ ! -e /tmp/.X11-unix/X1 ]; then
+    ln -sf /tmp/.X11-unix/X1_ /tmp/.X11-unix/X1
+fi

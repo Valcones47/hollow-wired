@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# rice-wallpaper-frame — devolve a melhor imagem estática de um wallpaper.
+#
+# O Wallpaper Engine guarda um `preview` minúsculo e QUADRADO junto de cada
+# item: na biblioteca daqui eles vão de 140x140 a 1024x1024. Esticar isso para
+# a tela inteira fica horrível, e alimentar o wallust com um thumbnail quadrado
+# também não representa o wallpaper de verdade.
+#
+# Quando o wallpaper é vídeo (mp4/webm/mkv), dá para extrair um quadro na
+# resolução real com o ffmpeg — 1920x1080 em vez de 924x924. O quadro fica em
+# cache, então só a primeira vez custa alguma coisa.
+#
+# Para cenas (scene.pkg) não há vídeo para extrair e o preview é o que existe.
+#
+# Uso:
+#   rice-wallpaper-frame <diretório do wallpaper> [preview de reserva]
+# Imprime o caminho da melhor imagem, ou nada se não houver nenhuma.
+# ==============================================================================
+
+set -uo pipefail
+
+dir="${1:-}"
+fallback="${2:-}"
+
+CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/hollow-wired/frames"
+
+emit_fallback() {
+    if [ -n "$fallback" ] && [ -f "$fallback" ]; then
+        printf '%s\n' "$fallback"
+    elif [ -n "$dir" ]; then
+        for p in "$dir"/preview.jpg "$dir"/preview.png "$dir"/preview.gif; do
+            [ -f "$p" ] && { printf '%s\n' "$p"; return 0; }
+        done
+    fi
+}
+
+[ -n "$dir" ] && [ -d "$dir" ] || { emit_fallback; exit 0; }
+command -v ffmpeg >/dev/null 2>&1 || { emit_fallback; exit 0; }
+
+video=""
+for ext in mp4 webm mkv; do
+    # O nome do arquivo varia por item (inclusive com caracteres não-ASCII),
+    # então é uma busca, não um nome fixo.
+    found=$(find "$dir" -maxdepth 1 -type f -iname "*.$ext" -print -quit 2>/dev/null)
+    [ -n "$found" ] && { video="$found"; break; }
+done
+
+[ -n "$video" ] || { emit_fallback; exit 0; }
+
+mkdir -p "$CACHE"
+key=$(printf '%s' "$video" | sha256sum | cut -c1-32)
+out="$CACHE/$key.png"
+
+# Reaproveita o cache, a menos que o vídeo tenha sido trocado por baixo.
+if [ -f "$out" ] && [ "$out" -nt "$video" ]; then
+    printf '%s\n' "$out"
+    exit 0
+fi
+
+# 3s evita fade-in preto que muitos wallpapers têm no começo. Se o vídeo for
+# mais curto que isso o ffmpeg falha, e aí tenta de novo no primeiro quadro.
+if ! ffmpeg -y -ss 3 -i "$video" -frames:v 1 "$out" >/dev/null 2>&1 || [ ! -s "$out" ]; then
+    ffmpeg -y -i "$video" -frames:v 1 "$out" >/dev/null 2>&1
+fi
+
+if [ -s "$out" ]; then
+    printf '%s\n' "$out"
+else
+    rm -f "$out"
+    emit_fallback
+fi
