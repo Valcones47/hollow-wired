@@ -6,13 +6,45 @@ ACTION="${1:-}"
 
 case "$ACTION" in
     logout)
-        # 1. Tenta sair graciosamente pelo Hyprland
+        # Encerrar a sessão deixava o PC numa tela preta para sempre, sem voltar
+        # para a tela de login. O motivo estava aqui: o script mandava o
+        # Hyprland sair, esperava 0,5s e disparava `loginctl terminate-session`
+        # de qualquer jeito. Meio segundo não cobre o encerramento do Xwayland,
+        # dos portals e do wallpaper, então o terminate-session sempre chegava no
+        # meio do caminho e matava o `sddm-helper` junto com o resto da sessão.
+        # O SDDM lê isso como "Process crashed", entra em estado de erro e não
+        # reabre o greeter:
+        #
+        #     session-2.scope: Killing process 1601 (sddm-helper) with SIGTERM
+        #     sddm: Auth: sddm-helper ... crashed (exit code 1)
+        #
+        # Saindo limpo, o Hyprland devolve o controle ao start-hyprland, o
+        # sddm-helper termina com 0 e o SDDM traz a tela de login de volta
+        # sozinho. O loginctl fica só como último recurso, quando o compositor
+        # realmente travou.
+        wait_hyprland_exit() {
+            local tries="$1"
+            while [ "$tries" -gt 0 ]; do
+                pgrep -x Hyprland >/dev/null 2>&1 || return 0
+                sleep 0.25
+                tries=$((tries - 1))
+            done
+            return 1
+        }
+
         if command -v hyprctl >/dev/null 2>&1; then
-            hyprctl dispatch exit
+            hyprctl dispatch exit >/dev/null 2>&1 || true
+            # até 15s para o compositor encerrar sozinho
+            wait_hyprland_exit 60 && exit 0
         fi
-        # 2. Se a sessão ainda persistir, finaliza via loginctl
-        sleep 0.5
-        loginctl terminate-session "${XDG_SESSION_ID:-self}" 2>/dev/null || loginctl terminate-user "$USER" 2>/dev/null || true
+
+        # Não saiu: pede educadamente ao processo e espera mais 5s.
+        pkill -x Hyprland >/dev/null 2>&1 || true
+        wait_hyprland_exit 20 && exit 0
+
+        # Travou de verdade — aí sim derruba a sessão inteira.
+        loginctl terminate-session "${XDG_SESSION_ID:-self}" 2>/dev/null \
+            || loginctl terminate-user "$USER" 2>/dev/null || true
         ;;
     suspend|sleep)
         # Bloqueia a tela antes de dormir — senão a sessão volta destravada.
