@@ -128,8 +128,9 @@ LAIN_GIF_1="$SCRIPT_DIR/dots/fastfetch/logos/lain4.gif"
 LAIN_GIF_2="$SCRIPT_DIR/dots/fastfetch/logos/lain5.gif"
 
 # Se não estiverem em dots/fastfetch/logos, busca no sistema
-[ ! -f "$LAIN_GIF_1" ] && [ -f "$HOME/Imagens/FastFetch/lain4.gif" ] && LAIN_GIF_1="$HOME/Imagens/FastFetch/lain4.gif"
-[ ! -f "$LAIN_GIF_2" ] && [ -f "$HOME/Imagens/FastFetch/lain5.gif" ] && LAIN_GIF_2="$HOME/Imagens/FastFetch/lain5.gif"
+_pics_dir="$(xdg-user-dir PICTURES 2>/dev/null || echo "$HOME/Imagens")"
+[ ! -f "$LAIN_GIF_1" ] && [ -f "$_pics_dir/FastFetch/lain4.gif" ] && LAIN_GIF_1="$_pics_dir/FastFetch/lain4.gif"
+[ ! -f "$LAIN_GIF_2" ] && [ -f "$_pics_dir/FastFetch/lain5.gif" ] && LAIN_GIF_2="$_pics_dir/FastFetch/lain5.gif"
 
 echo -e "${CYAN}${BOLD}"
 cat << "BANNER"
@@ -166,7 +167,8 @@ CPU_MODEL=$(lscpu | grep "Model name:" | sed 's/Model name:[ \t]*//' || echo "Pr
 info_msg "Processador: ${WHITE}$CPU_MODEL${NC}"
 
 # Detecção informativa de GPU & Verificação de Séries Legadas da NVIDIA (900 / 1000)
-GPU_INFO=$(lspci 2>/dev/null | grep -Ei "vga|3d" | sed 's/.*: //g' | tr '\n' ' | ' | sed 's/ | $//' || echo "Gráficos Genéricos")
+GPU_INFO=$(lspci 2>/dev/null | grep -Ei "vga|3d" | sed 's/.*: //g' | paste -sd '|' - | sed 's/|/ | /g')
+GPU_INFO="${GPU_INFO:-Gráficos Genéricos}"
 info_msg "Placa(s) de Vídeo: ${WHITE}$GPU_INFO${NC}"
 
 IS_LEGACY_NVIDIA=false
@@ -201,6 +203,8 @@ elif command -v yay >/dev/null 2>&1; then
 else
     warn_msg "Nenhum AUR helper encontrado (paru/yay). Instalando paru-bin..."
     sudo pacman -S --needed --noconfirm base-devel git
+    # Sobra de uma tentativa anterior faria o clone falhar e, com set -e, abortaria tudo.
+    rm -rf /tmp/paru-bin
     git clone https://aur.archlinux.org/paru-bin.git /tmp/paru-bin
     (cd /tmp/paru-bin && makepkg -si --noconfirm)
     AUR_HELPER="paru"
@@ -239,6 +243,8 @@ RICE_PACKAGES=(
     swappy
     cliphist
     wl-clipboard
+    wl-clip-persist   # Mantém o que foi copiado mesmo depois de fechar o app de origem
+    hyprpicker        # Conta-gotas de cor (Super + Shift + C)
     
     # Bloqueio, Ociosidade & Feedback
     hypridle
@@ -246,15 +252,26 @@ RICE_PACKAGES=(
     hyprshot
     brightnessctl
     
+    # Tela de Login & Autenticação
+    sddm
+    qt6-multimedia    # A tela de login usa QtMultimedia; sem isso o greeter nem carrega
+    qt6-svg
+    polkit-kde-agent  # Janela de senha para ações administrativas (sem ela nada que pede root funciona)
+
     # Sistema, Portais & Ferramentas
     zenity
     ffmpeg
+    imagemagick       # Processa o fundo da tela de login e miniaturas
+    hyprpaper         # Wallpaper estático (para quem não usa o Wallpaper Engine)
+    pacman-contrib    # checkupdates: contador de atualizações da sidebar
+    python-pillow     # Otimizador de wallpapers do Wallpaper Engine
     libwebp
     jq
     socat
     bc
     lm_sensors
     rsync
+    xdg-user-dirs
     dolphin
     xdg-desktop-portal
     xdg-desktop-portal-hyprland
@@ -346,17 +363,26 @@ done
 ok_msg "Backup salvo em: ${WHITE}$BACKUP_DIR${NC}"
 
 # 2. Criação das pastas de destino
+# Gera/atualiza ~/.config/user-dirs.dirs pro idioma/locale atual do usuário
+# (essencial pra quem instala em inglês ou outro idioma diferente do pt-BR do
+# autor: sem isso, "Vídeos"/"Imagens" ficariam hardcoded em português mesmo em
+# sistemas onde a pasta real do usuário é "Videos"/"Pictures").
+command -v xdg-user-dirs-update >/dev/null 2>&1 && xdg-user-dirs-update 2>/dev/null || true
+PICTURES_DIR="$(xdg-user-dir PICTURES 2>/dev/null || echo "$HOME/Imagens")"
+VIDEOS_DIR="$(xdg-user-dir VIDEOS 2>/dev/null || echo "$HOME/Vídeos")"
+
 mkdir -p "$HOME/.config" \
          "$HOME/.local/bin" \
          "$HOME/.local/share/applications" \
-         "$HOME/Vídeos/Gravações" \
-         "$HOME/Imagens/Capturas de tela" \
-         "$HOME/Imagens/FastFetch"
+         "$VIDEOS_DIR/Gravações" \
+         "$PICTURES_DIR/Capturas de tela" \
+         "$PICTURES_DIR/FastFetch"
 
 # 3. Cópia dos dotfiles para o usuário (preservando preferências pessoais se já existirem)
 gear_msg "Copiando configurações do Quickshell, Hyprland Lua, Kitty e Temas..."
 
-saved_dock="" saved_widgets="" saved_shell="" saved_locale="" saved_kitty="" saved_user_binds="" saved_user_prefs=""
+saved_dock="" saved_widgets="" saved_shell="" saved_locale="" saved_kitty="" saved_user_binds="" saved_user_prefs="" saved_colors=""
+[ -f "$HOME/.config/hypr/colors.conf" ] && saved_colors=$(cat "$HOME/.config/hypr/colors.conf")
 [ -f "$HOME/.config/quickshell/dock.json" ] && saved_dock=$(cat "$HOME/.config/quickshell/dock.json")
 [ -f "$HOME/.config/quickshell/desktop-widgets.json" ] && saved_widgets=$(cat "$HOME/.config/quickshell/desktop-widgets.json")
 [ -f "$HOME/.config/quickshell/shell-customization.json" ] && saved_shell=$(cat "$HOME/.config/quickshell/shell-customization.json")
@@ -372,8 +398,17 @@ cp -a "$SCRIPT_DIR/dots/kitty" "$HOME/.config/"
 [ -d "$SCRIPT_DIR/dots/xdg-desktop-portal" ] && cp -a "$SCRIPT_DIR/dots/xdg-desktop-portal" "$HOME/.config/"
 [ -d "$SCRIPT_DIR/dots/fastfetch" ] && cp -a "$SCRIPT_DIR/dots/fastfetch" "$HOME/.config/"
 [ -d "$SCRIPT_DIR/dots/swappy" ] && cp -a "$SCRIPT_DIR/dots/swappy" "$HOME/.config/"
+# Sem este arquivo o mako caía no visual padrão (caixa branca, sem bordas
+# arredondadas e sem as cores do wallust), destoando de todo o resto do rice.
+[ -d "$SCRIPT_DIR/dots/mako" ] && cp -a "$SCRIPT_DIR/dots/mako" "$HOME/.config/"
 [ -d "$SCRIPT_DIR/dots/gtk-3.0" ] && cp -a "$SCRIPT_DIR/dots/gtk-3.0" "$HOME/.config/"
 [ -d "$SCRIPT_DIR/dots/gtk-4.0" ] && cp -a "$SCRIPT_DIR/dots/gtk-4.0" "$HOME/.config/"
+
+# A paleta do wallust (colors.conf) pertence ao wallpaper do usuário: a cópia do
+# repositório só serve de ponto de partida quando ainda não existe nenhuma.
+if [ -n "$saved_colors" ]; then
+    echo "$saved_colors" > "$HOME/.config/hypr/colors.conf"
+fi
 
 # Restaura preferências pessoais pré-existentes
 [ -n "$saved_dock" ] && echo "$saved_dock" > "$HOME/.config/quickshell/dock.json"
@@ -391,17 +426,19 @@ cp -a --remove-destination "$SCRIPT_DIR/dots/bin/"* "$HOME/.local/bin/"
 chmod +x "$HOME/.local/bin/"*
 
 # 5. Cópia dos Logos e GIFs da Lain para ~/Imagens/FastFetch
-gear_msg "Copiando GIFs da Lain e logos para ~/Imagens/FastFetch/..."
+gear_msg "Copiando GIFs da Lain e logos para $PICTURES_DIR/FastFetch/..."
 if [ -d "$SCRIPT_DIR/dots/fastfetch/logos" ]; then
-    cp -a "$SCRIPT_DIR/dots/fastfetch/logos/"* "$HOME/Imagens/FastFetch/" 2>/dev/null || true
+    cp -a "$SCRIPT_DIR/dots/fastfetch/logos/"* "$PICTURES_DIR/FastFetch/" 2>/dev/null || true
 fi
 
 # 6. Atualização dinâmica do caminho no Fastfetch e Swappy config para o usuário atual
 if [ -f "$HOME/.config/fastfetch/config.jsonc" ]; then
-    sed -i "s|/home/[^/]*/Imagens/FastFetch|$HOME/Imagens/FastFetch|g" "$HOME/.config/fastfetch/config.jsonc"
+    # Cobre tanto o caminho do autor (~/Imagens/FastFetch) quanto qualquer outro
+    # já gravado, apontando pra pasta de imagens real deste usuário.
+    sed -i -E "s|/home/[^/\"]*/(Imagens|Pictures|Bilder|Images)/FastFetch|$PICTURES_DIR/FastFetch|g" "$HOME/.config/fastfetch/config.jsonc"
 fi
 if [ -f "$HOME/.config/swappy/config" ]; then
-    sed -i "s|save_dir=.*|save_dir=$HOME/Imagens/Capturas de tela|g" "$HOME/.config/swappy/config"
+    sed -i "s|save_dir=.*|save_dir=$PICTURES_DIR/Capturas de tela|g" "$HOME/.config/swappy/config"
 fi
 
 # 7. Registra repositório para o atualizador automático (rice-update)
@@ -436,32 +473,44 @@ ok_msg "Dotfiles, scripts e assets aplicados com perfeição!"
 # ------------------------------------------------------------------------------
 step_banner "04/04" "Serviços, zRAM & Opções Adicionais" "Configurações de memória ultrarrápida e recursos opcionais"
 
-# Configuração inteligente de zRAM (garante pelo menos 16GB com algoritmo ZSTD)
+# Configuração inteligente de zRAM (ZSTD), escalada pela RAM física instalada.
+# Nunca configura mais zRAM do que a RAM total da máquina: como o zram guarda
+# dados comprimidos dentro da própria RAM, um valor fixo alto (ex: 16GB) numa
+# máquina com pouca RAM (notebooks de 4-8GB de amigos, por exemplo) compete
+# pela mesma memória que deveria estar aliviando e pode causar pressão/OOM.
+# Teto de 16GB em máquinas com RAM suficiente (comportamento anterior preservado).
+TOTAL_RAM_MB=$(($(grep MemTotal /proc/meminfo | awk '{print $2}') / 1024))
+if [ "$TOTAL_RAM_MB" -lt 16384 ]; then
+    TARGET_ZRAM_MB=$TOTAL_RAM_MB
+else
+    TARGET_ZRAM_MB=16384
+fi
+TARGET_ZRAM_BYTES=$((TARGET_ZRAM_MB * 1024 * 1024))
+
 CURRENT_ZRAM_BYTES=$(zramctl -b -n -o DISKSIZE /dev/zram0 2>/dev/null | head -n1 || echo 0)
 [ -z "$CURRENT_ZRAM_BYTES" ] && CURRENT_ZRAM_BYTES=0
 
-# 16GB = 17179869184 bytes (ou ~16777216 KB em /proc/swaps)
-if [ "$CURRENT_ZRAM_BYTES" -ge 17179869184 ] 2>/dev/null; then
-    ok_msg "zRAM já configurado com 16GB ou mais ($((CURRENT_ZRAM_BYTES / 1024 / 1024 / 1024))GB). Nenhuma alteração necessária."
+if [ "$CURRENT_ZRAM_BYTES" -ge "$TARGET_ZRAM_BYTES" ] 2>/dev/null; then
+    ok_msg "zRAM já configurado com ${TARGET_ZRAM_MB}MB ou mais ($((CURRENT_ZRAM_BYTES / 1024 / 1024))MB). Nenhuma alteração necessária."
 else
     if [ "$CURRENT_ZRAM_BYTES" -gt 0 ] 2>/dev/null; then
-        warn_msg "zRAM atual detectado abaixo de 16GB ($((CURRENT_ZRAM_BYTES / 1024 / 1024))MB). Redefinindo para 16GB ZSTD..."
+        warn_msg "zRAM atual detectado abaixo do ideal ($((CURRENT_ZRAM_BYTES / 1024 / 1024))MB). Redefinindo para ${TARGET_ZRAM_MB}MB ZSTD..."
     else
-        gear_msg "zRAM não detectado ou inativo. Configurando 16GB de zRAM com compressão ZSTD..."
+        gear_msg "zRAM não detectado ou inativo. Configurando ${TARGET_ZRAM_MB}MB de zRAM com compressão ZSTD (RAM detectada: ${TOTAL_RAM_MB}MB)..."
     fi
 
-    sudo bash -c 'cat << "ZRAM_EOF" > /etc/systemd/zram-generator.conf
+    sudo bash -c "cat << ZRAM_EOF > /etc/systemd/zram-generator.conf
 [zram0]
-zram-size = 16384
+zram-size = ${TARGET_ZRAM_MB}
 compression-algorithm = zstd
 swap-priority = 100
 fs-type = swap
-ZRAM_EOF'
+ZRAM_EOF"
 
     sudo systemctl daemon-reload
     sudo swapoff /dev/zram0 2>/dev/null || true
     sudo systemctl restart /dev/zram0 2>/dev/null || sudo systemctl restart systemd-zram-setup@zram0.service 2>/dev/null || true
-    ok_msg "zRAM configurado para 16GB (ZSTD) com sucesso!"
+    ok_msg "zRAM configurado para ${TARGET_ZRAM_MB}MB (ZSTD) com sucesso!"
 fi
 
 # Opcional: Wallpaper Engine (Waywallen via Flatpak)
@@ -520,6 +569,18 @@ EOF'
 fi
 
 # ------------------------------------------------------------------------------
+# PAPEL DE PAREDE GARANTIDO
+# ------------------------------------------------------------------------------
+# Sem Wallpaper Engine, a área de trabalho abria totalmente preta e o wallust não
+# tinha imagem nenhuma de onde tirar a paleta. Aqui garantimos que sempre exista
+# um wallpaper — o do usuário, se houver, ou um gerado com as cores do tema.
+if ! flatpak info org.waywallen.waywallen >/dev/null 2>&1; then
+    gear_msg "Nenhum Wallpaper Engine detectado — definindo papel de parede estático..."
+    "$HOME/.local/bin/rice-wallpaper-set" --ensure >/dev/null 2>&1 || true
+    ok_msg "Papel de parede definido (troque quando quiser com Super + S)."
+fi
+
+# ------------------------------------------------------------------------------
 # FINALIZAÇÃO & STATUS
 # ------------------------------------------------------------------------------
 echo -e "\n${GREEN}╔══════════════════════════════════════════════════════════════╗"
@@ -530,10 +591,15 @@ echo -e "╚══════════════════════�
 echo -e "  ${WHITE}${BOLD}Resumo do Sistema Configurado:${NC}"
 echo -e "  • ${CYAN}Compositor:${NC}     Hyprland 0.56+ (Configurado em ~/.config/hypr/hyprland.lua)"
 echo -e "  • ${CYAN}Interface:${NC}      Quickshell (TopBar, Hub Central, Dock, OSD, Widgets)"
-echo -e "  • ${CYAN}Utilitários:${NC}    ~/.local/bin (Doctor, Wallust, Gravação NVENC, Presets)"
+echo -e "  • ${CYAN}Utilitários:${NC}    ~/.local/bin (Doctor, Wallust, Gravação, Wallpaper, Presets)"
 echo -e "  • ${CYAN}Discord Binds:${NC}  Gravação de tecla ativa (Mute/Deafen via Super + I)"
-echo -e "  • ${CYAN}Lain Fastfetch:${NC} ~/Imagens/FastFetch (Gifs e logos da Lain prontos)"
+echo -e "  • ${CYAN}Lain Fastfetch:${NC} $PICTURES_DIR/FastFetch (Gifs e logos da Lain prontos)"
 echo -e "  • ${YELLOW}Backup:${NC}         $BACKUP_DIR\n"
+
+echo -e "  ${WHITE}${BOLD}Primeiros passos:${NC}"
+echo -e "  • Ao entrar na sessão, uma tela de ${CYAN}boas-vindas${NC} mostra os atalhos essenciais."
+echo -e "  • ${CYAN}Tecla Windows${NC} abre o menu de aplicativos · ${CYAN}Super + F1${NC} lista todos os atalhos."
+echo -e "  • ${CYAN}Super + I${NC} abre o painel de configurações · ${CYAN}Rice Doctor${NC} conserta problemas comuns.\n"
 
 echo -e "${PURPLE}  \"No matter where you go, everyone's always connected.\"${NC}"
 echo -e "  Faça logout da sua sessão atual e inicie a sessão ${BOLD}${CYAN}Hyprland${NC} pelo gerenciador de login!\n"
