@@ -2,58 +2,140 @@
 # ==============================================================================
 # rice-screenshot: Sistema unificado de captura de tela do hollow-wired
 # Suporta: seleção de região, tela inteira, janela ativa e anotação (swappy)
+#
+# Toda captura é salva no disco, copiada pra área de transferência e notificada
+# com miniatura — e a notificação tem botão pra abrir a imagem.
+#
+# Cancelar a seleção de região (Esc, Ctrl+C ou um clique sem arrastar) NÃO
+# cancela mais a captura: vira uma captura da tela inteira. Era o comportamento
+# esperado por quem vem do Windows, onde PrintScreen sempre captura algo.
 # ==============================================================================
-set -e
+set -u
 
-DIR="${XDG_PICTURES_DIR:-$HOME/Imagens}/Capturas de tela"
+# $XDG_PICTURES_DIR nunca é exportado na sessão Hyprland (nem systemd --user nem o
+# shell o definem), então usa xdg-user-dir, que lê ~/.config/user-dirs.dirs direto
+# e resolve certo em qualquer idioma/locale (Pictures, Imagens, Bilder, etc.).
+DIR="$(xdg-user-dir PICTURES 2>/dev/null || echo "$HOME/Imagens")/Capturas de tela"
 mkdir -p "$DIR"
 
 MODE="${1:-region}"
 
+dest_path() {
+    echo "$DIR/captura-$(date +%Y-%m-%d_%H-%M-%S).png"
+}
+
+current_output() {
+    hyprctl monitors -j 2>/dev/null | jq -r '[.[] | select(.focused == true)][0].name // empty' 2>/dev/null
+}
+
+# Salva + copia + notifica (com botão "Abrir" que chama o visualizador padrão).
+finish() {
+    local file="$1" titulo="$2"
+    [ -f "$file" ] || return 1
+
+    wl-copy --type image/png < "$file" 2>/dev/null &
+
+    (
+        action=$(notify-send -a "Captura de tela" -i "$file" -t 6000 \
+            -A "open=Abrir" -A "folder=Abrir pasta" \
+            "$titulo" "Salva em $(basename "$file") e copiada para a área de transferência" 2>/dev/null)
+        case "$action" in
+            open)   xdg-open "$file" >/dev/null 2>&1 ;;
+            folder) xdg-open "$DIR" >/dev/null 2>&1 ;;
+        esac
+    ) >/dev/null 2>&1 &
+
+    echo "$file"
+}
+
+# Seleciona uma região. Devolve string vazia quando o usuário cancelou ou só
+# clicou sem arrastar (região degenerada).
+select_region() {
+    local geom w h
+    geom="$(slurp -d 2>/dev/null)" || return 0
+    [ -z "$geom" ] && return 0
+    w="$(echo "$geom" | sed -n 's/.* \([0-9]\+\)x[0-9]\+$/\1/p')"
+    h="$(echo "$geom" | sed -n 's/.* [0-9]\+x\([0-9]\+\)$/\1/p')"
+    if [ "${w:-0}" -lt 8 ] || [ "${h:-0}" -lt 8 ]; then
+        return 0
+    fi
+    echo "$geom"
+}
+
+capture_full() {
+    local out file
+    file="$(dest_path)"
+    out="$(current_output)"
+    if [ -n "$out" ]; then
+        grim -o "$out" "$file" 2>/dev/null || grim "$file" 2>/dev/null
+    else
+        grim "$file" 2>/dev/null
+    fi
+    [ -f "$file" ] && echo "$file"
+}
+
 case "$MODE" in
     region)
-        # Captura de região via hyprshot (salva no disco, copia pro clipboard e notifica)
-        hyprshot -m region -o "$DIR" 2>/dev/null || true
+        GEOM="$(select_region)"
+        FILE="$(dest_path)"
+        if [ -n "$GEOM" ]; then
+            grim -g "$GEOM" "$FILE" 2>/dev/null && finish "$FILE" "Região capturada"
+        else
+            # Cancelou a seleção: captura a tela inteira em vez de não fazer nada.
+            FILE="$(capture_full)"
+            [ -n "$FILE" ] && finish "$FILE" "Tela inteira capturada"
+        fi
         ;;
 
-    output|full)
-        # Captura de tela inteira do monitor atual
-        hyprshot -m output -o "$DIR" 2>/dev/null || true
+    output|full|screen)
+        FILE="$(capture_full)"
+        [ -n "$FILE" ] && finish "$FILE" "Tela inteira capturada"
         ;;
 
     window)
-        # Captura da janela ativa sob o cursor/foco
-        hyprshot -m window -o "$DIR" 2>/dev/null || true
+        # Janela ativa (usa a geometria real da janela em foco no Hyprland).
+        GEOM="$(hyprctl activewindow -j 2>/dev/null | jq -r 'select(.at != null) | "\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1])"' 2>/dev/null)"
+        FILE="$(dest_path)"
+        if [ -n "$GEOM" ] && grim -g "$GEOM" "$FILE" 2>/dev/null; then
+            finish "$FILE" "Janela capturada"
+        else
+            FILE="$(capture_full)"
+            [ -n "$FILE" ] && finish "$FILE" "Tela inteira capturada"
+        fi
         ;;
 
     edit|swappy|annotate)
-        # Seleção segura via slurp: se o usuário cancelar (ESC/clique solto), aborta sem abrir janela vazia
-        GEOM=$(slurp 2>/dev/null) || true
-        if [ -z "$GEOM" ]; then
-            exit 0
+        GEOM="$(select_region)"
+        TEMP_IMG="$(mktemp -t swappy-shot-XXXXXX.png)"
+        if [ -n "$GEOM" ]; then
+            grim -g "$GEOM" "$TEMP_IMG" 2>/dev/null || rm -f "$TEMP_IMG"
+        else
+            # Cancelou a seleção: edita a tela inteira.
+            OUT="$(current_output)"
+            if [ -n "$OUT" ]; then
+                grim -o "$OUT" "$TEMP_IMG" 2>/dev/null || grim "$TEMP_IMG" 2>/dev/null
+            else
+                grim "$TEMP_IMG" 2>/dev/null
+            fi
         fi
 
-        TEMP_IMG="/tmp/swappy-shot-$(date +%s%N).png"
-        if grim -g "$GEOM" "$TEMP_IMG" 2>/dev/null; then
-            # Se swappy estiver disponível, abre para edição/anotação
+        if [ -s "$TEMP_IMG" ]; then
             if command -v swappy >/dev/null 2>&1; then
                 swappy -f "$TEMP_IMG"
             else
-                # Fallback caso swappy não esteja instalado: copia e salva diretamente
-                wl-copy < "$TEMP_IMG"
-                DEST="$DIR/captura-$(date +%Y-%m-%d_%H-%M-%S).png"
+                DEST="$(dest_path)"
                 cp "$TEMP_IMG" "$DEST"
-                notify-send "Captura de tela" "Imagem salva em $DEST e copiada para a área de transferência" -i "$DEST" -a "Screenshot"
+                finish "$DEST" "Captura de tela"
             fi
-            rm -f "$TEMP_IMG"
         fi
+        rm -f "$TEMP_IMG" 2>/dev/null
         ;;
 
     *)
         echo "Uso: rice-screenshot [region|output|full|window|edit]"
-        echo "  region : Seleciona região (padrão)"
+        echo "  region : Seleciona região (cancelar = tela inteira)"
         echo "  output : Tela inteira"
-        echo "  window : Janela sob o cursor"
+        echo "  window : Janela ativa"
         echo "  edit   : Seleciona região e abre no editor de anotações (Swappy)"
         exit 1
         ;;
