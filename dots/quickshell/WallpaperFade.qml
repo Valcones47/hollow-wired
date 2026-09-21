@@ -24,7 +24,7 @@ import "."
 // Estilos de entrada (user-prefs.json > wallpaper_transition):
 //   fade   crossfade simples
 //   wipe   varredura lateral
-//   wave   ondas circulares saindo do canto superior direito
+//   wave   mancha suave e arredondada vindo da direita (borda desfocada)
 //   grow   círculo que abre do centro
 //
 // Uso (ver rice-wallpaper-fade):
@@ -156,13 +156,13 @@ Scope {
         from: 0
         to: 1
         duration: fadeScope.coverMs
-        // Na onda a frente anda quase por igual do começo ao fim — com o ease
-        // do CSS ela cobria 70% da tela no primeiro terço e os anéis mal
-        // apareciam. Os outros estilos seguem a curva do swww
-        // (0.25,0.1,0.25,1.0), que arranca rápido e assenta devagar.
+        // Na onda a mancha sai devagar da borda e desacelera no fim, sem o
+        // arranque do ease do CSS (que cobria 70% da tela no primeiro terço).
+        // Os outros estilos seguem a curva do swww (0.25,0.1,0.25,1.0), que
+        // arranca rápido e assenta devagar.
         onFinished: if (fadeScope.revealQueued) fadeScope.reveal()
         easing.type: Easing.Bezier
-        easing.bezierCurve: fadeScope.style === "wave" ? [0.45, 0.05, 0.55, 0.95, 1.0, 1.0]
+        easing.bezierCurve: fadeScope.style === "wave" ? [0.4, 0.0, 0.25, 1.0, 1.0, 1.0]
                                                        : [0.25, 0.1, 0.25, 1.0, 1.0, 1.0]
     }
 
@@ -296,11 +296,12 @@ Scope {
                 }
             }
 
-            // Onda: ondas circulares que nascem no canto superior direito e se
-            // espalham pela tela, como uma pedra na água. A frente é um arco
-            // de círculo com a borda ondulando (e a ondulação anda enquanto
-            // cresce), e à frente dela correm dois anéis mais fracos, por onde
-            // o wallpaper novo já aparece em faixas.
+            // "Onda": o wallpaper novo entra pela direita, com o centro um
+            // pouco acima do meio da tela, numa mancha arredondada de borda
+            // muito macia — como se viesse desfocado. Não é uma linha nem um
+            // anel: a frente é um disco grande de borda larga, cercado de
+            // bolhas também desfocadas que deixam o contorno irregular e
+            // redondo, e que mudam de tamanho devagar enquanto avançam.
             //
             // Tudo desenhado aqui dentro, em coordenadas de pintura: um `Item`
             // girado dentro da máscara faz o alfa sair uniforme (regra 3).
@@ -324,81 +325,49 @@ Scope {
                     ctx.reset();
                     const w = width;
                     const h = height;
-                    const cx = w;          // canto superior direito
-                    const cy = 0;
-                    const diag = Math.sqrt(w * w + h * h);
-                    const band = diag * 0.09;   // largura da borda macia
-                    const amp = diag * 0.03;    // altura da ondulação
-                    const gap = diag * 0.085;   // distância entre os anéis
-                    const lobes = 6;
-                    const phase = p * Math.PI * 4;
-                    // Em p = 1 a parte sólida já passou do canto oposto.
-                    const R = p * (diag + band + amp * 2);
+                    // Origem: fora da borda direita, um pouco acima do meio.
+                    const cx = w * 1.04;
+                    const cy = h * 0.42;
+                    // Borda macia bem larga: é o que dá o ar de desfoque.
+                    const feather = w * 0.26;
+                    // Distância até o canto mais longe (inferior esquerdo).
+                    const far = Math.sqrt(cx * cx + (h - cy) * (h - cy));
+                    // Em p = 1 a parte opaca já passou do canto mais longe.
+                    const R = p * (far + feather * 1.15);
+                    if (R <= 0)
+                        return;
 
-                    function radius(base, th, shift) {
-                        return base + amp * Math.sin(th * lobes + phase + shift)
-                                    + amp * 0.45 * Math.sin(th * lobes * 2.3 - phase * 1.6 + shift);
-                    }
-                    // Arco de 90° a 180° (para baixo até para a esquerda), com
-                    // uma folga para a ondulação não deixar frestas nas bordas.
-                    const a0 = Math.PI / 2 - 0.08;
-                    const a1 = Math.PI + 0.08;
-                    const steps = 90;
-
-                    function fillWave(base, shift) {
-                        if (base <= 0)
-                            return;
-                        ctx.beginPath();
-                        ctx.moveTo(cx, cy);
-                        for (let i = 0; i <= steps; i++) {
-                            const th = a0 + (a1 - a0) * i / steps;
-                            const r = Math.max(0, radius(base, th, shift));
-                            ctx.lineTo(cx + r * Math.cos(th), cy + r * Math.sin(th));
-                        }
-                        ctx.closePath();
-                        ctx.fill();
-                    }
-                    function strokeWave(base, shift) {
-                        ctx.beginPath();
-                        for (let i = 0; i <= steps; i++) {
-                            const th = a0 + (a1 - a0) * i / steps;
-                            const r = Math.max(0, radius(base, th, shift));
-                            const x = cx + r * Math.cos(th);
-                            const y = cy + r * Math.sin(th);
-                            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-                        }
-                        ctx.stroke();
+                    function softDisc(x, y, r, solid) {
+                        // Opaco até `solid` do raio, some até a borda.
+                        const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+                        g.addColorStop(0, "rgba(255,255,255,1)");
+                        g.addColorStop(Math.max(0, Math.min(0.99, solid)), "rgba(255,255,255,1)");
+                        g.addColorStop(1, "rgba(255,255,255,0)");
+                        ctx.fillStyle = g;
+                        ctx.fillRect(x - r, y - r, r * 2, r * 2);
                     }
 
-                    ctx.fillStyle = "white";
-                    // Miolo sólido.
-                    fillWave(R - band, 0);
-                    // Borda macia: camadas finas empilhadas até a frente. O
-                    // alfa se acumula, então o miolo chega a opaco e a frente
-                    // fica quase transparente, sem perder o contorno ondulado.
-                    const layers = 7;
-                    ctx.globalAlpha = 0.22;
-                    for (let k = 1; k <= layers; k++)
-                        fillWave(R - band + band * k / layers, 0);
+                    // Disco principal.
+                    softDisc(cx, cy, R, (R - feather) / R);
 
-                    // Anéis à frente. Aparecem logo no começo e somem no fim,
-                    // quando a tela já está quase coberta.
-                    const fadeIn = Math.min(1, p * 5);
-                    ctx.lineCap = "round";
-                    ctx.strokeStyle = "white";
-                    for (let k = 1; k <= 3; k++) {
-                        const base = R + gap * k;
-                        const lw = gap * (0.55 - 0.1 * k);
-                        const a = (0.95 - 0.25 * k) * fadeIn;
-                        // Três passadas de largura decrescente: anel com borda
-                        // suave em vez de uma linha dura.
-                        for (const f of [1.0, 0.6, 0.3]) {
-                            ctx.globalAlpha = a * 0.5;
-                            ctx.lineWidth = lw * f;
-                            strokeWave(base, k * 0.9);
-                        }
+                    // Bolhas na frente, voltadas para a esquerda (de ~105° a
+                    // ~255°). Cada uma tem tamanho e fase próprios, fixos, para
+                    // o contorno ser sempre o mesmo desenho e não tremer.
+                    const blobs = 9;
+                    for (let i = 0; i < blobs; i++) {
+                        const t = i / (blobs - 1);
+                        const ang = Math.PI * (0.58 + 0.84 * t);
+                        const seed = Math.sin(i * 12.9898) * 43758.5453;
+                        const rnd = seed - Math.floor(seed);
+                        const breathe = 0.85 + 0.3 * Math.sin(p * Math.PI * 2 + i * 1.7);
+                        const br = R * (0.2 + 0.14 * rnd) * breathe + feather * 0.35;
+                        const dist = R - feather * (0.55 + 0.35 * rnd);
+                        if (dist <= 0)
+                            continue;
+                        const bx = cx + Math.cos(ang) * dist;
+                        const by = cy + Math.sin(ang) * dist;
+                        softDisc(bx, by, br, 0.35);
                     }
-                    ctx.globalAlpha = 1;
                 }
             }
 

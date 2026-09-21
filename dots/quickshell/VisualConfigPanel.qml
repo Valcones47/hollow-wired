@@ -4838,7 +4838,7 @@ PanelWindow {
                                         model: [
                                             { id: "fade", name: Theme.t("wallust.tr_fade", "Dissolver"), desc: Theme.t("wallust.tr_fade_desc", "Um aparece sobre o outro") },
                                             { id: "wipe", name: Theme.t("wallust.tr_wipe", "Varredura"), desc: Theme.t("wallust.tr_wipe_desc", "Entra pela lateral") },
-                                            { id: "wave", name: Theme.t("wallust.tr_wave", "Onda"), desc: Theme.t("wallust.tr_wave_desc2", "Ondas circulares do canto") },
+                                            { id: "wave", name: Theme.t("wallust.tr_wave", "Onda"), desc: Theme.t("wallust.tr_wave_desc3", "Suave, vindo da direita") },
                                             { id: "grow", name: Theme.t("wallust.tr_grow", "Círculo"), desc: Theme.t("wallust.tr_grow_desc", "Abre do centro") }
                                         ]
                                         delegate: Rectangle {
