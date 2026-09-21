@@ -44,6 +44,62 @@ ShellRoot {
     Frame { id: frameScope }
     WallpaperFade { id: wallFade }
 
+    // Área especial (Super + A) reaparecendo sozinha ao clicar fora de um
+    // painel. Quando um painel do shell fecha, o Hyprland devolve o foco à
+    // última janela usada; se ela é a da área especial (escondida com
+    // Super + A, sobretudo com o workspace atual vazio), focar nela reabre a
+    // área especial — e a pessoa "é mandada" para o app. Se a área especial
+    // abrir logo depois de uma camada do shell fechar, sem ter sido aberta
+    // antes, ela é escondida de novo. Abrir pelo atalho continua normal: aí
+    // não há camada fechando no mesmo instante.
+    Item {
+        id: specialGuard
+        property real layerClosedAt: 0
+        // Área especial aberta em cada monitor. Começa lida do Hyprland: sem
+        // isso o shell nasceria achando que tudo está fechado e esconderia uma
+        // área especial que a pessoa tinha aberto de propósito.
+        property var openSpecial: ({})
+
+        Process {
+            running: true
+            command: ["hyprctl", "monitors", "-j"]
+            stdout: StdioCollector {
+                onStreamFinished: {
+                    try {
+                        const m = {};
+                        for (const mon of JSON.parse(text))
+                            m[mon.name] = (mon.specialWorkspace && mon.specialWorkspace.name) || "";
+                        specialGuard.openSpecial = m;
+                    } catch (e) {}
+                }
+            }
+        }
+
+        Connections {
+            target: Hyprland
+            function onRawEvent(event) {
+                const n = event.name;
+                const data = String(event.data);
+                if (n === "closelayer") {
+                    if (data.startsWith("quickshell") || data.startsWith("hollow"))
+                        specialGuard.layerClosedAt = Date.now();
+                } else if (n === "activespecial") {
+                    const parts = data.split(",");
+                    const name = parts[0];
+                    const mon = parts[1] || "";
+                    const wasOpen = specialGuard.openSpecial[mon] || "";
+                    const m = Object.assign({}, specialGuard.openSpecial);
+                    m[mon] = name;
+                    if (name !== "" && wasOpen === "" && Date.now() - specialGuard.layerClosedAt < 500) {
+                        Hyprland.dispatch('hl.dsp.workspace.toggle_special("' + name.replace(/^special:/, "") + '")');
+                        m[mon] = "";
+                    }
+                    specialGuard.openSpecial = m;
+                }
+            }
+        }
+    }
+
     // Luz noturna agendada. O `rice-nightlight auto` decide sozinho se o filtro
     // deve estar ligado no horário atual e não faz nada quando o agendamento
     // está desligado — por isso dá para chamar sempre, sem daemon novo nem
