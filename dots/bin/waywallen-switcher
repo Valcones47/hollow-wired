@@ -105,6 +105,28 @@ window.switcher {
 """
 
 
+def cached_still(preview):
+    """Quadro em resolução real já guardado em cache, ou "" (nunca extrai)."""
+    if not preview:
+        return ""
+    cache = os.path.expanduser("~/.cache/hollow-wired/frames")
+    scene = os.path.join(cache, "scene-%s.jpg" % os.path.basename(os.path.dirname(preview)))
+    if os.path.isfile(scene):
+        return scene
+    helper = os.path.expanduser("~/.local/bin/rice-wallpaper-frame")
+    if os.path.isfile(helper):
+        try:
+            out = subprocess.run(
+                [helper, "--cached-only", os.path.dirname(preview), preview],
+                capture_output=True, text=True, timeout=1.5,
+            ).stdout.strip()
+            if out and os.path.isfile(out) and out != preview:
+                return out
+        except Exception:
+            pass
+    return ""
+
+
 def fetch_wallpapers():
     conn = sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True)
     conn.row_factory = sqlite3.Row
@@ -378,9 +400,13 @@ class SwitcherWindow(Gtk.ApplicationWindow):
                 self.pool.submit(self._decode_thumbnail, card)
 
     def _decode_thumbnail(self, card):
+        # O preview do Wallpaper Engine é minúsculo e quadrado; ampliado para o
+        # cartão fica borrado. Com o quadro em resolução real no cache, o
+        # cartão usa ele (o GIF animado do selecionado continua o preview).
+        src = cached_still(card.wp["preview"]) or card.wp["preview"]
         try:
             pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(
-                card.wp["preview"], CARD_W * 2, CARD_H * 2, True
+                src, CARD_W * 2, CARD_H * 2, True
             )
         except GLib.Error:
             return
@@ -604,9 +630,15 @@ class SwitcherWindow(Gtk.ApplicationWindow):
         cached = self._stills.get(wallpaper.get("id"))
         if cached:
             return cached
-        # Ainda não ficou pronto: usa o preview e não segura o clique. O quadro
-        # entra na próxima vez que este wallpaper for escolhido.
         preview = wallpaper.get("preview") or ""
+        # A extração em segundo plano desta abertura ainda não chegou neste
+        # item — mas o quadro grande quase sempre já está no cache de outra
+        # vez. Antes ele caía direto no preview pequeno (o .gif de 160px) e a
+        # transição saía borrada. Consultar o cache é instantâneo; extrair do
+        # zero não, então aí sim fica o preview, sem segurar o clique.
+        big = cached_still(preview)
+        if big:
+            return big
         return preview if preview and os.path.isfile(preview) else ""
 
     def _apply_now(self, wallpaper):

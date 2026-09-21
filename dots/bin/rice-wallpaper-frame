@@ -14,12 +14,17 @@
 # Para cenas (scene.pkg) não há vídeo para extrair e o preview é o que existe.
 #
 # Uso:
-#   rice-wallpaper-frame <diretório do wallpaper> [preview de reserva]
+#   rice-wallpaper-frame [--cached-only] <diretório do wallpaper> [preview de reserva]
+#
+# --cached-only: só consulta o cache, nunca roda o ffmpeg (usado no clique do
+# seletor, que não pode esperar uma extração).
 # Imprime o caminho da melhor imagem, ou nada se não houver nenhuma.
 # ==============================================================================
 
 set -uo pipefail
 
+cached_only=0
+[ "${1:-}" = "--cached-only" ] && { cached_only=1; shift; }
 dir="${1:-}"
 fallback="${2:-}"
 
@@ -71,6 +76,8 @@ if [ -f "$out" ] && [ "$out" -nt "$video" ]; then
     printf '%s\n' "$out"
     exit 0
 fi
+
+[ "$cached_only" = 1 ] && { emit_fallback; exit 0; }
 
 # 3s evita fade-in preto que muitos wallpapers têm no começo. Se o vídeo for
 # mais curto que isso o ffmpeg falha, e aí tenta de novo no primeiro quadro.
