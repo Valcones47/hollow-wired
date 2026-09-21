@@ -43,6 +43,21 @@ MIN_TIMEOUT = 2
 MAX_TIMEOUT = 60
 DEFAULT_TIMEOUT = 5
 
+# Players de música que mandam a própria notificação a cada faixa. O shell já
+# mostra a faixa nova no OSD (capa, título e artista, no meio da tela), então
+# a do app era um segundo aviso igual, no canto. Some da tela e também do
+# histórico, para não encher a central de notificações com a playlist.
+MUSIC_MARKER = "# hollow-wired: players de música"
+MUSIC_APPS = [
+    "YouTube Music Desktop App", "YouTube Music", "youtube-music",
+    "Spotify", "spotify", "Tidal", "tidal-hifi", "Cider", "Amberol",
+    "Elisa", "Rhythmbox", "Lollypop", "Strawberry", "Clementine",
+    "Audacious", "mpv", "Plexamp", "Feishin", "Sonixd",
+]
+MUSIC_BLOCKS = MUSIC_MARKER + " (o OSD do shell já avisa a faixa nova)\n" + "".join(
+    '[app-name="%s"]\ninvisible=1\nhistory=0\n\n' % a for a in MUSIC_APPS
+) + "[category=x-gnome.music]\ninvisible=1\nhistory=0\n"
+
 DEFAULT_CONF = """# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # mako — notificações do hollow-wired (gerado pelo rice-mako-apply).
 # As cores vêm do wallust (arquivo colors, regenerado a cada troca de wallpaper).
@@ -78,7 +93,8 @@ border-size=2
 # Modo "não perturbe" (Super + Shift + N): continuam no histórico, sem aparecer.
 [mode=do-not-disturb]
 invisible=1
-"""
+
+""" + MUSIC_BLOCKS
 
 FALLBACK_COLORS = """# Cores de emergência criadas pelo rice-mako-apply.
 # O wallust sobrescreve este arquivo a cada troca de wallpaper.
@@ -256,6 +272,9 @@ def diagnose():
         if km and int(km.group(1)) == 0:
             problems.append("timeout_zero_%s" % section.split("=")[1])
 
+    if MUSIC_MARKER not in content:
+        problems.append("music_missing")
+
     if shutil.which("mako") and not mako_running():
         problems.append("not_running")
 
@@ -294,6 +313,10 @@ def doctor(fix=False):
         content = set_in_section(content, "urgency=critical", "default-timeout", 20000)
         changed = True
         fixed.append("notificações críticas voltaram a fechar sozinhas (20s)")
+    if "music_missing" in problems:
+        content = content.rstrip("\n") + "\n\n" + MUSIC_BLOCKS
+        changed = True
+        fixed.append("notificação dos players de música escondida (o OSD já mostra a faixa)")
     if changed:
         write_conf(content)
 
