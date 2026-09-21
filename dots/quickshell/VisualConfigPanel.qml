@@ -48,7 +48,8 @@ PanelWindow {
     // ================= DADOS & ESTADO =================
     // Abre na primeira categoria da navegação (Cores & Wallust). Antes abria no
     // Fastfetch, que é a configuração mais nichada de todas.
-    property int currentTab: 8
+    // Abre no "Jeito de Usar", o primeiro da categoria Ajuda.
+    property int currentTab: 19
 
     // Fastfetch
     property var ffConfig: ({})
@@ -1009,6 +1010,7 @@ PanelWindow {
         loadAppBindsProc.running = true;
         loadSysBindsProc.running = true;
         loadTipsProc.running = true;
+        loadWindowModeProc.running = true;
         loadAudioProc.running = true;
         loadPowerProc.running = true;
         loadAutostartProc.running = true;
@@ -1202,6 +1204,144 @@ PanelWindow {
             anchors.fill: parent
             cursorShape: Qt.PointingHandCursor
             onClicked: swt.toggled(!swt.checked)
+        }
+    }
+
+    // Cartão de escolha do modo de janelas, com um desenho da tela.
+    component ModeCard: Rectangle {
+        id: mc
+        property string mode: ""
+        property string title: ""
+        property string desc: ""
+        property var points: []
+        readonly property bool active: win.windowMode === mc.mode
+        Layout.fillWidth: true
+        Layout.preferredHeight: mcCol.implicitHeight + 36
+        radius: 16
+        color: mc.active ? Theme.withAlpha(Theme.primary, 0.14) : (mcArea.containsMouse ? Theme.tileHigh : Theme.tile)
+        border.width: mc.active ? 2 : 1
+        border.color: mc.active ? Theme.primary : Theme.withAlpha(Theme.outline, 0.25)
+        Behavior on color { ColorAnimation { duration: 140 } }
+
+        ColumnLayout {
+            id: mcCol
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.margins: 18
+            spacing: 12
+
+            // Desenho: uma telinha com as janelas no arranjo do modo.
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: width * 0.5
+                radius: 10
+                color: Theme.withAlpha(Theme.background, 0.8)
+                border.width: 1
+                border.color: Theme.withAlpha(Theme.outline, 0.3)
+                clip: true
+
+                Rectangle {
+                    x: 0; y: 0; width: parent.width; height: 8
+                    color: Theme.withAlpha(Theme.primary, 0.25)
+                }
+                Repeater {
+                    model: mc.mode === "windows"
+                        ? [ { x: 0.08, y: 0.22, w: 0.5, h: 0.55 }, { x: 0.3, y: 0.3, w: 0.52, h: 0.58 }, { x: 0.55, y: 0.16, w: 0.36, h: 0.4 } ]
+                        : [ { x: 0.03, y: 0.14, w: 0.46, h: 0.8 }, { x: 0.51, y: 0.14, w: 0.46, h: 0.39 }, { x: 0.51, y: 0.55, w: 0.46, h: 0.39 } ]
+                    delegate: Rectangle {
+                        required property var modelData
+                        required property int index
+                        x: modelData.x * parent.width
+                        y: modelData.y * parent.height
+                        width: modelData.w * parent.width
+                        height: modelData.h * parent.height
+                        radius: 6
+                        color: Theme.mix(Theme.background, Theme.textColor, 0.1 + index * 0.04)
+                        border.width: 1
+                        border.color: index === 1 ? Theme.primary : Theme.withAlpha(Theme.outline, 0.4)
+                        // barrinha de título com os três botões no estilo Windows
+                        Row {
+                            visible: mc.mode === "windows"
+                            anchors.right: parent.right
+                            anchors.top: parent.top
+                            anchors.margins: 5
+                            spacing: 4
+                            Repeater {
+                                model: 3
+                                Rectangle { width: 7; height: 7; radius: 3.5; color: index === 2 ? "#e06c75" : Theme.withAlpha(Theme.textColor, 0.35) }
+                            }
+                        }
+                    }
+                }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 8
+                Text {
+                    text: mc.title
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 15
+                    font.weight: Font.Bold
+                    color: Theme.textColor
+                }
+                Item { Layout.fillWidth: true }
+                Rectangle {
+                    visible: mc.active
+                    implicitWidth: activeLbl.implicitWidth + 16
+                    implicitHeight: 22
+                    radius: 11
+                    color: Theme.primary
+                    Text {
+                        id: activeLbl
+                        anchors.centerIn: parent
+                        text: Theme.t("mode.active", "Em uso")
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 11
+                        font.weight: Font.Bold
+                        color: Theme.background
+                    }
+                }
+            }
+            Text {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                text: mc.desc
+                font.family: Theme.fontFamily
+                font.pixelSize: 12
+                color: Theme.subtext
+            }
+            Repeater {
+                model: mc.points
+                delegate: RowLayout {
+                    required property var modelData
+                    Layout.fillWidth: true
+                    spacing: 8
+                    Text {
+                        text: Theme.icons.check
+                        font.family: Theme.iconFontFamily
+                        font.pixelSize: 13
+                        color: Theme.primary
+                    }
+                    Text {
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
+                        text: modelData
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 11
+                        color: Theme.textColor
+                    }
+                }
+            }
+        }
+
+        MouseArea {
+            id: mcArea
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: win.setWindowMode(mc.mode)
         }
     }
 
@@ -1646,14 +1786,15 @@ PanelWindow {
                                 { group: "system", tabIndex: 14, name: Theme.t("settings.cat_storage", "Armazenamento"), icon: Theme.icons.disk, desc: Theme.t("settings.desc_storage", "Limpeza de Disco"), keywords: "armazenamento storage disco disk hd ssd espaco limpar limpeza cache lixeira logs btrfs free space" },
                                 { group: "system", tabIndex: 16, name: Theme.t("settings.cat_system", "Sistema & Reparo"), icon: Theme.icons.health, desc: Theme.t("settings.desc_system", "Snapshots & Auto-Reparo"), keywords: "sistema system reparo repair consertar snapshot restauracao backup btrfs auto-reparo diagnostico info logs status" },
 
+                                { group: "help", tabIndex: 19, name: Theme.t("settings.cat_mode", "Jeito de Usar"), icon: Theme.icons.laptop, desc: Theme.t("settings.desc_mode", "Estilo Hyprland ou Windows"), keywords: "modo windows hyprland janelas flutuantes soltas tiling lado a lado organizar maximizar arrastar jeito estilo iniciante" },
                                 { group: "help", tabIndex: 15, name: Theme.t("settings.cat_shortcuts", "Guia de Atalhos"), icon: Theme.icons.magnify, desc: Theme.t("settings.desc_shortcuts", "Teclas do Rice"), keywords: "atalhos shortcuts teclas binds keybinds cheatsheet super mod custom user-binds ajuda boas-vindas" }
                             ]
 
                             readonly property var navGroups: [
+                                { id: "help", name: Theme.t("settings.group_help", "Ajuda") },
                                 { id: "look", name: Theme.t("settings.group_look", "Aparência") },
                                 { id: "hardware", name: Theme.t("settings.group_hardware", "Hardware") },
-                                { id: "system", name: Theme.t("settings.group_system", "Sistema") },
-                                { id: "help", name: Theme.t("settings.group_help", "Ajuda") }
+                                { id: "system", name: Theme.t("settings.group_system", "Sistema") }
                             ]
 
                             // Lista final: cabeçalho de grupo + itens do grupo.
@@ -1732,7 +1873,7 @@ PanelWindow {
                                         spacing: 10
 
                                         Text {
-                                            text: navDelegate.modelData.icon
+                                            text: navDelegate.modelData.icon || ""
                                             font.family: Theme.iconFontFamily
                                             font.pixelSize: 16
                                             color: win.currentTab === navDelegate.targetTab ? Theme.primary : Theme.subtext
@@ -1922,7 +2063,8 @@ PanelWindow {
                                     Theme.t("header.title_15", "Guia de Teclas & Atalhos"),
                                     Theme.t("header.title_16", "Sistema, Snapshots & Reparo"),
                                     Theme.t("header.title_17", "Programas & Atualizações"),
-                                    Theme.t("header.title_18", "Customização do Shell")
+                                    Theme.t("header.title_18", "Customização do Shell"),
+                                    Theme.t("header.title_19", "Jeito de Usar")
                                 ][win.currentTab] || Theme.t("settings.panel_title", "Configurações")
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 16
@@ -1950,7 +2092,8 @@ PanelWindow {
                                     Theme.t("header.sub_15", "Consulte e busque todos os atalhos de teclado do Hyprland com 1 clique."),
                                     Theme.t("header.sub_16", "Crie pontos de restauração Btrfs e resolva problemas comuns com 1 clique."),
                                     Theme.t("header.sub_17", "Atualize o sistema e o hollow-wired, e abra a loja de programas para instalar o que quiser."),
-                                    Theme.t("header.sub_18", "Ajuste estilo, escala, blur e cores de destaque dos componentes do shell.")
+                                    Theme.t("header.sub_18", "Ajuste estilo, escala, blur e cores de destaque dos componentes do shell."),
+                                    Theme.t("header.sub_19", "Janelas lado a lado (Hyprland) ou soltas como no Windows. Troca na hora, sem sair da sessão.")
                                 ][win.currentTab] || ""
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 11
@@ -8377,6 +8520,83 @@ PanelWindow {
                         // ==========================================
                         // ABA 18: CUSTOMIZAÇÃO DO SHELL (HUB, SIDEBAR, DOCK)
                         // ==========================================
+                        // ============ ABA 19: JEITO DE USAR (modo de janelas) ============
+                        Flickable {
+                            anchors.fill: parent
+                            visible: win.currentTab === 19
+                            contentHeight: modeCol.implicitHeight + 30
+                            clip: true
+                            boundsBehavior: Flickable.StopAtBounds
+
+                            ColumnLayout {
+                                id: modeCol
+                                width: parent.width
+                                spacing: 16
+
+                                SectionHeader {
+                                    title: Theme.t("mode.section_title", "Como as janelas se comportam")
+                                    subtitle: Theme.t("mode.section_sub", "Clique num dos dois. A troca vale na hora para as janelas abertas e as próximas, e dá para voltar quando quiser.")
+                                }
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 16
+
+                                    ModeCard {
+                                        Layout.alignment: Qt.AlignTop
+                                        mode: "windows"
+                                        title: Theme.t("mode.windows_title", "Estilo Windows")
+                                        desc: Theme.t("mode.windows_desc", "Cada programa abre numa janela solta no meio da tela, por cima das outras, como você já conhece.")
+                                        points: [
+                                            Theme.t("mode.windows_p1", "Arraste a janela pela barra de cima do próprio programa ou segurando Super"),
+                                            Theme.t("mode.windows_p2", "Redimensione puxando a borda da janela"),
+                                            Theme.t("mode.windows_p3", "O botão de maximizar dos programas funciona")
+                                        ]
+                                    }
+                                    ModeCard {
+                                        Layout.alignment: Qt.AlignTop
+                                        mode: "hyprland"
+                                        title: Theme.t("mode.hyprland_title", "Estilo Hyprland")
+                                        desc: Theme.t("mode.hyprland_desc", "As janelas dividem a tela sozinhas, lado a lado, sem se sobrepor. Nada de ficar arrumando janela.")
+                                        points: [
+                                            Theme.t("mode.hyprland_p1", "Cada janela nova ganha um pedaço da tela"),
+                                            Theme.t("mode.hyprland_p2", "Super + J troca a divisão entre horizontal e vertical"),
+                                            Theme.t("mode.hyprland_p3", "Aproveita a tela inteira, ótimo para monitores grandes")
+                                        ]
+                                    }
+                                }
+
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    implicitHeight: modeNote.implicitHeight + 24
+                                    radius: 12
+                                    color: Theme.tile
+                                    RowLayout {
+                                        id: modeNote
+                                        anchors.left: parent.left
+                                        anchors.right: parent.right
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        anchors.margins: 14
+                                        spacing: 12
+                                        Text {
+                                            text: Theme.icons.info
+                                            font.family: Theme.iconFontFamily
+                                            font.pixelSize: 18
+                                            color: Theme.primary
+                                        }
+                                        Text {
+                                            Layout.fillWidth: true
+                                            wrapMode: Text.WordWrap
+                                            text: Theme.t("mode.note", "Os atalhos são os mesmos nos dois estilos. Em qualquer um, Super + Shift + V solta ou prende só a janela atual.")
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: 11
+                                            color: Theme.textColor
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
                         Flickable {
                             id: shellCustomTab
                             anchors.fill: parent
@@ -9102,6 +9322,31 @@ PanelWindow {
     Process {
         id: setTipsProc
         onExited: (code, status) => loadTipsProc.running = true
+    }
+
+    // Modo de janelas (rice-window-mode): "hyprland" ou "windows".
+    property string windowMode: "hyprland"
+    Process {
+        id: loadWindowModeProc
+        command: ["rice-window-mode", "status"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try { win.windowMode = JSON.parse(text).mode || "hyprland"; } catch (e) {}
+            }
+        }
+    }
+    Process {
+        id: setWindowModeProc
+        onExited: (code, status) => loadWindowModeProc.running = true
+    }
+    function setWindowMode(mode) {
+        if (mode === win.windowMode) return;
+        win.windowMode = mode;
+        setWindowModeProc.command = ["rice-window-mode", mode];
+        setWindowModeProc.running = true;
+        win.showToast(mode === "windows"
+            ? Theme.t("mode.toast_windows", "Estilo Windows ativado")
+            : Theme.t("mode.toast_hyprland", "Estilo Hyprland ativado"));
     }
 
     function startBindCapture(command, name) {

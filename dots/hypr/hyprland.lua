@@ -728,12 +728,81 @@ hl.bind(mainMod .. " + D", hl.dsp.window.move({ workspace = "special:magic" }))
 --------------------
 ---- WINDOW RULES --
 --------------------
-hl.window_rule({
+rice_suppress_max_rule = hl.window_rule({
     name  = "suppress-maximize-events",
     match = { class = ".*" },
 
     suppress_event = "maximize",
 })
+
+----------------------------------------------------------------
+---- MODO DE JANELAS: "hyprland" (lado a lado) ou "windows" ----
+----------------------------------------------------------------
+-- No modo Windows toda janela nova abre flutuando e centralizada, do tamanho
+-- que o app pede, e pode ser redimensionada pela borda. O botão maximizar
+-- dos próprios apps volta a funcionar (no modo lado a lado ele é ignorado
+-- pela regra "suppress-maximize-events"). Os atalhos não mudam.
+--
+-- A escolha fica em ~/.config/hypr/window-mode (preferência do usuário) e é
+-- trocada ao vivo pelo `rice-window-mode`, que chama rice_set_window_mode()
+-- via `hyprctl eval`: as regras têm nome e são ligadas/desligadas sem reload.
+local windowModeFile = home .. "/.config/hypr/window-mode"
+rice_window_mode = "hyprland"
+do
+    local f = io.open(windowModeFile, "r")
+    if f then
+        local m = (f:read("*l") or ""):gsub("%s+", "")
+        f:close()
+        if m == "windows" then rice_window_mode = "windows" end
+    end
+end
+
+rice_windows_rule = hl.window_rule({
+    name    = "windows-mode",
+    enabled = rice_window_mode == "windows",
+    match   = { class = ".*" },
+
+    float  = true,
+    center = true,
+})
+
+-- Definida antes das regras do dropterm e do PiP para que elas, vindo
+-- depois, continuem valendo sobre o "centralizar".
+-- Janelas com regra própria de posição: não mexer ao trocar de modo.
+local keepAsIs = { dropterm = true }
+
+function rice_set_window_mode(mode, convert)
+    local on = mode == "windows"
+    rice_window_mode = on and "windows" or "hyprland"
+    rice_windows_rule:set_enabled(on)
+    rice_suppress_max_rule:set_enabled(not on)
+    hl.config({ general = { resize_on_border = on } })
+    if not convert then return end
+    -- As janelas já abertas acompanham a troca: soltas num tamanho
+    -- confortável e centralizadas, ou de volta para o lado a lado.
+    for _, w in ipairs(hl.get_windows()) do
+        if w.mapped and not keepAsIs[w.class] and not w.pinned and w.fullscreen == 0 then
+            local sel = "address:" .. w.address
+            if on and not w.floating then
+                hl.dispatch(hl.dsp.window.float({ action = "enable", window = sel }))
+                local m = w.monitor
+                if m then
+                    local mw, mh = m.width / m.scale, m.height / m.scale
+                    hl.dispatch(hl.dsp.window.resize({
+                        exact = true, window = sel,
+                        x = math.floor(math.min(1400, mw * 0.62)),
+                        y = math.floor(math.min(900, mh * 0.72)),
+                    }))
+                end
+                hl.dispatch(hl.dsp.window.center({ window = sel }))
+            elseif not on and w.floating then
+                hl.dispatch(hl.dsp.window.float({ action = "disable", window = sel }))
+            end
+        end
+    end
+end
+
+if rice_window_mode == "windows" then rice_set_window_mode("windows", false) end
 
 -- Terminal drop-down (rice-dropterm): mora no workspace especial "dropterm",
 -- flutuante, centralizado no topo, 70% x 55% da tela.

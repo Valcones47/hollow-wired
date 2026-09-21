@@ -90,6 +90,17 @@ PanelWindow {
         }
     ]
 
+    property string windowMode: "hyprland"
+    Process {
+        id: modeStatus
+        command: ["rice-window-mode", "status"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try { welcomeWindow.windowMode = JSON.parse(text).mode || "hyprland"; } catch (e) {}
+            }
+        }
+    }
+
     property bool tipsOn: true
     Process {
         id: tipsStatus
@@ -133,7 +144,10 @@ PanelWindow {
     WlrLayershell.keyboardFocus: welcomeWindow.open ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
     onOpenChanged: {
-        if (open) tipsStatus.running = true;
+        if (open) {
+            tipsStatus.running = true;
+            modeStatus.running = true;
+        }
         if (!open) welcomeWindow.markDone();
     }
 
@@ -154,7 +168,7 @@ PanelWindow {
         id: card
         anchors.centerIn: parent
         width: 780
-        height: 680
+        height: 740
         radius: Theme.radius
         color: Theme.surface
         border.color: Theme.withAlpha(Theme.outline, 0.35)
@@ -344,6 +358,88 @@ PanelWindow {
                                         font.weight: Font.Bold
                                         color: Theme.primary
                                     }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ------------------------------------------------- estilo das janelas
+            // Mesma escolha do painel Rice > Jeito de Usar (rice-window-mode).
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 54
+                radius: 14
+                color: Theme.tile
+                border.width: 1
+                border.color: Theme.withAlpha(Theme.outline, 0.22)
+
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 14
+                    anchors.rightMargin: 8
+                    spacing: 12
+
+                    Text {
+                        text: Theme.icons.laptop
+                        font.family: Theme.iconFontFamily
+                        font.pixelSize: 18
+                        color: Theme.primary
+                    }
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 0
+                        Text {
+                            text: Theme.t("welcome.mode_title", "Como as janelas devem abrir?")
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 12
+                            font.weight: Font.DemiBold
+                            color: Theme.textColor
+                        }
+                        Text {
+                            Layout.fillWidth: true
+                            elide: Text.ElideRight
+                            text: welcomeWindow.windowMode === "windows"
+                                ? Theme.t("welcome.mode_windows_desc", "Soltas no meio da tela, como no Windows.")
+                                : Theme.t("welcome.mode_hyprland_desc", "Lado a lado, dividindo a tela sozinhas.")
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 10
+                            color: Theme.subtext
+                        }
+                    }
+                    Repeater {
+                        model: [
+                            { mode: "windows", label: Theme.t("welcome.mode_windows", "Estilo Windows") },
+                            { mode: "hyprland", label: Theme.t("welcome.mode_hyprland", "Estilo Hyprland") }
+                        ]
+                        delegate: Rectangle {
+                            required property var modelData
+                            readonly property bool on: welcomeWindow.windowMode === modelData.mode
+                            implicitWidth: modeLbl.implicitWidth + 26
+                            implicitHeight: 34
+                            radius: 17
+                            color: on ? Theme.primary : (modeArea.containsMouse ? Theme.tileHigh : "transparent")
+                            border.width: on ? 0 : 1
+                            border.color: Theme.withAlpha(Theme.outline, 0.35)
+                            Behavior on color { ColorAnimation { duration: 140 } }
+                            Text {
+                                id: modeLbl
+                                anchors.centerIn: parent
+                                text: modelData.label
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 12
+                                font.weight: Font.DemiBold
+                                color: parent.on ? Theme.background : Theme.textColor
+                            }
+                            MouseArea {
+                                id: modeArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    welcomeWindow.windowMode = modelData.mode;
+                                    Quickshell.execDetached(["rice-window-mode", modelData.mode]);
                                 }
                             }
                         }

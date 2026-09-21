@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# rice-window-mode — alterna entre o modo "hyprland" (janelas lado a lado,
+# organizadas sozinhas) e o modo "windows" (janelas soltas, centralizadas,
+# redimensionáveis pela borda, com o maximizar dos apps funcionando).
+#
+# A troca é ao vivo: as janelas abertas mudam na hora, sem reload nem sair da
+# sessão. A escolha fica em ~/.config/hypr/window-mode e o hyprland.lua a lê
+# ao iniciar. Os atalhos de teclado são os mesmos nos dois modos.
+#
+# Uso: rice-window-mode [status | hyprland | windows | toggle]
+FILE="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/window-mode"
+
+current() {
+    local m
+    [ -f "$FILE" ] && m=$(tr -d "[:space:]" < "$FILE")
+    [ "$m" = "windows" ] && echo windows || echo hyprland
+}
+
+apply() {
+    local mode="$1"
+    mkdir -p "$(dirname "$FILE")"
+    printf '%s\n' "$mode" > "$FILE"
+    if [ -n "$HYPRLAND_INSTANCE_SIGNATURE" ]; then
+        out=$(hyprctl eval "rice_set_window_mode('$mode', true)" 2>&1)
+        case "$out" in *rror*) echo "$out" >&2 ;; esac
+    fi
+    printf '{"mode": "%s"}\n' "$mode"
+}
+
+case "${1:-status}" in
+    status) printf '{"mode": "%s"}\n' "$(current)" ;;
+    windows|hyprland) apply "$1" ;;
+    toggle) [ "$(current)" = windows ] && apply hyprland || apply windows ;;
+    *) sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+esac
