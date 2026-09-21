@@ -104,6 +104,58 @@ mark_synced() {
     git -C "$REPO_DIR" rev-parse HEAD > "$SYNC_MARKER" 2>/dev/null || true
 }
 
+# Pacotes novos: o packages.txt do repositório é a lista do instalador. Quem
+# instalou o rice antes de um pacote entrar nela nunca o recebia (a luz
+# noturna, por exemplo, depende do hyprsunset). Na atualização pela janela do
+# terminal, instala o que falta pedindo a senha; no modo silencioso só avisa.
+install_new_packages() {
+    local interactive="$1" list="$REPO_DIR/packages.txt" line pkg
+    [ -f "$list" ] || return 0
+    command -v pacman >/dev/null 2>&1 || return 0
+    local missing=() repo=() aur=()
+    while IFS= read -r line || [ -n "$line" ]; do
+        pkg="${line%%#*}"
+        pkg="${pkg//[[:space:]]/}"
+        [ -n "$pkg" ] || continue
+        if [ "$pkg" = "wallust-git" ] && command -v wallust >/dev/null 2>&1; then continue; fi
+        pacman -T "$pkg" >/dev/null 2>&1 || missing+=("$pkg")
+    done < "$list"
+    [ ${#missing[@]} -eq 0 ] && return 0
+
+    for pkg in "${missing[@]}"; do
+        if pacman -Si "$pkg" >/dev/null 2>&1; then repo+=("$pkg"); else aur+=("$pkg"); fi
+    done
+    echo -e "\n\e[1;36m[*] Programas novos que o rice passou a usar:\e[0m ${missing[*]}"
+    if [ "$interactive" != "true" ]; then
+        notify-send -a "Rice Updater" -i system-software-update \
+            "Faltam ${#missing[@]} programa(s) do rice" "Abra Atualizar o rice na barra lateral para instalar." 2>/dev/null || true
+        return 0
+    fi
+    read -r -p "Instalar agora? (pede a sua senha) [S/n]: " ans || ans=n
+    [[ "${ans:-s}" =~ ^[SsYy]$ ]] || return 0
+    if [ ${#repo[@]} -gt 0 ]; then
+        # Um conflito derruba a transação inteira; aí tenta um por vez.
+        sudo pacman -S --needed --noconfirm "${repo[@]}" || for pkg in "${repo[@]}"; do
+            sudo pacman -S --needed --noconfirm "$pkg" >/dev/null 2>&1 || echo "  não instalado: $pkg"
+        done
+    fi
+    if [ ${#aur[@]} -gt 0 ]; then
+        local helper=""
+        command -v yay >/dev/null 2>&1 && helper=yay
+        [ -z "$helper" ] && command -v paru >/dev/null 2>&1 && helper=paru
+        if [ -n "$helper" ]; then
+            "$helper" -S --needed --noconfirm "${aur[@]}" || true
+        else
+            echo "  Sem yay/paru para instalar do AUR: ${aur[*]}"
+        fi
+    fi
+    # Serviços que chegam junto e precisam ser ligados.
+    for svc in NetworkManager bluetooth power-profiles-daemon; do
+        systemctl list-unit-files "$svc.service" 2>/dev/null | grep -q "^$svc.service" || continue
+        systemctl is-enabled --quiet "$svc.service" 2>/dev/null || sudo systemctl enable --now "$svc.service" >/dev/null 2>&1 || true
+    done
+}
+
 apply_updates() {
     local interactive="${1:-true}"
     local force="${2:-false}"
@@ -317,6 +369,8 @@ PYFF
             [ -n "$tmp_prefs" ] && echo "$tmp_prefs" > "$p_file"
         fi
     done
+
+    install_new_packages "$interactive"
 
     # 5. Recarregar Hyprland ao vivo sem reiniciar a sessão nem fechar aplicativos
     echo -e "\e[1;34m[*] Recarregando compositor Hyprland...\e[0m"

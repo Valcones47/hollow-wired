@@ -184,6 +184,8 @@ CPU_MODEL=$(lscpu | grep "Model name:" | sed 's/Model name:[ \t]*//' || echo "Pr
 info_msg "Processador: ${WHITE}$CPU_MODEL${NC}"
 
 # Detecção informativa de GPU & Verificação de Séries Legadas da NVIDIA (900 / 1000)
+# Sem o pciutils (instalação mínima) o lspci não existe e a detecção saía vazia.
+command -v lspci >/dev/null 2>&1 || sudo pacman -S --needed --noconfirm pciutils >/dev/null 2>&1 || true
 GPU_INFO=$(lspci 2>/dev/null | grep -Ei "vga|3d" | sed 's/.*: //g' | paste -sd '|' - | sed 's/|/ | /g')
 GPU_INFO="${GPU_INFO:-Gráficos Genéricos}"
 info_msg "Placa(s) de Vídeo: ${WHITE}$GPU_INFO${NC}"
@@ -240,89 +242,32 @@ ok_msg "AUR Helper ativo: ${GREEN}$AUR_HELPER${NC}"
 step_banner "02/04" "Dependências Essenciais do Rice" "Instalando Hyprland, Quickshell, Wallust, áudio PipeWire e utilitários"
 
 # Lista focada 100% no ricing e interface (SEM drivers proprietários de GPU e SEM pacotes de jogos)
-RICE_PACKAGES=(
-    # Compositor & Shell
-    hyprland
-    aquamarine
-    quickshell
-    kitty
-    wallust-git
-    fastfetch
-    cava
-    mako
-    wlsunset
-    
-    # Áudio & Mídia
-    playerctl
-    pipewire
-    pipewire-pulse
-    pipewire-alsa
-    wireplumber
-    
-    # Captura, Gravação & Área de Transferência
-    wf-recorder
-    grim
-    slurp
-    swappy
-    cliphist
-    wl-clipboard
-    wl-clip-persist   # Mantém o que foi copiado mesmo depois de fechar o app de origem
-    hyprpicker        # Conta-gotas de cor (Super + Shift + C)
-    
-    # Bloqueio, Ociosidade & Feedback
-    hypridle
-    hyprlock
-    hyprshot
-    brightnessctl
-    
-    # Tela de Login & Autenticação
-    sddm
-    qt6-multimedia    # A tela de login usa QtMultimedia; sem isso o greeter nem carrega
-    qt6-svg
-    polkit-kde-agent  # Janela de senha para ações administrativas (sem ela nada que pede root funciona)
-
-    # Sistema, Portais & Ferramentas
-    zenity
-    ffmpeg
-    imagemagick       # Processa o fundo da tela de login e miniaturas
-    hyprpaper         # Wallpaper estático (para quem não usa o Wallpaper Engine)
-    pacman-contrib    # checkupdates: contador de atualizações da sidebar
-    python-pillow     # Otimizador de wallpapers do Wallpaper Engine
-    libwebp
-    jq
-    socat
-    bc
-    lm_sensors
-    rsync
-    xdg-user-dirs
-    dolphin
-    mission-center    # Gerenciador de tarefas (Super + Esc / Ctrl + Shift + Esc)
-    xdg-desktop-portal
-    xdg-desktop-portal-hyprland
-    xdg-desktop-portal-gtk
-    xdg-desktop-portal-kde
-    zram-generator
-    flatpak
-    
-    # Fontes & Temas de Ícones
-    ttf-jetbrains-mono-nerd
-    noto-fonts
-    noto-fonts-cjk
-    noto-fonts-emoji
-    papirus-icon-theme
-    breeze-icons
-    
-    # Bibliotecas de Interface & Atalhos
-    gtk4-layer-shell
-    python-gobject
-    python-evdev   # Necessário para gravação direta de atalhos de hardware do Discord
-    chafa          # Renderizador de imagens/GIFs em alta fidelidade no terminal
-)
+# Lista em packages.txt (a mesma que o rice-update usa para instalar o que
+# entrar de novo em quem já tem o rice).
+RICE_PACKAGES=()
+while IFS= read -r line || [ -n "$line" ]; do
+    line="${line%%#*}"
+    line="${line//[[:space:]]/}"
+    [ -n "$line" ] && RICE_PACKAGES+=("$line")
+done < "$SCRIPT_DIR/packages.txt"
 
 info_msg "Sincronizando chaveiros de segurança e banco do pacman..."
 sudo pacman -Sy --needed --noconfirm archlinux-keyring 2>/dev/null || true
 if [ "$IS_CACHYOS" = true ]; then
     sudo pacman -Sy --needed --noconfirm cachyos-keyring 2>/dev/null || true
+fi
+
+# Drivers Vulkan e de decodificação de vídeo da placa que desenha a tela.
+# (NVIDIA fica com o chwd/driver do sistema; a série legada tem etapa própria.)
+if echo "$GPU_INFO" | grep -qi "intel"; then
+    RICE_PACKAGES+=(vulkan-intel intel-media-driver)
+fi
+if echo "$GPU_INFO" | grep -Eqi "amd|ati|radeon"; then
+    RICE_PACKAGES+=(vulkan-radeon)
+fi
+# Notebook híbrido com NVIDIA: prime-run manda jogos para a placa dedicada.
+if echo "$GPU_INFO" | grep -qi "nvidia" && [ "$(echo "$GPU_INFO" | grep -o '|' | wc -l)" -ge 1 ]; then
+    RICE_PACKAGES+=(nvidia-prime)
 fi
 
 info_msg "Verificando dependências já presentes no sistema..."
@@ -354,7 +299,15 @@ else
 
     if [ ${#REPO_MISSING[@]} -gt 0 ]; then
         gear_msg "Instalando pacotes dos repositórios oficiais (${#REPO_MISSING[@]}): ${REPO_MISSING[*]}..."
-        sudo pacman -S --needed --noconfirm "${REPO_MISSING[@]}"
+        # Um conflito (ex.: tuned-ppd x power-profiles-daemon) derrubava a
+        # transação inteira e nada era instalado. Plano B: um por vez.
+        if ! sudo pacman -S --needed --noconfirm "${REPO_MISSING[@]}"; then
+            warn_pkgs=()
+            for pkg in "${REPO_MISSING[@]}"; do
+                sudo pacman -S --needed --noconfirm "$pkg" >/dev/null 2>&1 || warn_pkgs+=("$pkg")
+            done
+            [ ${#warn_pkgs[@]} -gt 0 ] && echo -e "  ${GRAY}Não instalados (conflito ou indisponíveis): ${warn_pkgs[*]}${NC}"
+        fi
     fi
 
     if [ ${#AUR_MISSING[@]} -gt 0 ]; then
@@ -537,13 +490,35 @@ ZRAM_EOF"
     ok_msg "zRAM configurado para ${TARGET_ZRAM_MB}MB (ZSTD) com sucesso!"
 fi
 
+# Flathub sempre: a loja de apps (Shelly) e o Waywallen instalam por ele, e
+# antes ele só era configurado se a pessoa aceitasse o Waywallen.
+# Instalação do sistema (a mesma que o `flatpak install flathub ...` usa por padrão).
+sudo flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo 2>/dev/null || true
+
+# Navegador: numa instalação mínima não há nenhum, e o rice abre links,
+# o clima e a loja pelo navegador padrão.
+HAS_BROWSER=false
+for b in firefox zen-browser zen chromium google-chrome-stable brave vivaldi-stable librewolf microsoft-edge-stable; do
+    command -v "$b" >/dev/null 2>&1 && HAS_BROWSER=true && break
+done
+if [ "$HAS_BROWSER" = false ]; then
+    echo -e "\n${CYAN}◈ [RECOMENDADO] Nenhum navegador encontrado.${NC}"
+    echo -e "  ${WHITE}1${NC}) Firefox   ${WHITE}2${NC}) Zen Browser   ${WHITE}3${NC}) Chromium   ${WHITE}4${NC}) Brave   ${WHITE}0${NC}) Nenhum"
+    read -rp "  Qual instalar? [1]: " BROWSER_CHOICE || true
+    case "${BROWSER_CHOICE:-1}" in
+        1) sudo pacman -S --needed --noconfirm firefox firefox-i18n-pt-br || true ;;
+        2) [ -n "${AUR_HELPER:-}" ] && $AUR_HELPER -S --needed --noconfirm zen-browser-bin || true ;;
+        3) sudo pacman -S --needed --noconfirm chromium || true ;;
+        4) [ -n "${AUR_HELPER:-}" ] && $AUR_HELPER -S --needed --noconfirm brave-bin || true ;;
+    esac
+fi
+
 # Opcional: Wallpaper Engine (Waywallen via Flatpak)
 echo -e "\n${CYAN}◈ [OPCIONAL] Deseja instalar o suporte a Wallpaper Engine (Waywallen via Flatpak)?${NC}"
 read -rp "  Instalar Waywallen? [S/n]: " INSTALL_WAYWALLEN || true
 INSTALL_WAYWALLEN=${INSTALL_WAYWALLEN:-S}
 if [[ "$INSTALL_WAYWALLEN" =~ ^[Ss]$ ]]; then
-    gear_msg "Configurando Flathub e instalando Waywallen..."
-    flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo 2>/dev/null || true
+    gear_msg "Instalando Waywallen..."
     flatpak install -y flathub org.waywallen.waywallen 2>/dev/null || true
     ok_msg "Waywallen instalado! Atalho Super + S configurado."
 fi
@@ -622,6 +597,18 @@ EOF'
         fi
     fi
 fi
+
+# ------------------------------------------------------------------------------
+# SERVIÇOS DO SISTEMA
+# ------------------------------------------------------------------------------
+# Instalar não liga: numa instalação mínima o Wi-Fi e o Bluetooth ficavam
+# desligados até alguém descobrir o systemctl.
+for svc in NetworkManager bluetooth power-profiles-daemon; do
+    if systemctl list-unit-files "$svc.service" 2>/dev/null | grep -q "^$svc.service" \
+        && ! systemctl is-enabled --quiet "$svc.service" 2>/dev/null; then
+        sudo systemctl enable --now "$svc.service" >/dev/null 2>&1 && ok_msg "Serviço $svc ativado."
+    fi
+done
 
 # ------------------------------------------------------------------------------
 # PAPEL DE PAREDE GARANTIDO

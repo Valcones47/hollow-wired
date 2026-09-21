@@ -1,0 +1,122 @@
+# Pacotes do hollow-wired — um por linha; "#" começa comentário.
+# Lido pelo install.sh (instalação) e pelo rice-update (atualização: quem já
+# tem o rice recebe os pacotes novos que entrarem aqui). Pacotes que não estão
+# nos repositórios oficiais são instalados pelo AUR (yay/paru).
+# Compositor & Shell
+hyprland
+aquamarine
+quickshell
+kitty
+wallust-git
+fastfetch
+cava
+mako
+wlsunset
+
+# Áudio & Mídia
+playerctl
+pipewire
+pipewire-pulse
+pipewire-alsa
+wireplumber
+
+# Captura, Gravação & Área de Transferência
+wf-recorder
+grim
+slurp
+swappy
+cliphist
+wl-clipboard
+wl-clip-persist   # Mantém o que foi copiado mesmo depois de fechar o app de origem
+hyprpicker        # Conta-gotas de cor (Super + Shift + C)
+
+# Bloqueio, Ociosidade & Feedback
+hypridle
+hyprlock
+hyprshot
+brightnessctl
+
+# Tela de Login & Autenticação
+sddm
+qt6-multimedia    # A tela de login usa QtMultimedia; sem isso o greeter nem carrega
+qt6-svg
+polkit-kde-agent  # Janela de senha para ações administrativas (sem ela nada que pede root funciona)
+
+# Sistema, Portais & Ferramentas
+zenity
+ffmpeg
+imagemagick       # Processa o fundo da tela de login e miniaturas
+hyprpaper         # Wallpaper estático (para quem não usa o Wallpaper Engine)
+pacman-contrib    # checkupdates: contador de atualizações da sidebar
+python-pillow     # Otimizador de wallpapers do Wallpaper Engine
+libwebp
+jq
+socat
+bc
+lm_sensors
+rsync
+xdg-user-dirs
+dolphin
+mission-center    # Gerenciador de tarefas (Super + Esc / Ctrl + Shift + Esc)
+xdg-desktop-portal
+xdg-desktop-portal-hyprland
+xdg-desktop-portal-gtk
+xdg-desktop-portal-kde
+zram-generator
+flatpak
+
+# Fontes & Temas de Ícones
+ttf-jetbrains-mono-nerd
+noto-fonts
+noto-fonts-cjk
+noto-fonts-emoji
+papirus-icon-theme
+breeze-icons
+
+# Base do desktop que o rice usa. Num CachyOS/Arch que já teve KDE ou
+# GNOME quase tudo isso já existe; numa instalação mínima, não — e aí
+# Wi-Fi, Bluetooth, perfis de energia, luz noturna e seletor de arquivos
+# simplesmente não funcionavam.
+networkmanager    # Wi-Fi e rede (sidebar, painel)
+bluez
+bluez-utils       # Bluetooth (painel, bluetoothctl)
+power-profiles-daemon # Perfis de energia (sidebar)
+hyprsunset        # Luz noturna
+kdialog           # Seletor de arquivos (avatar, ícone da dock, wallpaper)
+xdg-utils         # xdg-open: abrir links e arquivos no app padrão
+libnotify         # notify-send
+psmisc            # fuser
+pciutils          # lspci: detecção de placa de vídeo
+iw
+curl
+udisks2           # Montar pendrives e HDs externos
+gvfs              # Lixeira, celulares (MTP) e redes nos seletores de arquivo
+gamemode          # Modo jogo
+btop              # Monitor no terminal (plano B do Super + Esc)
+qt5-wayland
+qt6-wayland
+gnome-keyring     # Guarda senhas de navegador, Discord, VS Code etc.
+
+# Bom ter para quem chega do Windows: abrir o que baixar sem caçar programa
+ark               # Compactados (zip, rar, 7z)
+unzip
+7zip
+unrar
+ntfs-3g           # Pendrives e HDs formatados no Windows
+exfatprogs
+dosfstools
+kio-extras        # Miniaturas, celulares e rede no Dolphin
+ffmpegthumbs      # Miniaturas de vídeo no Dolphin
+kdegraphics-thumbnailers # Miniaturas de PDF e imagens RAW
+gwenview          # Visualizador de imagens
+okular            # PDF
+kate              # Editor de texto
+mpv               # Player de vídeo
+pavucontrol       # Controle de som detalhado
+ttf-liberation    # Fontes compatíveis com Arial/Times/Courier (documentos do Office)
+
+# Bibliotecas de Interface & Atalhos
+gtk4-layer-shell
+python-gobject
+python-evdev   # Necessário para gravação direta de atalhos de hardware do Discord
+chafa          # Renderizador de imagens/GIFs em alta fidelidade no terminal
