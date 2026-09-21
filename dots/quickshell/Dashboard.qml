@@ -75,6 +75,15 @@ Item {
     property string weatherDesc: "Sem dados"
     property string weatherPlace: ""
     property int weatherCode: 0
+    // A resposta do wttr.in (format=j1) já vem com sensação térmica, umidade,
+    // vento, nascer/pôr do sol e a previsão de três dias. Tudo isso era baixado
+    // e jogado fora: só a temperatura era lida.
+    property string weatherFeels: ""
+    property string weatherHumidity: ""
+    property string weatherWind: ""
+    property string weatherSunrise: ""
+    property string weatherSunset: ""
+    property var weatherDays: []
     Timer {
         interval: 30 * 60 * 1000
         running: root.visible
@@ -94,12 +103,49 @@ Item {
                     root.weatherCode = parseInt(cur.weatherCode);
                     root.weatherDesc = cur.lang_pt ? cur.lang_pt[0].value : cur.weatherDesc[0].value;
                     root.weatherPlace = data.nearest_area ? data.nearest_area[0].areaName[0].value : "";
+
+                    root.weatherFeels = cur.FeelsLikeC ? cur.FeelsLikeC + "°" : "";
+                    root.weatherHumidity = cur.humidity ? cur.humidity + "%" : "";
+                    root.weatherWind = cur.windspeedKmph ? cur.windspeedKmph + " km/h" : "";
+
+                    const astro = (data.weather && data.weather[0] && data.weather[0].astronomy)
+                                ? data.weather[0].astronomy[0] : null;
+                    // O wttr.in devolve o horário em 12h ("05:23 AM"); aqui o
+                    // relógio é de 24h em todo o resto da interface.
+                    root.weatherSunrise = astro ? root.to24h(astro.sunrise) : "";
+                    root.weatherSunset = astro ? root.to24h(astro.sunset) : "";
+
+                    const days = [];
+                    const names = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+                    for (let i = 0; i < (data.weather || []).length && i < 3; i++) {
+                        const w = data.weather[i];
+                        const d = new Date(w.date + "T12:00:00");
+                        days.push({
+                            label: i === 0 ? Theme.t("dash.today", "Hoje") : names[d.getDay()],
+                            min: w.mintempC + "°",
+                            max: w.maxtempC + "°",
+                            code: parseInt((w.hourly && w.hourly[4]) ? w.hourly[4].weatherCode : "113")
+                        });
+                    }
+                    root.weatherDays = days;
                 } catch (e) {
                     console.log("Dashboard: resposta do wttr.in inválida:", e);
                 }
             }
         }
     }
+    function to24h(text) {
+        // "05:23 AM" / "5:23 PM" -> "05:23"
+        const m = /^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i.exec((text || "").trim());
+        if (!m)
+            return text || "";
+        let h = parseInt(m[1]);
+        const ampm = (m[3] || "").toUpperCase();
+        if (ampm === "PM" && h !== 12) h += 12;
+        if (ampm === "AM" && h === 12) h = 0;
+        return ("0" + h).slice(-2) + ":" + m[2];
+    }
+
     function weatherIcon(code, hour) {
         const night = hour < 6 || hour >= 18;
         if (code === 113) return night ? Theme.icons.night : Theme.icons.sunny;
@@ -192,46 +238,131 @@ Item {
                 // layouts aninhados têm fillHeight=true por padrão — sem isso
                 // essa linha engolia a altura toda e empurrava o calendário.
                 Layout.fillHeight: false
-                Layout.preferredHeight: 116
+                // 116 antes: cabia só ícone e temperatura. Subiu para acomodar
+                // a sensação/umidade/vento/sol e a previsão dos próximos dias,
+                // que já vinham na mesma resposta e eram descartadas.
+                Layout.preferredHeight: 152
                 spacing: Theme.gap + 2
 
                 Tile {
-                    Layout.preferredWidth: 196
+                    Layout.preferredWidth: 300
                     Layout.fillHeight: true
 
-                    RowLayout {
-                        anchors.centerIn: parent
-                        spacing: 14
+                    ColumnLayout {
+                        anchors.fill: parent
+                        anchors.margins: 12
+                        spacing: 8
 
-                        Icon {
-                            text: root.weatherIcon(root.weatherCode, root.now.getHours())
-                            font.pixelSize: 48
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 14
+
+                            Icon {
+                                text: root.weatherIcon(root.weatherCode, root.now.getHours())
+                                font.pixelSize: 44
+                            }
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 0
+                                Text {
+                                    text: root.weatherTemp
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 26
+                                    font.weight: Font.Medium
+                                    color: Theme.textColor
+                                }
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: root.weatherDesc
+                                    elide: Text.ElideRight
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 11
+                                    color: Theme.subtext
+                                }
+                                Text {
+                                    Layout.fillWidth: true
+                                    visible: text !== ""
+                                    text: root.weatherPlace
+                                    elide: Text.ElideRight
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 10
+                                    color: Theme.withAlpha(Theme.subtext, 0.7)
+                                }
+                            }
                         }
-                        ColumnLayout {
-                            spacing: 0
-                            Text {
-                                text: root.weatherTemp
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 26
-                                font.weight: Font.Medium
-                                color: Theme.textColor
+
+                        // Sensação, umidade, vento e o sol — dados que já
+                        // chegavam na mesma resposta.
+                        Flow {
+                            Layout.fillWidth: true
+                            spacing: 10
+
+                            Repeater {
+                                model: [
+                                    { i: Theme.icons.thermometer, v: root.weatherFeels },
+                                    { i: Theme.icons.humidity,    v: root.weatherHumidity },
+                                    { i: Theme.icons.wind,        v: root.weatherWind },
+                                    { i: Theme.icons.sunrise,     v: root.weatherSunrise },
+                                    { i: Theme.icons.sunset,      v: root.weatherSunset }
+                                ]
+                                delegate: Row {
+                                    required property var modelData
+                                    visible: modelData.v !== ""
+                                    spacing: 4
+                                    Text {
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: parent.modelData.i
+                                        font.family: Theme.iconFontFamily
+                                        font.pixelSize: 12
+                                        color: Theme.subtext
+                                    }
+                                    Text {
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: parent.modelData.v
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 11
+                                        color: Theme.textColor
+                                    }
+                                }
                             }
-                            Text {
-                                Layout.maximumWidth: 100
-                                text: root.weatherDesc
-                                elide: Text.ElideRight
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 11
-                                color: Theme.subtext
-                            }
-                            Text {
-                                Layout.maximumWidth: 100
-                                visible: text !== ""
-                                text: root.weatherPlace
-                                elide: Text.ElideRight
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 10
-                                color: Theme.withAlpha(Theme.subtext, 0.7)
+                        }
+
+                        Item { Layout.fillHeight: true }
+
+                        // Previsão dos próximos dias.
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 6
+                            visible: root.weatherDays.length > 0
+
+                            Repeater {
+                                model: root.weatherDays
+                                delegate: ColumnLayout {
+                                    required property var modelData
+                                    Layout.fillWidth: true
+                                    spacing: 1
+                                    Text {
+                                        Layout.alignment: Qt.AlignHCenter
+                                        text: parent.modelData.label
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 10
+                                        color: Theme.subtext
+                                    }
+                                    Text {
+                                        Layout.alignment: Qt.AlignHCenter
+                                        text: root.weatherIcon(parent.modelData.code, 12)
+                                        font.family: Theme.iconFontFamily
+                                        font.pixelSize: 16
+                                        color: Theme.textColor
+                                    }
+                                    Text {
+                                        Layout.alignment: Qt.AlignHCenter
+                                        text: parent.modelData.max + " / " + parent.modelData.min
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 10
+                                        color: Theme.textColor
+                                    }
+                                }
                             }
                         }
                     }

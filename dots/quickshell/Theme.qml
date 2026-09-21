@@ -108,6 +108,8 @@ QtObject {
         cpu: "\u{F0EE0}", memory: "\u{F035B}", disk: "\u{F02CA}", gpu: "\u{F08AE}",
         music: "\u{F0387}", confirm: "\u{F012C}",
         sunny: "\u{F0599}", night: "\u{F0594}", partly: "\u{F0595}", cloudy: "\u{F0590}",
+        thermometer: "\u{F050F}", humidity: "\u{F058E}", wind: "\u{F059D}",
+        sunrise: "\u{F059C}", sunset: "\u{F059B}",
         fog: "\u{F0591}", rainy: "\u{F0597}", pouring: "\u{F0596}", snowy: "\u{F0598}",
         lightning: "\u{F0593}",
         lock: "\u{F033E}", record: "\u{F044A}", coffee: "\u{F0176}", coffeeOff: "\u{F0FAA}",
