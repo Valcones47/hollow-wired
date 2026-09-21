@@ -6,7 +6,7 @@
 # gerenciador gráfico instalado) já faz isso muito melhor, com busca, AUR,
 # Flatpak, AppImage, detalhes e remoção. O antigo catálogo de 22 aplicativos
 # soltos aqui dentro era uma versão pior disso — e ainda instalava com `yay`
-# fixo, que nem existe em quem instalou o rice com `paru`.
+# fixo, sem olhar qual AUR helper a pessoa tem.
 #
 # O que sobrou é o que a loja não faz:
 #   • contagem unificada de atualizações (oficiais + AUR + Flatpak + dotfiles do rice);
@@ -29,9 +29,10 @@ set -uo pipefail
 # até alguém recompilar — continua na lista só para quem ainda o tem.
 STORE_CANDIDATES=(shelly-ui pamac-manager octopi discover gnome-software)
 
+# yay primeiro (escolha do projeto); paru só quando não houver yay.
 aur_helper() {
-    if command -v paru >/dev/null 2>&1; then echo "paru"
-    elif command -v yay >/dev/null 2>&1; then echo "yay"
+    if command -v yay >/dev/null 2>&1; then echo "yay"
+    elif command -v paru >/dev/null 2>&1; then echo "paru"
     elif command -v shelly >/dev/null 2>&1; then echo "shelly"
     elif command -v pamac >/dev/null 2>&1; then echo "pamac"
     else echo ""; fi

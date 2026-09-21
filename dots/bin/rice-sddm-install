@@ -88,9 +88,9 @@ install_base_theme() {
   fi
 
   # (c) pacote do AUR, instalado como o usuário real (makepkg não roda em root)
-  if command -v paru >/dev/null 2>&1 || command -v yay >/dev/null 2>&1; then
+  if command -v yay >/dev/null 2>&1 || command -v paru >/dev/null 2>&1; then
     local helper
-    helper=$(command -v paru || command -v yay)
+    helper=$(command -v yay || command -v paru)
     echo "==> Instalando o tema base pelo AUR ($(basename "$helper") sddm-silent-theme)..."
     sudo -u "$REAL_USER" "$helper" -S --needed --noconfirm sddm-silent-theme >/dev/null 2>&1 || true
     for dir in /usr/share/sddm/themes/*/; do
@@ -128,7 +128,7 @@ install_base_theme() {
 if ! install_base_theme; then
   echo ""
   echo "[✗] Não consegui instalar o tema base SilentSDDM (sem internet ou sem AUR helper)."
-  echo "    Instale com:  paru -S sddm-silent-theme"
+  echo "    Instale com:  yay -S sddm-silent-theme"
   echo "    e rode este script de novo. Nada foi alterado no gerenciador de login."
   exit 1
 fi

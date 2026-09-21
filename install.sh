@@ -194,20 +194,26 @@ if [ -d /sys/class/power_supply/BAT0 ] || [ -d /sys/class/power_supply/BAT1 ]; t
 fi
 info_msg "Chassi detectado: ${WHITE}$CHASSIS${NC}"
 
-# Detecção e instalação do AUR Helper (paru ou yay)
+# Detecção e instalação do AUR Helper — yay é o principal; paru só é usado
+# quando já está instalado e o yay não.
 AUR_HELPER=""
-if command -v paru >/dev/null 2>&1; then
-    AUR_HELPER="paru"
-elif command -v yay >/dev/null 2>&1; then
+if command -v yay >/dev/null 2>&1; then
     AUR_HELPER="yay"
-else
-    warn_msg "Nenhum AUR helper encontrado (paru/yay). Instalando paru-bin..."
-    sudo pacman -S --needed --noconfirm base-devel git
-    # Sobra de uma tentativa anterior faria o clone falhar e, com set -e, abortaria tudo.
-    rm -rf /tmp/paru-bin
-    git clone https://aur.archlinux.org/paru-bin.git /tmp/paru-bin
-    (cd /tmp/paru-bin && makepkg -si --noconfirm)
+elif command -v paru >/dev/null 2>&1; then
     AUR_HELPER="paru"
+else
+    warn_msg "Nenhum AUR helper encontrado (yay/paru). Instalando yay..."
+    sudo pacman -S --needed --noconfirm base-devel git
+    if pacman -Si yay >/dev/null 2>&1; then
+        # CachyOS (e outros) trazem o yay no repositório: sem compilar nada.
+        sudo pacman -S --needed --noconfirm yay
+    else
+        # Sobra de uma tentativa anterior faria o clone falhar e, com set -e, abortaria tudo.
+        rm -rf /tmp/yay-bin
+        git clone https://aur.archlinux.org/yay-bin.git /tmp/yay-bin
+        (cd /tmp/yay-bin && makepkg -si --noconfirm)
+    fi
+    AUR_HELPER="yay"
 fi
 ok_msg "AUR Helper ativo: ${GREEN}$AUR_HELPER${NC}"
 
