@@ -40,7 +40,11 @@ ShellRoot {
         }
     }
 
-    DesktopWidgets { id: dw }
+    DesktopWidgets {
+        id: dw
+        onDesktopRightClicked: (x, y) => desktopMenu.popup(x, y)
+    }
+    DesktopMenu { id: desktopMenu }
     Frame { id: frameScope }
     WallpaperFade { id: wallFade }
 
@@ -97,6 +101,44 @@ ShellRoot {
                     specialGuard.openSpecial = m;
                 }
             }
+        }
+    }
+
+    // Link aberto no navegador que está em outra área de trabalho: o
+    // Hyprland só marca a janela como "urgente" (não pula para ela), então o
+    // rice-browser-notice avisa com uma notificação que leva até a aba. O
+    // evento chega duas vezes por link (uma por troca de título); o intervalo
+    // por janela evita notificação dobrada.
+    Item {
+        id: browserNotice
+        property var lastAt: ({})
+        Connections {
+            target: Hyprland
+            function onRawEvent(event) {
+                if (event.name !== "urgent") return;
+                const addr = String(event.data);
+                const now = Date.now();
+                if (now - (browserNotice.lastAt[addr] || 0) < 4000) return;
+                const m = Object.assign({}, browserNotice.lastAt);
+                m[addr] = now;
+                browserNotice.lastAt = m;
+                Quickshell.execDetached(["rice-browser-notice", addr]);
+            }
+        }
+    }
+
+    // Dicas de uso (rice-tips): uma de cada vez, a primeira 4 minutos depois
+    // de entrar e depois a cada 20. Cada dica aparece no máximo duas vezes e o
+    // script não faz nada quando elas estão desligadas ou já se esgotaram.
+    // Com jogo ou vídeo em tela cheia, espera a próxima rodada.
+    Timer {
+        interval: 4 * 60 * 1000
+        running: true
+        repeat: true
+        onTriggered: {
+            interval = 20 * 60 * 1000;
+            if (!shellRoot.hasFullscreen)
+                Quickshell.execDetached(["rice-tips", "random"]);
         }
     }
 
@@ -180,6 +222,7 @@ ShellRoot {
     }
 
     AltTab {}
+    Overview {}
     OSD {}
     Cheatsheet {}
     Clipboard {}

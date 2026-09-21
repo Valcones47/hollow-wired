@@ -296,6 +296,7 @@ RICE_PACKAGES=(
     rsync
     xdg-user-dirs
     dolphin
+    mission-center    # Gerenciador de tarefas (Super + Esc / Ctrl + Shift + Esc)
     xdg-desktop-portal
     xdg-desktop-portal-hyprland
     xdg-desktop-portal-gtk

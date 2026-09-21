@@ -201,14 +201,19 @@ PanelWindow {
         }
     }
 
-    // Clique direito no desktop vazio abre/fecha modo de edição
+    // Clique direito no desktop vazio (ou num widget) abre o menu de atalhos
+    // (DesktopMenu.qml, com "Editar widgets" entre as opções). Em modo de
+    // edição ele só sai do modo, como antes.
+    signal desktopRightClicked(real x, real y)
     MouseArea {
         anchors.fill: parent
         acceptedButtons: Qt.RightButton
         onClicked: mouse => {
-            if (mouse.button === Qt.RightButton) {
-                dwWindow.editMode = !dwWindow.editMode;
-                if (!dwWindow.editMode) dwWindow.selectedWidgetId = "";
+            if (dwWindow.editMode) {
+                dwWindow.editMode = false;
+                dwWindow.selectedWidgetId = "";
+            } else {
+                dwWindow.desktopRightClicked(mouse.x, mouse.y);
             }
         }
     }

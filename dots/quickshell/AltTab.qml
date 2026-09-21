@@ -59,6 +59,8 @@ PanelWindow {
                 if (sw.wins.length === 0) return;
                 sw.index = sw.wins.length > 1 ? (sw.pendingStep > 0 ? 1 : sw.wins.length - 1) : 0;
                 sw.open = true;
+                // Dica (no máximo 2 vezes): o Super+Tab mostra tudo de uma vez.
+                Quickshell.execDetached(["rice-tips", "show", "alttab_overview"]);
             }
         }
     }

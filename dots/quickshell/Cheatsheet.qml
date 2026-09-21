@@ -211,6 +211,8 @@ PanelWindow {
                                 { keys: ["Super", "Q"], desc: Theme.t("cheatsheet.desc_terminal", "Terminal Kitty") },
                                 { keys: ["Super", "E"], desc: Theme.t("cheatsheet.desc_dolphin", "Gerenciador Dolphin") },
                                 { keys: ["Alt", "Tab"], desc: Theme.t("cheatsheet.desc_alttab", "Alternar janelas com miniaturas") },
+                                { keys: ["Super", "Tab"], desc: Theme.t("cheatsheet.desc_overview", "Visão geral das áreas de trabalho") },
+                                { keys: ["Super", "Esc"], desc: Theme.t("cheatsheet.desc_taskmgr", "Gerenciador de tarefas") },
                                 { keys: ["Super", "'"], desc: Theme.t("cheatsheet.desc_dropterm", "Terminal drop-down suspenso") },
                                 { keys: ["Super", "Shift", "X"], desc: Theme.t("cheatsheet.desc_kill", "Encerrar janela travada (Kill)") },
                                 { keys: ["Super", "L"], desc: Theme.t("cheatsheet.desc_lock", "Bloquear sessão (hyprlock)") },
@@ -236,7 +238,7 @@ PanelWindow {
                             items: [
                                 { keys: ["Print", "/", "Super", "Shift", "S"], desc: Theme.t("cheatsheet.desc_screenshot", "Captura de região (salva e copia)") },
                                 { keys: ["Super", "Alt", "S"], desc: Theme.t("cheatsheet.desc_screenshot_edit", "Captura com editor de anotações (Swappy)") },
-                                { keys: ["Super", "Shift", "R"], desc: Theme.t("cheatsheet.desc_record_region", "Gravar região da tela") },
+                                { keys: ["Super", "Shift", "R"], desc: Theme.t("cheatsheet.desc_record_region", "Gravar a tela inteira (de novo para parar)") },
                                 { keys: ["Super", "Ctrl", "Shift", "R"], desc: Theme.t("cheatsheet.desc_record_screen", "Gravar tela inteira") },
                                 { keys: ["Super", "Shift", "C"], desc: Theme.t("cheatsheet.desc_picker", "Conta-gotas de cores") },
                                 { keys: ["Super", "V"], desc: Theme.t("cheatsheet.desc_clipboard", "Histórico da área de transferência") },

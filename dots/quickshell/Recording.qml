@@ -172,6 +172,8 @@ Item {
 
     // Processo de Ações com Arquivos
     Process { id: openFolderProc; command: ["rice-record", "open-folder"] }
+    // Chamado de dentro dos componentes da lista, que não enxergam o id do timer.
+    function scheduleRefresh() { recRefreshTimer.restart(); }
     Timer {
         id: recRefreshTimer
         interval: 500
@@ -1034,7 +1036,7 @@ Item {
                                                 const pathToDelete = modelData.path;
                                                 Quickshell.execDetached(["rice-record", "delete", pathToDelete]);
                                                 root.recentRecordings = root.recentRecordings.filter(function(item) { return item.path !== pathToDelete; });
-                                                recRefreshTimer.restart();
+                                                root.scheduleRefresh();
                                             }
                                         }
                                     }

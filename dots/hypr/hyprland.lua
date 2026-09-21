@@ -361,6 +361,7 @@ hl.layer_rule({ match = { namespace = "quickshell-launcher" }, blur = true, igno
 hl.layer_rule({ match = { namespace = "quickshell-visualconfig" }, blur = true, ignore_alpha = 0.3 })
 hl.layer_rule({ match = { namespace = "quickshell-clipboard" }, blur = true, ignore_alpha = 0.3 })
 hl.layer_rule({ match = { namespace = "quickshell-cheatsheet" }, blur = true, ignore_alpha = 0.3 })
+hl.layer_rule({ match = { namespace = "quickshell-overview" }, blur = true, ignore_alpha = 0.3 })
 hl.layer_rule({ match = { namespace = "quickshell-desktop-widgets" }, blur = false })
 
 -- Beziers customizados (não usa só os presets padrão)
@@ -482,10 +483,17 @@ hl.device({
 hl.bind(mainMod .. " + Q", hl.dsp.exec_cmd(terminal))
 hl.bind(mainMod .. " + T", hl.dsp.exec_cmd(terminal))
 hl.bind(mainMod .. " + C", hl.dsp.window.close())
-hl.bind("ALT + F4", hl.dsp.window.close())
+-- Alt+F4 fecha como no Windows e, nas primeiras vezes, avisa do Super+C (rice-tips).
+hl.bind("ALT + F4", function()
+    hl.dispatch(hl.dsp.window.close())
+    hl.exec_cmd("rice-tips show close_super_c")
+end)
 hl.bind(mainMod .. " + M", hl.dsp.exit())
 hl.bind(mainMod .. " + E", hl.dsp.exec_cmd(fileManager))
 hl.bind(mainMod .. " + F1", hl.dsp.exec_cmd("quickshell ipc call cheatsheet toggle"))
+-- Gerenciador de tarefas: Super+Esc e o Ctrl+Shift+Esc de quem vem do Windows.
+hl.bind(mainMod .. " + Escape", hl.dsp.exec_cmd("rice-task-manager"))
+hl.bind("CTRL + SHIFT + Escape", hl.dsp.exec_cmd("rice-task-manager"))
 -- Super+I = Painel de Configurações Visuais do Rice (VisualConfigPanel.qml)
 hl.bind(mainMod .. " + I", hl.dsp.exec_cmd("quickshell ipc call visualconfig toggle"))
 -- Super+V = histórico do clipboard nativo no Quickshell (Clipboard.qml)
@@ -706,6 +714,8 @@ hl.bind(mainMod .. " + SHIFT + B", hl.dsp.exec_cmd("rice-perf-mode"))
 -- Alt+Tab com miniaturas ao vivo (AltTab.qml). Soltar o Alt troca.
 hl.bind("ALT + Tab",         hl.dsp.global("quickshell:alttab-next"))
 hl.bind("ALT + SHIFT + Tab", hl.dsp.global("quickshell:alttab-prev"))
+-- Visão geral das áreas de trabalho em carrossel (Visão de Tarefas do Windows).
+hl.bind(mainMod .. " + Tab", hl.dsp.global("quickshell:overview"))
 
 -----------------
 ---- MINIMIZAR --

@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# rice-browser-notice <endereço> — avisa quando um app abre um link no
+# navegador que está em outra área de trabalho (ou escondido na área especial).
+#
+# Chamado pelo shell no evento `urgent` do Hyprland: com focus_on_activate
+# desligado, o navegador que recebe um link não pula para a frente, só fica
+# "urgente". Quem vem do Windows clica num link no Discord e acha que nada
+# aconteceu. A notificação diz onde a aba abriu e leva até ela no clique.
+
+addr="$1"
+[ -n "$addr" ] || exit 0
+case "$addr" in 0x*) ;; *) addr="0x$addr" ;; esac
+
+client() {
+    hyprctl clients -j 2>/dev/null | jq -c --arg a "$addr" 'first(.[] | select(.address == $a)) // empty'
+}
+
+c=$(client)
+[ -n "$c" ] || exit 0
+
+cls=$(jq -r '.class | ascii_downcase' <<<"$c")
+case "$cls" in
+    zen|zen-*|firefox*|librewolf|floorp|waterfox*|chromium*|google-chrome*|brave*|vivaldi*|microsoft-edge*|opera*|thorium*) ;;
+    *) exit 0 ;;
+esac
+
+ws_id=$(jq -r '.workspace.id' <<<"$c")
+ws_name=$(jq -r '.workspace.name' <<<"$c")
+
+# Na tela agora (workspace ativo de algum monitor, ou área especial aberta)?
+# Então a pessoa já está vendo: nada a avisar.
+visible=$(hyprctl monitors -j 2>/dev/null | jq -r --argjson w "$ws_id" \
+    '[.[] | .activeWorkspace.id, .specialWorkspace.id] | index($w) != null')
+[ "$visible" = "true" ] && exit 0
+
+# O título só vira o da página nova um instante depois.
+sleep 0.6
+c=$(client)
+[ -n "$c" ] || exit 0
+title=$(jq -r '.title' <<<"$c")
+
+# "Página — Zen Browser" → página e nome do navegador.
+browser="${title##* — }"
+page="${title% — *}"
+if [ "$browser" = "$title" ]; then
+    browser="${title##* - }"
+    page="${title% - *}"
+fi
+[ "$browser" = "$title" ] && browser=$(jq -r '.class' <<<"$c") && page="$title"
+
+if [ "$ws_id" -lt 0 ]; then
+    where="Na área especial (Super + A)"
+    [ "${LANG%%_*}" = "en" ] && where="In the special workspace (Super + A)"
+else
+    where="Na área de trabalho $ws_name"
+    [ "${LANG%%_*}" = "en" ] && where="On workspace $ws_name"
+fi
+head="Link aberto no $browser"
+btn="Ir para a aba"
+if [ "${LANG%%_*}" = "en" ]; then head="Link opened in $browser"; btn="Go to tab"; fi
+
+icon=$(jq -r '.class' <<<"$c")
+action=$(notify-send -a "Navegador" -i "$icon" -t 8000 --action=default="$btn" \
+    "$head" "$page
+$where")
+
+if [ "$action" = "default" ]; then
+    if [ "$ws_id" -lt 0 ]; then
+        hyprctl dispatch "hl.dsp.workspace.toggle_special(\"${ws_name#special:}\")" >/dev/null
+    else
+        hyprctl dispatch "hl.dsp.focus({ workspace = $ws_id })" >/dev/null
+    fi
+    hyprctl dispatch "hl.dsp.focus({ window = \"address:$addr\" })" >/dev/null
+fi

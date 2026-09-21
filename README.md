@@ -63,6 +63,9 @@ Legacy tools like Waybar, Rofi, SwayOSD, and Wofi are completely omitted. Every 
 - **Shell Customization (`ShellCustomization.qml`)**: Unified visual styling engine for Hub, Sidebar, and Dock. Supports Glass, Solid, Glow (Neon), and Borderless styles, custom scales (80%, 100%, 120%), background opacities, and 6 accent colors with live reactive synchronization.
 - **Dynamic Island OSD (`OSD.qml`)**: Non-intrusive floating capsule below the top bar providing visual feedback for volume levels, microphone mute, and screen brightness.
 - **Energy Sidebar (`EnergySidebar.qml`)**: Slide-out right panel providing system tray icons, update count badges (Repo + AUR + Dotfiles), night light toggle, blur toggle, and two-step power options.
+- **Workspace Overview (`Overview.qml`, `Super + Tab`)**: Workspaces laid out in a spring-animated 3D carousel with live window thumbnails at their real positions; click a window to jump to it, Enter to switch, number keys to jump.
+- **Desktop Menu (`DesktopMenu.qml`)**: Right-click on an empty spot of the desktop for Settings, Display, Terminal, Wallpaper (greyed out without Waywallen), Edit widgets and more.
+- **Newcomer helpers**: Usage tips delivered as notifications (`rice-tips`, each tip at most twice, toggle in the welcome screen and in Settings → Shortcuts), and a notification when an app opens a link in a browser sitting on another workspace (`rice-browser-notice`), with a button that takes you to the tab.
 - **Alt+Tab Task Switcher (`AltTab.qml`)**: Live window thumbnails rendered via Wayland screencopy buffers, sorted by MRU (most recently used) focus history. Quick close windows on the fly with `Q`.
 - **Native Clipboard (`Clipboard.qml`)**: Built-in clipboard manager invoked with `Super + V`, supporting quick search, image preview, and instant history clearing. Copied content survives closing the source application (`wl-clip-persist`), and a dedicated **Favourites** tab keeps pinned entries out of the rolling history.
 - **Internationalization (i18n)**: Seamless bilingual localization (English & Brazilian Portuguese) across all shell components and settings via reactive JSON dictionaries and `Theme.t(...)`.
@@ -120,6 +123,9 @@ Legacy tools like Waybar, Rofi, SwayOSD, and Wofi are completely omitted. Every 
 | `Super + L` | Lock Screen (`hyprlock`) |
 | `Super + M` | Exit Hyprland Session |
 | `Alt + Tab` | Live Window Switcher |
+| `Super + Tab` | Workspace Overview — 3D carousel of every workspace with live windows, plus a row of all open apps |
+| `Super + Esc` or `Ctrl + Shift + Esc` | Task Manager (Mission Center, falls back to the Plasma/GNOME monitor or `btop`) |
+| Right-click on the desktop | Quick menu: Settings, Display, Terminal, Wallpaper, Edit widgets, Files, Overview, Shortcuts |
 | `Print` or `Super + Shift + S` | Region Screenshot — saves, copies to clipboard and notifies. Cancelling the selection captures the **entire screen** instead of doing nothing |
 | `Super + Alt + S` | Interactive Screenshot with Annotation (Swappy) |
 | `Super + Shift + R` | Record the entire display (press again to stop) |

@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# rice-task-manager — o "Gerenciador de Tarefas" (Super+Esc / Ctrl+Shift+Esc).
+#
+# Se já estiver aberto, traz a janela para a frente em vez de abrir outra.
+# Ordem de preferência: Mission Center (o mais parecido com o do Windows),
+# Monitor do Sistema do Plasma, o do GNOME e, por último, btop no terminal.
+
+focus_existing() {
+    local addr
+    addr=$(hyprctl clients -j 2>/dev/null | jq -r --arg c "$1" \
+        'first(.[] | select((.class | ascii_downcase) == ($c | ascii_downcase)) | .address) // empty')
+    [ -n "$addr" ] || return 1
+    hyprctl dispatch "hl.dsp.focus({ window = \"address:$addr\" })" >/dev/null
+}
+
+try_app() {
+    # $1 = executável, $2 = classe da janela
+    command -v "$1" >/dev/null 2>&1 || return 1
+    focus_existing "$2" && exit 0
+    setsid -f "$1" >/dev/null 2>&1
+    exit 0
+}
+
+try_app missioncenter io.missioncenter.MissionCenter
+try_app plasma-systemmonitor org.kde.plasma-systemmonitor
+try_app gnome-system-monitor gnome-system-monitor
+
+if command -v btop >/dev/null 2>&1; then
+    focus_existing rice-btop && exit 0
+    setsid -f kitty --class rice-btop -e btop >/dev/null 2>&1
+    exit 0
+fi
+
+notify-send -a "Sistema" "Nenhum monitor do sistema instalado" \
+    "Instale o Mission Center pela loja de apps (ou: sudo pacman -S mission-center)."

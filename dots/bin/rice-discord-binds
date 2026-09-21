@@ -205,9 +205,9 @@ def cmd_record(target=None, timeout=12.0):
                         if isinstance(key_name_raw, list):
                             key_name_raw = key_name_raw[0] if key_name_raw else ""
 
-                        if key_name_raw == "KEY_ESC":
-                            print(json.dumps({"status": "cancelled"}))
-                            return
+                        # Esc é gravado como qualquer outra tecla (dá para usar
+                        # Super+Esc num atalho). Para desistir, o painel tem o
+                        # botão Cancelar, que encerra este processo.
 
                         if key_name_raw in SPECIAL_MAP:
                             key_name = SPECIAL_MAP[key_name_raw]

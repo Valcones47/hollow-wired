@@ -340,7 +340,11 @@ Scope {
                     const R = near + p * (far + feather * 1.15 - near);
 
                     function softDisc(x, y, r, solid) {
-                        // Opaco até `solid` do raio, some até a borda.
+                        // Opaco até `solid` do raio, some até a borda. Com a
+                        // tela ainda sem tamanho o raio dá 0 e o `solid` NaN,
+                        // que o gradiente recusa com erro.
+                        if (!(r > 0) || !isFinite(x) || !isFinite(y)) return;
+                        if (!isFinite(solid)) solid = 0;
                         const g = ctx.createRadialGradient(x, y, 0, x, y, r);
                         g.addColorStop(0, "rgba(255,255,255,1)");
                         g.addColorStop(Math.max(0, Math.min(0.99, solid)), "rgba(255,255,255,1)");

@@ -1,0 +1,188 @@
+#!/usr/bin/env python3
+"""rice-tips — dicas de uso em forma de notificação, para quem está chegando.
+
+Cada dica aparece no máximo 2 vezes. Algumas aparecem na hora certa (quem
+fecha com Alt+F4 fica sabendo do Super+C), as outras saem aos poucos, uma por
+vez, enquanto a pessoa usa o computador (o shell chama `random` de tempos em
+tempos). Quando todas já apareceram duas vezes, param sozinhas.
+
+Liga/desliga no painel Rice (Guia de Atalhos) e na tela de boas-vindas. A
+própria notificação tem o botão "Não mostrar mais dicas".
+
+Estado em ~/.config/hollow-wired/tips.json (preferência da pessoa: nunca
+sobrescrever na sincronização dos dots).
+
+Uso:
+  rice-tips show <id>      mostra essa dica se ainda couber (contextual)
+  rice-tips random         mostra uma dica que ainda não esgotou
+  rice-tips status         JSON: enabled, total, restantes
+  rice-tips on | off       liga/desliga
+  rice-tips reset          zera a contagem (as dicas voltam a aparecer)
+"""
+
+import json
+import os
+import random
+import subprocess
+import sys
+import time
+
+HOME = os.path.expanduser("~")
+STATE = os.path.join(os.environ.get("XDG_CONFIG_HOME", os.path.join(HOME, ".config")),
+                     "hollow-wired", "tips.json")
+MAX_TIMES = 2
+# Intervalo mínimo entre duas dicas quaisquer: nada de avalanche.
+MIN_GAP = 90
+
+EN = (os.environ.get("LANG", "") or "").startswith("en")
+try:
+    with open(os.path.join(HOME, ".config/quickshell/locale.json"), encoding="utf-8") as f:
+        EN = json.load(f).get("locale", "pt-BR") == "en"
+except (OSError, ValueError, AttributeError):
+    pass
+
+# id: (pt, en, contextual). As contextuais só aparecem pelo `show`, na hora
+# em que fazem sentido; as outras entram no sorteio.
+TIPS = {
+    "close_super_c": ("Super + C também fecha a janela, sem precisar mirar no Alt + F4.",
+                      "Super + C also closes the window.", True),
+    "alttab_overview": ("Super + Tab mostra todas as áreas de trabalho e os apps abertos de uma vez.",
+                        "Super + Tab shows every workspace and open app at once.", True),
+    "print_edit": ("Super + Alt + S tira a captura e já abre para desenhar e anotar por cima.",
+                   "Super + Alt + S takes a screenshot and opens it for annotating.", True),
+    "overview": ("Super + Tab abre a visão geral: todas as áreas de trabalho num carrossel.",
+                 "Super + Tab opens the overview: all workspaces in a carousel.", False),
+    "clipboard": ("Super + V mostra tudo que você copiou, com busca. Super + Ctrl + V abre os favoritos.",
+                  "Super + V shows everything you copied, with search.", False),
+    "task_manager": ("Travou algo? Super + Esc (ou Ctrl + Shift + Esc) abre o gerenciador de tarefas.",
+                     "Something froze? Super + Esc (or Ctrl + Shift + Esc) opens the task manager.", False),
+    "special": ("Super + A abre uma área escondida para apps que você quer à mão, como música ou chat. Super + Shift + A manda a janela para lá.",
+                "Super + A toggles a hidden workspace for apps you want at hand. Super + Shift + A sends a window there.", False),
+    "minimize": ("Não existe minimizar: Super + D guarda a janela na área escondida, e Super + A traz de volta.",
+                 "There is no minimize: Super + D stashes the window, Super + A brings it back.", False),
+    "float": ("Super + Shift + V solta a janela para você mover e redimensionar à vontade, como no Windows.",
+              "Super + Shift + V makes a window float so you can move and resize it freely.", False),
+    "drag": ("Segure Super e arraste com o botão esquerdo para mover qualquer janela; com o direito, redimensiona.",
+             "Hold Super and drag with the left button to move a window; right button resizes.", False),
+    "workspaces_move": ("Super + Shift + 1..9 manda a janela atual para outra área de trabalho.",
+                        "Super + Shift + 1..9 sends the current window to another workspace.", False),
+    "workspaces_scroll": ("Segure Super e gire a roda do mouse para passar pelas áreas de trabalho.",
+                          "Hold Super and scroll to cycle through workspaces.", False),
+    "desktop_menu": ("Clique com o botão direito na área de trabalho para ver atalhos: configurações, tela, wallpaper e widgets.",
+                     "Right-click the desktop for quick actions: settings, display, wallpaper and widgets.", False),
+    "cheatsheet": ("Esqueceu um atalho? Super + F1 mostra todos.",
+                   "Forgot a shortcut? Super + F1 lists them all.", False),
+    "settings": ("Super + I abre as configurações: cores, tela, som, atalhos e muito mais.",
+                 "Super + I opens the settings: colors, display, sound, shortcuts and more.", False),
+    "record": ("Super + Shift + R começa a gravar a tela inteira. Aperte de novo para parar.",
+               "Super + Shift + R records the whole screen. Press again to stop.", False),
+    "dropterm": ("Super + ' abre um terminal suspenso por cima de tudo, que some quando você aperta de novo.",
+                 "Super + ' drops down a terminal over everything.", False),
+    "fullscreen": ("Super + F deixa a janela em tela cheia.",
+                   "Super + F toggles fullscreen.", False),
+    "lock": ("Super + L bloqueia a tela, igual ao Windows.",
+             "Super + L locks the screen, just like Windows.", False),
+    "wallpaper": ("Super + S troca o papel de parede. As cores do sistema acompanham o wallpaper.",
+                  "Super + S changes the wallpaper, and the system colors follow it.", False),
+    "sidebar": ("Encoste o mouse na borda direita da tela para abrir a barra com desligar, atualizações e bandeja.",
+                "Move the mouse to the right edge to open the sidebar with power, updates and tray.", False),
+    "hub": ("Clique no relógio da barra de cima para abrir o painel com mídia, desempenho e notificações.",
+            "Click the clock on the top bar for media, performance and notifications.", False),
+}
+
+
+def load():
+    try:
+        with open(STATE, encoding="utf-8") as f:
+            d = json.load(f)
+            if isinstance(d, dict):
+                d.setdefault("enabled", True)
+                d.setdefault("shown", {})
+                return d
+    except (OSError, ValueError):
+        pass
+    return {"enabled": True, "shown": {}, "last": 0}
+
+
+def save(d):
+    os.makedirs(os.path.dirname(STATE), exist_ok=True)
+    tmp = STATE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(d, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+    os.replace(tmp, STATE)
+
+
+def remaining(d, contextual=None):
+    out = []
+    for tid, (_, _, ctx) in TIPS.items():
+        if contextual is not None and ctx != contextual:
+            continue
+        if d["shown"].get(tid, 0) < MAX_TIMES:
+            out.append(tid)
+    return out
+
+
+def notify(d, tid):
+    pt, en, _ = TIPS[tid]
+    d["shown"][tid] = d["shown"].get(tid, 0) + 1
+    d["last"] = time.time()
+    save(d)
+    title = "Tip" if EN else "Dica"
+    stop = "Don't show tips" if EN else "Não mostrar mais dicas"
+    # Em segundo plano: o notify-send com --action fica esperando o clique.
+    pid = os.fork()
+    if pid:
+        return
+    os.setsid()
+    try:
+        r = subprocess.run(["notify-send", "-a", "Dicas", "-i", "dialog-information", "-t", "12000",
+                            "--action=stop=" + stop, title, en if EN else pt],
+                           capture_output=True, text=True)
+        if r.stdout.strip() == "stop":
+            cur = load()
+            cur["enabled"] = False
+            save(cur)
+    finally:
+        os._exit(0)
+
+
+def main(argv):
+    cmd = argv[0] if argv else "status"
+    d = load()
+
+    if cmd == "status":
+        print(json.dumps({"enabled": d["enabled"], "total": len(TIPS),
+                          "remaining": len(remaining(d))}))
+    elif cmd in ("on", "off"):
+        d["enabled"] = cmd == "on"
+        save(d)
+        print(json.dumps({"enabled": d["enabled"]}))
+    elif cmd == "reset":
+        d["shown"] = {}
+        d["last"] = 0
+        save(d)
+    elif cmd == "show" and len(argv) > 1:
+        tid = argv[1]
+        if not d["enabled"] or tid not in TIPS or d["shown"].get(tid, 0) >= MAX_TIMES:
+            return 0
+        if time.time() - d.get("last", 0) < MIN_GAP:
+            return 0
+        notify(d, tid)
+    elif cmd == "random":
+        if not d["enabled"] or time.time() - d.get("last", 0) < MIN_GAP:
+            return 0
+        pool = remaining(d, contextual=False)
+        if not pool:
+            return 0
+        # Primeiro as que ainda não apareceram nenhuma vez.
+        fresh = [t for t in pool if d["shown"].get(t, 0) == 0]
+        notify(d, random.choice(fresh or pool))
+    else:
+        print(__doc__.strip(), file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

@@ -80,6 +80,8 @@ case "$MODE" in
         FILE="$(dest_path)"
         if [ -n "$GEOM" ]; then
             grim -g "$GEOM" "$FILE" 2>/dev/null && finish "$FILE" "Região capturada"
+            # Dica (no máximo 2 vezes): existe a versão que já abre o editor.
+            command -v rice-tips >/dev/null && (sleep 3; rice-tips show print_edit) >/dev/null 2>&1 &
         else
             # Cancelou a seleção: captura a tela inteira em vez de não fazer nada.
             FILE="$(capture_full)"

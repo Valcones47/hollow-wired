@@ -1008,6 +1008,7 @@ PanelWindow {
         loadColorOverridesProc.running = true;
         loadAppBindsProc.running = true;
         loadSysBindsProc.running = true;
+        loadTipsProc.running = true;
         loadAudioProc.running = true;
         loadPowerProc.running = true;
         loadAutostartProc.running = true;
@@ -1297,7 +1298,61 @@ PanelWindow {
         border.width: 1.5
         border.color: Theme.withAlpha(Theme.primary, 0.4)
         focus: win.open
-        Keys.onEscapePressed: win.open = false
+        // Durante a gravação de um atalho o Esc é uma tecla como outra
+        // qualquer (Super+Esc, por exemplo): não pode fechar o painel.
+        Keys.onEscapePressed: if (!win.bindCapturing) win.open = false
+
+        // Faixa de gravação de atalho, por cima de qualquer aba: aparece tanto
+        // no guia (trocar atalho do sistema) quanto na lista dos programas.
+        Rectangle {
+            z: 60
+            visible: win.bindCapturing
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 22
+            width: Math.min(parent.width - 60, captureRow.implicitWidth + 36)
+            height: 62
+            radius: 16
+            color: Theme.mix(Theme.background, Theme.primary, 0.12)
+            border.width: 1.5
+            border.color: Theme.primary
+
+            RowLayout {
+                id: captureRow
+                anchors.fill: parent
+                anchors.leftMargin: 18
+                anchors.rightMargin: 12
+                spacing: 14
+                Text {
+                    text: Theme.icons.cursor
+                    font.family: Theme.iconFontFamily
+                    font.pixelSize: 20
+                    color: Theme.primary
+                }
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 1
+                    Text {
+                        text: Theme.t("binds.sub_capturing", "Aperte a combinação de teclas agora...")
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 13
+                        font.weight: Font.DemiBold
+                        color: Theme.textColor
+                    }
+                    Text {
+                        text: win.bindRecordingName + " · " + Theme.t("binds.sub_capturing_hint", "qualquer tecla vale, inclusive o Esc")
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 11
+                        color: Theme.subtext
+                    }
+                }
+                ActionBtn {
+                    icon: Theme.icons.close
+                    text: Theme.t("binds.cancel", "Cancelar")
+                    onClicked: win.cancelBindCapture()
+                }
+            }
+        }
 
         // Borda com efeito sutil de profundidade
         Rectangle {
@@ -1697,7 +1752,7 @@ PanelWindow {
                                             }
 
                                             Text {
-                                                text: navDelegate.modelData.desc
+                                                text: navDelegate.modelData.desc || ""
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: 10
                                                 color: Theme.withAlpha(Theme.subtext, 0.6)
@@ -6975,6 +7030,44 @@ PanelWindow {
                                     Item { Layout.fillWidth: true }
                                 }
 
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    implicitHeight: tipsRow.implicitHeight + 24
+                                    radius: 12
+                                    color: Theme.tile
+                                    border.width: 1
+                                    border.color: Theme.withAlpha(Theme.outline, 0.2)
+
+                                    RowLayout {
+                                        id: tipsRow
+                                        anchors.fill: parent
+                                        anchors.margins: 12
+                                        spacing: 10
+
+                                        CfgToggle {
+                                            title: Theme.t("binds.tips_title", "Dicas de uso em notificação")
+                                            subtitle: win.tipsRemaining > 0
+                                                ? Theme.t("binds.tips_sub", "Ensinam um atalho de vez em quando. Cada dica aparece no máximo 2 vezes.")
+                                                : Theme.t("binds.tips_done", "Todas as dicas já foram mostradas. Recomeçar faz elas voltarem.")
+                                            checked: win.tipsEnabled
+                                            onToggled: nextVal => {
+                                                win.tipsEnabled = nextVal;
+                                                setTipsProc.command = ["rice-tips", nextVal ? "on" : "off"];
+                                                setTipsProc.running = true;
+                                            }
+                                        }
+                                        ActionBtn {
+                                            icon: Theme.icons.restore
+                                            text: Theme.t("binds.tips_reset", "Recomeçar")
+                                            onClicked: {
+                                                setTipsProc.command = ["rice-tips", "reset"];
+                                                setTipsProc.running = true;
+                                                win.showToast(Theme.t("binds.tips_reset_toast", "As dicas vão aparecer de novo"));
+                                            }
+                                        }
+                                    }
+                                }
+
                                 RowLayout {
                                     Layout.fillWidth: true
                                     SectionHeader {
@@ -7120,7 +7213,9 @@ PanelWindow {
                                                 { key: "Super + N", action: Theme.t("binds.act_notifcenter", "Abrir Central de Notificações") },
                                                 { key: "Super + Shift + N", action: Theme.t("binds.act_dnd", "Alternar Não Perturbe (DND)") },
                                                 { key: "Super + L", action: Theme.t("binds.act_lock", "Bloquear Tela (Hyprlock)") },
-                                                { key: "Alt + Tab", action: Theme.t("binds.act_alttab", "Alternador de Janelas com Miniaturas") }
+                                                { key: "Alt + Tab", action: Theme.t("binds.act_alttab", "Alternador de Janelas com Miniaturas") },
+                                                { key: "Super + Tab", action: Theme.t("binds.act_overview", "Visão Geral das Áreas de Trabalho (Carrossel)") },
+                                                { key: "Super + Esc", action: Theme.t("binds.act_taskmgr", "Gerenciador de Tarefas (também Ctrl + Shift + Esc)") }
                                             ]
                                         },
                                         {
@@ -7302,47 +7397,7 @@ PanelWindow {
 
                                 SectionHeader {
                                     title: Theme.t("binds.sub_title", "Atalhos dos Programas")
-                                    subtitle: Theme.t("binds.sub_desc", "Clique em Definir atalho, aperte a combinação de teclas e pronto. Esc cancela.")
-                                }
-
-                                // Faixa de captura em andamento
-                                Rectangle {
-                                    Layout.fillWidth: true
-                                    visible: win.bindCapturing
-                                    radius: 12
-                                    color: Qt.rgba(1, 0.65, 0.2, 0.12)
-                                    border.width: 1
-                                    border.color: Theme.primary
-                                    implicitHeight: 54
-
-                                    RowLayout {
-                                        anchors.fill: parent
-                                        anchors.margins: 14
-                                        spacing: 12
-                                        Text {
-                                            text: Theme.icons.cursor
-                                            font.family: Theme.iconFontFamily
-                                            font.pixelSize: 18
-                                            color: Theme.primary
-                                        }
-                                        ColumnLayout {
-                                            Layout.fillWidth: true
-                                            spacing: 1
-                                            Text {
-                                                text: Theme.t("binds.sub_capturing", "Aperte a combinação de teclas agora...")
-                                                font.family: Theme.fontFamily
-                                                font.pixelSize: 13
-                                                font.weight: Font.DemiBold
-                                                color: Theme.textColor
-                                            }
-                                            Text {
-                                                text: win.bindRecordingName + " · " + Theme.t("binds.sub_capturing_hint", "Esc cancela")
-                                                font.family: Theme.fontFamily
-                                                font.pixelSize: 11
-                                                color: Theme.subtext
-                                            }
-                                        }
-                                    }
+                                    subtitle: Theme.t("binds.sub_desc", "Clique em Definir atalho, aperte a combinação de teclas e pronto.")
                                 }
 
                                 Text {
@@ -9016,6 +9071,37 @@ PanelWindow {
         const c = win.pickerColor;
         const h = n => ("0" + Math.round(n * 255).toString(16)).slice(-2).toUpperCase();
         return "#" + h(c.r) + h(c.g) + h(c.b);
+    }
+
+    // O gravador lê o teclado direto do /dev/input e aceita qualquer tecla,
+    // então desistir é pelo botão: matar o processo encerra a leitura.
+    function cancelBindCapture() {
+        win.bindRecordingFor = "";
+        win.sysRecordingFor = "";
+        win.bindCapturing = false;
+        recordAppBindProc.running = false;
+        win.showToast(Theme.t("toast.bind_cancelled", "Gravação cancelada"));
+    }
+
+    // Dicas de uso em notificação (rice-tips).
+    property bool tipsEnabled: true
+    property int tipsRemaining: 0
+    Process {
+        id: loadTipsProc
+        command: ["rice-tips", "status"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const d = JSON.parse(text);
+                    win.tipsEnabled = d.enabled !== false;
+                    win.tipsRemaining = d.remaining || 0;
+                } catch (e) {}
+            }
+        }
+    }
+    Process {
+        id: setTipsProc
+        onExited: (code, status) => loadTipsProc.running = true
     }
 
     function startBindCapture(command, name) {
