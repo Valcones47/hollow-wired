@@ -120,9 +120,19 @@ Scope {
 
     // Revela o wallpaper novo. Chamado quando o renderizador novo já está no ar
     // (ver rice-wallpaper-fade --reveal-when-ready).
+    // Pedido de revelação que chegou com a animação de entrada ainda
+    // correndo (a troca começa cedo e o wallpaper novo pode ficar pronto
+    // antes da onda terminar). Revela quando ela acabar.
+    property bool revealQueued: false
+
     function reveal() {
         if (!fadeScope.covering && !fadeScope.pendingCover)
             return;
+        if (coverAnim.running) {
+            fadeScope.revealQueued = true;
+            return;
+        }
+        fadeScope.revealQueued = false;
         fadeScope.pendingCover = false;
         fadeScope.opDuration = fadeScope.revealMs;
         fadeScope.covering = false;
@@ -130,6 +140,7 @@ Scope {
     }
 
     function dismiss() {
+        fadeScope.revealQueued = false;
         fadeScope.pendingCover = false;
         fadeScope.covering = false;
         coverAnim.stop();
@@ -149,6 +160,7 @@ Scope {
         // do CSS ela cobria 70% da tela no primeiro terço e os anéis mal
         // apareciam. Os outros estilos seguem a curva do swww
         // (0.25,0.1,0.25,1.0), que arranca rápido e assenta devagar.
+        onFinished: if (fadeScope.revealQueued) fadeScope.reveal()
         easing.type: Easing.Bezier
         easing.bezierCurve: fadeScope.style === "wave" ? [0.45, 0.05, 0.55, 0.95, 1.0, 1.0]
                                                        : [0.25, 0.1, 0.25, 1.0, 1.0, 1.0]
@@ -435,9 +447,13 @@ Scope {
         // Revela o wallpaper novo, agora que o renderizador dele está no ar.
         function reveal(): void { fadeScope.reveal(); }
         // Quanto tempo o chamador deve esperar antes de aplicar a troca.
-        // Começa a troca com a imagem em ~85%: o resto da animação corre
-        // enquanto o backend já está trocando, em vez de esperar parado.
-        function coverDelay(): string { return String(Math.round(fadeScope.coverMs * 0.85)); }
+        // A troca começa logo no início da animação (~25%), não quando a tela
+        // já está coberta: o wallpaper novo leva perto de 1s para começar a
+        // rodar, e esperar a cobertura terminar deixava esse segundo inteiro
+        // depois da transição, com a imagem parada. Assim o carregamento
+        // acontece enquanto a onda ainda está andando. O pedaço ainda
+        // descoberto mostra o último quadro do antigo, que o compositor mantém.
+        function coverDelay(): string { return String(Math.round(fadeScope.coverMs * 0.25)); }
         // Troca o estilo sem reiniciar o shell (usado pelo painel e para teste).
         function setStyle(name: string): void { fadeScope.style = name; }
         function currentStyle(): string { return fadeScope.style; }
