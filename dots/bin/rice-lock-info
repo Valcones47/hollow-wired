@@ -110,6 +110,22 @@ case "${1:-}" in
         out=$(curl -fsS --max-time 6 'https://wttr.in/?format=%C+%t' 2>/dev/null) || exit 0
         [ -n "$out" ] && printf '%s\n' "$out" > "$WEATHER_CACHE"
         ;;
+    notifs)
+        # As notificações vivem na memória do shell, não em arquivo, então
+        # quem sabe o número é ele. Sai vazio se o shell não estiver de pé, e aí
+        # a linha simplesmente não aparece na tela de bloqueio.
+        n=$(qs ipc call notif count 2>/dev/null | tr -cd '0-9')
+        [ -n "$n" ] && [ "$n" != "0" ] && {
+            [ "$n" = "1" ] && echo "1 notificação" || echo "$n notificações"
+        }
+        ;;
+    avatar)
+        # Caminho da foto do usuário, no primeiro formato que existir.
+        for f in "$HOME/.face.webp" "$HOME/.face" "$HOME/.face.icon" \
+                 "/var/lib/AccountsService/icons/$USER"; do
+            [ -s "$f" ] && { printf '%s\n' "$f"; exit 0; }
+        done
+        ;;
     greeting)
         h=$(date +%-H)
         if   [ "$h" -lt 6 ]  ; then echo "Boa madrugada"
@@ -119,7 +135,7 @@ case "${1:-}" in
         fi
         ;;
     *)
-        echo "uso: rice-lock-info <cpu|ram|bat|media|host|uptime|weather|weather-refresh|greeting>" >&2
+        echo "uso: rice-lock-info <cpu|ram|bat|media|host|uptime|weather|weather-refresh|greeting|notifs|avatar>" >&2
         exit 2
         ;;
 esac

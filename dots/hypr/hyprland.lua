@@ -169,14 +169,12 @@ if hasNvidia and hasIgpu then
     -- eliminando overhead de cópia inter-GPU. Jogos usam dGPU via prime-run.
     hl.env("__NV_PRIME_RENDER_OFFLOAD", "0")
     hl.env("__GLX_VENDOR_LIBRARY_NAME", "mesa")
-    -- __GLX_VENDOR_LIBRARY_NAME só cobre GLX. Aplicativos Electron (Discord,
-    -- VS Code, Zen) desenham por EGL no Wayland e, sem isto, o Chromium
-    -- escolhia a dGPU NVIDIA sozinho — o processo de GPU morria com
-    -- "GPU process isn't usable. Goodbye." e a janela nunca abria, sem
-    -- nenhuma mensagem visível pro usuário. DRI_PRIME é variável do Mesa e
-    -- seleciona a iGPU; jogos não são afetados porque prime-run e game-run
-    -- usam __NV_PRIME_RENDER_OFFLOAD=1, que é o caminho da NVIDIA.
-    hl.env("DRI_PRIME", "0")
+    -- Aqui já houve um `hl.env("DRI_PRIME", "0")`, posto junto do conserto do
+    -- Discord que não abria. Ele era inválido: o Mesa aceita DRI_PRIME a partir
+    -- de 1 (ou "vendor:device") e reclama de "Invalid value (0)" em todo
+    -- programa gráfico, porque a iGPU já é o padrão quando a variável não
+    -- existe. Testado sem ela: o Discord abre igual — quem resolvia era a
+    -- outra metade do conserto, a flag de ozone duplicada no settings.json.
 elseif hasNvidia and not hasIgpu then
     -- PC Desktop com NVIDIA exclusiva (sem iGPU): aceleração direta por hardware
     -- NOTA: GBM_BACKEND=nvidia-drm NUNCA deve ser definido no Hyprland moderno pois causa flickering severo

@@ -434,6 +434,10 @@ ShellRoot {
 
             function toggleDnd(): void { NotifService.toggleDnd(); }
             function refresh(): void { NotifService.refresh(); }
+            // A tela de bloqueio lê isto: o hyprlock não tem como enxergar o
+            // estado do shell de outro jeito, e as notificações vivem em
+            // memória, não em arquivo.
+            function count(): string { return String(NotifService.unreadCount); }
             function clear(): void { NotifService.setCleared(NotifService.maxId); }
             function open(): void {
                 card.currentTab = 5;
