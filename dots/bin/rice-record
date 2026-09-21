@@ -10,21 +10,51 @@ set -e
 DIR="$(xdg-user-dir VIDEOS 2>/dev/null || echo "$HOME/Vídeos")/Gravações"
 RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$UID}"
 
-# Escolhe o melhor encoder disponível nesta máquina:
-#   NVIDIA com NVENC → h264_nvenc | Intel/AMD com VAAPI → h264_vaapi | resto → CPU
-detect_codec() {
-    local encoders=""
-    command -v ffmpeg >/dev/null 2>&1 && encoders="$(ffmpeg -hide_banner -encoders 2>/dev/null)"
+# Escolhe o encoder pela placa que DESENHA A TELA, não pela mais forte.
+#
+# O wf-recorder copia cada quadro do compositor. Se o encoder está em outra
+# placa, cada quadro (60 por segundo, em 1080p) sai da placa da tela, passa
+# pela memória do sistema e sobe para a outra — em notebook híbrido isso é a
+# Intel mandando tudo para a NVIDIA. Medido aqui: com NVENC o wf-recorder
+# ficava em 19% de CPU e 827 MB, e o Hyprland subia de 9% para 14% (o lag ao
+# começar a gravar). Com VAAPI na própria Intel, sem cópia nenhuma: 3% e 95 MB,
+# e o Hyprland nem se mexe.
+#
+# Monitor ligado na NVIDIA → h264_nvenc | na Intel/AMD → h264_vaapi no nó
+# dela | nada disso → CPU (libx264).
+display_render_node() {
+    # Placa com um conector de monitor ligado.
+    local st card
+    for st in /sys/class/drm/card*-*/status; do
+        [ "$(cat "$st" 2>/dev/null)" = "connected" ] || continue
+        card="$(basename "$(dirname "$st")")"
+        card="${card%%-*}"
+        ls "/sys/class/drm/$card/device/drm/" 2>/dev/null | grep -m1 '^renderD' && return 0
+    done
+    return 1
+}
 
-    if [ -e /dev/nvidiactl ] || [ -d /proc/driver/nvidia ]; then
-        if [ -z "$encoders" ] || printf '%s' "$encoders" | grep -q "h264_nvenc"; then
-            echo "h264_nvenc"; return
-        fi
+detect_codec() {
+    local encoders="" node vendor
+    command -v ffmpeg >/dev/null 2>&1 && encoders="$(ffmpeg -hide_banner -encoders 2>/dev/null)"
+    has() { [ -z "$encoders" ] || printf '%s' "$encoders" | grep -q "$1"; }
+
+    node="$(display_render_node || true)"
+    vendor="$( [ -n "$node" ] && cat "/sys/class/drm/$node/device/vendor" 2>/dev/null || true)"
+
+    if [ "$vendor" = "0x10de" ] && has h264_nvenc; then
+        echo "h264_nvenc"; return
     fi
-    if ls /dev/dri/renderD* >/dev/null 2>&1; then
-        if [ -z "$encoders" ] || printf '%s' "$encoders" | grep -q "h264_vaapi"; then
-            echo "h264_vaapi"; return
-        fi
+    if [ -n "$node" ] && [ "$vendor" != "0x10de" ] && has h264_vaapi; then
+        VAAPI_NODE="/dev/dri/$node"
+        echo "h264_vaapi"; return
+    fi
+    # Sem como saber a placa da tela: o comportamento antigo.
+    if { [ -e /dev/nvidiactl ] || [ -d /proc/driver/nvidia ]; } && has h264_nvenc; then
+        echo "h264_nvenc"; return
+    fi
+    if ls /dev/dri/renderD* >/dev/null 2>&1 && has h264_vaapi; then
+        echo "h264_vaapi"; return
     fi
     echo "libx264"
 }
@@ -222,13 +252,16 @@ do_start() {
     # Codec de Vídeo: acelerado por hardware quando a máquina tem, CPU quando não.
     if [ "$codec" = "auto" ] || [ -z "$codec" ]; then
         codec="$(detect_codec)"
+        # detect_codec roda num subshell; o nó da VAAPI é recalculado aqui.
+        [ "$codec" = "h264_vaapi" ] && VAAPI_NODE="/dev/dri/$(display_render_node || true)"
+        [ "$VAAPI_NODE" = "/dev/dri/" ] && VAAPI_NODE=""
     fi
     if [ -n "$codec" ]; then
         wf_args+=(-c "$codec")
         # VAAPI (Intel/AMD) precisa saber qual nó de render usar.
         if [ "$codec" = "h264_vaapi" ]; then
-            local render_node
-            render_node="$(ls /dev/dri/renderD* 2>/dev/null | head -1)"
+            local render_node="${VAAPI_NODE:-}"
+            [ -n "$render_node" ] || render_node="$(ls /dev/dri/renderD* 2>/dev/null | head -1)"
             [ -n "$render_node" ] && wf_args+=(-d "$render_node")
         fi
     fi
