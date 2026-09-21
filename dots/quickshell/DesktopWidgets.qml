@@ -6,6 +6,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Hyprland
 import Quickshell.Services.Mpris
+import Quickshell.Widgets
 import Quickshell.Services.UPower
 import "."
 
@@ -587,8 +588,17 @@ PanelWindow {
             width: 360
             height: 160
 
-            readonly property var player: Mpris.players.values.length > 0 ? Mpris.players.values[0] : null
+            // O que está tocando de fato; sem nenhum tocando, o primeiro. Fixar
+            // em values[0] mostrava o navegador parado com o Spotify tocando.
+            readonly property var player: {
+                const list = Mpris.players.values;
+                for (let i = 0; i < list.length; i++)
+                    if (list[i].isPlaying)
+                        return list[i];
+                return list.length > 0 ? list[0] : null;
+            }
             readonly property bool playing: player ? player.isPlaying : false
+            readonly property string artUrl: player && player.trackArtUrl ? player.trackArtUrl : ""
 
             RowLayout {
                 anchors.fill: parent
@@ -610,20 +620,50 @@ PanelWindow {
                         running: w.playing
                     }
 
-                    Rectangle { anchors.centerIn: parent; width: 70; height: 70; radius: 35; color: "transparent"; border.color: "#25272c"; border.width: 1 }
-                    Rectangle { anchors.centerIn: parent; width: 46; height: 46; radius: 23; color: "transparent"; border.color: "#25272c"; border.width: 1 }
+                    // Capa da música tocando, recortada no círculo do disco e
+                    // girando com ele. Sem capa (ou sem player) fica o vinil
+                    // liso com o selo colorido no meio, como antes.
+                    ClippingRectangle {
+                        anchors.fill: parent
+                        anchors.margins: 2
+                        radius: width / 2
+                        color: "transparent"
+                        visible: discArt.status === Image.Ready
+
+                        Image {
+                            id: discArt
+                            anchors.fill: parent
+                            source: w.artUrl
+                            fillMode: Image.PreserveAspectCrop
+                            asynchronous: true
+                            smooth: true
+                        }
+                    }
+
+                    Rectangle { anchors.centerIn: parent; width: 70; height: 70; radius: 35; color: "transparent"; border.color: discArt.status === Image.Ready ? Qt.rgba(0, 0, 0, 0.25) : "#25272c"; border.width: 1 }
+                    Rectangle { anchors.centerIn: parent; width: 46; height: 46; radius: 23; color: "transparent"; border.color: discArt.status === Image.Ready ? Qt.rgba(0, 0, 0, 0.25) : "#25272c"; border.width: 1 }
 
                     Rectangle {
                         anchors.centerIn: parent
                         width: 28; height: 28; radius: 14
-                        color: w.wAccent
+                        // Com capa, o selo vira o furo do vinil.
+                        color: discArt.status === Image.Ready ? "#111215" : w.wAccent
+                        border.width: discArt.status === Image.Ready ? 2 : 0
+                        border.color: w.wAccent
 
                         Text {
                             anchors.centerIn: parent
+                            visible: discArt.status !== Image.Ready
                             text: Theme.icons.music
                             font.family: Theme.iconFontFamily
                             font.pixelSize: 13
                             color: Theme.background
+                        }
+                        Rectangle {
+                            anchors.centerIn: parent
+                            visible: discArt.status === Image.Ready
+                            width: 6; height: 6; radius: 3
+                            color: Theme.withAlpha(Theme.foreground, 0.8)
                         }
                     }
                 }
