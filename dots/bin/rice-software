@@ -2,13 +2,13 @@
 # ==============================================================================
 # rice-software — estado das atualizações e kits de aplicativos do rice.
 #
-# Esta ferramenta NÃO tenta ser uma loja de aplicativos: o Pamac (ou outro
+# Esta ferramenta NÃO tenta ser uma loja de aplicativos: o Shelly (ou outro
 # gerenciador gráfico instalado) já faz isso muito melhor, com busca, AUR,
-# Flatpak, detalhes e remoção. O antigo catálogo de 22 aplicativos soltos aqui
-# dentro era uma versão pior do Pamac — e ainda instalava com `yay` fixo, que
-# nem existe em quem instalou o rice com `paru`.
+# Flatpak, AppImage, detalhes e remoção. O antigo catálogo de 22 aplicativos
+# soltos aqui dentro era uma versão pior disso — e ainda instalava com `yay`
+# fixo, que nem existe em quem instalou o rice com `paru`.
 #
-# O que sobrou é o que o Pamac não faz:
+# O que sobrou é o que a loja não faz:
 #   • contagem unificada de atualizações (oficiais + AUR + Flatpak + dotfiles do rice);
 #   • atualização das dotfiles do próprio rice;
 #   • atalho para abrir o gerenciador gráfico que estiver instalado.
@@ -23,12 +23,16 @@
 
 set -uo pipefail
 
-# Gerenciador gráfico de programas preferido do usuário (Pamac primeiro).
-STORE_CANDIDATES=(pamac-manager octopi discover gnome-software)
+# Gerenciador gráfico de programas preferido do usuário. Shelly primeiro: está
+# no repositório do CachyOS e é recompilado junto com o pacman. O Pamac vem do
+# AUR, não tem suporte oficial no Arch e quebra a cada atualização da libalpm
+# até alguém recompilar — continua na lista só para quem ainda o tem.
+STORE_CANDIDATES=(shelly-ui pamac-manager octopi discover gnome-software)
 
 aur_helper() {
     if command -v paru >/dev/null 2>&1; then echo "paru"
     elif command -v yay >/dev/null 2>&1; then echo "yay"
+    elif command -v shelly >/dev/null 2>&1; then echo "shelly"
     elif command -v pamac >/dev/null 2>&1; then echo "pamac"
     else echo ""; fi
 }
@@ -114,6 +118,8 @@ install_packages() {
         cmd="paru -S --needed ${pkgs[*]}"
     elif [ "$helper" = "yay" ]; then
         cmd="yay -S --needed ${pkgs[*]}"
+    elif [ "$helper" = "shelly" ]; then
+        cmd="shelly install ${pkgs[*]}"
     elif [ "$helper" = "pamac" ]; then
         cmd="pamac install ${pkgs[*]}"
     else
@@ -143,10 +149,11 @@ open_store() {
         nohup "$store" >/dev/null 2>&1 &
         return 0
     fi
-    # Nenhum gerenciador gráfico: oferece instalar o Pamac.
+    # Nenhum gerenciador gráfico: oferece instalar o Shelly. Ele está no
+    # repositório do CachyOS; em outras distros Arch vem do AUR.
     notify-send -a "Programas" -i dialog-information -t 5000 \
-        "Nenhuma loja de programas instalada" "Abrindo a instalação do Pamac..." 2>/dev/null
-    install_packages pamac-aur
+        "Nenhuma loja de programas instalada" "Abrindo a instalação do Shelly..." 2>/dev/null
+    install_packages shelly
 }
 
 update_system() {
@@ -155,6 +162,7 @@ update_system() {
     local cmd="sudo pacman -Syu"
     [ "$helper" = "paru" ] && cmd="paru -Syu"
     [ "$helper" = "yay" ] && cmd="yay -Syu"
+    [ "$helper" = "shelly" ] && cmd="shelly upgrade -a"
     [ "$helper" = "pamac" ] && cmd="pamac update -a"
 
     notify-send -a "Atualização do Sistema" -i system-software-update -r 91197 -t 3000 \

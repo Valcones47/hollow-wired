@@ -864,7 +864,7 @@
   "store.browse_title": "Browse and install programs",
   "store.browse_sub": "The system store has search, ratings, AUR and Flatpak — that's where you install anything.",
   "store.open_store": "Open the software store",
-  "store.no_store": "None installed — click to install Pamac",
+  "store.no_store": "None installed — click to install Shelly",
   "store.rice_section": "hollow-wired updater",
   "store.rice_section_sub": "Improvements and fixes to the desktop itself arrive here — no package manager handles this.",
   "store.rice_latest": "You're on the latest version",

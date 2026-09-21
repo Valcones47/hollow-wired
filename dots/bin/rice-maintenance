@@ -22,7 +22,7 @@ case "$cmd" in
         echo "[✓] Limpeza de cache concluída"
         ;;
     unlockpacman)
-        if pgrep -x pacman &>/dev/null || pgrep -x pamac &>/dev/null || pgrep -x yay &>/dev/null; then
+        if pgrep -x pacman &>/dev/null || pgrep -x pamac &>/dev/null || pgrep -x shelly &>/dev/null || pgrep -x yay &>/dev/null; then
             notify-send -a "Sistema" -i dialog-warning -r 91195 -t 3000 "Pacman em Execução" "Existe um instalador rodando no momento. Não remova a trava agora."
             echo "[-] Pacman em execução"
             exit 1

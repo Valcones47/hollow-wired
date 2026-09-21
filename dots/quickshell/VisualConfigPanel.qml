@@ -7960,7 +7960,7 @@ PanelWindow {
                         // ==========================================
                         // ABA 17: PROGRAMAS & ATUALIZAÇÕES
                         // ==========================================
-                        // Esta aba deixou de ser um "catálogo de aplicativos": o Pamac
+                        // Esta aba deixou de ser um "catálogo de aplicativos": o Shelly
                         // (ou o gerenciador gráfico que o usuário tiver) faz isso muito
                         // melhor. Aqui ficou só o que ele não faz — contagem unificada
                         // de atualizações, atualização das dotfiles do rice e kits de
@@ -8121,7 +8121,7 @@ PanelWindow {
                                             Text {
                                                 text: win.softwareUpdatesData.store && win.softwareUpdatesData.store !== ""
                                                     ? win.softwareUpdatesData.store
-                                                    : Theme.t("store.no_store", "Nenhuma instalada — clique para instalar o Pamac")
+                                                    : Theme.t("store.no_store", "Nenhuma instalada — clique para instalar o Shelly")
                                                 font.family: Theme.monoFamily
                                                 font.pixelSize: 10
                                                 color: Theme.subtext

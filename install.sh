@@ -524,6 +524,37 @@ if [[ "$INSTALL_WAYWALLEN" =~ ^[Ss]$ ]]; then
     ok_msg "Waywallen instalado! Atalho Super + S configurado."
 fi
 
+# Opcional: loja de programas (Shelly)
+# O rice abre a "loja" pelo painel e pela sidebar; sem nenhuma, esses botões só
+# conseguem oferecer a instalação na hora. O Shelly instala e atualiza pacotes
+# do repositório, AUR, Flatpak e AppImage num lugar só, e no CachyOS vem do
+# repositório oficial (recompilado junto com o pacman — o Pamac, do AUR,
+# quebra a cada atualização da libalpm).
+if command -v shelly-ui >/dev/null 2>&1 || command -v shelly >/dev/null 2>&1; then
+    ok_msg "Shelly (loja de programas) já está instalado."
+else
+    echo -e "\n${CYAN}◈ [RECOMENDADO] O Shelly não está instalado.${NC}"
+    echo -e "  ${GRAY}É a loja de programas do rice: instala e atualiza pacotes do repositório, AUR, Flatpak e AppImage.${NC}"
+    if pacman -Q pamac-aur >/dev/null 2>&1 || pacman -Q pamac-gtk >/dev/null 2>&1; then
+        echo -e "  ${GRAY}O Pamac que você tem continua funcionando; o Shelly passa a ser o preferido.${NC}"
+    fi
+    read -rp "  Instalar o Shelly agora? [S/n]: " INSTALL_SHELLY || true
+    INSTALL_SHELLY=${INSTALL_SHELLY:-s}
+    if [[ "$INSTALL_SHELLY" =~ ^[Ss]$ ]]; then
+        gear_msg "Instalando Shelly..."
+        if pacman -Si shelly >/dev/null 2>&1; then
+            sudo pacman -S --needed --noconfirm shelly || true
+        elif [ -n "${AUR_HELPER:-}" ]; then
+            $AUR_HELPER -S --needed --noconfirm shelly || true
+        fi
+        if command -v shelly-ui >/dev/null 2>&1 || command -v shelly >/dev/null 2>&1; then
+            ok_msg "Shelly instalado!"
+        else
+            echo -e "  ${GRAY}Não consegui instalar o Shelly agora — dá para instalar depois pelo painel (Super + I).${NC}"
+        fi
+    fi
+fi
+
 # Opcional: Tela de Login SDDM & Bootloader Limine
 echo -e "\n${CYAN}◈ [OPCIONAL] Deseja configurar o SDDM (SilentSDDM) e o Bootloader Limine com tema do rice?${NC}"
 read -rp "  Configurar Login e Boot agora? [s/N]: " APPLY_BOOT || true
