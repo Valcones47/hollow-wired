@@ -384,6 +384,8 @@ PanelWindow {
     property int gapsIn: 6
     property string animPreset: "smooth"
     property string wallTransition: "wipe"
+    property int wallTransitionMs: 900
+    property var previewStatus: ({})
 
     // Snapshots Btrfs
     property var snapshotsData: ({ snapshots: [] })
@@ -445,6 +447,19 @@ PanelWindow {
     }
 
     // Processos de Leitura
+    // Quantas previews em alta resolução já existem. Alimenta os rótulos dos
+    // botões de gerar/fotografar.
+    Process {
+        id: previewStatusProc
+        command: ["rice-wallpaper-previews", "status"]
+        running: true
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try { win.previewStatus = JSON.parse(text); } catch (e) {}
+            }
+        }
+    }
+
     Process {
         id: loadFFProc
         command: ["rice-fastfetch-apply", "get"]
@@ -631,6 +646,7 @@ PanelWindow {
                     if (d.gaps_in !== undefined) win.gapsIn = d.gaps_in;
                     if (d.anim_preset !== undefined) win.animPreset = d.anim_preset;
                     if (d.wallpaper_transition !== undefined) win.wallTransition = d.wallpaper_transition;
+                    if (d.wallpaper_transition_ms !== undefined) win.wallTransitionMs = d.wallpaper_transition_ms;
                     if (d.monitor_hz !== undefined) win.monitorHz = parseInt(d.monitor_hz) || 0;
                     if (d.monitor_scale !== undefined) win.monitorScale = parseFloat(d.monitor_scale) || 1.0;
                     if (d.vrr !== undefined) win.vrrEnabled = (d.vrr === 1 || d.vrr === true);
@@ -4857,6 +4873,89 @@ PanelWindow {
                                                 }
                                             }
                                         }
+                                    }
+                                }
+
+                                CfgSlider {
+                                    title: Theme.t("wallust.tr_duration", "Duração da transição")
+                                    minVal: 300
+                                    maxVal: 2500
+                                    value: win.wallTransitionMs
+                                    unit: " ms"
+                                    onChanged: newVal => {
+                                        win.wallTransitionMs = Math.round(newVal);
+                                        debounceTimer.exec(() => {
+                                            Quickshell.execDetached(["rice-hypr-prefs", "set",
+                                                "wallpaper_transition_ms", String(win.wallTransitionMs)]);
+                                        });
+                                    }
+                                }
+
+                                SectionHeader {
+                                    title: Theme.t("wallust.section_previews", "Imagens dos wallpapers em alta resolução")
+                                    subtitle: Theme.t("wallust.section_previews_sub", "O Wallpaper Engine guarda só um ícone quadrado de cada papel de parede. Estas imagens são usadas na transição e para gerar as cores.")
+                                }
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: {
+                                        const st = win.previewStatus;
+                                        if (!st || st.total === undefined)
+                                            return Theme.t("wallust.previews_loading", "Verificando...");
+                                        return Theme.t("wallust.previews_count", "Vídeos: ")
+                                             + st.videos_prontos + "/" + st.videos + "   "
+                                             + Theme.t("wallust.previews_scenes", "Cenas: ")
+                                             + st.cenas_prontas + "/" + st.cenas;
+                                    }
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 11
+                                    color: Theme.subtext
+                                }
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 12
+
+                                    ActionBtn {
+                                        icon: Theme.icons.packages
+                                        text: Theme.t("wallust.previews_videos_btn", "Extrair Quadro dos Wallpapers de Vídeo")
+                                        onClicked: {
+                                            Quickshell.execDetached(["rice-wallpaper-previews", "videos"]);
+                                            win.showToast(Theme.t("toast.previews_videos", "Extraindo os quadros em segundo plano..."));
+                                            previewRecheck.restart();
+                                        }
+                                    }
+
+                                    ActionBtn {
+                                        icon: Theme.icons.monitor
+                                        text: Theme.t("wallust.previews_scenes_btn", "Fotografar os Wallpapers Animados")
+                                        onClicked: {
+                                            Quickshell.execDetached(["rice-wallpaper-previews", "scenes"]);
+                                            win.showToast(Theme.t("toast.previews_scenes", "Fotografando: a tela vai piscar entre os wallpapers e voltar ao normal no fim."));
+                                            previewRecheck.restart();
+                                        }
+                                    }
+                                }
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: Theme.t("wallust.previews_warn", "Os animados (cenas) não têm vídeo de onde tirar um quadro: a única forma é deixar cada um rodar e fotografar a tela. Por isso esse botão troca os wallpapers por alguns segundos, esconde a interface e depois devolve tudo como estava. Uma cena é pulada se sobrar alguma janela na tela.")
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 10
+                                    color: Theme.subtext
+                                    wrapMode: Text.WordWrap
+                                }
+
+                                Timer {
+                                    id: previewRecheck
+                                    interval: 8000
+                                    repeat: true
+                                    triggeredOnStart: false
+                                    property int ticks: 0
+                                    onTriggered: {
+                                        previewStatusProc.running = true;
+                                        ticks += 1;
+                                        if (ticks > 12) { ticks = 0; stop(); }
                                     }
                                 }
 

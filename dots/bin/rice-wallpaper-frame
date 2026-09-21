@@ -36,6 +36,16 @@ emit_fallback() {
 }
 
 [ -n "$dir" ] && [ -d "$dir" ] || { emit_fallback; exit 0; }
+
+# Cenas (scene.pkg) não têm vídeo para extrair, mas podem ter sido fotografadas
+# em tela cheia por `rice-wallpaper-previews scenes`. Essa foto é o melhor que
+# existe para elas e vale mais que o preview quadrado.
+scene_shot="$CACHE/scene-$(basename "$dir").jpg"
+if [ -s "$scene_shot" ]; then
+    printf '%s\n' "$scene_shot"
+    exit 0
+fi
+
 command -v ffmpeg >/dev/null 2>&1 || { emit_fallback; exit 0; }
 
 video=""

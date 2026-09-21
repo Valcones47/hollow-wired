@@ -1,0 +1,285 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# rice-wallpaper-previews — gera imagens de alta resolução dos wallpapers.
+#
+# O Wallpaper Engine guarda junto de cada item um preview QUADRADO e minúsculo:
+# nesta biblioteca eles vão de 140x140 a 1024x1024. Esticado para a tela inteira
+# isso fica borrado, e como fonte de paleta representa mal o wallpaper.
+#
+# Há dois casos, e eles pedem soluções diferentes:
+#
+#   vídeo (.mp4/.webm/.mkv)  o ffmpeg extrai um quadro na resolução real,
+#                            offline e em segundos;
+#   cena (scene.pkg)         não há arquivo de imagem para extrair. A única
+#                            forma de ter um quadro real é deixar a cena rodar
+#                            e fotografar a tela.
+#
+# Uso:
+#   rice-wallpaper-previews status          # o que já existe, em JSON
+#   rice-wallpaper-previews videos          # extrai os quadros dos vídeos
+#   rice-wallpaper-previews scenes          # fotografa as cenas (invasivo)
+#   rice-wallpaper-previews all             # os dois
+#
+# `scenes` troca o wallpaper várias vezes, some com a interface e muda de
+# workspace por alguns segundos por cena. No fim devolve o wallpaper e o
+# workspace que estavam antes.
+# ==============================================================================
+
+set -uo pipefail
+
+CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/hollow-wired/frames"
+FLATPAK_ROOT="$HOME/.var/app/org.waywallen.waywallen"
+DB="$FLATPAK_ROOT/data/waywallen/waywallen-v2.db"
+CFG="$FLATPAK_ROOT/config/waywallen/config.toml"
+
+BUS_NAME="org.waywallen.waywallen.Daemon"
+OBJ_PATH="/org/waywallen/waywallen/Daemon"
+IFACE="org.waywallen.waywallen.Daemon1"
+
+have() { command -v "$1" >/dev/null 2>&1; }
+note() { printf '%s\n' "$*"; }
+
+qs_bin=""
+for c in qs quickshell; do have "$c" && { qs_bin="$c"; break; } done
+
+# ------------------------------------------------------------------ biblioteca
+
+# Imprime uma linha por wallpaper: id<TAB>diretório<TAB>tipo<TAB>nome
+list_wallpapers() {
+    python3 - "$DB" <<'PY'
+import os, sqlite3, sys
+
+db = sys.argv[1]
+if not os.path.isfile(db):
+    sys.exit(0)
+try:
+    conn = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute(
+        "SELECT item.id, item.display_name, item.preview_path, library.path AS lib "
+        "FROM item JOIN library ON library.id = item.library_id"
+    ).fetchall()
+except Exception:
+    sys.exit(0)
+
+VIDEO = (".mp4", ".webm", ".mkv")
+for r in rows:
+    if not r["preview_path"]:
+        continue
+    d = os.path.dirname(os.path.join(r["lib"].rstrip("/"), r["preview_path"]))
+    if not os.path.isdir(d):
+        continue
+    kind = "outro"
+    try:
+        names = os.listdir(d)
+    except OSError:
+        continue
+    if any(n.lower().endswith(VIDEO) for n in names):
+        kind = "video"
+    elif any(n == "scene.pkg" for n in names):
+        kind = "cena"
+    print("\t".join([str(r["id"]), d, kind, r["display_name"] or ""]))
+PY
+}
+
+current_wallpaper_id() {
+    python3 - "$CFG" <<'PY'
+import os, sys, tomllib
+cfg = sys.argv[1]
+if not os.path.isfile(cfg):
+    sys.exit(0)
+try:
+    with open(cfg, "rb") as f:
+        data = tomllib.load(f)
+except Exception:
+    sys.exit(0)
+wid = data.get("global", {}).get("last_wallpaper")
+if not wid:
+    for v in data.get("display", {}).values():
+        if isinstance(v, dict) and v.get("last_wallpaper"):
+            wid = v["last_wallpaper"]
+            break
+if wid:
+    print(wid)
+PY
+}
+
+scene_shot() { echo "$CACHE/scene-$(basename "$1").jpg"; }
+
+# Quantas janelas estão visíveis na tela agora.
+#
+# Não basta olhar o workspace ativo: um workspace especial aberto fica por cima
+# de qualquer outro. Mas também não dá para contar todo workspace especial, que
+# existe mesmo escondido — quem diz qual está à mostra é `hyprctl monitors`.
+visible_windows() {
+    python3 <<'PY' 2>/dev/null || echo 1
+import json, subprocess
+
+def run(*args):
+    return json.loads(subprocess.run(["hyprctl", *args, "-j"],
+                                     capture_output=True, text=True).stdout)
+
+try:
+    clients = run("clients")
+    monitors = run("monitors")
+except Exception:
+    print(1); raise SystemExit
+
+shown = set()
+for m in monitors:
+    ws = m.get("activeWorkspace") or {}
+    if ws.get("id") is not None:
+        shown.add(ws["id"])
+    sp = m.get("specialWorkspace") or {}
+    # id 0 / nome vazio = nenhum especial aberto neste monitor.
+    if sp.get("id") and sp.get("name"):
+        shown.add(sp["id"])
+
+print(sum(1 for c in clients
+          if c.get("mapped") and c.get("workspace", {}).get("id") in shown))
+PY
+}
+
+apply_wallpaper() {
+    busctl --user call "$BUS_NAME" "$OBJ_PATH" "$IFACE" ApplyById s "$1" >/dev/null 2>&1
+}
+
+# Espera o renderizador do wallpaper novo aparecer. É o mesmo sinal que a
+# transição usa: o waywallen sobe um processo por wallpaper com o caminho do
+# item na linha de comando.
+wait_renderer() {
+    local target="$1" deadline=$(( $(date +%s) + 10 ))
+    while [ "$(date +%s)" -lt "$deadline" ]; do
+        pgrep -f "waywallen-.*-renderer.*$target" >/dev/null 2>&1 && return 0
+        sleep 0.15
+    done
+    return 1
+}
+
+# ------------------------------------------------------------------ comandos
+
+cmd_status() {
+    local total=0 videos=0 cenas=0 v_ok=0 c_ok=0
+    while IFS=$'\t' read -r id dir kind name; do
+        [ -n "$dir" ] || continue
+        total=$((total + 1))
+        case "$kind" in
+            video)
+                videos=$((videos + 1))
+                out=$(rice-wallpaper-frame "$dir" 2>/dev/null)
+                case "$out" in "$CACHE"/*) v_ok=$((v_ok + 1)) ;; esac
+                ;;
+            cena)
+                cenas=$((cenas + 1))
+                [ -s "$(scene_shot "$dir")" ] && c_ok=$((c_ok + 1))
+                ;;
+        esac
+    done < <(list_wallpapers)
+    printf '{"total":%d,"videos":%d,"videos_prontos":%d,"cenas":%d,"cenas_prontas":%d}\n' \
+        "$total" "$videos" "$v_ok" "$cenas" "$c_ok"
+}
+
+cmd_videos() {
+    have ffmpeg || { note "[-] ffmpeg não encontrado."; return 1; }
+    local n=0
+    while IFS=$'\t' read -r id dir kind name; do
+        [ "$kind" = "video" ] || continue
+        note "  extraindo: $name"
+        rice-wallpaper-frame "$dir" >/dev/null 2>&1 && n=$((n + 1))
+    done < <(list_wallpapers)
+    note "[✓] $n quadro(s) de vídeo prontos."
+    notify-send -a "Wallpapers" -i image-x-generic -t 4000 \
+        "Previews dos vídeos" "$n wallpaper(s) em resolução real." >/dev/null 2>&1 || true
+}
+
+cmd_scenes() {
+    have grim || { note "[-] grim não encontrado."; return 1; }
+    [ -n "$qs_bin" ] || note "[!] Quickshell não está rodando; a barra vai aparecer nas fotos."
+
+    mkdir -p "$CACHE"
+
+    local original empty_ws cur_ws n=0
+    original=$(current_wallpaper_id)
+    cur_ws=$(hyprctl activeworkspace -j 2>/dev/null \
+             | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])' 2>/dev/null)
+
+    # Um workspace sem janelas, para a foto sair só com o wallpaper.
+    empty_ws=$(hyprctl workspaces -j 2>/dev/null | python3 -c '
+import json, sys
+try:
+    used = {w["id"] for w in json.load(sys.stdin) if w.get("windows", 0) > 0}
+except Exception:
+    used = set()
+for i in range(1, 11):
+    if i not in used:
+        print(i); break
+' 2>/dev/null)
+    [ -n "$empty_ws" ] || empty_ws=9
+
+    note "[*] Fotografando as cenas. A tela vai piscar entre wallpapers."
+
+    while IFS=$'\t' read -r id dir kind name; do
+        [ "$kind" = "cena" ] || continue
+        local shot
+        shot=$(scene_shot "$dir")
+        [ "${FORCE:-0}" = "1" ] || [ ! -s "$shot" ] || { note "  (já tem) $name"; continue; }
+
+        note "  $name"
+        apply_wallpaper "$id" || continue
+        wait_renderer "$dir" || { note "    [!] o renderizador não subiu; pulando."; continue; }
+        # A cena ainda precisa desenhar os primeiros quadros.
+        sleep 2
+
+        # `hl.dsp.workspace` é uma TABELA neste provider, não uma função:
+        # chamá-la falha com "attempt to call a table value" e, com o erro
+        # descartado, a troca de workspace virava um no-op silencioso — as
+        # primeiras fotos saíram com as janelas do usuário no meio. Quem troca
+        # de workspace é `hl.dsp.focus`.
+        hyprctl dispatch "hl.dsp.focus({ workspace = $empty_ws })" >/dev/null 2>&1
+        [ -n "$qs_bin" ] && "$qs_bin" ipc call capture hide >/dev/null 2>&1
+        sleep 1
+
+        # Confere que a tela está mesmo vazia antes de fotografar, em vez de
+        # confiar que a troca deu certo.
+        if [ "$(visible_windows)" != "0" ]; then
+            note "    [!] ainda há janela na tela; pulando para não fotografar ela."
+            [ -n "$qs_bin" ] && "$qs_bin" ipc call capture restore >/dev/null 2>&1
+            [ -n "$cur_ws" ] && hyprctl dispatch "hl.dsp.focus({ workspace = $cur_ws })" >/dev/null 2>&1
+            continue
+        fi
+
+        grim -t jpeg -q 90 "$shot" >/dev/null 2>&1
+
+        [ -n "$qs_bin" ] && "$qs_bin" ipc call capture restore >/dev/null 2>&1
+        [ -n "$cur_ws" ] && hyprctl dispatch "hl.dsp.focus({ workspace = $cur_ws })" >/dev/null 2>&1
+
+        if [ -s "$shot" ]; then
+            n=$((n + 1))
+        else
+            rm -f "$shot"
+            note "    [!] a captura falhou."
+        fi
+    done < <(list_wallpapers)
+
+    # Devolve o wallpaper que estava antes.
+    if [ -n "$original" ]; then
+        apply_wallpaper "$original"
+    fi
+    [ -n "$cur_ws" ] && hyprctl dispatch "hl.dsp.focus({ workspace = $cur_ws })" >/dev/null 2>&1
+    [ -n "$qs_bin" ] && "$qs_bin" ipc call capture restore >/dev/null 2>&1
+
+    note "[✓] $n cena(s) fotografadas."
+    notify-send -a "Wallpapers" -i image-x-generic -t 5000 \
+        "Previews das cenas" "$n cena(s) capturadas em tela cheia." >/dev/null 2>&1 || true
+}
+
+case "${1:-status}" in
+    status)  cmd_status ;;
+    videos)  cmd_videos ;;
+    scenes)  cmd_scenes ;;
+    all)     cmd_videos; cmd_scenes ;;
+    *)
+        echo "uso: rice-wallpaper-previews [status|videos|scenes|all]" >&2
+        exit 2
+        ;;
+esac

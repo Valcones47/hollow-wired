@@ -40,7 +40,7 @@ Scope {
     // espera a tela estar coberta antes de mandar o comando. Era 1300 e, com o
     // ~1s que o backend leva por conta própria, o wallpaper só mudava 3s
     // depois do clique.
-    property int coverMs: 450
+    property int coverMs: 900
 
     // `hold` deixou de ser o caminho normal e virou só o limite: quem revela é
     // o `reveal()`, chamado assim que o renderizador novo aparece de verdade.
@@ -289,7 +289,7 @@ Scope {
                 renderTarget: Canvas.FramebufferObject
 
                 readonly property real feather: 0.16
-                readonly property real p: fadeScope.progress * (1 + feather) - feather
+                readonly property real p: fadeScope.progress
 
                 onPChanged: requestPaint()
                 onWidthChanged: requestPaint()
@@ -301,25 +301,44 @@ Scope {
                     ctx.reset();
                     const w = width;
                     const h = height;
-                    const edge = p * w;
                     const band = feather * w;
-                    const amp = w * 0.04;
-                    const cycles = 2.2;
-                    const steps = 48;
+                    const amp = w * 0.035;
+                    const cycles = 2.4;
+                    const steps = 64;
 
-                    // Cada fatia horizontal recebe o mesmo degradê, deslocado
-                    // pela onda: é isso que dá a borda ondulada sem precisar de
-                    // shader compilado (.qsb), que obrigaria uma etapa de build
-                    // no repositório.
+                    // Varre do canto superior DIREITO para o inferior esquerdo.
+                    //
+                    // A diagonal é desenhada aqui dentro, em coordenadas de
+                    // pintura. Tentar girar um `Item` que contém a máscara não
+                    // funciona: com contêiner girado o alfa volta a sair
+                    // uniforme e a transição some.
+                    //
+                    // Para cada fatia, a fronteira fica em
+                    //   xb = w * (1 - 2p + t)
+                    // com t indo de 0 no topo a 1 embaixo — o topo vai na
+                    // frente. Em p=0 xb cai fora da tela à direita (nada
+                    // coberto) e em p=1 cai fora à esquerda (tudo coberto).
                     const sliceH = h / steps;
                     for (let i = 0; i < steps; i++) {
                         const t = (i + 0.5) / steps;
-                        const x0 = edge + Math.sin(t * Math.PI * 2 * cycles) * amp;
-                        const g = ctx.createLinearGradient(x0, 0, x0 + band, 0);
-                        g.addColorStop(0, "rgba(255,255,255,1)");
-                        g.addColorStop(1, "rgba(255,255,255,0)");
-                        ctx.fillStyle = g;
-                        ctx.fillRect(0, i * sliceH, Math.max(0, x0 + band), sliceH + 1);
+                        const xb = w * (1 - 2 * p + t)
+                                 + Math.sin(t * Math.PI * 2 * cycles) * amp;
+
+                        // Coberto: da fronteira até a borda direita.
+                        if (xb < w) {
+                            ctx.fillStyle = "rgba(255,255,255,1)";
+                            ctx.fillRect(Math.max(0, xb), i * sliceH,
+                                         w - Math.max(0, xb), sliceH + 1);
+                        }
+                        // Borda macia, à esquerda da fronteira.
+                        if (xb > 0) {
+                            const g = ctx.createLinearGradient(xb - band, 0, xb, 0);
+                            g.addColorStop(0, "rgba(255,255,255,0)");
+                            g.addColorStop(1, "rgba(255,255,255,1)");
+                            ctx.fillStyle = g;
+                            ctx.fillRect(Math.max(0, xb - band), i * sliceH,
+                                         Math.min(band, xb), sliceH + 1);
+                        }
                     }
                 }
             }
