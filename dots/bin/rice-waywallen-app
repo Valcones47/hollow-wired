@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# rice-waywallen-app — abre a janela do Waywallen (a biblioteca de wallpapers).
+#
+# O Waywallen roda como serviço em segundo plano (`waywallen --no-ui`, que
+# desenha o wallpaper). Chamar o app pelo atalho do menu com o serviço já
+# rodando deveria só abrir a interface, mas ela fechava na hora; abrir o
+# `waywallen-ui` direto funciona. Sem o serviço, abre o app completo.
+APP=org.waywallen.waywallen
+
+flatpak info "$APP" >/dev/null 2>&1 || {
+    notify-send -a "Wallpaper" "Waywallen não instalado" "Instale pela loja de apps (Flathub: $APP)."
+    exit 1
+}
+
+# Já aberto: só traz para a frente.
+addr=$(hyprctl clients -j 2>/dev/null | jq -r --arg c "$APP" 'first(.[] | select(.class == $c) | .address) // empty')
+if [ -n "$addr" ]; then
+    hyprctl dispatch "hl.dsp.focus({ window = \"address:$addr\" })" >/dev/null
+    exit 0
+fi
+
+if pgrep -f "waywallen --no-ui" >/dev/null; then
+    setsid -f flatpak run --command=waywallen-ui "$APP" >/dev/null 2>&1
+else
+    setsid -f flatpak run "$APP" >/dev/null 2>&1
+fi
