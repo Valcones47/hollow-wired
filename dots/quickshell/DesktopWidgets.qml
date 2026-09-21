@@ -72,9 +72,39 @@ PanelWindow {
         }
     }
 
+    // Troca de workspace animada: os widgets atuais saem deslizando para o
+    // lado da troca (como as janelas) e os do workspace novo entram pelo
+    // outro lado, um pouco escalonados. Em modo de edição a troca é seca,
+    // para não atrapalhar quem está arrastando.
+    property int lastWs: currentWs
+    property int wsDir: 1
     onCurrentWsChanged: {
         selectedWidgetId = "";
-        currentList = allConfig[String(currentWs)] || [];
+        wsDir = currentWs >= lastWs ? 1 : -1;
+        lastWs = currentWs;
+        if (editMode || !configLoaded) {
+            currentList = allConfig[String(currentWs)] || [];
+            return;
+        }
+        wsSwap.restart();
+    }
+
+    SequentialAnimation {
+        id: wsSwap
+        ParallelAnimation {
+            NumberAnimation { target: wsLayer; property: "opacity"; to: 0; duration: 140; easing.type: Easing.InCubic }
+            NumberAnimation { target: wsLayer; property: "shift"; to: -dwWindow.wsDir * 60; duration: 140; easing.type: Easing.InCubic }
+        }
+        ScriptAction {
+            script: {
+                dwWindow.currentList = dwWindow.allConfig[String(dwWindow.currentWs)] || [];
+                wsLayer.shift = dwWindow.wsDir * 60;
+            }
+        }
+        ParallelAnimation {
+            NumberAnimation { target: wsLayer; property: "opacity"; to: 1; duration: 320; easing.type: Easing.OutCubic }
+            NumberAnimation { target: wsLayer; property: "shift"; to: 0; duration: 420; easing.type: Easing.OutBack; easing.overshoot: 0.8 }
+        }
     }
 
     Process {
@@ -243,9 +273,100 @@ PanelWindow {
         }
     }
 
+    // ================= PEÇAS COMUNS DOS WIDGETS =================
+    // Cabeçalho padrão: ícone num círculo com a cor de destaque, título e um
+    // selo opcional à direita. Antes cada widget montava o seu, com tamanhos e
+    // pesos diferentes.
+    component WHeader: RowLayout {
+        id: hdr
+        property string icon: ""
+        property string title: ""
+        property string badge: ""
+        property color accent: Theme.primary
+        Layout.fillWidth: true
+        spacing: 8
+        Rectangle {
+            Layout.preferredWidth: 24
+            Layout.preferredHeight: 24
+            radius: 12
+            color: Theme.withAlpha(hdr.accent, 0.18)
+            Text {
+                anchors.centerIn: parent
+                text: hdr.icon
+                font.family: Theme.iconFontFamily
+                font.pixelSize: 12
+                color: hdr.accent
+            }
+        }
+        Text {
+            Layout.fillWidth: true
+            text: hdr.title
+            elide: Text.ElideRight
+            font.family: Theme.fontFamily
+            font.pixelSize: 12
+            font.weight: Font.DemiBold
+            color: Theme.textColor
+        }
+        Rectangle {
+            visible: hdr.badge !== ""
+            Layout.preferredHeight: 20
+            Layout.preferredWidth: badgeText.implicitWidth + 14
+            radius: 10
+            color: Theme.withAlpha(hdr.accent, 0.14)
+            Text {
+                id: badgeText
+                anchors.centerIn: parent
+                text: hdr.badge
+                font.family: Theme.monoFamily
+                font.pixelSize: 10
+                font.weight: Font.DemiBold
+                color: hdr.accent
+            }
+        }
+    }
+
+    // Minigráfico de linha com área preenchida (histórico curto).
+    component Spark: Canvas {
+        id: sp
+        property var values: []
+        property color lineColor: Theme.primary
+        property real maxValue: 1
+        onValuesChanged: requestPaint()
+        onMaxValueChanged: requestPaint()
+        onPaint: {
+            const ctx = getContext("2d");
+            ctx.reset();
+            const v = sp.values;
+            if (!v || v.length < 2) return;
+            const n = v.length, W = width, H = height, m = Math.max(1e-9, sp.maxValue);
+            const X = i => i / (n - 1) * W;
+            const Y = x => H - 1 - Math.min(1, x / m) * (H - 3);
+            ctx.beginPath();
+            ctx.moveTo(0, H);
+            for (let i = 0; i < n; i++) ctx.lineTo(X(i), Y(v[i]));
+            ctx.lineTo(W, H);
+            ctx.closePath();
+            const g = ctx.createLinearGradient(0, 0, 0, H);
+            g.addColorStop(0, Theme.withAlpha(sp.lineColor, 0.35));
+            g.addColorStop(1, Theme.withAlpha(sp.lineColor, 0));
+            ctx.fillStyle = g;
+            ctx.fill();
+            ctx.beginPath();
+            for (let i = 0; i < n; i++) i === 0 ? ctx.moveTo(X(i), Y(v[i])) : ctx.lineTo(X(i), Y(v[i]));
+            ctx.strokeStyle = sp.lineColor;
+            ctx.lineWidth = 1.6;
+            ctx.lineJoin = "round";
+            ctx.stroke();
+        }
+    }
+
     // ================= CONTAINER DE WIDGETS DO WORKSPACE =================
     Item {
-        anchors.fill: parent
+        id: wsLayer
+        width: parent.width
+        height: parent.height
+        property real shift: 0
+        x: shift
 
         Repeater {
             model: dwWindow.currentList
@@ -259,6 +380,28 @@ PanelWindow {
 
                 x: modelData.x || 100
                 y: modelData.y || 100
+                // Entrada escalonada: cada widget surge um instante depois do
+                // anterior, subindo e crescendo levemente.
+                opacity: 0
+                property real enter: 0
+                transform: [
+                    Translate { y: (1 - widgetContainer.enter) * 18 },
+                    Scale {
+                        origin.x: widgetContainer.width / 2
+                        origin.y: widgetContainer.height / 2
+                        xScale: 0.94 + 0.06 * widgetContainer.enter
+                        yScale: 0.94 + 0.06 * widgetContainer.enter
+                    }
+                ]
+                SequentialAnimation {
+                    id: enterAnim
+                    PauseAnimation { duration: dwWindow.editMode ? 0 : widgetContainer.index * 55 }
+                    ParallelAnimation {
+                        NumberAnimation { target: widgetContainer; property: "opacity"; to: 1; duration: 260; easing.type: Easing.OutCubic }
+                        NumberAnimation { target: widgetContainer; property: "enter"; to: 1; duration: 380; easing.type: Easing.OutBack }
+                    }
+                }
+                Component.onCompleted: enterAnim.start()
                 width: (widgetLoader.item ? widgetLoader.item.width : 280) * sScale
                 height: (widgetLoader.item ? widgetLoader.item.height : 140) * sScale
 
@@ -456,7 +599,7 @@ PanelWindow {
                 }
 
                 Text {
-                    text: Qt.formatDate(w.now, Theme.t("clock.date_format", "dddd, d 'de' MMMM"))
+                    text: Theme.formatDate(w.now, Theme.t("clock.date_format", "dddd, d 'de' MMMM"))
                     font.family: Theme.fontFamily
                     font.pixelSize: 12
                     color: Theme.subtext
@@ -569,7 +712,7 @@ PanelWindow {
                 anchors.bottom: parent.bottom
                 anchors.bottomMargin: 10
                 anchors.horizontalCenter: parent.horizontalCenter
-                text: Qt.formatDate(w.now, "dd MMM").toUpperCase()
+                text: Theme.formatDate(w.now, "dd MMM").replace(".", "").toUpperCase()
                 font.family: Theme.monoFamily
                 font.pixelSize: 10
                 font.weight: Font.Bold
@@ -818,82 +961,65 @@ PanelWindow {
     }
 
     // ================= WIDGET 4: RECURSOS DO SISTEMA (CPU/GPU/RAM) =================
+    // Três medidores com o valor no centro e a temperatura na abertura de
+    // baixo. As cores são as vivas da paleta: o "secondary" antigo quase sumia
+    // em cima do fundo (o rótulo da GPU ficava ilegível).
     Component {
         id: compSys
         WidgetBase {
             id: w
             modelData: widgetModel
             width: 340
-            height: 140
+            height: 168
 
-            RowLayout {
+            readonly property var items: [
+                { label: "CPU", value: SysStats.cpuUsage, text: Math.round(SysStats.cpuUsage * 100) + "%",
+                  sub: SysStats.cpuTemp > 0 ? Math.round(SysStats.cpuTemp) + "°" : "", color: w.wAccent },
+                { label: SysStats.gpuName, value: SysStats.gpuUsage, text: Math.round(SysStats.gpuUsage * 100) + "%",
+                  sub: SysStats.gpuTemp > 0 ? Math.round(SysStats.gpuTemp) + "°" : "", color: Theme.color13 },
+                { label: "RAM", value: SysStats.ramRealFrac, text: SysStats.ramRealGiB.toFixed(1) + "G",
+                  sub: SysStats.ramTotalGiB > 0 ? "/" + Math.round(SysStats.ramTotalGiB) + "G" : "", color: Theme.color14 }
+            ]
+
+            ColumnLayout {
                 anchors.fill: parent
                 anchors.margins: 14
-                spacing: 12
+                spacing: 8
 
-                // CPU
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: 4
-                    Text {
-                        text: "CPU"
-                        font.family: Theme.fontFamily; font.pixelSize: 11; font.weight: Font.Bold
-                        color: w.wAccent; Layout.alignment: Qt.AlignHCenter
-                    }
-                    Gauge {
-                        Layout.preferredWidth: 64; Layout.preferredHeight: 64
-                        Layout.alignment: Qt.AlignHCenter
-                        value: SysStats.cpuUsage
-                        color: w.wAccent
-                    }
-                    Text {
-                        text: Math.round(SysStats.cpuUsage * 100) + "%"
-                        font.family: Theme.monoFamily; font.pixelSize: 11
-                        color: Theme.textColor; Layout.alignment: Qt.AlignHCenter
-                    }
+                WHeader {
+                    icon: Theme.icons.chip
+                    title: Theme.t("widgets.sys_title", "Sistema")
+                    accent: w.wAccent
                 }
 
-                // GPU (RTX 3050)
-                ColumnLayout {
+                RowLayout {
                     Layout.fillWidth: true
-                    spacing: 4
-                    Text {
-                        text: SysStats.gpuName
-                        font.family: Theme.fontFamily; font.pixelSize: 11; font.weight: Font.Bold
-                        color: Theme.secondary; Layout.alignment: Qt.AlignHCenter
-                    }
-                    Gauge {
-                        Layout.preferredWidth: 64; Layout.preferredHeight: 64
-                        Layout.alignment: Qt.AlignHCenter
-                        value: SysStats.gpuUsage
-                        color: Theme.secondary
-                    }
-                    Text {
-                        text: Math.round(SysStats.gpuUsage * 100) + "%"
-                        font.family: Theme.monoFamily; font.pixelSize: 11
-                        color: Theme.textColor; Layout.alignment: Qt.AlignHCenter
-                    }
-                }
-
-                // RAM REAL
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: 4
-                    Text {
-                        text: "RAM REAL"
-                        font.family: Theme.fontFamily; font.pixelSize: 11; font.weight: Font.Bold
-                        color: Theme.accent1; Layout.alignment: Qt.AlignHCenter
-                    }
-                    Gauge {
-                        Layout.preferredWidth: 64; Layout.preferredHeight: 64
-                        Layout.alignment: Qt.AlignHCenter
-                        value: SysStats.ramRealFrac
-                        color: Theme.accent1
-                    }
-                    Text {
-                        text: SysStats.ramRealGiB.toFixed(1) + "G"
-                        font.family: Theme.monoFamily; font.pixelSize: 11
-                        color: Theme.textColor; Layout.alignment: Qt.AlignHCenter
+                    Layout.fillHeight: true
+                    spacing: 6
+                    Repeater {
+                        model: w.items
+                        delegate: ColumnLayout {
+                            required property var modelData
+                            Layout.fillWidth: true
+                            spacing: 2
+                            Gauge {
+                                Layout.preferredWidth: 78
+                                Layout.preferredHeight: 78
+                                Layout.alignment: Qt.AlignHCenter
+                                value: modelData.value
+                                valueText: modelData.text
+                                secondaryText: modelData.sub
+                                color: modelData.color
+                            }
+                            Text {
+                                Layout.alignment: Qt.AlignHCenter
+                                text: modelData.label
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 10
+                                font.weight: Font.DemiBold
+                                color: modelData.color
+                            }
+                        }
                     }
                 }
             }
@@ -1013,22 +1139,28 @@ PanelWindow {
     }
 
     // ================= WIDGET 6: MONITOR DE REDE (DOWNLOAD / UPLOAD) =================
+    // Velocidade atual e um minigráfico do último minuto. A interface é a de
+    // maior tráfego, lida do sistema — antes o rótulo era "wlan0" fixo.
     Component {
         id: compNet
         WidgetBase {
             id: w
             modelData: widgetModel
-            width: 280
-            height: 130
+            width: 300
+            height: 160
 
             property real rxBytes: 0
             property real txBytes: 0
             property real downSpeed: 0
             property real upSpeed: 0
+            property string iface: ""
+            property var downHist: []
+            property var upHist: []
+            readonly property real histMax: Math.max(1024 * 8, Math.max.apply(null, w.downHist.concat(w.upHist, [0])))
 
             Process {
                 id: netProc
-                command: ["bash", "-c", "awk '$1 ~ /^(wlan|enp|eth)/ { rx += $2; tx += $10 } END { print rx, tx }' /proc/net/dev"]
+                command: ["bash", "-c", "awk 'NR>2 { sub(/^ +/, \"\"); n = split($0, f, /[: ]+/); if (f[1] ~ /^(lo|docker|veth|br-|virbr|tun|wg)/) next; rx += f[2]; tx += f[10]; if (f[2] > best) { best = f[2]; name = f[1] } } END { print rx+0, tx+0, name }' /proc/net/dev"]
                 stdout: StdioCollector {
                     onStreamFinished: {
                         const parts = text.trim().split(/\s+/);
@@ -1038,9 +1170,12 @@ PanelWindow {
                             if (w.rxBytes > 0) {
                                 w.downSpeed = Math.max(0, (newRx - w.rxBytes) / 2);
                                 w.upSpeed = Math.max(0, (newTx - w.txBytes) / 2);
+                                w.downHist = w.downHist.concat([w.downSpeed]).slice(-30);
+                                w.upHist = w.upHist.concat([w.upSpeed]).slice(-30);
                             }
                             w.rxBytes = newRx;
                             w.txBytes = newTx;
+                            if (parts[2]) w.iface = parts[2];
                         }
                     }
                 }
@@ -1062,56 +1197,44 @@ PanelWindow {
                 anchors.margins: 14
                 spacing: 8
 
-                RowLayout {
-                    Layout.fillWidth: true
-                    Text {
-                        text: Theme.icons.network
-                        font.family: Theme.iconFontFamily; font.pixelSize: 14; color: w.wAccent
-                    }
-                    Text {
-                        text: "Tráfego de Rede"
-                        font.family: Theme.fontFamily; font.pixelSize: 12; font.weight: Font.Bold
-                        color: Theme.textColor; Layout.fillWidth: true
-                    }
-                    Text {
-                        text: "wlan0"
-                        font.family: Theme.monoFamily; font.pixelSize: 10; color: Theme.subtext
-                    }
+                WHeader {
+                    icon: Theme.icons.network
+                    title: Theme.t("widgets.net_title", "Rede")
+                    badge: w.iface
+                    accent: w.wAccent
                 }
 
                 RowLayout {
                     Layout.fillWidth: true
-                    spacing: 16
-
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        spacing: 2
-                        Row {
-                            spacing: 4
-                            Text { text: "↓"; font.pixelSize: 14; color: Theme.accent1; font.weight: Font.Bold }
-                            Text { text: "Download"; font.family: Theme.fontFamily; font.pixelSize: 10; color: Theme.subtext }
-                        }
-                        Text {
-                            text: w.fmtSpeed(w.downSpeed)
-                            font.family: Theme.monoFamily; font.pixelSize: 15; font.weight: Font.Bold
-                            color: Theme.textColor
-                        }
-                    }
-
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        spacing: 2
-                        Row {
-                            spacing: 4
-                            Text { text: "↑"; font.pixelSize: 14; color: w.wAccent; font.weight: Font.Bold }
-                            Text { text: "Upload"; font.family: Theme.fontFamily; font.pixelSize: 10; color: Theme.subtext }
-                        }
-                        Text {
-                            text: w.fmtSpeed(w.upSpeed)
-                            font.family: Theme.monoFamily; font.pixelSize: 15; font.weight: Font.Bold
-                            color: Theme.textColor
+                    spacing: 12
+                    Repeater {
+                        model: [
+                            { arrow: "↓", label: Theme.t("widgets.net_down", "Download"), v: w.downSpeed, c: w.wAccent },
+                            { arrow: "↑", label: Theme.t("widgets.net_up", "Upload"), v: w.upSpeed, c: Theme.color13 }
+                        ]
+                        delegate: ColumnLayout {
+                            required property var modelData
+                            Layout.fillWidth: true
+                            spacing: 0
+                            Text {
+                                text: modelData.arrow + " " + modelData.label
+                                font.family: Theme.fontFamily; font.pixelSize: 10
+                                color: modelData.c
+                            }
+                            Text {
+                                text: w.fmtSpeed(modelData.v)
+                                font.family: Theme.monoFamily; font.pixelSize: 16; font.weight: Font.Bold
+                                color: Theme.textColor
+                            }
                         }
                     }
+                }
+
+                Item {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    Spark { anchors.fill: parent; values: w.upHist; lineColor: Theme.color13; maxValue: w.histMax }
+                    Spark { anchors.fill: parent; values: w.downHist; lineColor: w.wAccent; maxValue: w.histMax }
                 }
             }
         }
@@ -1219,65 +1342,113 @@ PanelWindow {
     }
 
     // ================= WIDGET 8: BATERIA & SAÚDE DE ENERGIA =================
+    // Porcentagem grande, desenho de bateria que enche, e o que importa no dia
+    // a dia: quanto tempo falta (para acabar ou para encher) e o consumo.
     Component {
         id: compBattery
         WidgetBase {
             id: w
             modelData: widgetModel
             width: 300
-            height: 140
+            height: 132
 
             readonly property var bat: UPower.displayDevice
+            readonly property real pct: bat ? Math.max(0, Math.min(1, bat.percentage)) : 0
+            readonly property bool charging: bat && bat.state === UPowerDeviceState.Charging
+            readonly property bool full: bat && bat.state === UPowerDeviceState.FullyCharged
+            readonly property color levelColor: pct <= 0.15 ? Theme.critical : pct <= 0.3 ? Theme.warning : w.wAccent
 
-            ColumnLayout {
+            function fmtTime(sec) {
+                if (!sec || sec <= 0) return "";
+                const h = Math.floor(sec / 3600), m = Math.round((sec % 3600) / 60);
+                return h > 0 ? h + "h " + (m < 10 ? "0" : "") + m + "min" : m + " min";
+            }
+            readonly property string timeText: {
+                if (!bat) return Theme.t("widgets.bat_none", "Sem bateria");
+                if (full) return Theme.t("widgets.bat_full", "Carga completa");
+                if (charging) {
+                    const t = fmtTime(bat.timeToFull);
+                    return t ? Theme.t("widgets.bat_full_in", "Cheia em ") + t : Theme.t("widgets.bat_charging", "Carregando");
+                }
+                const t = fmtTime(bat.timeToEmpty);
+                return t ? t + Theme.t("widgets.bat_left", " restantes") : Theme.t("widgets.bat_discharging", "Na bateria");
+            }
+
+            RowLayout {
                 anchors.fill: parent
-                anchors.margins: 14
-                spacing: 8
+                anchors.margins: 16
+                spacing: 16
 
-                RowLayout {
+                ColumnLayout {
                     Layout.fillWidth: true
-                    Text {
-                        text: Theme.icons.bat
-                        font.family: Theme.iconFontFamily; font.pixelSize: 16
-                        color: (w.bat && w.bat.percentage <= 0.2) ? Theme.critical : w.wAccent
+                    spacing: 2
+                    Row {
+                        spacing: 6
+                        Text {
+                            text: Math.round(w.pct * 100)
+                            font.family: Theme.monoFamily; font.pixelSize: 40; font.weight: Font.Bold
+                            color: Theme.textColor
+                        }
+                        Text {
+                            anchors.baseline: parent.children[0].baseline
+                            text: "%"
+                            font.family: Theme.monoFamily; font.pixelSize: 18
+                            color: Theme.subtext
+                        }
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            visible: w.charging
+                            text: Theme.icons.batCharging
+                            font.family: Theme.iconFontFamily; font.pixelSize: 18
+                            color: w.wAccent
+                        }
                     }
                     Text {
-                        text: "Bateria & Energia"
-                        font.family: Theme.fontFamily; font.pixelSize: 12; font.weight: Font.Bold
-                        color: Theme.textColor; Layout.fillWidth: true
-                    }
-                    Text {
-                        text: w.bat ? (Math.round(w.bat.percentage * 100) + "%") : "--"
-                        font.family: Theme.monoFamily; font.pixelSize: 14; font.weight: Font.Bold
-                        color: w.wAccent
-                    }
-                }
-
-                // Barra de Bateria
-                Rectangle {
-                    Layout.fillWidth: true; Layout.preferredHeight: 8; radius: 4
-                    color: Theme.tile
-                    Rectangle {
-                        height: parent.height; radius: 4
-                        width: w.bat ? (parent.width * Math.max(0, Math.min(1, w.bat.percentage))) : 0
-                        color: (w.bat && w.bat.percentage <= 0.2) ? Theme.critical : w.wAccent
-                    }
-                }
-
-                RowLayout {
-                    Layout.fillWidth: true
-                    Text {
-                        text: !w.bat ? "Sem bateria"
-                            : w.bat.state === UPowerDeviceState.Charging ? "⚡ Carregando"
-                            : w.bat.state === UPowerDeviceState.FullyCharged ? "✓ Bateria cheia"
-                            : "🔋 Descarregando"
-                        font.family: Theme.fontFamily; font.pixelSize: 11; color: Theme.textColor
-                        Layout.fillWidth: true
+                        text: w.timeText
+                        font.family: Theme.fontFamily; font.pixelSize: 12
+                        color: Theme.textColor
                     }
                     Text {
                         visible: w.bat && Math.abs(w.bat.changeRate) > 0.1
-                        text: w.bat ? (Math.abs(w.bat.changeRate).toFixed(1) + " W") : ""
-                        font.family: Theme.monoFamily; font.pixelSize: 11; color: Theme.subtext
+                        text: w.bat ? (w.charging ? "+" : "−") + Math.abs(w.bat.changeRate).toFixed(1) + " W" : ""
+                        font.family: Theme.monoFamily; font.pixelSize: 11
+                        color: Theme.subtext
+                    }
+                }
+
+                // Desenho da bateria enchendo.
+                Item {
+                    Layout.preferredWidth: 46
+                    Layout.preferredHeight: 84
+                    Rectangle {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        width: 18; height: 6; radius: 2
+                        color: Theme.withAlpha(Theme.subtext, 0.5)
+                    }
+                    Rectangle {
+                        y: 5
+                        width: parent.width; height: parent.height - 5
+                        radius: 9
+                        color: "transparent"
+                        border.width: 2
+                        border.color: Theme.withAlpha(Theme.subtext, 0.5)
+                        Rectangle {
+                            anchors.bottom: parent.bottom
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.margins: 4
+                            height: (parent.height - 8) * w.pct
+                            radius: 5
+                            color: w.levelColor
+                            Behavior on height { NumberAnimation { duration: 600; easing.type: Easing.OutCubic } }
+                            SequentialAnimation on opacity {
+                                running: w.charging
+                                loops: Animation.Infinite
+                                NumberAnimation { to: 0.55; duration: 900; easing.type: Easing.InOutSine }
+                                NumberAnimation { to: 1; duration: 900; easing.type: Easing.InOutSine }
+                                onRunningChanged: if (!running) parent.opacity = 1
+                            }
+                        }
                     }
                 }
             }
@@ -1285,30 +1456,34 @@ PanelWindow {
     }
 
     // ================= WIDGET 9: ARMAZENAMENTO & PARTIÇÕES =================
+    // Anel com a porcentagem usada e, ao lado, quanto sobra em destaque — é o
+    // número que a pessoa quer saber.
     Component {
         id: compStorage
         WidgetBase {
             id: w
             modelData: widgetModel
-            width: 320
-            height: 135
+            width: 300
+            height: 132
 
             property string totalStr: ""
             property string usedStr: ""
             property string availStr: ""
+            property string fsType: ""
             property real usedFrac: 0
 
             Process {
                 id: dfProc
-                command: ["bash", "-c", "df -h / | tail -n 1"]
+                command: ["bash", "-c", "df -h --output=size,used,avail,pcent,fstype / | tail -n 1"]
                 stdout: StdioCollector {
                     onStreamFinished: {
                         const parts = text.trim().split(/\s+/);
-                        if (parts.length >= 5) {
-                            w.totalStr = parts[1];
-                            w.usedStr = parts[2];
-                            w.availStr = parts[3];
-                            w.usedFrac = (parseFloat(parts[4]) || 0) / 100;
+                        if (parts.length >= 4) {
+                            w.totalStr = parts[0];
+                            w.usedStr = parts[1];
+                            w.availStr = parts[2];
+                            w.usedFrac = (parseFloat(parts[3]) || 0) / 100;
+                            w.fsType = parts[4] || "";
                         }
                     }
                 }
@@ -1319,50 +1494,43 @@ PanelWindow {
                 onTriggered: dfProc.running = true
             }
 
-            ColumnLayout {
+            RowLayout {
                 anchors.fill: parent
-                anchors.margins: 14
-                spacing: 8
+                anchors.margins: 16
+                spacing: 16
 
-                RowLayout {
-                    Layout.fillWidth: true
-                    Text {
-                        text: Theme.icons.disk
-                        font.family: Theme.iconFontFamily; font.pixelSize: 16; color: w.wAccent
-                    }
-                    Text {
-                        text: "Armazenamento (Btrfs)"
-                        font.family: Theme.fontFamily; font.pixelSize: 12; font.weight: Font.Bold
-                        color: Theme.textColor; Layout.fillWidth: true
-                    }
-                    Text {
-                        text: Math.round(w.usedFrac * 100) + "%"
-                        font.family: Theme.monoFamily; font.pixelSize: 13; font.weight: Font.Bold
-                        color: w.wAccent
-                    }
+                Gauge {
+                    Layout.preferredWidth: 96
+                    Layout.preferredHeight: 96
+                    value: w.usedFrac
+                    valueText: Math.round(w.usedFrac * 100) + "%"
+                    secondaryText: w.fsType
+                    color: w.usedFrac > 0.9 ? Theme.critical : w.wAccent
                 }
 
-                Rectangle {
-                    Layout.fillWidth: true; Layout.preferredHeight: 8; radius: 4
-                    color: Theme.tile
-                    Rectangle {
-                        height: parent.height; radius: 4
-                        width: parent.width * Math.min(1, Math.max(0, w.usedFrac))
-                        color: w.usedFrac > 0.9 ? Theme.critical : w.wAccent
-                    }
-                }
-
-                RowLayout {
+                ColumnLayout {
                     Layout.fillWidth: true
+                    spacing: 2
                     Text {
-                        text: w.usedStr + " usado de " + w.totalStr
-                        font.family: Theme.fontFamily; font.pixelSize: 11; color: Theme.subtext
-                        Layout.fillWidth: true
+                        text: Theme.t("widgets.disk_title", "Disco do sistema")
+                        font.family: Theme.fontFamily; font.pixelSize: 11
+                        color: Theme.subtext
                     }
                     Text {
-                        text: w.availStr + " livre"
-                        font.family: Theme.monoFamily; font.pixelSize: 11; font.weight: Font.Medium
+                        text: w.availStr
+                        font.family: Theme.monoFamily; font.pixelSize: 30; font.weight: Font.Bold
                         color: Theme.textColor
+                    }
+                    Text {
+                        text: Theme.t("widgets.disk_free", "livres")
+                        font.family: Theme.fontFamily; font.pixelSize: 11
+                        color: Theme.subtext
+                    }
+                    Text {
+                        Layout.topMargin: 4
+                        text: w.usedStr + " / " + w.totalStr
+                        font.family: Theme.monoFamily; font.pixelSize: 11
+                        color: Theme.withAlpha(Theme.subtext, 0.8)
                     }
                 }
             }
@@ -1504,24 +1672,20 @@ PanelWindow {
         WidgetBase {
             id: w
             modelData: widgetModel
-            width: 320
-            height: 180
+            width: 300
+            height: 150
 
             ColumnLayout {
                 anchors.fill: parent
-                anchors.margins: 12
+                anchors.margins: 14
                 spacing: 6
 
                 RowLayout {
                     Layout.fillWidth: true
-                    Text {
-                        text: Theme.icons.pencil
-                        font.family: Theme.iconFontFamily; font.pixelSize: 13; color: w.wAccent
-                    }
-                    Text {
-                        text: "Notas Rápidas (WS " + dwWindow.currentWs + ")"
-                        font.family: Theme.fontFamily; font.pixelSize: 11; font.weight: Font.Bold
-                        color: Theme.textColor; Layout.fillWidth: true
+                    WHeader {
+                        icon: Theme.icons.pencil
+                        title: Theme.t("widgets.notes_title", "Notas")
+                        accent: w.wAccent
                     }
                     Text {
                         text: Theme.icons.trash
@@ -1541,7 +1705,7 @@ PanelWindow {
                     TextArea {
                         id: noteArea
                         text: widgetModel.noteText || ""
-                        placeholderText: "Clique para digitar notas..."
+                        placeholderText: Theme.t("widgets.notes_placeholder", "Clique e escreva...")
                         placeholderTextColor: Theme.subtext
                         color: Theme.textColor
                         font.family: Theme.fontFamily; font.pixelSize: 12
@@ -1560,6 +1724,9 @@ PanelWindow {
     }
 
     // ================= WIDGET 12: CLIMA & PREVISÃO =================
+    // Condição em português (lang=pt), ícone conforme o tempo e a hora, e
+    // mínima/máxima do dia. A cidade vem da própria resposta — antes havia a
+    // cidade do autor fixa como padrão.
     Component {
         id: compWeather
         WidgetBase {
@@ -1569,63 +1736,111 @@ PanelWindow {
             height: 140
 
             property string temp: "--"
-            property string desc: "Carregando..."
-            property string city: "Mandaguaçu"
+            property string desc: Theme.t("widgets.weather_loading", "Carregando...")
+            property string city: ""
+            property string feels: ""
+            property string minmax: ""
+            property int code: 0
+
+            function icon(code) {
+                const h = new Date().getHours();
+                const night = h < 6 || h >= 18;
+                if (code === 113) return night ? Theme.icons.night : Theme.icons.sunny;
+                if (code === 116) return Theme.icons.partly;
+                if (code === 119 || code === 122) return Theme.icons.cloudy;
+                if ([143, 248, 260].includes(code)) return Theme.icons.fog;
+                if ([200, 386, 389, 392, 395].includes(code)) return Theme.icons.lightning;
+                if ([299, 302, 305, 308, 356, 359].includes(code)) return Theme.icons.pouring;
+                if ([179, 182, 185, 227, 230, 317, 320, 323, 326, 329, 332, 335, 338, 350, 362, 365, 368, 371, 374, 377].includes(code))
+                    return Theme.icons.snowy;
+                if (code >= 176) return Theme.icons.rainy;
+                return code === 0 ? Theme.icons.partly : Theme.icons.cloudy;
+            }
 
             Process {
                 id: wProc
-                command: ["bash", "-c", "curl -s 'wttr.in/?format=j1' --max-time 4 2>/dev/null"]
+                command: ["bash", "-c", "curl -s 'https://wttr.in/?format=j1&lang=pt' --max-time 6 2>/dev/null"]
                 stdout: StdioCollector {
                     onStreamFinished: {
                         try {
                             const data = JSON.parse(text);
                             const cur = data.current_condition[0];
-                            w.temp = cur.temp_C + "°C";
+                            w.temp = cur.temp_C + "°";
+                            w.feels = cur.FeelsLikeC + "°";
+                            w.code = parseInt(cur.weatherCode) || 0;
                             w.desc = cur.lang_pt ? cur.lang_pt[0].value : cur.weatherDesc[0].value;
-                            if (data.nearest_area && data.nearest_area[0].areaName) {
+                            if (data.weather && data.weather[0])
+                                w.minmax = data.weather[0].mintempC + "° / " + data.weather[0].maxtempC + "°";
+                            if (data.nearest_area && data.nearest_area[0].areaName)
                                 w.city = data.nearest_area[0].areaName[0].value;
-                            }
                         } catch (e) {
-                            w.desc = "Previsão indisponível";
+                            w.desc = Theme.t("widgets.weather_offline", "Previsão indisponível");
                         }
                     }
                 }
             }
 
             Timer {
-                interval: 300000; running: true; repeat: true; triggeredOnStart: true
+                interval: 900000; running: true; repeat: true; triggeredOnStart: true
                 onTriggered: wProc.running = true
             }
 
             RowLayout {
                 anchors.fill: parent
-                anchors.margins: 14
+                anchors.margins: 16
                 spacing: 14
 
-                Text {
-                    text: Theme.icons.sunny
-                    font.family: Theme.iconFontFamily; font.pixelSize: 42
-                    color: w.wAccent
+                Rectangle {
+                    Layout.preferredWidth: 64
+                    Layout.preferredHeight: 64
+                    radius: 32
+                    color: Theme.withAlpha(w.wAccent, 0.15)
+                    Text {
+                        anchors.centerIn: parent
+                        text: w.icon(w.code)
+                        font.family: Theme.iconFontFamily; font.pixelSize: 34
+                        color: w.wAccent
+                    }
                 }
 
                 ColumnLayout {
-                    Layout.fillWidth: true; spacing: 2
-
-                    Text {
-                        text: w.temp
-                        font.family: Theme.monoFamily; font.pixelSize: 30; font.weight: Font.Bold
-                        color: Theme.textColor
+                    Layout.fillWidth: true
+                    spacing: 1
+                    RowLayout {
+                        spacing: 8
+                        Text {
+                            text: w.temp
+                            font.family: Theme.monoFamily; font.pixelSize: 34; font.weight: Font.Bold
+                            color: Theme.textColor
+                        }
+                        ColumnLayout {
+                            spacing: 0
+                            Text {
+                                visible: w.minmax !== ""
+                                text: w.minmax
+                                font.family: Theme.monoFamily; font.pixelSize: 10
+                                color: Theme.subtext
+                            }
+                            Text {
+                                visible: w.feels !== ""
+                                text: Theme.t("widgets.weather_feels", "sensação ") + w.feels
+                                font.family: Theme.fontFamily; font.pixelSize: 10
+                                color: Theme.subtext
+                            }
+                        }
                     }
-
                     Text {
+                        Layout.fillWidth: true
                         text: w.desc
-                        font.family: Theme.fontFamily; font.pixelSize: 12; color: Theme.subtext
-                        elide: Text.ElideRight; Layout.fillWidth: true
+                        font.family: Theme.fontFamily; font.pixelSize: 12
+                        color: Theme.textColor
+                        elide: Text.ElideRight
                     }
-
                     Text {
+                        visible: w.city !== ""
                         text: w.city
-                        font.family: Theme.fontFamily; font.pixelSize: 11; color: Theme.withAlpha(Theme.subtext, 0.7)
+                        font.family: Theme.fontFamily; font.pixelSize: 10
+                        color: Theme.withAlpha(Theme.subtext, 0.8)
                     }
                 }
             }

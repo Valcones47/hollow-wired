@@ -53,6 +53,9 @@ QtObject {
     // mais clara (color10) e os cards são o background clareado um pouco na
     // direção do foreground, em vez de bordas finas.
     readonly property color primary: color10
+    // Usado em vários lugares mas nunca tinha sido definido: virava
+    // `undefined` e o QML desenhava preto (o medidor da GPU nos widgets).
+    readonly property color secondary: color13
     readonly property color textColor: foreground
     readonly property color subtext: color7
     readonly property color outline: color8
@@ -184,6 +187,10 @@ QtObject {
 
     // ---------- Internacionalização (i18n) ----------
     property string locale: "pt-BR"
+    // Locale do Qt para datas: Qt.formatDate usa o locale do processo (C/en),
+    // e as datas saíam misturando os idiomas ("Monday, 21 de September").
+    readonly property var qtLocale: Qt.locale(locale === "en" ? "en_US" : "pt_BR")
+    function formatDate(d, fmt) { return qtLocale.toString(d, fmt); }
     property var translationsPt: ({})
     property var translationsEn: ({})
 
