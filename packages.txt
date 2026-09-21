@@ -111,6 +111,7 @@ kdegraphics-thumbnailers # Miniaturas de PDF e imagens RAW
 gwenview          # Visualizador de imagens
 okular            # PDF
 kate              # Editor de texto
+kmenuedit         # "Editar entrada" no menu do launcher
 mpv               # Player de vídeo
 pavucontrol       # Controle de som detalhado
 ttf-liberation    # Fontes compatíveis com Arial/Times/Courier (documentos do Office)
