@@ -620,6 +620,57 @@ PanelWindow {
                         running: w.playing
                     }
 
+                    // Contorno ondulado em volta do disco, como nos players de
+                    // referência: gira junto com o disco e ondula enquanto a
+                    // música toca; pausado, a amplitude cai e vira um círculo
+                    // liso. Sem processo de áudio: é só animação, e o timer
+                    // fica parado quando nada toca.
+                    Canvas {
+                        id: discWave
+                        anchors.centerIn: parent
+                        width: parent.width + 34
+                        height: parent.height + 34
+                        z: -1
+                        property real phase: 0
+                        property real amp: w.playing ? 1 : 0
+                        Behavior on amp { NumberAnimation { duration: 600; easing.type: Easing.InOutQuad } }
+                        onAmpChanged: requestPaint()
+                        onPhaseChanged: requestPaint()
+
+                        Timer {
+                            interval: 33
+                            repeat: true
+                            running: w.playing && w.visible
+                            onTriggered: discWave.phase += 0.09
+                        }
+
+                        onPaint: {
+                            const ctx = getContext("2d");
+                            ctx.reset();
+                            const cx = width / 2, cy = height / 2;
+                            const base = (width - 34) / 2 + 5;
+                            const A = 3.2 * amp;
+                            function ring(k1, k2, sp, alpha, lw, off) {
+                                ctx.beginPath();
+                                const steps = 120;
+                                for (let i = 0; i <= steps; i++) {
+                                    const t = i / steps * Math.PI * 2;
+                                    const r = base + off + A * (0.6 * Math.sin(k1 * t + phase * sp)
+                                                              + 0.4 * Math.sin(k2 * t - phase * sp * 1.4));
+                                    const x = cx + Math.cos(t) * r, y = cy + Math.sin(t) * r;
+                                    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                                }
+                                ctx.closePath();
+                                ctx.globalAlpha = alpha;
+                                ctx.lineWidth = lw;
+                                ctx.strokeStyle = "white";
+                                ctx.stroke();
+                            }
+                            ring(7, 11, 1.0, 0.9, 2.2, 0);
+                            ring(5, 9, -0.8, 0.35, 1.4, 3);
+                        }
+                    }
+
                     // Capa da música tocando, recortada no círculo do disco e
                     // girando com ele. Sem capa (ou sem player) fica o vinil
                     // liso com o selo colorido no meio, como antes.
