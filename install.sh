@@ -30,15 +30,32 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd || echo "")
 BACKUP_DIR="$HOME/.config/rice-backup-$(date +%Y%m%d_%H%M%S)"
 
 # Suporte à execução via curl / pipe (ex: curl -sS https://... | bash)
-# Se o script estiver sendo executado via stdin ou fora da pasta clonada, clona automaticamente
+# Se o script estiver sendo executado via stdin ou fora da pasta clonada, clona automaticamente.
+#
+# O repositório vai para ~/.local/share/hollow-wired (o lugar padrão de dados de
+# programa no Linux), e não para uma pasta de projetos na home: quem instala
+# pelo curl não é desenvolvedor e não precisa ver nem mexer nesses arquivos. As
+# configurações continuam em ~/.config. O `rice-update` puxa as novidades daqui.
 if [ -z "$SCRIPT_DIR" ] || [ ! -d "$SCRIPT_DIR/dots" ]; then
-    TARGET_REPO="$HOME/projetos/hollow-wired"
+    TARGET_REPO="${XDG_DATA_HOME:-$HOME/.local/share}/hollow-wired"
+    OLD_REPO="$HOME/projetos/hollow-wired"
     echo -e "\033[38;2;34;211;238m[*] Execução remota detectada. Clonando repositório hollow-wired...\033[0m"
     if ! command -v git >/dev/null 2>&1; then
         echo -e "\033[38;2;248;113;113m[!] Git não encontrado. Instalando git...\033[0m"
         sudo pacman -S --needed --noconfirm git
     fi
-    mkdir -p "$HOME/projetos"
+    mkdir -p "$(dirname "$TARGET_REPO")"
+    # Instalações antigas clonavam em ~/projetos/hollow-wired. Se aquele clone
+    # estiver limpo (sem mudanças locais nem commits próprios), é movido para o
+    # lugar novo; se tiver algo do usuário, fica onde está e um clone novo é
+    # feito, para não perder nada.
+    if [ ! -d "$TARGET_REPO/.git" ] && [ -d "$OLD_REPO/.git" ] \
+        && [ -z "$(git -C "$OLD_REPO" status --porcelain 2>/dev/null)" ] \
+        && [ "$(git -C "$OLD_REPO" rev-list --count origin/main..HEAD 2>/dev/null || echo 1)" = "0" ]; then
+        echo -e "\033[38;2;52;211;153m[*] Movendo o repositório de $OLD_REPO para $TARGET_REPO...\033[0m"
+        mv "$OLD_REPO" "$TARGET_REPO"
+        rmdir "$HOME/projetos" 2>/dev/null || true
+    fi
     if [ -d "$TARGET_REPO/.git" ]; then
         echo -e "\033[38;2;52;211;153m[*] Repositório existente em $TARGET_REPO. Atualizando...\033[0m"
         git -C "$TARGET_REPO" pull --ff-only origin main || true

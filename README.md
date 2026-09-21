@@ -146,6 +146,8 @@ Install directly with a single command in your terminal:
 curl -sS https://raw.githubusercontent.com/Valcones47/hollow-wired/main/install.sh | bash
 ```
 
+The repository is cloned to `~/.local/share/hollow-wired` (your settings live in `~/.config` as usual); `rice-update` pulls new versions from there. Older installs in `~/projetos/hollow-wired` are moved automatically when clean.
+
 ---
 
 ### Manual Setup

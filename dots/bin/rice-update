@@ -13,6 +13,11 @@ if [ -f "$REPO_FILE" ] && [ -d "$(cat "$REPO_FILE")" ]; then
     REPO_DIR="$(cat "$REPO_FILE")"
 elif [ -f "$HOME/.config/hyprland-setup-repo" ] && [ -d "$(cat "$HOME/.config/hyprland-setup-repo")" ]; then
     REPO_DIR="$(cat "$HOME/.config/hyprland-setup-repo")"
+# Onde o instalador por curl clona (ver install.sh). Vem antes dos caminhos
+# antigos: numa instalação migrada, o ponteiro acima pode apontar para a pasta
+# que foi movida para cá.
+elif [ -d "${XDG_DATA_HOME:-$HOME/.local/share}/hollow-wired/.git" ]; then
+    REPO_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/hollow-wired"
 elif [ -d "$DEFAULT_REPO/.git" ]; then
     REPO_DIR="$DEFAULT_REPO"
 elif [ -d "$HOME/projetos/hollow-wired/.git" ]; then
