@@ -579,24 +579,6 @@ else
     fi
 fi
 
-# Opcional: barra de título (minimizar, maximizar, fechar) para o estilo
-# Windows (Configurações > Jeito de Usar). É um plugin do Hyprland: o pacote
-# precisa ser da mesma versão do Hyprland, e o AUR acompanha.
-if [ -f /usr/lib/libhyprbars.so ]; then
-    ok_msg "Barra de título das janelas (hyprbars) já instalada."
-else
-    echo -e "\n${CYAN}◈ [OPCIONAL] Barra de título para o estilo Windows${NC}"
-    echo -e "  ${GRAY}Põe minimizar, maximizar e fechar nas janelas que não têm barra própria (terminal, por exemplo).${NC}"
-    echo -e "  ${GRAY}Só aparece com o estilo Windows ligado.${NC}"
-    read -rp "  Instalar agora? [S/n]: " INSTALL_HYPRBARS || true
-    INSTALL_HYPRBARS=${INSTALL_HYPRBARS:-s}
-    if [[ "$INSTALL_HYPRBARS" =~ ^[Ss]$ ]] && [ -n "${AUR_HELPER:-}" ]; then
-        gear_msg "Instalando hyprland-plugin-hyprbars..."
-        $AUR_HELPER -S --needed --noconfirm hyprland-plugin-hyprbars || \
-            echo -e "  ${GRAY}Não consegui instalar agora; o estilo Windows funciona sem a barra.${NC}"
-    fi
-fi
-
 # Opcional: Tela de Login SDDM & Bootloader Limine
 echo -e "\n${CYAN}◈ [OPCIONAL] Deseja configurar o SDDM (SilentSDDM) e o Bootloader Limine com tema do rice?${NC}"
 read -rp "  Configurar Login e Boot agora? [s/N]: " APPLY_BOOT || true

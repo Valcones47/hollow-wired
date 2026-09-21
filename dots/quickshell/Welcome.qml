@@ -168,7 +168,7 @@ PanelWindow {
         id: card
         anchors.centerIn: parent
         width: 780
-        height: 740
+        height: 680
         radius: Theme.radius
         color: Theme.surface
         border.color: Theme.withAlpha(Theme.outline, 0.35)
@@ -367,7 +367,9 @@ PanelWindow {
 
             // ------------------------------------------------- estilo das janelas
             // Mesma escolha do painel Rice > Jeito de Usar (rice-window-mode).
+            // Escondido até o estilo Windows ficar estável.
             Rectangle {
+                visible: false
                 Layout.fillWidth: true
                 Layout.preferredHeight: 54
                 radius: 14

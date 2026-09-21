@@ -48,8 +48,10 @@ PanelWindow {
     // ================= DADOS & ESTADO =================
     // Abre na primeira categoria da navegação (Cores & Wallust). Antes abria no
     // Fastfetch, que é a configuração mais nichada de todas.
-    // Abre no "Jeito de Usar", o primeiro da categoria Ajuda.
-    property int currentTab: 19
+    // Abre no Guia de Atalhos, o primeiro da categoria Ajuda.
+    // (A aba 19 "Jeito de Usar" — estilo Windows — está guardada: fora do
+    // menu até o modo ficar estável.)
+    property int currentTab: 15
 
     // Fastfetch
     property var ffConfig: ({})
@@ -1786,7 +1788,6 @@ PanelWindow {
                                 { group: "system", tabIndex: 14, name: Theme.t("settings.cat_storage", "Armazenamento"), icon: Theme.icons.disk, desc: Theme.t("settings.desc_storage", "Limpeza de Disco"), keywords: "armazenamento storage disco disk hd ssd espaco limpar limpeza cache lixeira logs btrfs free space" },
                                 { group: "system", tabIndex: 16, name: Theme.t("settings.cat_system", "Sistema & Reparo"), icon: Theme.icons.health, desc: Theme.t("settings.desc_system", "Snapshots & Auto-Reparo"), keywords: "sistema system reparo repair consertar snapshot restauracao backup btrfs auto-reparo diagnostico info logs status" },
 
-                                { group: "help", tabIndex: 19, name: Theme.t("settings.cat_mode", "Jeito de Usar"), icon: Theme.icons.laptop, desc: Theme.t("settings.desc_mode", "Estilo Hyprland ou Windows"), keywords: "modo windows hyprland janelas flutuantes soltas tiling lado a lado organizar maximizar arrastar jeito estilo iniciante" },
                                 { group: "help", tabIndex: 15, name: Theme.t("settings.cat_shortcuts", "Guia de Atalhos"), icon: Theme.icons.magnify, desc: Theme.t("settings.desc_shortcuts", "Teclas do Rice"), keywords: "atalhos shortcuts teclas binds keybinds cheatsheet super mod custom user-binds ajuda boas-vindas" }
                             ]
 
