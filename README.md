@@ -74,6 +74,10 @@ Legacy tools like Waybar, Rofi, SwayOSD, and Wofi are completely omitted. Every 
   - **Programs**: unified update count (official repos + AUR + Flatpak), a shortcut to whichever graphical package manager is installed, and the rice updater with the list of what is coming in the next update.
   - Keyboard (10 layouts, repeat rate, touchpad), idle/power timings, gaming & GPU, storage, printers, and a first-run **Welcome guide** aimed at people arriving from Windows.
 
+- **Keep awake (`rice-caffeine`)**: the Windows "prevent sleep" equivalent, in the sidebar. Creates a real `systemd-inhibit` lock — which hypridle already honours — instead of suspending the idle daemon, so nothing stays stuck awake if the process dies. Closing the lid still suspends.
+- **Scheduled night light (`rice-nightlight`)**: turns itself on at sunset and off at sunrise, or on a fixed schedule. Sunrise and sunset are computed **on the machine** from latitude and longitude, so it keeps working with no network. Settings survive reboots, and flipping it by hand holds the schedule off for a few hours instead of being undone a minute later.
+- **Song lyrics (`rice-lyrics`)**: fetched from LRCLIB — open, no signup, no API key — and cached on disk, so a track is fetched once and the lyrics still show offline. Timed LRC files highlight and auto-centre the current line.
+
 ### Theming & Dynamic Colors
 - **Wallust Palette Engine**: Dynamic color palette extracted directly from the active wallpaper. Automatically updates Hyprland window borders, Quickshell UI surfaces, and Kitty terminal colors without requiring session restarts.
 - **Hand-picked colour overrides (`rice-colors`)**: any palette entry can be replaced by hand from the Control Center colour wheel. Overrides live in a separate user file and are re-applied on top of every freshly extracted palette, so they survive wallpaper changes. `rice-colors auto 0` freezes the palette entirely.
