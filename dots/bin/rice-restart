@@ -1,11 +1,29 @@
 #!/usr/bin/env bash
 # Botão de emergência: reinicia a interface (quickshell + waybar, se existir)
-# sem precisar abrir terminal. Bind: Super+Ctrl+R.
-pkill -9 -x quickshell 2>/dev/null || true
+# sem precisar abrir terminal. Bind: Super+Ctrl+R. Também é o que o
+# `rice-update` usa depois de atualizar.
+#
+# O processo do Quickshell tem dois nomes possíveis: `quickshell` quando sobe
+# pelo autostart e `qs` quando foi reiniciado com `qs -d`. Matar só o primeiro
+# deixava o outro vivo e subia um segundo shell por cima — duas barras, dois
+# docks, dois de tudo (era o "atualizar o rice abriu outra topbar").
+
+names='qs|quickshell'
+pkill -x "$names" 2>/dev/null || true
+# Espera sair de verdade; quem não sair por bem sai à força.
+for _ in $(seq 1 20); do
+    pgrep -x "$names" >/dev/null 2>&1 || break
+    sleep 0.1
+done
+pkill -9 -x "$names" 2>/dev/null || true
 pkill -x waybar 2>/dev/null || true
-sleep 0.5
-quickshell -d >/dev/null 2>&1 || (nohup quickshell >/dev/null 2>&1 & disown)
-if [ -f "$HOME/.config/waybar/config.jsonc" ] && grep -qE "^[[:space:]]*hl.exec_cmd\(\"waybar\"\)" "$HOME/.config/hypr/hyprland.lua"; then
+sleep 0.3
+
+# Nunca sobe um segundo: se algo ainda estiver vivo, não duplica.
+if ! pgrep -x "$names" >/dev/null 2>&1; then
+    quickshell -d >/dev/null 2>&1 || (nohup quickshell >/dev/null 2>&1 & disown)
+fi
+if [ -f "$HOME/.config/waybar/config.jsonc" ] && chop grep -qE "^[[:space:]]*hl.exec_cmd\(\"waybar\"\)" "$HOME/.config/hypr/hyprland.lua"; then
     nohup waybar >/dev/null 2>&1 & disown
 fi
 notify-send -a "Rice" -t 2000 "Interface reiniciada"

@@ -49,7 +49,7 @@ set_mode() {
 
         local anim="true"
         if [ -f "$HOME/.config/hypr/user-prefs.json" ] && command -v jq >/dev/null 2>&1; then
-            anim=$(jq -r '.anim_enabled // true' "$HOME/.config/hypr/user-prefs.json" 2>/dev/null || true)
+            anim=$(jq -r 'if .anim_enabled == false then false else true end' "$HOME/.config/hypr/user-prefs.json" 2>/dev/null || true)
         fi
 
         hyprctl eval "hl.config({ decoration = { blur = { enabled = $restore_blur } }, animations = { enabled = $anim } })" &>/dev/null

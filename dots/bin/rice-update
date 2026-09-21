@@ -44,7 +44,11 @@ check_updates() {
     # saber de quando é a instalação dela, não só um hash solto.
     LOCAL_DATE=$(git -C "$REPO_DIR" log -1 --format=%cd --date=format:'%d/%m/%Y' 2>/dev/null || echo "")
 
-    if [ "$LOCAL_HASH" != "$REMOTE_HASH" ]; then
+    if installed_is_newer origin/main; then
+        jq -n --arg hash "$LOCAL_HASH" --arg local_date "$LOCAL_DATE" \
+              '{status: "up_to_date", count: 0, hash: $hash, local: $hash, local_date: $local_date, commits: [],
+                message: "A versão instalada é mais nova que a do GitHub"}'
+    elif [ "$LOCAL_HASH" != "$REMOTE_HASH" ]; then
         COUNT=$(git -C "$REPO_DIR" rev-list --count HEAD..origin/main 2>/dev/null || echo 0)
         COMMITS=$(git -C "$REPO_DIR" log --format=%s -n 5 HEAD..origin/main 2>/dev/null | jq -R . | jq -s . 2>/dev/null || echo "[]")
         REMOTE_DATE=$(git -C "$REPO_DIR" log -1 --format=%cd --date=format:'%d/%m/%Y' origin/main 2>/dev/null || echo "")
@@ -71,6 +75,23 @@ needs_resync() {
     head=$(git -C "$REPO_DIR" rev-parse HEAD 2>/dev/null || echo "")
     marked=$(cat "$SYNC_MARKER" 2>/dev/null || echo "")
     [ -n "$head" ] && [ "$head" != "$marked" ]
+}
+
+# Versão instalada mais nova que a do repositório? Acontece quando o que está
+# em ~/.config veio de outro clone (o de desenvolvimento, com commits ainda não
+# enviados ao GitHub) e o repositório configurado ficou para trás. Sem esta
+# checagem o "Atualizar o rice" copiava a versão velha por cima de tudo — foi
+# o que trouxe de volta o seletor de wallpaper antigo, duplicou a barra e
+# religou o blur. Retorna 0 quando instalar o HEAD do repositório seria voltar.
+installed_is_newer() {
+    local ref="${1:-HEAD}" marked
+    marked=$(cat "$SYNC_MARKER" 2>/dev/null || echo "")
+    [ -n "$marked" ] || return 1
+    # Commit instalado desconhecido aqui: veio de um clone mais novo.
+    git -C "$REPO_DIR" cat-file -e "${marked}^{commit}" 2>/dev/null || return 0
+    # Conhecido, mas o alvo não o contém: seria voltar no tempo.
+    git -C "$REPO_DIR" merge-base --is-ancestor "$marked" "$ref" 2>/dev/null && return 1
+    return 0
 }
 
 mark_synced() {
@@ -142,9 +163,32 @@ apply_updates() {
     # 2. Puxar alterações do git
     echo -e "\e[1;34m[*] Puxando alterações do GitHub...\e[0m"
     git -C "$REPO_DIR" pull --ff-only origin main 2>/dev/null || {
-        echo -e "\e[1;33m[*] Sincronizando com a árvore remota limpa...\e[0m"
-        git -C "$REPO_DIR" reset --hard origin/main
+        # `reset --hard` só num clone limpo e sem commits próprios. Num
+        # repositório de desenvolvimento ele apagaria o trabalho não enviado.
+        local dirty ahead
+        dirty=$(git -C "$REPO_DIR" status --porcelain 2>/dev/null | head -1)
+        ahead=$(git -C "$REPO_DIR" rev-list --count origin/main..HEAD 2>/dev/null || echo 1)
+        if [ -z "$dirty" ] && [ "$ahead" = "0" ]; then
+            echo -e "\e[1;33m[*] Sincronizando com a árvore remota limpa...\e[0m"
+            git -C "$REPO_DIR" reset --hard origin/main
+        else
+            echo -e "\e[1;31m[!] $REPO_DIR tem mudanças locais ou commits não enviados;"
+            echo -e "    não vou descartá-los. Atualização cancelada.\e[0m" >&2
+            notify-send -a "Rice Updater" -u critical -t 6000 "Atualização cancelada" \
+                "O repositório tem mudanças locais que não foram enviadas ao GitHub." 2>/dev/null || true
+            return 1
+        fi
     }
+
+    if installed_is_newer HEAD && [ "${HOLLOW_ALLOW_DOWNGRADE:-0}" != "1" ]; then
+        echo -e "\e[1;31m[!] A versão instalada é mais nova que a de $REPO_DIR."
+        echo -e "    Copiar agora voltaria o rice para uma versão antiga. Nada foi alterado."
+        echo -e "    (Para forçar mesmo assim: HOLLOW_ALLOW_DOWNGRADE=1 rice-update)\e[0m" >&2
+        notify-send -a "Rice Updater" -t 6000 "Nada para atualizar" \
+            "A versão instalada já é mais nova que a do repositório." 2>/dev/null || true
+        rm -rf "$BACKUP_DIR"
+        return 0
+    fi
 
     # 3. Sincronizar dotfiles com proteção total das preferências do usuário
     echo -e "\e[1;34m[*] Sincronizando arquivos de configuração e scripts...\e[0m"
