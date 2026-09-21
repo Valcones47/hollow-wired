@@ -24,6 +24,7 @@ import os
 import re
 import subprocess
 import sys
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -32,6 +33,7 @@ CACHE = os.path.join(
     "hollow-wired", "lyrics")
 
 API = "https://lrclib.net/api/get"
+SEARCH = "https://lrclib.net/api/search"
 TIMEOUT = 6
 UA = "hollow-wired/1.0 (https://github.com/Valcones47/hyprland-setup)"
 
@@ -82,16 +84,62 @@ def parse_lrc(text):
     return lines
 
 
+def request(base, params):
+    url = base + "?" + urllib.parse.urlencode(params)
+    req = urllib.request.Request(url, headers={"User-Agent": UA})
+    try:
+        with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
+            return json.loads(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        # 404 é "não conheço esta música", não falta de rede. Antes ele caía
+        # no mesmo except da falta de internet e a aba dizia "sem internet"
+        # para qualquer faixa que o LRCLIB não tivesse.
+        if e.code == 404:
+            return None
+        raise
+
+
+def clean_title(title):
+    """Tira o que vídeo do YouTube costuma pendurar no título."""
+    t = re.sub(r"[\(\[][^\)\]]*(official|video|lyric|audio|visualizer|clipe|legendado|"
+               r"slowed|reverb|sped|speed|nightcore|remaster|hd|4k)[^\)\]]*[\)\]]",
+               "", title, flags=re.I)
+    return re.sub(r"\s+", " ", t).strip(" -|")
+
+
+def best(items, duration):
+    """Da busca, a que tem letra (sincronizada de preferência) e duração mais perto."""
+    items = [i for i in (items or []) if i.get("syncedLyrics") or i.get("plainLyrics")]
+    if not items:
+        return None
+    def score(i):
+        d = abs((i.get("duration") or 0) - duration) if duration else 0
+        return (0 if i.get("syncedLyrics") else 1, d)
+    return sorted(items, key=score)[0]
+
+
 def fetch(artist, title, album, duration):
     params = {"artist_name": artist, "track_name": title}
     if album:
         params["album_name"] = album
     if duration:
         params["duration"] = str(duration)
-    url = API + "?" + urllib.parse.urlencode(params)
-    req = urllib.request.Request(url, headers={"User-Agent": UA})
-    with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
-        return json.loads(r.read().decode("utf-8"))
+    data = request(API, params)
+    if data:
+        return data
+
+    # Sem acerto exato (álbum ou duração diferentes, versão "slowed", título
+    # de vídeo): busca mais solta. A duração não entra no critério quando o
+    # título indica versão acelerada/lenta, porque ali ela nunca bate.
+    cleaned = clean_title(title)
+    altered = cleaned != title and re.search(r"slowed|sped|speed|nightcore|reverb", title, re.I)
+    dur = 0 if altered else duration
+    found = best(request(SEARCH, {"track_name": cleaned, "artist_name": artist}), dur)
+    if found:
+        return found
+    # Navegador: o "artista" costuma ser o canal e o título vem "Artista - Música".
+    q = cleaned if " - " in cleaned else (artist + " " + cleaned).strip()
+    return best(request(SEARCH, {"q": q}), dur)
 
 
 def main():
