@@ -685,10 +685,10 @@ hl.bind("CTRL + Print",                  hl.dsp.exec_cmd("rice-screenshot window
 -----------------------
 ---- QoL (backlog) ----
 -----------------------
--- Gravar tela: região (Super+Shift+R) ou tela inteira (Super+Ctrl+Shift+R).
--- Rodar de novo para parar. Script em ~/.local/bin/rice-record.
-hl.bind(mainMod .. " + SHIFT + R",        hl.dsp.exec_cmd("rice-record toggle --mode region"))
-hl.bind(mainMod .. " + CTRL + SHIFT + R", hl.dsp.exec_cmd("rice-record full"))
+-- Gravar a tela inteira (Super+Shift+R); de novo para parar. Sem seleção de
+-- região: o atalho começa a gravar na hora. Gravar só uma região ou uma janela
+-- continua possível pela aba Gravação do hub. Script em ~/.local/bin/rice-record.
+hl.bind(mainMod .. " + SHIFT + R", hl.dsp.exec_cmd("rice-record full"))
 -- Conta-gotas: clica num pixel e a cor (hex) vai pro clipboard.
 hl.bind(mainMod .. " + SHIFT + C", hl.dsp.exec_cmd([[sh -c 'c=$(hyprpicker -a -f hex) && notify-send -a "Conta-gotas" -t 2500 "Cor copiada" "$c"']]))
 -- Matar janela travada: o cursor vira "mira", clique na janela pra matar.

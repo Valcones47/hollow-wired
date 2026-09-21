@@ -122,8 +122,7 @@ Legacy tools like Waybar, Rofi, SwayOSD, and Wofi are completely omitted. Every 
 | `Alt + Tab` | Live Window Switcher |
 | `Print` or `Super + Shift + S` | Region Screenshot — saves, copies to clipboard and notifies. Cancelling the selection captures the **entire screen** instead of doing nothing |
 | `Super + Alt + S` | Interactive Screenshot with Annotation (Swappy) |
-| `Super + Shift + R` | Record Selected Screen Region |
-| `Super + Ctrl + Shift + R` | Record Entire Display |
+| `Super + Shift + R` | Record the entire display (press again to stop) |
 | `Super + Shift + C` | Color Picker (`hyprpicker`) |
 | `Super + Shift + X` | Force Kill Unresponsive Window (`hyprctl kill`) |
 | `Super + Ctrl + R` | Emergency Reload Quickshell Shell |

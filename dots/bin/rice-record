@@ -356,7 +356,7 @@ case "$cmd" in
             do_stop
         else
             if [ $# -eq 0 ]; then
-                do_start --mode region
+                do_start --mode screen
             else
                 do_start "$@"
             fi
