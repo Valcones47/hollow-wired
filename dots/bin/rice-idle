@@ -36,9 +36,11 @@ HEADER = """# hypridle.conf — gerado pelo rice-idle (painel do rice, aba Energ
 # Tempos atuais (minutos, 0 = desligado): {summary}
 
 general {{
-    lock_cmd = pidof hyprlock || hyprlock
+    lock_cmd = rice-lock-info weather-refresh & pidof hyprlock || hyprlock
     before_sleep_cmd = loginctl lock-session
-    after_sleep_cmd = hyprctl dispatch dpms on
+    # Sintaxe do provider Lua: o antigo `hyprctl dispatch dpms on` falhava em
+    # silêncio e a tela não voltava depois de suspender.
+    after_sleep_cmd = hyprctl dispatch 'hl.dsp.dpms({{ action = "on" }})'
 }}
 """
 
@@ -55,8 +57,8 @@ listener {{
 # Desliga a tela (o computador continua ligado).
 listener {{
     timeout = {secs}
-    on-timeout = hyprctl dispatch dpms off
-    on-resume = hyprctl dispatch dpms on
+    on-timeout = hyprctl dispatch 'hl.dsp.dpms({{ action = "off" }})'
+    on-resume = hyprctl dispatch 'hl.dsp.dpms({{ action = "on" }})'
 }}
 """,
     "lock": """

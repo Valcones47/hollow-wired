@@ -397,6 +397,13 @@ hl.config({
         disable_splash_rendering = true,
         background_color        = "rgba(000000ff)",
         vrr                     = 0, -- VRR desativado (elimina flickering/piscamento na tela quando ocioso)
+        -- Se o hyprlock morrer segurando o bloqueio (travou, foi morto, a GPU
+        -- engasgou), o Hyprland mantém a sessão travada e mostra um aviso. Com
+        -- esta opção desligada, que é o padrão, ele também RECUSA um hyprlock
+        -- novo — e a única saída vira um TTY ou reiniciar o computador. Com ela
+        -- ligada, basta abrir o hyprlock de novo (Super + L, abaixo) e digitar
+        -- a senha. Não destrava nada sozinha: só permite bloquear outra vez.
+        allow_session_lock_restore = true,
     },
 
     render = {
@@ -479,7 +486,10 @@ hl.bind(mainMod .. " + SUPER_L", hl.dsp.exec_cmd(menu), { release = true })
 hl.bind(mainMod .. " + P", hl.dsp.window.pseudo())
 hl.bind(mainMod .. " + J", hl.dsp.layout("togglesplit"))
 hl.bind(mainMod .. " + F", hl.dsp.window.fullscreen({ mode = "fullscreen", action = "toggle" }))
-hl.bind(mainMod .. " + L", hl.dsp.exec_cmd("hyprlock"))
+-- `locked = true` faz o atalho funcionar também com a sessão bloqueada: é a
+-- saída sem TTY quando o hyprlock morre e sobra só o aviso do Hyprland. O
+-- `pidof` impede abrir um segundo hyprlock quando o primeiro está vivo.
+hl.bind(mainMod .. " + L", hl.dsp.exec_cmd("pidof hyprlock || hyprlock"), { locked = true })
 
 -- Super + esquerda/direita troca de área de trabalho. Antes as quatro setas
 -- moviam só o foco entre janelas — algo que quem vem do Windows não procura,

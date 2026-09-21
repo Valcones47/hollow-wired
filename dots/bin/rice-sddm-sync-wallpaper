@@ -98,7 +98,7 @@ capture_clean_frame() {
     qs ipc call capture hide >/dev/null 2>&1 || true
 
     # Vai pro primeiro workspace vazio (dispatcher correto: "workspace empty").
-    if [ -n "$prev_ws" ] && hyprctl dispatch workspace empty >/dev/null 2>&1; then
+    if [ -n "$prev_ws" ] && hyprctl dispatch 'hl.dsp.focus({ workspace = "empty" })' >/dev/null 2>&1; then
         restore_ws=1
     fi
     sleep 0.45
@@ -122,7 +122,7 @@ capture_clean_frame() {
         ok=0
     fi
 
-    [ "$restore_ws" = 1 ] && hyprctl dispatch workspace "$prev_ws" >/dev/null 2>&1
+    [ "$restore_ws" = 1 ] && hyprctl dispatch "hl.dsp.focus({ workspace = $prev_ws })" >/dev/null 2>&1
     qs ipc call capture restore >/dev/null 2>&1 || true
 
     [ "$ok" = 1 ] || return 1

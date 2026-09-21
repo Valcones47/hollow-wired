@@ -66,7 +66,10 @@ case "$ACTION" in
         }
 
         if command -v hyprctl >/dev/null 2>&1; then
-            hyprctl dispatch exit >/dev/null 2>&1 || true
+            # `hyprctl dispatch exit` é sintaxe antiga: no provider Lua ela
+            # falha, e o script esperava 15s à toa antes de apelar para o pkill
+            # — era parte da lentidão ao sair da sessão.
+            hyprctl dispatch 'hl.dsp.exit()' >/dev/null 2>&1 || true
             # até 15s para o compositor encerrar sozinho
             wait_hyprland_exit 60 && exit 0
         fi
