@@ -1,0 +1,168 @@
+#!/usr/bin/env python3
+"""rice-lyrics — letras da música que está tocando, sincronizadas quando houver.
+
+Busca no LRCLIB (lrclib.net), que é aberto e não pede cadastro nem chave de API.
+O resultado fica em cache no disco, então a mesma música não vai à rede duas
+vezes e a letra continua aparecendo offline.
+
+Sem argumentos usa o que o MPRIS estiver tocando agora.
+
+Uso:
+  rice-lyrics                       # da música atual, em JSON
+  rice-lyrics --artist X --title Y [--album Z] [--duration N]
+
+Saída:
+  {"status":"ok","synced":true,"lines":[{"t":12.3,"text":"..."}, ...]}
+  {"status":"none"}        nada encontrado (fica em cache para não insistir)
+  {"status":"offline"}     sem rede e sem cache
+  {"status":"idle"}        nada tocando
+"""
+
+import hashlib
+import json
+import os
+import re
+import subprocess
+import sys
+import urllib.parse
+import urllib.request
+
+CACHE = os.path.join(
+    os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache")),
+    "hollow-wired", "lyrics")
+
+API = "https://lrclib.net/api/get"
+TIMEOUT = 6
+UA = "hollow-wired/1.0 (https://github.com/Valcones47/hyprland-setup)"
+
+
+def now_playing():
+    """Artista, título, álbum e duração do player ativo, via playerctl."""
+    try:
+        out = subprocess.run(
+            ["playerctl", "metadata", "--format",
+             "{{artist}}\t{{title}}\t{{album}}\t{{mpris:length}}"],
+            capture_output=True, text=True, timeout=4).stdout.strip()
+    except Exception:
+        return None
+    if not out:
+        return None
+    parts = (out.split("\t") + ["", "", "", ""])[:4]
+    artist, title, album, length = parts
+    if not title:
+        return None
+    try:
+        # mpris:length vem em microssegundos.
+        duration = int(int(length) / 1_000_000)
+    except Exception:
+        duration = 0
+    return artist, title, album, duration
+
+
+def cache_path(artist, title, album):
+    key = hashlib.sha256(
+        ("%s\x00%s\x00%s" % (artist.lower(), title.lower(), album.lower()))
+        .encode("utf-8")).hexdigest()[:32]
+    return os.path.join(CACHE, key + ".json")
+
+
+def parse_lrc(text):
+    """Converte LRC em linhas com tempo. Ignora as tags de cabeçalho."""
+    lines = []
+    stamp = re.compile(r"\[(\d+):(\d+(?:\.\d+)?)\]")
+    for raw in text.splitlines():
+        marks = list(stamp.finditer(raw))
+        if not marks:
+            continue
+        body = raw[marks[-1].end():].strip()
+        for m in marks:
+            t = int(m.group(1)) * 60 + float(m.group(2))
+            lines.append({"t": round(t, 2), "text": body})
+    lines.sort(key=lambda x: x["t"])
+    return lines
+
+
+def fetch(artist, title, album, duration):
+    params = {"artist_name": artist, "track_name": title}
+    if album:
+        params["album_name"] = album
+    if duration:
+        params["duration"] = str(duration)
+    url = API + "?" + urllib.parse.urlencode(params)
+    req = urllib.request.Request(url, headers={"User-Agent": UA})
+    with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
+        return json.loads(r.read().decode("utf-8"))
+
+
+def main():
+    args = sys.argv[1:]
+    artist = title = album = ""
+    duration = 0
+
+    if args:
+        i = 0
+        while i < len(args):
+            if args[i] == "--artist" and i + 1 < len(args):
+                artist = args[i + 1]; i += 2
+            elif args[i] == "--title" and i + 1 < len(args):
+                title = args[i + 1]; i += 2
+            elif args[i] == "--album" and i + 1 < len(args):
+                album = args[i + 1]; i += 2
+            elif args[i] == "--duration" and i + 1 < len(args):
+                try:
+                    duration = int(args[i + 1])
+                except ValueError:
+                    pass
+                i += 2
+            else:
+                i += 1
+
+    if not title:
+        current = now_playing()
+        if not current:
+            print(json.dumps({"status": "idle"}))
+            return 0
+        artist, title, album, duration = current
+
+    path = cache_path(artist, title, album)
+    if os.path.isfile(path):
+        try:
+            with open(path, encoding="utf-8") as f:
+                print(f.read().strip())
+            return 0
+        except Exception:
+            pass
+
+    try:
+        data = fetch(artist, title, album, duration)
+    except Exception:
+        # Sem rede: não grava cache negativo, para tentar de novo mais tarde.
+        print(json.dumps({"status": "offline"}))
+        return 0
+
+    synced = (data or {}).get("syncedLyrics") or ""
+    plain = (data or {}).get("plainLyrics") or ""
+
+    if synced.strip():
+        result = {"status": "ok", "synced": True, "lines": parse_lrc(synced)}
+    elif plain.strip():
+        result = {"status": "ok", "synced": False,
+                  "lines": [{"t": -1, "text": l} for l in plain.splitlines()]}
+    else:
+        result = {"status": "none"}
+
+    os.makedirs(CACHE, exist_ok=True)
+    try:
+        tmp = path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(result, f, ensure_ascii=False)
+        os.replace(tmp, path)
+    except Exception:
+        pass
+
+    print(json.dumps(result, ensure_ascii=False))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

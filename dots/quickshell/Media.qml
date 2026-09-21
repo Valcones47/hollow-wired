@@ -78,6 +78,64 @@ Item {
             tickPosition = player.position;
     }
 
+    // ---------- letras ----------
+    // Buscadas por rice-lyrics (LRCLIB, sem cadastro) e guardadas em cache no
+    // disco, então a mesma música não vai à rede duas vezes e continua
+    // aparecendo offline.
+    property var lyricsLines: []
+    property bool lyricsSynced: false
+    property string lyricsStatus: "idle"
+    property bool lyricsOpen: false
+
+    // Linha que corresponde ao instante atual. -1 quando a letra não é
+    // sincronizada (aí ela vira só um texto rolável).
+    readonly property int lyricsIndex: {
+        if (!root.lyricsSynced || root.lyricsLines.length === 0)
+            return -1;
+        const pos = root.tickPosition;
+        let idx = -1;
+        for (let i = 0; i < root.lyricsLines.length; i++) {
+            if (root.lyricsLines[i].t <= pos + 0.15)
+                idx = i;
+            else
+                break;
+        }
+        return idx;
+    }
+
+    Process {
+        id: lyricsProc
+        command: ["rice-lyrics"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const d = JSON.parse(text);
+                    root.lyricsStatus = d.status || "none";
+                    root.lyricsSynced = !!d.synced;
+                    root.lyricsLines = d.lines || [];
+                } catch (e) {
+                    root.lyricsStatus = "none";
+                    root.lyricsLines = [];
+                }
+            }
+        }
+    }
+
+    // Trocar de faixa invalida a letra na hora, senão a anterior fica na tela
+    // enquanto a nova é buscada.
+    function reloadLyrics() {
+        root.lyricsLines = [];
+        root.lyricsStatus = "carregando";
+        lyricsProc.running = false;
+        lyricsProc.running = true;
+    }
+
+    Connections {
+        target: root.player
+        function onTrackTitleChanged() { if (root.lyricsOpen) root.reloadLyrics(); }
+    }
+    onLyricsOpenChanged: if (lyricsOpen && lyricsLines.length === 0) reloadLyrics()
+
     function fmtTime(seconds) {
         if (!seconds || seconds < 0 || isNaN(seconds))
             return "0:00";
@@ -535,6 +593,124 @@ Item {
                 }
             }
 
+        }
+
+        // ---------- letras ----------
+        ColumnLayout {
+            Layout.fillWidth: true
+            Layout.topMargin: 4
+            spacing: 6
+            visible: root.player !== null
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 8
+
+                Rectangle {
+                    id: lyricsBtn
+                    property bool hovered: false
+                    Layout.preferredWidth: lyricsBtnLabel.implicitWidth + 26
+                    Layout.preferredHeight: 26
+                    radius: 13
+                    color: root.lyricsOpen ? Theme.withAlpha(Theme.accent2, 0.22)
+                                           : (hovered ? Theme.withAlpha(Theme.inactive, 0.15) : "transparent")
+                    border.width: 1
+                    border.color: root.lyricsOpen ? Theme.accent2 : Theme.withAlpha(Theme.inactive, 0.3)
+                    Behavior on color { ColorAnimation { duration: 100 } }
+
+                    Row {
+                        id: lyricsBtnLabel
+                        anchors.centerIn: parent
+                        spacing: 6
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: Theme.icons.lyrics
+                            font.family: Theme.iconFontFamily
+                            font.pixelSize: 11
+                            color: root.lyricsOpen ? Theme.accent2 : Theme.inactive
+                        }
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: Theme.t("media.lyrics", "Letra")
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 11
+                            color: root.lyricsOpen ? Theme.accent2 : Theme.inactive
+                        }
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onEntered: lyricsBtn.hovered = true
+                        onExited: lyricsBtn.hovered = false
+                        onClicked: root.lyricsOpen = !root.lyricsOpen
+                    }
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    visible: root.lyricsOpen
+                    text: {
+                        if (root.lyricsStatus === "carregando") return Theme.t("media.lyrics_loading", "Procurando a letra...");
+                        if (root.lyricsStatus === "offline")    return Theme.t("media.lyrics_offline", "Sem internet e sem cópia guardada.");
+                        if (root.lyricsStatus === "none")       return Theme.t("media.lyrics_none", "Não achei a letra desta música.");
+                        if (root.lyricsLines.length > 0 && !root.lyricsSynced)
+                            return Theme.t("media.lyrics_plain", "Letra sem sincronia — role para acompanhar.");
+                        return "";
+                    }
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 10
+                    color: Theme.subtext
+                    elide: Text.ElideRight
+                }
+            }
+
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 132
+                visible: root.lyricsOpen && root.lyricsLines.length > 0
+                radius: Theme.radius / 2
+                color: Theme.withAlpha(Theme.inactive, 0.08)
+                clip: true
+
+                ListView {
+                    id: lyricsView
+                    anchors.fill: parent
+                    anchors.margins: 10
+                    model: root.lyricsLines
+                    spacing: 4
+                    // Sem letra sincronizada quem rola é o usuário.
+                    interactive: !root.lyricsSynced
+                    boundsBehavior: Flickable.StopAtBounds
+
+                    delegate: Text {
+                        required property var modelData
+                        required property int index
+                        width: lyricsView.width
+                        text: modelData.text
+                        horizontalAlignment: root.lyricsSynced ? Text.AlignHCenter : Text.AlignLeft
+                        wrapMode: Text.WordWrap
+                        font.family: Theme.fontFamily
+                        font.pixelSize: index === root.lyricsIndex ? 14 : 12
+                        font.weight: index === root.lyricsIndex ? Font.DemiBold : Font.Normal
+                        color: !root.lyricsSynced ? Theme.foreground
+                             : (index === root.lyricsIndex ? Theme.accent2
+                                                           : Theme.withAlpha(Theme.inactive, 0.75))
+                        Behavior on font.pixelSize { NumberAnimation { duration: 120 } }
+                        Behavior on color { ColorAnimation { duration: 160 } }
+                    }
+
+                    // Mantém a linha atual no meio do quadro.
+                    Connections {
+                        target: root
+                        function onLyricsIndexChanged() {
+                            if (root.lyricsSynced && root.lyricsIndex >= 0)
+                                lyricsView.positionViewAtIndex(root.lyricsIndex, ListView.Center);
+                        }
+                    }
+                }
+            }
         }
 
         // ---------- escolha do player ----------
