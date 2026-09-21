@@ -15,6 +15,11 @@
 #
 # Uso:
 #   rice-wallpaper-frame [--cached-only] <diretório do wallpaper> [preview de reserva]
+#   rice-wallpaper-frame [--cached-only] <arquivo de vídeo ou imagem>
+#
+# O arquivo direto é para os itens das pastas comuns do Waywallen (plugins
+# "video" e "image"): uma pasta dessas tem vários vídeos, e procurar "o vídeo
+# da pasta" pegaria sempre o primeiro. Imagem sai como está.
 #
 # --cached-only: só consulta o cache, nunca roda o ffmpeg (usado no clique do
 # seletor, que não pode esperar uma extração).
@@ -40,6 +45,16 @@ emit_fallback() {
     fi
 }
 
+video=""
+if [ -n "$dir" ] && [ -f "$dir" ]; then
+    case "${dir,,}" in
+        *.mp4|*.webm|*.mkv|*.mov|*.avi) video="$dir" ;;
+        *.png|*.jpg|*.jpeg|*.webp|*.bmp|*.gif) printf '%s\n' "$dir"; exit 0 ;;
+        *) exit 0 ;;
+    esac
+fi
+
+if [ -z "$video" ]; then
 [ -n "$dir" ] && [ -d "$dir" ] || { emit_fallback; exit 0; }
 
 # Cenas (scene.pkg) não têm vídeo para extrair, mas podem ter sido fotografadas
@@ -53,13 +68,14 @@ fi
 
 command -v ffmpeg >/dev/null 2>&1 || { emit_fallback; exit 0; }
 
-video=""
 for ext in mp4 webm mkv; do
     # O nome do arquivo varia por item (inclusive com caracteres não-ASCII),
     # então é uma busca, não um nome fixo.
     found=$(find "$dir" -maxdepth 1 -type f -iname "*.$ext" -print -quit 2>/dev/null)
     [ -n "$found" ] && { video="$found"; break; }
 done
+
+fi
 
 [ -n "$video" ] || { emit_fallback; exit 0; }
 

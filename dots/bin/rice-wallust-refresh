@@ -43,13 +43,23 @@ if last_id and os.path.isfile(db_file):
         conn = sqlite3.connect(f"file:{db_file}?mode=ro", uri=True)
         conn.row_factory = sqlite3.Row
         r = conn.execute(
-            "SELECT item.preview_path, library.path AS lib_path FROM item JOIN library ON library.id = item.library_id WHERE item.id = ?",
+            "SELECT item.preview_path, item.path, library.path AS lib_path FROM item JOIN library ON library.id = item.library_id WHERE item.id = ?",
             (str(last_id),)
         ).fetchone()
         if r and r["preview_path"]:
             p = os.path.join(r["lib_path"].rstrip("/"), r["preview_path"])
             if os.path.isfile(p):
                 preview_path = p
+        # Vídeo/imagem de pasta comum do Waywallen: sem preview; usa o arquivo
+        # (imagem) ou um quadro extraído dele (vídeo).
+        if not preview_path and r and r["path"]:
+            import subprocess
+            media = os.path.join(r["lib_path"].rstrip("/"), r["path"])
+            if os.path.isfile(media):
+                out = subprocess.run([os.path.expanduser("~/.local/bin/rice-wallpaper-frame"), media],
+                                     capture_output=True, text=True, timeout=25).stdout.strip()
+                if out and os.path.isfile(out):
+                    preview_path = out
     except Exception:
         pass
 

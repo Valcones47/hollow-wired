@@ -106,7 +106,15 @@ case "${1:-}" in
         deadline=$(( $(date +%s) + 8 ))
         pid=""
         while [ "$(date +%s)" -lt "$deadline" ]; do
-            pid=$(pgrep -f "waywallen-.*-renderer.*$target" 2>/dev/null | head -1)
+            # Comparação de texto exata: nomes de arquivo com ( ) [ ] (comuns
+            # em vídeos baixados) quebravam o `pgrep -f` com regex.
+            pid=""
+            for p in $(pgrep -f "waywallen-[a-z]*-renderer" 2>/dev/null); do
+                if tr '\0' ' ' < "/proc/$p/cmdline" 2>/dev/null | grep -qF -- "$target"; then
+                    pid=$p
+                    break
+                fi
+            done
             [ -n "$pid" ] && break
             sleep 0.12
         done

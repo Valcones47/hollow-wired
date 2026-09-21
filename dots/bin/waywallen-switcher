@@ -105,21 +105,27 @@ window.switcher {
 """
 
 
-def cached_still(preview):
+FRAME_HELPER = os.path.expanduser("~/.local/bin/rice-wallpaper-frame")
+
+
+def cached_still(wp):
     """Quadro em resolução real já guardado em cache, ou "" (nunca extrai)."""
-    if not preview:
+    if not wp:
         return ""
-    cache = os.path.expanduser("~/.cache/hollow-wired/frames")
-    scene = os.path.join(cache, "scene-%s.jpg" % os.path.basename(os.path.dirname(preview)))
-    if os.path.isfile(scene):
-        return scene
-    helper = os.path.expanduser("~/.local/bin/rice-wallpaper-frame")
-    if os.path.isfile(helper):
+    if wp.get("kind") == "image":
+        return wp["media"] if os.path.isfile(wp["media"]) else ""
+    preview = wp.get("preview") or ""
+    if wp.get("kind") == "we":
+        if not preview:
+            return ""
+        cache = os.path.expanduser("~/.cache/hollow-wired/frames")
+        scene = os.path.join(cache, "scene-%s.jpg" % os.path.basename(os.path.dirname(preview)))
+        if os.path.isfile(scene):
+            return scene
+    if os.path.isfile(FRAME_HELPER):
         try:
-            out = subprocess.run(
-                [helper, "--cached-only", os.path.dirname(preview), preview],
-                capture_output=True, text=True, timeout=1.5,
-            ).stdout.strip()
+            args = [FRAME_HELPER, "--cached-only", wp["src"]] + ([preview] if preview else [])
+            out = subprocess.run(args, capture_output=True, text=True, timeout=1.5).stdout.strip()
             if out and os.path.isfile(out) and out != preview:
                 return out
         except Exception:
@@ -127,33 +133,75 @@ def cached_still(preview):
     return ""
 
 
+def extract_still(wp):
+    """Como cached_still, mas extrai o quadro se ainda não existir (lento)."""
+    if wp.get("kind") == "image":
+        return cached_still(wp)
+    preview = wp.get("preview") or ""
+    if os.path.isfile(FRAME_HELPER):
+        try:
+            args = [FRAME_HELPER, wp["src"]] + ([preview] if preview else [])
+            out = subprocess.run(args, capture_output=True, text=True, timeout=25).stdout.strip()
+            if out and os.path.isfile(out):
+                return out
+        except Exception:
+            pass
+    return preview if preview and os.path.isfile(preview) else ""
+
+
 def fetch_wallpapers():
+    """Tudo que o Waywallen conhece, não só o Wallpaper Engine.
+
+    Antes a consulta filtrava o plugin "wallpaper_engine": vídeos e imagens
+    de pastas comuns adicionadas no Waywallen (plugins "video" e "image") não
+    apareciam no seletor, mesmo aplicáveis pelo próprio Waywallen.
+    """
     conn = sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True)
     conn.row_factory = sqlite3.Row
     rows = conn.execute(
         """
-        SELECT item.id, item.display_name, item.preview_path,
-               library.path AS lib_path
+        SELECT item.id, item.display_name, item.preview_path, item.path,
+               source_plugin.name AS plugin, library.path AS lib_path
         FROM item
         JOIN library ON library.id = item.library_id
         JOIN source_plugin ON source_plugin.id = item.plugin_id
-        WHERE source_plugin.name = 'wallpaper_engine'
+        WHERE source_plugin.name IN ('wallpaper_engine', 'video', 'image')
         ORDER BY item.display_name COLLATE NOCASE
         """
     ).fetchall()
     conn.close()
     wallpapers = []
     for r in rows:
+        lib = (r["lib_path"] or "").rstrip("/")
+        media = os.path.join(lib, r["path"]) if r["path"] else ""
         preview = None
         if r["preview_path"]:
-            preview = os.path.join(r["lib_path"].rstrip("/"), r["preview_path"])
+            preview = os.path.join(lib, r["preview_path"])
             if not os.path.isfile(preview):
                 preview = None
+        if r["plugin"] == "wallpaper_engine":
+            kind = "we"
+            # Pasta do item: é dela que sai o quadro do vídeo, e é o caminho
+            # que aparece na linha de comando do renderizador.
+            src = os.path.dirname(preview) if preview else os.path.dirname(media)
+            target = src
+        else:
+            kind = "image" if r["plugin"] == "image" else "video"
+            if not media or not os.path.exists(media):
+                continue
+            src = media
+            target = media
+            if kind == "image" and not preview:
+                preview = media
         wallpapers.append(
             {
                 "id": str(r["id"]),
                 "name": r["display_name"] or f"#{r['id']}",
                 "preview": preview,
+                "kind": kind,
+                "media": media,
+                "src": src,
+                "target": target,
                 "animated": bool(preview) and preview.lower().endswith(".gif"),
             }
         )
@@ -395,7 +443,7 @@ class SwitcherWindow(Gtk.ApplicationWindow):
         order = sorted(range(len(self.cards)), key=lambda i: abs(i - self.selected))
         for i in order:
             card = self.cards[i]
-            if card.static_texture is None and not card.loading and card.wp["preview"]:
+            if card.static_texture is None and not card.loading and (card.wp["preview"] or card.wp["kind"] != "we"):
                 card.loading = True
                 self.pool.submit(self._decode_thumbnail, card)
 
@@ -403,7 +451,11 @@ class SwitcherWindow(Gtk.ApplicationWindow):
         # O preview do Wallpaper Engine é minúsculo e quadrado; ampliado para o
         # cartão fica borrado. Com o quadro em resolução real no cache, o
         # cartão usa ele (o GIF animado do selecionado continua o preview).
-        src = cached_still(card.wp["preview"]) or card.wp["preview"]
+        # Vídeo de pasta comum não tem preview: o quadro é extraído aqui
+        # mesmo (este método já roda fora da thread da interface).
+        src = cached_still(card.wp) or card.wp["preview"] or extract_still(card.wp)
+        if not src:
+            return
         try:
             pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(
                 src, CARD_W * 2, CARD_H * 2, True
@@ -587,20 +639,7 @@ class SwitcherWindow(Gtk.ApplicationWindow):
     # 0,6s TRAVANDO a interface, o que aparecia como "cliquei e não aconteceu
     # nada".
     def _extract_still(self, wallpaper):
-        preview = wallpaper.get("preview") or ""
-        helper = os.path.expanduser("~/.local/bin/rice-wallpaper-frame")
-        if not preview or not os.path.isfile(helper):
-            return preview if preview and os.path.isfile(preview) else ""
-        try:
-            out = subprocess.run(
-                [helper, os.path.dirname(preview), preview],
-                capture_output=True, text=True, timeout=25,
-            ).stdout.strip()
-            if out and os.path.isfile(out):
-                return out
-        except Exception:
-            pass
-        return preview if os.path.isfile(preview) else ""
+        return extract_still(wallpaper)
 
     def prefetch_stills(self):
         """Extrai os quadros enquanto o carrossel está aberto.
@@ -636,7 +675,7 @@ class SwitcherWindow(Gtk.ApplicationWindow):
         # vez. Antes ele caía direto no preview pequeno (o .gif de 160px) e a
         # transição saía borrada. Consultar o cache é instantâneo; extrair do
         # zero não, então aí sim fica o preview, sem segurar o clique.
-        big = cached_still(preview)
+        big = cached_still(wallpaper)
         if big:
             return big
         return preview if preview and os.path.isfile(preview) else ""
@@ -676,8 +715,8 @@ class SwitcherWindow(Gtk.ApplicationWindow):
         # em vez de por tempo fixo. Destacado: o switcher fecha logo em
         # seguida, e a espera continua sozinha.
         fader = os.path.expanduser("~/.local/bin/rice-wallpaper-fade")
-        if os.path.isfile(fader) and wallpaper.get("preview"):
-            cmd = [fader, "--reveal-when-ready", os.path.dirname(wallpaper["preview"])]
+        if os.path.isfile(fader) and wallpaper.get("target"):
+            cmd = [fader, "--reveal-when-ready", wallpaper["target"]]
             if still:
                 cmd += ["--colors", still]
             subprocess.Popen(
