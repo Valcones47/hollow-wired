@@ -266,6 +266,13 @@ apply_updates() {
     # Mesma história do colors.conf: o hyprlock-colors.conf é gerado pelo
     # wallust a partir do wallpaper do usuário, e o repositório só carrega uma
     # cópia pra primeira instalação.
+    # Tempos de ociosidade: quem ajustou no painel tem o idle.json e o arquivo
+    # é regerado a partir dele no fim; quem editou o hypridle.conf à mão (sem
+    # idle.json) tem o arquivo guardado e devolvido. Antes a cópia dos dots
+    # voltava tudo para 5/10/30 minutos a cada atualização.
+    local saved_idle=""
+    [ ! -f "$HOME/.config/hypr/idle.json" ] && [ -f "$HOME/.config/hypr/hypridle.conf" ] \
+        && saved_idle=$(cat "$HOME/.config/hypr/hypridle.conf")
     local saved_lock_colors=""
     [ -f "$HOME/.config/hypr/hyprlock-colors.conf" ] && saved_lock_colors=$(cat "$HOME/.config/hypr/hyprlock-colors.conf")
 
@@ -361,12 +368,20 @@ PYFF
     [ -n "$saved_user_binds" ] && echo "$saved_user_binds" > "$HOME/.config/hypr/user-binds.lua"
     [ -n "$saved_colors" ] && echo "$saved_colors" > "$HOME/.config/hypr/colors.conf"
     [ -n "$saved_lock_colors" ] && echo "$saved_lock_colors" > "$HOME/.config/hypr/hyprlock-colors.conf"
+    if [ -f "$HOME/.config/hypr/idle.json" ]; then
+        "$HOME/.local/bin/rice-idle" apply >/dev/null 2>&1 || true
+    elif [ -n "$saved_idle" ]; then
+        printf '%s\n' "$saved_idle" > "$HOME/.config/hypr/hypridle.conf"
+    fi
 
-    # 4. Correção automática de preferências (elimina flickering por VRR e bug de zoom 300%)
+    # 4. Preferências antigas sem escala caíam no zoom de 300%: completa só o
+    #    que falta. O VRR NÃO é mais zerado aqui — antes toda atualização
+    #    apagava a escolha que a pessoa fez no painel (Tela > VRR).
     for p_file in "$HOME/.config/hypr/user-prefs.json" "$HOME/.config/hypr/prefs.json"; do
-        if [ -f "$p_file" ] && command -v jq >/dev/null 2>&1; then
-            tmp_prefs=$(jq '.vrr = 0 | .monitor_scale = (.monitor_scale // 1)' "$p_file" 2>/dev/null || true)
-            [ -n "$tmp_prefs" ] && echo "$tmp_prefs" > "$p_file"
+        if [ -f "$p_file" ] && command -v jq >/dev/null 2>&1 \
+            && [ "$(jq -r 'has("monitor_scale")' "$p_file" 2>/dev/null)" = "false" ]; then
+            tmp_prefs=$(jq '.monitor_scale = 1' "$p_file" 2>/dev/null || true)
+            [ -n "$tmp_prefs" ] && printf '%s\n' "$tmp_prefs" > "$p_file"
         fi
     done
 
@@ -376,9 +391,10 @@ PYFF
     echo -e "\e[1;34m[*] Recarregando compositor Hyprland...\e[0m"
     if command -v hyprctl >/dev/null 2>&1; then
         hyprctl reload >/dev/null 2>&1 || true
-        hyprctl eval "hl.config({ misc = { vrr = 0 }, render = { direct_scanout = 0 } })" >/dev/null 2>&1 || true
-        hyprctl eval "hl.monitor({ output = '', mode = 'preferred', position = 'auto', scale = '1' })" >/dev/null 2>&1 || true
     fi
+    # Reaplica o que a pessoa salvou (monitores, escala, VRR, blur...). Antes
+    # vinha precedido de um "escala 1 e VRR desligado" forçado em todo monitor,
+    # que piscava a tela e, se o apply falhasse, deixava tudo errado.
     "$HOME/.local/bin/rice-hypr-prefs" apply >/dev/null 2>&1 || true
 
     # 6. Reiniciar interface gráfica do Quickshell (0.5s de transição transparente)

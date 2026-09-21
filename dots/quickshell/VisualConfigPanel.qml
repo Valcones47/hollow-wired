@@ -3971,7 +3971,7 @@ PanelWindow {
                                                         anchors.centerIn: parent
                                                         spacing: 4
                                                         Text {
-                                                            text: Theme.icons.edit || "✎"
+                                                            text: Theme.icons.pencil
                                                             font.family: Theme.iconFontFamily
                                                             font.pixelSize: 10
                                                             color: Theme.textColor
@@ -4200,7 +4200,7 @@ PanelWindow {
                                                         anchors.centerIn: parent
                                                         spacing: 4
                                                         Text {
-                                                            text: Theme.icons.edit || "✎"
+                                                            text: Theme.icons.pencil
                                                             font.family: Theme.iconFontFamily
                                                             font.pixelSize: 10
                                                             color: Theme.textColor

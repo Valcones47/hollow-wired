@@ -16,7 +16,10 @@ except ImportError:
     evdev = None
 
 LUA_PATH = os.path.expanduser("~/.config/hypr/hyprland.lua")
-REPO_LUA_PATH = os.path.expanduser("~/projetos/hyprland-setup/dots/hypr/hyprland.lua")
+# Preferência do usuário, lida pelo hyprland.lua. O hyprland.lua é do
+# repositório e é trocado a cada atualização: gravar as teclas nele fazia a
+# escolha sumir.
+KEYS_PATH = os.path.expanduser("~/.config/hypr/discord-binds.conf")
 
 def get_running_client():
     try:
@@ -41,19 +44,26 @@ def get_running_client():
 def get_current_binds():
     mute_bind = "CTRL + SHIFT + M"
     deafen_bind = "Num_Lock"
-    if not os.path.exists(LUA_PATH):
+    if os.path.exists(KEYS_PATH):
+        with open(KEYS_PATH, "r", encoding="utf-8") as f:
+            for line in f:
+                k, _, v = line.partition("=")
+                k, v = k.strip(), v.strip()
+                if k == "mute" and v:
+                    mute_bind = v
+                elif k == "deafen" and v:
+                    deafen_bind = v
         return mute_bind, deafen_bind
-    with open(LUA_PATH, "r", encoding="utf-8") as f:
-        content = f.read()
-    
-    m_mute = re.search(r'hl\.bind\(\s*["\']([^"\']+)["\']\s*,\s*toggle_discord_mute', content)
-    if m_mute:
-        mute_bind = m_mute.group(1)
-    
-    m_deafen = re.search(r'hl\.bind\(\s*["\']([^"\']+)["\']\s*,\s*toggle_discord_deafen', content)
-    if m_deafen:
-        deafen_bind = m_deafen.group(1)
-        
+    # Instalações antigas guardavam as teclas no próprio hyprland.lua.
+    if os.path.exists(LUA_PATH):
+        with open(LUA_PATH, "r", encoding="utf-8") as f:
+            content = f.read()
+        m_mute = re.search(r'hl\.bind\(\s*["\']([^"\']+)["\']\s*,\s*toggle_discord_mute', content)
+        if m_mute:
+            mute_bind = m_mute.group(1)
+        m_deafen = re.search(r'hl\.bind\(\s*["\']([^"\']+)["\']\s*,\s*toggle_discord_deafen', content)
+        if m_deafen:
+            deafen_bind = m_deafen.group(1)
     return mute_bind, deafen_bind
 
 def cmd_status():
@@ -68,55 +78,25 @@ def cmd_status():
     print(json.dumps(data, indent=2))
 
 def cmd_set(new_mute, new_deafen):
-    if not os.path.exists(LUA_PATH):
-        print("Erro: hyprland.lua não encontrado.", file=sys.stderr)
-        sys.exit(1)
-    with open(LUA_PATH, "r", encoding="utf-8") as f:
-        content = f.read()
-
     cur_mute, cur_deafen = get_current_binds()
     target_mute = new_mute if new_mute is not None else cur_mute
     target_deafen = new_deafen if new_deafen is not None else cur_deafen
+    if '"' in target_mute or '"' in target_deafen:
+        print("Erro: aspas não são aceitas.", file=sys.stderr)
+        sys.exit(1)
 
-    # Substitui mute bind se existir, senão adiciona
-    if "toggle_discord_mute" in content and re.search(r'hl\.bind\(\s*["\'][^"\']+["\']\s*,\s*toggle_discord_mute', content):
-        content = re.sub(
-            r'hl\.bind\(\s*["\'][^"\']+["\']\s*,\s*toggle_discord_mute(\s*,\s*\{[^}]*\})?\s*\)',
-            f'hl.bind("{target_mute}", toggle_discord_mute, {{ locked = true }})',
-            content
-        )
-    else:
-        # Adiciona antes ou junto ao deafen
-        pass
+    os.makedirs(os.path.dirname(KEYS_PATH), exist_ok=True)
+    tmp = KEYS_PATH + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write("# Teclas do Discord (painel do rice). Lido pelo hyprland.lua.\n")
+        f.write(f"mute={target_mute}\ndeafen={target_deafen}\n")
+    os.replace(tmp, KEYS_PATH)
 
-    # Substitui deafen bind
-    if "toggle_discord_deafen" in content and re.search(r'hl\.bind\(\s*["\'][^"\']+["\']\s*,\s*toggle_discord_deafen', content):
-        content = re.sub(
-            r'hl\.bind\(\s*["\'][^"\']+["\']\s*,\s*toggle_discord_deafen(\s*,\s*\{[^}]*\})?\s*\)',
-            f'hl.bind("{target_deafen}", toggle_discord_deafen, {{ locked = true }})',
-            content
-        )
-
-    with open(LUA_PATH, "w", encoding="utf-8") as f:
-        f.write(content)
-
-    # Sincroniza com o repositório se o arquivo existir
-    if os.path.exists(REPO_LUA_PATH):
-        try:
-            with open(REPO_LUA_PATH, "w", encoding="utf-8") as f:
-                f.write(content)
-        except Exception as e:
-            print("Aviso ao sincronizar repo:", e, file=sys.stderr)
-
-    # Recarrega Hyprland
     subprocess.run(["hyprctl", "reload"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    
-    # Notifica
     subprocess.run([
         "notify-send", "-a", "Quickshell", "Atalhos do Discord Atualizados",
         f"Mute: {target_mute}\nDeafen: {target_deafen}"
     ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    
     print(f"Atalhos configurados com sucesso:\nMute: {target_mute}\nDeafen: {target_deafen}")
 
 def cmd_record(target=None, timeout=12.0):
@@ -299,9 +279,11 @@ def main():
                 i += 1
         cmd_record(target=target, timeout=timeout)
     elif action == "toggle-mute":
-        subprocess.run(["hyprctl", "dispatch", "sendshortcut", "CTRL SHIFT, m, class:^(discord|vesktop)$"])
+        # A mesma função do atalho (hyprland.lua). O antigo
+        # `hyprctl dispatch sendshortcut` não existe no config em Lua.
+        subprocess.run(["hyprctl", "eval", "rice_discord_mute()"], stdout=subprocess.DEVNULL)
     elif action == "toggle-deafen":
-        subprocess.run(["hyprctl", "dispatch", "sendshortcut", "CTRL SHIFT, d, class:^(discord|vesktop)$"])
+        subprocess.run(["hyprctl", "eval", "rice_discord_deafen()"], stdout=subprocess.DEVNULL)
     else:
         print("Uso: rice-discord-binds [status | set --mute <KEY> --deafen <KEY> | record [--target mute|deafen] | toggle-mute | toggle-deafen]")
 

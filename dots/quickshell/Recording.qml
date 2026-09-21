@@ -941,7 +941,7 @@ Item {
                                         color: Theme.withAlpha(Theme.primary, 0.15)
                                         Text {
                                             anchors.centerIn: parent
-                                            text: Theme.icons.video || Theme.icons.record
+                                            text: Theme.icons.record
                                             font.family: Theme.iconFontFamily
                                             font.pixelSize: 15
                                             color: Theme.primary
@@ -1033,10 +1033,14 @@ Item {
                                             hoverEnabled: true
                                             cursorShape: Qt.PointingHandCursor
                                             onClicked: {
+                                                // Tirar o item da lista destrói este delegate no meio
+                                                // do clique: tudo que vier depois roda sem contexto
+                                                // ("root is not defined"). Por isso a lista muda por último.
                                                 const pathToDelete = modelData.path;
+                                                const r = root;
                                                 Quickshell.execDetached(["rice-record", "delete", pathToDelete]);
-                                                root.recentRecordings = root.recentRecordings.filter(function(item) { return item.path !== pathToDelete; });
-                                                root.scheduleRefresh();
+                                                r.scheduleRefresh();
+                                                r.recentRecordings = r.recentRecordings.filter(function(item) { return item.path !== pathToDelete; });
                                             }
                                         }
                                     }
@@ -1052,7 +1056,7 @@ Item {
 
                             Text {
                                 Layout.alignment: Qt.AlignHCenter
-                                text: Theme.icons.video || Theme.icons.record
+                                text: Theme.icons.record
                                 font.family: Theme.iconFontFamily
                                 font.pixelSize: 36
                                 color: Theme.withAlpha(Theme.subtext, 0.4)

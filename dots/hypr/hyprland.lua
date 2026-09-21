@@ -665,9 +665,26 @@ local function toggle_discord_mute()
     hl.dispatch(hl.dsp.send_key_state({ mods = "", key = "Shift_L", state = "up", window = "class:^(discord|vesktop)$" }))
 end
 
--- DISCORD_BINDS
-hl.bind("CTRL + SHIFT + M", toggle_discord_mute, { locked = true })
-hl.bind("Num_Lock", toggle_discord_deafen, { locked = true })
+-- Teclas de mute/ensurdecer escolhidas no painel (rice-discord-binds), em
+-- ~/.config/hypr/discord-binds.conf ("mute=..." e "deafen=..."). Antes o
+-- script reescrevia estas linhas do hyprland.lua, e toda atualização do rice
+-- devolvia as teclas ao padrão.
+local discordKeys = { mute = "CTRL + SHIFT + M", deafen = "Num_Lock" }
+do
+    local f = io.open(home .. "/.config/hypr/discord-binds.conf", "r")
+    if f then
+        for line in f:lines() do
+            local k, v = line:match("^%s*(%w+)%s*=%s*(.-)%s*$")
+            if (k == "mute" or k == "deafen") and v ~= "" then discordKeys[k] = v end
+        end
+        f:close()
+    end
+end
+hl.bind(discordKeys.mute, toggle_discord_mute, { locked = true })
+hl.bind(discordKeys.deafen, toggle_discord_deafen, { locked = true })
+-- Para o `rice-discord-binds toggle-mute|toggle-deafen` (via hyprctl eval).
+rice_discord_mute = toggle_discord_mute
+rice_discord_deafen = toggle_discord_deafen
 
 -- OSD de brilho via Quickshell
 hl.bind("XF86MonBrightnessUp",   hl.dsp.exec_cmd("quickshell ipc call osd brightnessUp"),   { locked = true, repeating = true })

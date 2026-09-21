@@ -171,6 +171,8 @@ def reset_config():
     candidates = []
     if repo:
         candidates.append(os.path.join(repo, "dots/fastfetch/config.jsonc"))
+    candidates.append(os.path.join(os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share"),
+                                   "hollow-wired/dots/fastfetch/config.jsonc"))
     candidates.append(os.path.expanduser("~/projetos/hyprland-setup/dots/fastfetch/config.jsonc"))
 
     for src in candidates:

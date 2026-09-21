@@ -418,7 +418,7 @@ PanelWindow {
                 }
 
                 Section {
-                    icon: (win.batDesign > 0 || (win.mod("Battery") && win.mod("Battery").length > 0)) ? Theme.icons.batHealth : Theme.icons.bolt
+                    icon: (win.batDesign > 0 || (win.mod("Battery") && win.mod("Battery").length > 0)) ? Theme.icons.batHealth : Theme.icons.batCharging
                     title: (win.batDesign > 0 || (win.mod("Battery") && win.mod("Battery").length > 0)) ? Theme.t("sysinfo.battery", "Bateria") : Theme.t("sysinfo.power", "Alimentação")
                     Bar2 {
                         visible: win.batDesign > 0

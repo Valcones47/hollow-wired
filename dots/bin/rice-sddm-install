@@ -43,6 +43,8 @@ echo "========================================================="
 DOTS_DIR=""
 for candidate in \
   "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." 2>/dev/null && pwd)/dots" \
+  "$(cat "$USER_HOME/.config/hollow-wired-repo" 2>/dev/null)/dots" \
+  "$USER_HOME/.local/share/hollow-wired/dots" \
   "$USER_HOME/projetos/hyprland-setup/dots" \
   "$USER_HOME/projetos/hollow-wired/dots" \
   "$USER_HOME/.hollow-wired/dots"; do

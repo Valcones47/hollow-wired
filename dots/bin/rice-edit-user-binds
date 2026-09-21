@@ -10,6 +10,8 @@ TARGET_FILE="$HOME/.config/hypr/user-binds.lua"
 if [ ! -f "$TARGET_FILE" ]; then
     mkdir -p "$(dirname "$TARGET_FILE")"
     for p in \
+        "$(cat "$HOME/.config/hollow-wired-repo" 2>/dev/null)/dots/hypr/user-binds.lua.example" \
+        "${XDG_DATA_HOME:-$HOME/.local/share}/hollow-wired/dots/hypr/user-binds.lua.example" \
         "$HOME/.hollow-wired/dots/hypr/user-binds.lua.example" \
         "$HOME/projetos/hyprland-setup/dots/hypr/user-binds.lua.example" \
         "$HOME/hyprland-setup/dots/hypr/user-binds.lua.example" \
