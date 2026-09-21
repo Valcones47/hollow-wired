@@ -20,7 +20,9 @@
 # Primeira GPU NVIDIA do sistema, no formato "vendor:device" que o Mesa espera.
 nvidia_id() {
     command -v lspci >/dev/null 2>&1 || return 1
-    lspci -n -d 10de::0300 2>/dev/null | awk '{print $3; exit}'
+    # 0300 = VGA; em muitos notebooks híbridos a NVIDIA aparece como
+    # "controlador 3D" (0302), e aí nada ia para a placa dedicada.
+    { lspci -n -d 10de::0300; lspci -n -d 10de::0302; } 2>/dev/null | awk '{print $3; exit}'
 }
 
 NVIDIA_PCI_ID="$(nvidia_id)"

@@ -30,6 +30,7 @@ def detect_gpu_fallback():
         out = subprocess.check_output(["lspci", "-mm"], text=True, stderr=subprocess.DEVNULL)
     except Exception:
         return "GPU integrada"
+    names = []
     for line in out.splitlines():
         if '"VGA compatible controller"' in line or '"Display controller"' in line or '"3D controller"' in line:
             parts = [p.strip('"') for p in re.findall(r'"[^"]*"|\S+', line)]
@@ -37,8 +38,14 @@ def detect_gpu_fallback():
             model = parts[3] if len(parts) > 3 else ""
             name = f"{vendor} {model}".strip()
             if name:
-                return name
-    return "GPU integrada"
+                names.append(name)
+    # Notebook híbrido: a integrada (Intel) costuma vir primeiro na lista, e a
+    # aba de jogos mostrava ela em vez da placa dedicada.
+    for want in ("NVIDIA", "Advanced Micro Devices", "AMD"):
+        for n in names:
+            if want in n:
+                return n
+    return names[0] if names else "GPU integrada"
 
 
 def get_status():

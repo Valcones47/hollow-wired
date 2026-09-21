@@ -392,6 +392,14 @@ fi
 [ -n "$saved_widgets" ] && echo "$saved_widgets" > "$HOME/.config/quickshell/desktop-widgets.json"
 [ -n "$saved_shell" ] && echo "$saved_shell" > "$HOME/.config/quickshell/shell-customization.json"
 [ -n "$saved_locale" ] && echo "$saved_locale" > "$HOME/.config/quickshell/locale.json"
+# Instalação nova: idioma da interface pelo idioma do sistema. Antes vinha
+# sempre o do repositório (inglês), mesmo num sistema em português.
+if [ -z "$saved_locale" ]; then
+    case "${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}" in
+        pt*) echo '{"locale": "pt-BR"}' > "$HOME/.config/quickshell/locale.json" ;;
+        *)   echo '{"locale": "en"}' > "$HOME/.config/quickshell/locale.json" ;;
+    esac
+fi
 [ -n "$saved_kitty" ] && echo "$saved_kitty" > "$HOME/.config/kitty/kitty.conf"
 [ -n "$saved_user_binds" ] && echo "$saved_user_binds" > "$HOME/.config/hypr/user-binds.lua"
 [ -n "$saved_user_prefs" ] && echo "$saved_user_prefs" > "$HOME/.config/hypr/user-prefs.json"
@@ -497,8 +505,18 @@ sudo flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flat
 
 # Navegador: numa instalação mínima não há nenhum, e o rice abre links,
 # o clima e a loja pelo navegador padrão.
+# O Zen é checado pela instalação real: o rice põe um atalho `zen-browser`
+# em ~/.local/bin (para rodar na placa dedicada) que existe mesmo sem o Zen.
+zen_installed() {
+    local c
+    for c in /opt/zen-browser-bin/zen-bin /opt/zen-browser/zen-bin /usr/lib/zen-browser/zen-bin /usr/bin/zen-browser /usr/bin/zen; do
+        [ -x "$c" ] && return 0
+    done
+    flatpak info app.zen_browser.zen >/dev/null 2>&1
+}
 HAS_BROWSER=false
-for b in firefox zen-browser zen chromium google-chrome-stable brave vivaldi-stable librewolf microsoft-edge-stable; do
+zen_installed && HAS_BROWSER=true
+for b in firefox chromium google-chrome-stable brave vivaldi-stable librewolf microsoft-edge-stable; do
     command -v "$b" >/dev/null 2>&1 && HAS_BROWSER=true && break
 done
 if [ "$HAS_BROWSER" = false ]; then
@@ -511,6 +529,21 @@ if [ "$HAS_BROWSER" = false ]; then
         3) sudo pacman -S --needed --noconfirm chromium || true ;;
         4) [ -n "${AUR_HELPER:-}" ] && $AUR_HELPER -S --needed --noconfirm brave-bin || true ;;
     esac
+fi
+
+# A dock vem com o Zen fixado. Sem ele, fixa o navegador padrão que existir
+# (senão a dock ficava sem navegador nenhum).
+if ! zen_installed && [ -f "$HOME/.config/quickshell/dock.json" ] && command -v jq >/dev/null 2>&1; then
+    BROWSER_ID=$(xdg-settings get default-web-browser 2>/dev/null | sed 's/\.desktop$//')
+    if [ -z "$BROWSER_ID" ]; then
+        for b in firefox chromium brave-browser google-chrome vivaldi-stable; do
+            [ -f "/usr/share/applications/$b.desktop" ] && BROWSER_ID=$b && break
+        done
+    fi
+    if [ -n "$BROWSER_ID" ]; then
+        tmp_dock=$(jq --arg b "$BROWSER_ID" '.pins = [.pins[] | if . == "zen" then $b else . end]' "$HOME/.config/quickshell/dock.json" 2>/dev/null)
+        [ -n "$tmp_dock" ] && printf '%s\n' "$tmp_dock" > "$HOME/.config/quickshell/dock.json"
+    fi
 fi
 
 # Opcional: Wallpaper Engine (Waywallen via Flatpak)
