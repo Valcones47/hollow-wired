@@ -289,7 +289,10 @@ PanelWindow {
             width: 46
             height: 46
             radius: 23
-            x: -200
+            // Fora da JANELA, não só da pílula: a janela do OSD ocupa a largura
+            // da tela toda, e com x: -200 o círculo branco aparecia ao lado da
+            // pílula.
+            x: -pill.x - width - 100
             layer.enabled: true
         }
 
