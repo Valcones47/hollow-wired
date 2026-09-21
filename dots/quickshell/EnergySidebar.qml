@@ -197,13 +197,42 @@ PanelWindow {
     property bool nightLight: false
     Process {
         id: nightCheck
-        command: ["pgrep", "-x", "wlsunset"]
+        // A sidebar usava `wlsunset` com a latitude/longitude do autor fixas no
+        // código, enquanto o painel usava `hyprsunset` pelo rice-nightlight: os
+        // dois discordavam sobre o estado e o repositório carregava a
+        // localização de uma pessoa. Agora os dois falam com o mesmo programa.
+        command: ["pgrep", "-x", "hyprsunset"]
         onExited: code => sidebar.nightLight = code === 0
     }
     Process {
         id: nightToggle
-        command: ["bash", "-c", "pkill -x wlsunset || (setsid -f wlsunset -l -23.35 -L -52.10 -t 4000 -T 6500 >/dev/null 2>&1)"]
+        command: ["rice-nightlight", "toggle"]
         onExited: nightRecheck.restart()
+    }
+
+    // ---------- manter acordado ----------
+    property bool caffeine: false
+    Process {
+        id: caffeineCheck
+        command: ["rice-caffeine", "status"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try { sidebar.caffeine = !!JSON.parse(text).active; } catch (e) {}
+            }
+        }
+    }
+    Process {
+        id: caffeineToggle
+        command: ["rice-caffeine", "toggle"]
+        onExited: caffeineRecheck.restart()
+    }
+    Timer { id: caffeineRecheck; interval: 400; onTriggered: caffeineCheck.running = true }
+    Timer {
+        interval: 20000
+        running: true
+        repeat: true
+        triggeredOnStart: true
+        onTriggered: caffeineCheck.running = true
     }
     Timer { id: nightRecheck; interval: 400; onTriggered: nightCheck.running = true }
 
@@ -610,6 +639,12 @@ PanelWindow {
                     onActivated: nightToggle.running = true
                 }
                 SideButton {
+                    kind: "caffeine"
+                    icon: sidebar.caffeine ? Theme.icons.coffee : Theme.icons.coffeeOff
+                    tint: sidebar.caffeine ? Theme.primary : Theme.textColor
+                    onActivated: caffeineToggle.running = true
+                }
+                SideButton {
                     kind: "gpu"
                     icon: Theme.icons.gpu
                     tint: sidebar.nvidiaState === "active" ? Theme.primary : Theme.textColor
@@ -759,6 +794,7 @@ PanelWindow {
                     case "update": return updatePop;
                     case "record": return recordPop;
                     case "night": return nightPop;
+                    case "caffeine": return caffeinePop;
                     case "gpu": return gpuPop;
                     case "lock": return lockPop;
                     case "suspend": return suspendPop;
@@ -860,8 +896,24 @@ PanelWindow {
                     visible: popContent.current === nightPop
                     spacing: 2
                     PopTitle { text: sidebar.nightLight ? Theme.t("sidebar.night_light_on", "Luz noturna ligada") : Theme.t("sidebar.night_light_off", "Luz noturna desligada") }
-                    PopText { text: Theme.t("sidebar.night_light_desc", "Tela mais quente depois do pôr do sol (4000K)") }
+                    PopText { text: Theme.t("sidebar.night_light_desc", "Deixa a tela mais quente. O horário automático fica no painel.") }
                     PopText { text: Theme.t("sidebar.night_light_action", "Clique para alternar") }
+                }
+
+                ColumnLayout {
+                    id: caffeinePop
+                    visible: popContent.current === caffeinePop
+                    spacing: 2
+                    PopTitle {
+                        text: sidebar.caffeine ? Theme.t("sidebar.caffeine_on", "A tela não vai apagar")
+                                               : Theme.t("sidebar.caffeine_off", "A tela apaga sozinha")
+                    }
+                    PopText {
+                        text: sidebar.caffeine
+                            ? Theme.t("sidebar.caffeine_on_desc", "Bloqueio automático e suspensão pausados. Fechar a tampa ainda suspende.")
+                            : Theme.t("sidebar.caffeine_off_desc", "Para assistir um filme sem a tela bloquear no meio.")
+                    }
+                    PopText { text: Theme.t("sidebar.caffeine_action", "Clique para alternar") }
                 }
 
                 ColumnLayout {

@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# rice-caffeine — impede a tela de apagar e o computador de suspender.
+#
+# É o caso clássico de quem vem do Windows: assistir um filme, ler uma página
+# longa ou acompanhar um download demorado e ver a tela bloquear no meio.
+#
+# Usa `systemd-inhibit`, e não um truque de parar o hypridle: o hypridle já
+# respeita inibidores do systemd por padrão (general:ignore_systemd_inhibit é
+# falso), então um inibidor de verdade cobre o hypridle, o logind e qualquer
+# outro programa que respeite o mesmo mecanismo. Se algo matar este script, o
+# inibidor morre junto — não fica um sistema preso acordado sem ninguém saber.
+#
+# Só `idle` e `sleep`: fechar a tampa continua suspendendo, que é o que as
+# pessoas esperam.
+#
+# Uso: rice-caffeine [status|on|off|toggle]
+# ==============================================================================
+
+set -uo pipefail
+
+TAG="hollow-wired-caffeine"
+WHY="Mantendo a tela acordada a pedido do usuário"
+
+have() { command -v "$1" >/dev/null 2>&1; }
+
+holder_pid() {
+    pgrep -f "systemd-inhibit .*--who=$TAG" 2>/dev/null | head -1
+}
+
+is_on() {
+    [ -n "$(holder_pid)" ]
+}
+
+start() {
+    is_on && return 0
+    have systemd-inhibit || return 1
+    setsid systemd-inhibit \
+        --what=idle:sleep \
+        --who="$TAG" \
+        --why="$WHY" \
+        --mode=block \
+        sleep infinity >/dev/null 2>&1 &
+    # Dá um instante para o processo aparecer antes de quem chamou ler o status.
+    sleep 0.2
+    is_on
+}
+
+stop() {
+    local pid
+    pid=$(holder_pid)
+    [ -n "$pid" ] || return 0
+    kill "$pid" 2>/dev/null || true
+    sleep 0.2
+    ! is_on
+}
+
+notify() {
+    have notify-send || return 0
+    notify-send -a "Energia" -i "$2" -r 91205 -t 3000 "$1" "$3" >/dev/null 2>&1 || true
+}
+
+case "${1:-status}" in
+    status)
+        if is_on; then
+            echo '{"active": true}'
+        else
+            echo '{"active": false}'
+        fi
+        ;;
+    on)
+        if start; then
+            notify "Tela não vai apagar" "preferences-desktop-screensaver" \
+                   "O bloqueio automático e a suspensão ficam pausados."
+            echo "OK"
+        else
+            echo "não consegui criar o inibidor" >&2
+            exit 1
+        fi
+        ;;
+    off)
+        stop
+        notify "Bloqueio automático de volta" "preferences-desktop-screensaver" \
+               "A tela volta a apagar sozinha."
+        echo "OK"
+        ;;
+    toggle)
+        if is_on; then
+            exec "$0" off
+        else
+            exec "$0" on
+        fi
+        ;;
+    *)
+        echo "uso: rice-caffeine [status|on|off|toggle]" >&2
+        exit 2
+        ;;
+esac
