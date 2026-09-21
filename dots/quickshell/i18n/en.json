@@ -976,5 +976,6 @@
   "anim.st_fade": "Fade",
   "anim.st_slidefadevert": "Vertical + fade",
   "anim.duration": "Duration",
-  "anim.hint": "Drag the curve handles. Changing any group switches the style to Custom, starting from the preset that was active."
+  "anim.hint": "Drag the curve handles. Changing any group switches the style to Custom, starting from the preset that was active.",
+  "wallust.tr_wave_desc2": "Circular ripples from the corner"
 }

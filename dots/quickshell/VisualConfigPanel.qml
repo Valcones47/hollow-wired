@@ -1570,8 +1570,8 @@ PanelWindow {
                             // numa lista corrida, sem separação: achar "Rede" ou
                             // "Armazenamento" exigia ler a lista inteira.
                             readonly property var navItems: [
-                                { group: "look", tabIndex: 8, name: Theme.t("settings.cat_wallust", "Cores & Wallust"), icon: Theme.icons.palette, desc: Theme.t("settings.desc_wallust", "Paleta Dinâmica"), keywords: "cores color colors wallust tema theme wallpaper papel de parede paleta palette dinamica accent visual fundo" },
-                                { group: "look", tabIndex: 9, name: Theme.t("settings.cat_effects", "Efeitos & Janelas"), icon: Theme.icons.laptop, desc: Theme.t("settings.desc_effects", "Bordas & Animações"), keywords: "efeitos effects janelas windows blur desfoque bordas borders sombras shadows sddm animacoes animations transparência luz noturna" },
+                                { group: "look", tabIndex: 8, name: Theme.t("settings.cat_wallust", "Cores & Wallust"), icon: Theme.icons.palette, desc: Theme.t("settings.desc_wallust", "Paleta Dinâmica"), keywords: "cores color colors wallust tema theme wallpaper papel de parede paleta palette dinamica accent visual fundo transicao transição transition onda wave varredura circulo fade" },
+                                { group: "look", tabIndex: 9, name: Theme.t("settings.cat_effects", "Efeitos & Janelas"), icon: Theme.icons.laptop, desc: Theme.t("settings.desc_effects", "Bordas & Animações"), keywords: "efeitos effects janelas windows blur desfoque bordas borders sombras shadows sddm animacoes animations transparência luz noturna curvas bezier curves velocidade" },
                                 { group: "look", tabIndex: 18, name: Theme.t("settings.cat_shell_custom", "Customização do Shell"), icon: Theme.icons.tune, desc: Theme.t("settings.desc_shell_custom", "Hub, Sidebar & Dock"), keywords: "shell quickshell customizacao dock topbar barra sidebar hub aparencia widgets glass solid glow borderless escala" },
                                 { group: "look", tabIndex: 2, name: Theme.t("settings.cat_mako", "Notificações"), icon: Theme.icons.bell, desc: Theme.t("settings.desc_mako", "Posição & Estilo"), keywords: "mako notificacoes notifications som posicao borda alert toast banner avisos" },
                                 { group: "look", tabIndex: 1, name: Theme.t("settings.cat_kitty", "Kitty Terminal"), icon: Theme.icons.console, desc: Theme.t("settings.desc_kitty", "Fonte & Opacidade"), keywords: "kitty terminal console fonte font opacidade padding cursor audio blur som transparencia" },
@@ -4838,7 +4838,7 @@ PanelWindow {
                                         model: [
                                             { id: "fade", name: Theme.t("wallust.tr_fade", "Dissolver"), desc: Theme.t("wallust.tr_fade_desc", "Um aparece sobre o outro") },
                                             { id: "wipe", name: Theme.t("wallust.tr_wipe", "Varredura"), desc: Theme.t("wallust.tr_wipe_desc", "Entra pela lateral") },
-                                            { id: "wave", name: Theme.t("wallust.tr_wave", "Onda"), desc: Theme.t("wallust.tr_wave_desc", "Varredura ondulada") },
+                                            { id: "wave", name: Theme.t("wallust.tr_wave", "Onda"), desc: Theme.t("wallust.tr_wave_desc2", "Ondas circulares do canto") },
                                             { id: "grow", name: Theme.t("wallust.tr_grow", "Círculo"), desc: Theme.t("wallust.tr_grow_desc", "Abre do centro") }
                                         ]
                                         delegate: Rectangle {
