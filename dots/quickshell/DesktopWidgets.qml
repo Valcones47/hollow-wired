@@ -6,7 +6,6 @@ import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Hyprland
 import Quickshell.Services.Mpris
-import Quickshell.Widgets
 import Quickshell.Services.UPower
 import "."
 
@@ -605,54 +604,96 @@ PanelWindow {
                 anchors.margins: 14
                 spacing: 16
 
-                // Disco de Vinil com rotação animada
-                Rectangle {
+                // Disco: com capa, a própria capa vira a peça — recortada numa
+                // forma de borda ondulada, com contorno branco colado nela,
+                // girando e ondulando enquanto a música toca (como nos players
+                // de referência). Sem capa, o vinil liso com o selo colorido.
+                Item {
+                    id: disc
                     Layout.preferredWidth: 100
                     Layout.preferredHeight: 100
-                    radius: 50
-                    color: "#111215"
-                    border.color: Theme.withAlpha(Theme.outline, 0.4)
-                    border.width: 2
+                    readonly property bool hasArt: discCanvas.artReady
 
                     RotationAnimation on rotation {
                         loops: Animation.Infinite
-                        from: 0; to: 360; duration: 6000
-                        running: w.playing
+                        from: 0; to: 360; duration: 9000
+                        running: w.playing && w.visible
                     }
 
-                    // Contorno ondulado em volta do disco, como nos players de
-                    // referência: gira junto com o disco e ondula enquanto a
-                    // música toca; pausado, a amplitude cai e vira um círculo
-                    // liso. Sem processo de áudio: é só animação, e o timer
-                    // fica parado quando nada toca.
+                    // Vinil (sem capa)
+                    Rectangle {
+                        anchors.fill: parent
+                        visible: !disc.hasArt
+                        radius: 50
+                        color: "#111215"
+                        border.color: Theme.withAlpha(Theme.outline, 0.4)
+                        border.width: 2
+                        Rectangle { anchors.centerIn: parent; width: 70; height: 70; radius: 35; color: "transparent"; border.color: "#25272c"; border.width: 1 }
+                        Rectangle { anchors.centerIn: parent; width: 46; height: 46; radius: 23; color: "transparent"; border.color: "#25272c"; border.width: 1 }
+                        Rectangle {
+                            anchors.centerIn: parent
+                            width: 28; height: 28; radius: 14
+                            color: w.wAccent
+                            Text {
+                                anchors.centerIn: parent
+                                text: Theme.icons.music
+                                font.family: Theme.iconFontFamily
+                                font.pixelSize: 13
+                                color: Theme.background
+                            }
+                        }
+                    }
+
                     Canvas {
-                        id: discWave
+                        id: discCanvas
                         anchors.centerIn: parent
-                        width: parent.width + 34
-                        height: parent.height + 34
-                        z: -1
+                        width: parent.width + 24
+                        height: parent.height + 24
                         property real phase: 0
-                        property real amp: w.playing ? 1 : 0
+                        property real amp: w.playing ? 1 : 0.25
+                        property string loaded: ""
+                        property bool artReady: false
                         Behavior on amp { NumberAnimation { duration: 600; easing.type: Easing.InOutQuad } }
                         onAmpChanged: requestPaint()
                         onPhaseChanged: requestPaint()
+                        onImageLoaded: {
+                            artReady = w.artUrl !== "" && isImageLoaded(w.artUrl);
+                            requestPaint();
+                        }
+
+                        // Carrega a capa nova e solta a anterior.
+                        Connections {
+                            target: w
+                            function onArtUrlChanged() { discCanvas.swapArt(); }
+                        }
+                        function swapArt() {
+                            if (loaded !== "" && loaded !== w.artUrl)
+                                unloadImage(loaded);
+                            loaded = w.artUrl;
+                            artReady = loaded !== "" && isImageLoaded(loaded);
+                            if (loaded !== "")
+                                loadImage(loaded);
+                            requestPaint();
+                        }
+                        Component.onCompleted: swapArt()
 
                         Timer {
                             interval: 33
                             repeat: true
                             running: w.playing && w.visible
-                            onTriggered: discWave.phase += 0.09
+                            onTriggered: discCanvas.phase += 0.08
                         }
 
                         onPaint: {
                             const ctx = getContext("2d");
                             ctx.reset();
                             const cx = width / 2, cy = height / 2;
-                            const base = (width - 34) / 2 + 5;
-                            const A = 3.2 * amp;
-                            function ring(k1, k2, sp, alpha, lw, off) {
+                            const base = 48;
+                            const A = 3.4 * amp;
+                            const art = artReady;
+                            function shape(off, k1, k2, sp) {
                                 ctx.beginPath();
-                                const steps = 120;
+                                const steps = 140;
                                 for (let i = 0; i <= steps; i++) {
                                     const t = i / steps * Math.PI * 2;
                                     const r = base + off + A * (0.6 * Math.sin(k1 * t + phase * sp)
@@ -661,60 +702,25 @@ PanelWindow {
                                     if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
                                 }
                                 ctx.closePath();
-                                ctx.globalAlpha = alpha;
-                                ctx.lineWidth = lw;
-                                ctx.strokeStyle = "white";
-                                ctx.stroke();
                             }
-                            ring(7, 11, 1.0, 0.9, 2.2, 0);
-                            ring(5, 9, -0.8, 0.35, 1.4, 3);
-                        }
-                    }
-
-                    // Capa da música tocando, recortada no círculo do disco e
-                    // girando com ele. Sem capa (ou sem player) fica o vinil
-                    // liso com o selo colorido no meio, como antes.
-                    ClippingRectangle {
-                        anchors.fill: parent
-                        anchors.margins: 2
-                        radius: width / 2
-                        color: "transparent"
-                        visible: discArt.status === Image.Ready
-
-                        Image {
-                            id: discArt
-                            anchors.fill: parent
-                            source: w.artUrl
-                            fillMode: Image.PreserveAspectCrop
-                            asynchronous: true
-                            smooth: true
-                        }
-                    }
-
-                    Rectangle { anchors.centerIn: parent; width: 70; height: 70; radius: 35; color: "transparent"; border.color: discArt.status === Image.Ready ? Qt.rgba(0, 0, 0, 0.25) : "#25272c"; border.width: 1 }
-                    Rectangle { anchors.centerIn: parent; width: 46; height: 46; radius: 23; color: "transparent"; border.color: discArt.status === Image.Ready ? Qt.rgba(0, 0, 0, 0.25) : "#25272c"; border.width: 1 }
-
-                    Rectangle {
-                        anchors.centerIn: parent
-                        width: 28; height: 28; radius: 14
-                        // Com capa, o selo vira o furo do vinil.
-                        color: discArt.status === Image.Ready ? "#111215" : w.wAccent
-                        border.width: discArt.status === Image.Ready ? 2 : 0
-                        border.color: w.wAccent
-
-                        Text {
-                            anchors.centerIn: parent
-                            visible: discArt.status !== Image.Ready
-                            text: Theme.icons.music
-                            font.family: Theme.iconFontFamily
-                            font.pixelSize: 13
-                            color: Theme.background
-                        }
-                        Rectangle {
-                            anchors.centerIn: parent
-                            visible: discArt.status === Image.Ready
-                            width: 6; height: 6; radius: 3
-                            color: Theme.withAlpha(Theme.foreground, 0.8)
+                            if (art) {
+                                // Capa dentro da forma ondulada.
+                                ctx.save();
+                                shape(0, 7, 11, 1.0);
+                                ctx.clip();
+                                const s = (base + 4) * 2;
+                                ctx.drawImage(w.artUrl, cx - s / 2, cy - s / 2, s, s);
+                                ctx.restore();
+                            }
+                            ctx.strokeStyle = "white";
+                            ctx.lineJoin = "round";
+                            // Contorno colado na capa, com um leve brilho.
+                            shape(0, 7, 11, 1.0);
+                            ctx.globalAlpha = 0.25; ctx.lineWidth = 6; ctx.stroke();
+                            ctx.globalAlpha = 0.95; ctx.lineWidth = 2.4; ctx.stroke();
+                            // Segunda onda, mais fraca e um pouco para fora.
+                            shape(5, 5, 9, -0.8);
+                            ctx.globalAlpha = 0.3; ctx.lineWidth = 1.4; ctx.stroke();
                         }
                     }
                 }
