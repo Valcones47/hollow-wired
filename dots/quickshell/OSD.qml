@@ -4,6 +4,9 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Services.Pipewire
+import Quickshell.Services.Mpris
+import Quickshell.Hyprland
+import Qt5Compat.GraphicalEffects
 import "."
 
 // OSD flutuante estilo Caelestia / Dynamic Island.
@@ -33,6 +36,67 @@ PanelWindow {
     property real osdValue: 1.0
     property bool isMuted: false
 
+    // ---------- faixa nova ----------
+    // Ao trocar de música a pílula alarga e mostra capa, título e artista — o
+    // aviso que o Windows e os rices de referência dão. Não aparece por cima
+    // de janela em tela cheia (jogo, vídeo), nem no boot, nem repetindo a
+    // mesma faixa quando o player reemite o título.
+    property string mediaTitle: ""
+    property string mediaArtist: ""
+    property string mediaArt: ""
+    property bool mediaPlaying: false
+    property string lastMediaKey: ""
+
+    readonly property var mediaPlayer: {
+        const list = Mpris.players.values;
+        for (let i = 0; i < list.length; i++)
+            if (list[i].isPlaying)
+                return list[i];
+        return list.length > 0 ? list[0] : null;
+    }
+
+    function showMedia() {
+        const pl = osdWindow.mediaPlayer;
+        if (!pl || !pl.trackTitle)
+            return;
+        const key = pl.trackTitle + "\u0000" + pl.trackArtist;
+        if (key === osdWindow.lastMediaKey)
+            return;
+        osdWindow.lastMediaKey = key;
+        if (!osdWindow.ready || !pl.isPlaying)
+            return;
+        const ws = Hyprland.focusedWorkspace;
+        if (ws && ws.hasFullscreen)
+            return;
+        // Não Perturbe cala também este aviso: é uma notificação como outra.
+        if (NotifService.dnd)
+            return;
+        osdType = "media";
+        isMuted = false;
+        mediaTitle = pl.trackTitle;
+        mediaArtist = pl.trackArtist || pl.identity || "";
+        mediaArt = pl.trackArtUrl || "";
+        mediaPlaying = pl.isPlaying;
+        open = true;
+        hideTimer.interval = 3400;
+        hideTimer.restart();
+    }
+
+    Connections {
+        target: osdWindow.mediaPlayer
+        function onTrackTitleChanged() { mediaDebounce.restart(); }
+        function onIsPlayingChanged() {
+            osdWindow.mediaPlaying = osdWindow.mediaPlayer ? osdWindow.mediaPlayer.isPlaying : false;
+        }
+    }
+    // Players costumam emitir o título antes do artista e da capa; esperar um
+    // instante evita mostrar a pílula com metade dos dados.
+    Timer {
+        id: mediaDebounce
+        interval: 350
+        onTriggered: osdWindow.showMedia()
+    }
+
     readonly property PwNode sink: Pipewire.defaultAudioSink
     readonly property PwNode source: Pipewire.defaultAudioSource
     PwObjectTracker { objects: [osdWindow.sink, osdWindow.source] }
@@ -58,6 +122,7 @@ PanelWindow {
     }
 
     function showVolume() {
+        hideTimer.interval = 1800;
         if (!sink || !sink.audio) return;
         osdType = "volume";
         isMuted = sink.audio.muted;
@@ -70,6 +135,7 @@ PanelWindow {
     }
 
     function showMic() {
+        hideTimer.interval = 1800;
         if (!source || !source.audio) return;
         osdType = "mic";
         isMuted = source.audio.muted;
@@ -82,6 +148,7 @@ PanelWindow {
     }
 
     function showBrightness(val) {
+        hideTimer.interval = 1800;
         osdType = "brightness";
         isMuted = false;
         osdValue = Math.max(0, Math.min(1, val));
@@ -173,6 +240,18 @@ PanelWindow {
         function test(): void {
             osdWindow.showVolume();
         }
+
+        // Teste do aviso de faixa sem precisar de um player tocando.
+        function testMedia(title: string, artist: string): void {
+            osdWindow.osdType = "media";
+            osdWindow.mediaTitle = title;
+            osdWindow.mediaArtist = artist;
+            osdWindow.mediaArt = "";
+            osdWindow.mediaPlaying = true;
+            osdWindow.open = true;
+            hideTimer.interval = 3400;
+            hideTimer.restart();
+        }
     }
 
     // Pílula flutuante (Caelestia Pill)
@@ -187,9 +266,12 @@ PanelWindow {
         Behavior on opacity { NumberAnimation { duration: 200 } }
         Behavior on scale { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
 
-        width: 280
-        height: 46
-        radius: 23
+        readonly property bool media: osdWindow.osdType === "media"
+        width: media ? 380 : 280
+        height: media ? 62 : 46
+        radius: height / 2
+        Behavior on width { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+        Behavior on height { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
         color: Theme.surface
         border.color: Theme.withAlpha(Theme.primary, 0.45)
         border.width: 1
@@ -200,11 +282,103 @@ PanelWindow {
             color: Theme.withAlpha(Theme.tileHigh, 0.5)
         }
 
+        // Máscara redonda da capa. Fica fora da vista com layer próprio, em vez
+        // de `visible: false`, que não gera a textura que o OpacityMask usa.
+        Rectangle {
+            id: artMask
+            width: 46
+            height: 46
+            radius: 23
+            x: -200
+            layer.enabled: true
+        }
+
+        RowLayout {
+            anchors.fill: parent
+            anchors.leftMargin: 8
+            anchors.rightMargin: 20
+            spacing: 12
+            visible: pill.media
+
+            Item {
+                Layout.preferredWidth: 46
+                Layout.preferredHeight: 46
+                Layout.alignment: Qt.AlignVCenter
+
+                Rectangle {
+                    anchors.fill: parent
+                    radius: 23
+                    color: Theme.withAlpha(Theme.primary, 0.18)
+                    Text {
+                        anchors.centerIn: parent
+                        text: Theme.icons.music
+                        font.family: Theme.iconFontFamily
+                        font.pixelSize: 20
+                        color: Theme.primary
+                        visible: osdArt.status !== Image.Ready
+                    }
+                }
+
+                Image {
+                    id: osdArt
+                    anchors.fill: parent
+                    source: osdWindow.mediaArt
+                    fillMode: Image.PreserveAspectCrop
+                    asynchronous: true
+                    visible: status === Image.Ready
+                    layer.enabled: true
+                    layer.effect: OpacityMask { maskSource: artMask }
+
+                    // Gira como um disco enquanto a música toca.
+                    RotationAnimation on rotation {
+                        from: 0
+                        to: 360
+                        duration: 9000
+                        loops: Animation.Infinite
+                        running: osdWindow.open && osdWindow.mediaPlaying && pill.media
+                    }
+                }
+            }
+
+            ColumnLayout {
+                Layout.fillWidth: true
+                Layout.alignment: Qt.AlignVCenter
+                spacing: 1
+                Text {
+                    Layout.fillWidth: true
+                    text: osdWindow.mediaTitle
+                    elide: Text.ElideRight
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 13
+                    font.weight: Font.DemiBold
+                    color: Theme.textColor
+                }
+                Text {
+                    Layout.fillWidth: true
+                    visible: text !== ""
+                    text: osdWindow.mediaArtist
+                    elide: Text.ElideRight
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 11
+                    color: Theme.subtext
+                }
+            }
+
+            Text {
+                Layout.alignment: Qt.AlignVCenter
+                text: osdWindow.mediaPlaying ? Theme.icons.play : Theme.icons.pause
+                font.family: Theme.iconFontFamily
+                font.pixelSize: 14
+                color: Theme.primary
+            }
+        }
+
         RowLayout {
             anchors.fill: parent
             anchors.leftMargin: 16
             anchors.rightMargin: 16
             spacing: 12
+            visible: !pill.media
 
             Text {
                 Layout.alignment: Qt.AlignVCenter
