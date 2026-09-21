@@ -771,12 +771,87 @@ rice_windows_rule = hl.window_rule({
 -- Janelas com regra própria de posição: não mexer ao trocar de modo.
 local keepAsIs = { dropterm = true }
 
+-- Barra de título (plugin hyprbars, opcional: pacote
+-- hyprland-plugin-hyprbars). Só no modo Windows, e só nas janelas que não
+-- desenham a própria barra (navegadores, Electron e apps GNOME já têm; ficaria
+-- dupla). Botões: minimizar (vai para a área escondida do Super+A),
+-- maximizar e fechar. Duplo clique na barra maximiza.
+local hyprbarsLib = "/usr/lib/libhyprbars.so"
+-- Recomeça a cada leitura do config: o reload apaga os botões do plugin.
+rice_hyprbars_ready = false
+local ownTitlebar = "^(zen|firefox|librewolf|floorp|chromium|google-chrome|brave-browser|vivaldi-stable|microsoft-edge|"
+    .. "com.anthropic.Claude|discord|vesktop|youtube-music-desktop-app|spotify|code|code-oss|Code|steam|"
+    .. "org.gnome..*|dropterm|xdg-desktop-portal-gtk)$"
+
+local function hex(c, alpha)
+    c = tostring(c or ""):gsub("#", "")
+    if #c ~= 6 then c = "1e1e2e" end
+    return alpha and ("rgba(" .. c .. alpha .. ")") or ("rgb(" .. c .. ")")
+end
+
+local function hyprbars_setup()
+    if rice_hyprbars_ready then return true end
+    if not hl.plugin.hyprbars then
+        local f = io.open(hyprbarsLib, "r")
+        if not f then return false end
+        f:close()
+        local ok = pcall(hl.plugin.load, hyprbarsLib)
+        if not ok or not hl.plugin.hyprbars then return false end
+    end
+    local bg = wallust.wallust_background or "#1e1e2e"
+    local fg = wallust.wallust_foreground or "#ffffff"
+    hl.config({ plugin = { hyprbars = {
+        bar_height = 28,
+        bar_color = hex(bg, "e6"),
+        ["col.text"] = hex(fg),
+        bar_text_font = "JetBrainsMono Nerd Font",
+        bar_text_size = 10,
+        bar_text_align = "left",
+        bar_padding = 12,
+        bar_button_padding = 8,
+        bar_part_of_window = true,
+        bar_precedence_over_border = true,
+        on_double_click = [[hyprctl dispatch 'hl.dsp.window.fullscreen({ mode = "maximized", action = "toggle" })']],
+    } } })
+    -- Da direita para a esquerda: fechar, maximizar, minimizar.
+    hl.plugin.hyprbars.add_button({
+        bg_color = "rgb(e06c75)", fg_color = hex(bg), size = 16, icon = "󰖭",
+        action = [[hyprctl dispatch 'hl.dsp.window.close()']],
+    })
+    hl.plugin.hyprbars.add_button({
+        bg_color = hex(wallust.wallust_accent2 or fg), fg_color = hex(bg), size = 16, icon = "󰖯",
+        action = [[hyprctl dispatch 'hl.dsp.window.fullscreen({ mode = "maximized", action = "toggle" })']],
+    })
+    hl.plugin.hyprbars.add_button({
+        bg_color = hex(wallust.wallust_accent1 or fg), fg_color = hex(bg), size = 16, icon = "󰖰",
+        action = [[hyprctl dispatch 'hl.dsp.window.move({ workspace = "special:magic" })']],
+    })
+    -- Com o plugin carregado a regra passa a existir.
+    rice_nobar_rule = hl.window_rule({
+        name  = "hyprbars-own-titlebar",
+        match = { class = ownTitlebar },
+        ["hyprbars:no_bar"] = true,
+    })
+    hl.window_rule({
+        name  = "hyprbars-pinned",
+        match = { pin = true },
+        ["hyprbars:no_bar"] = true,
+    })
+    rice_hyprbars_ready = true
+    return true
+end
+
 function rice_set_window_mode(mode, convert)
     local on = mode == "windows"
     rice_window_mode = on and "windows" or "hyprland"
     rice_windows_rule:set_enabled(on)
     rice_suppress_max_rule:set_enabled(not on)
     hl.config({ general = { resize_on_border = on } })
+    if on then
+        if hyprbars_setup() then hl.config({ plugin = { hyprbars = { enabled = true } } }) end
+    elseif hl.plugin.hyprbars then
+        hl.config({ plugin = { hyprbars = { enabled = false } } })
+    end
     if not convert then return end
     -- As janelas já abertas acompanham a troca: soltas num tamanho
     -- confortável e centralizadas, ou de volta para o lado a lado.
@@ -785,16 +860,7 @@ function rice_set_window_mode(mode, convert)
             local sel = "address:" .. w.address
             if on and not w.floating then
                 hl.dispatch(hl.dsp.window.float({ action = "enable", window = sel }))
-                local m = w.monitor
-                if m then
-                    local mw, mh = m.width / m.scale, m.height / m.scale
-                    hl.dispatch(hl.dsp.window.resize({
-                        exact = true, window = sel,
-                        x = math.floor(math.min(1400, mw * 0.62)),
-                        y = math.floor(math.min(900, mh * 0.72)),
-                    }))
-                end
-                hl.dispatch(hl.dsp.window.center({ window = sel }))
+                rice_window_comfy(w)
             elseif not on and w.floating then
                 hl.dispatch(hl.dsp.window.float({ action = "disable", window = sel }))
             end
@@ -802,7 +868,39 @@ function rice_set_window_mode(mode, convert)
     end
 end
 
-if rice_window_mode == "windows" then rice_set_window_mode("windows", false) end
+-- Apps que lembram o último tamanho (o kitty, por exemplo) abriam quase do
+-- tamanho da tela, com a barra de título escondida atrás da barra do topo.
+-- No modo Windows, janela nova maior que 90% da tela volta a um tamanho
+-- confortável, centralizada.
+local function comfy(w)
+    local m = w.monitor
+    if not m then return end
+    local sel = "address:" .. w.address
+    local mw, mh = m.width / m.scale, m.height / m.scale
+    hl.dispatch(hl.dsp.window.resize({
+        exact = true, window = sel,
+        x = math.floor(math.min(1400, mw * 0.62)),
+        y = math.floor(math.min(900, mh * 0.72)),
+    }))
+    hl.dispatch(hl.dsp.window.center({ window = sel }))
+end
+rice_window_comfy = comfy
+
+hl.on("window.open", function(w)
+    if rice_window_mode ~= "windows" or not w or not w.floating or w.pinned or keepAsIs[w.class] then return end
+    local m = w.monitor
+    if not m or type(w.size) ~= "table" then return end
+    local sw = w.size.x or w.size[1] or 0
+    local sh = w.size.y or w.size[2] or 0
+    if sw > m.width / m.scale * 0.9 or sh > m.height / m.scale * 0.85 then comfy(w) end
+end)
+
+if rice_window_mode == "windows" then
+    rice_set_window_mode("windows", false)
+elseif hl.plugin.hyprbars then
+    -- Plugin continua carregado depois de voltar ao modo Hyprland.
+    hl.config({ plugin = { hyprbars = { enabled = false } } })
+end
 
 -- Terminal drop-down (rice-dropterm): mora no workspace especial "dropterm",
 -- flutuante, centralizado no topo, 70% x 55% da tela.
