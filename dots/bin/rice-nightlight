@@ -1,54 +1,300 @@
-#!/bin/bash
-STATE_FILE="/tmp/hyprsunset_temp"
+#!/usr/bin/env python3
+"""rice-nightlight — filtro de luz azul, com agendamento pelo sol.
 
-get_temp() {
-    if [ -f "$STATE_FILE" ]; then
-        cat "$STATE_FILE"
-    else
-        echo "4500"
-    fi
+Antes disto o estado morava em /tmp/hyprsunset_temp: a temperatura escolhida se
+perdia a cada reinício, e ligar/desligar era sempre manual. Agora:
+
+  * a configuração fica em ~/.config/hypr/nightlight.json e sobrevive ao reboot;
+  * dá para agendar. No modo `sun` o filtro liga no pôr do sol e desliga no
+    nascer, calculados **localmente** a partir da latitude/longitude — sem
+    depender de rede, que é o que estragaria justamente quando o notebook está
+    fora de casa. No modo `fixed` valem dois horários escolhidos à mão.
+
+Quem chama `auto` periodicamente é o shell (um Timer no Quickshell), então não
+há daemon novo para instalar nem serviço para o usuário lembrar de habilitar.
+
+Uso:
+  rice-nightlight status
+  rice-nightlight on [temp] | off | toggle | set <temp>
+  rice-nightlight auto                      # aplica o que o horário pede
+  rice-nightlight schedule off|sun|fixed
+  rice-nightlight times <início> <fim>      # modo fixed, HH:MM
+  rice-nightlight location <lat> <lon>
+"""
+
+import json
+import math
+import os
+import subprocess
+import sys
+import time
+
+CONFIG = os.path.expanduser("~/.config/hypr/nightlight.json")
+LEGACY_STATE = "/tmp/hyprsunset_temp"
+
+DEFAULTS = {
+    "temp": 4500,          # temperatura do filtro, em kelvin
+    "schedule": "off",     # off | sun | fixed
+    "start": "19:00",      # modo fixed: quando liga
+    "end": "07:00",        # modo fixed: quando desliga
+    # Fortaleza, que é de onde o rice nasceu. Trocável pelo painel.
+    "lat": -3.73,
+    "lon": -38.52,
+    # Ligado/desligado à mão pelo usuário. O `auto` respeita isso até o próximo
+    # cruzamento de horário, senão desligar o filtro no meio da noite seria
+    # desfeito em segundos pelo próprio agendamento.
+    "manual_until": 0,
 }
 
-is_active() {
-    pgrep -x hyprsunset >/dev/null && echo "true" || echo "false"
-}
 
-case "$1" in
-    status)
-        active=$(is_active)
-        temp=$(get_temp)
-        echo "{\"active\": $active, \"temp\": $temp}"
-        ;;
-    on)
-        temp="${2:-$(get_temp)}"
-        echo "$temp" > "$STATE_FILE"
-        pkill -x hyprsunset 2>/dev/null || true
-        hyprsunset -t "$temp" &>/dev/null &
-        echo "OK"
-        ;;
-    off)
-        pkill -x hyprsunset 2>/dev/null || true
-        echo "OK"
-        ;;
-    toggle)
-        if pgrep -x hyprsunset >/dev/null; then
-            pkill -x hyprsunset 2>/dev/null || true
-        else
-            temp=$(get_temp)
-            hyprsunset -t "$temp" &>/dev/null &
-        fi
-        echo "OK"
-        ;;
-    set)
-        temp="${2:-4500}"
-        echo "$temp" > "$STATE_FILE"
-        if pgrep -x hyprsunset >/dev/null; then
-            pkill -x hyprsunset 2>/dev/null || true
-            hyprsunset -t "$temp" &>/dev/null &
-        fi
-        echo "OK"
-        ;;
-    *)
-        echo "Usage: rice-nightlight [status|on [temp]|off|toggle|set <temp>]"
-        ;;
-esac
+def load():
+    cfg = dict(DEFAULTS)
+    try:
+        with open(CONFIG, encoding="utf-8") as f:
+            cfg.update(json.load(f))
+    except Exception:
+        # Primeira execução depois da mudança: aproveita a temperatura que
+        # estava no arquivo antigo em /tmp, se ainda existir nesta sessão.
+        try:
+            with open(LEGACY_STATE, encoding="utf-8") as f:
+                cfg["temp"] = int(f.read().strip())
+        except Exception:
+            pass
+    return cfg
+
+
+def save(cfg):
+    os.makedirs(os.path.dirname(CONFIG), exist_ok=True)
+    tmp = CONFIG + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(cfg, f, indent=2, ensure_ascii=False)
+    os.replace(tmp, CONFIG)
+
+
+def running():
+    return subprocess.run(["pgrep", "-x", "hyprsunset"],
+                          stdout=subprocess.DEVNULL).returncode == 0
+
+
+def apply_on(temp):
+    subprocess.run(["pkill", "-x", "hyprsunset"], stdout=subprocess.DEVNULL,
+                   stderr=subprocess.DEVNULL)
+    subprocess.Popen(["hyprsunset", "-t", str(temp)],
+                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                     start_new_session=True)
+
+
+def apply_off():
+    subprocess.run(["pkill", "-x", "hyprsunset"], stdout=subprocess.DEVNULL,
+                   stderr=subprocess.DEVNULL)
+
+
+# ------------------------------------------------------------ sol
+
+def sun_times(lat, lon, when=None):
+    """Nascer e pôr do sol em minutos desde a meia-noite local.
+
+    Algoritmo do "Sunrise/Sunset Almanac" do NOAA, versão simplificada: erra
+    por volta de um minuto, o que é irrelevante para acender uma tela mais
+    quente. Feito à mão de propósito — depender de rede para isso deixaria o
+    recurso quebrado justamente quando o notebook está sem internet.
+
+    Devolve (nascer, pôr) ou None quando o sol não nasce nem se põe no dia
+    (latitudes polares).
+    """
+    t = time.localtime(when if when is not None else time.time())
+    # Dia do ano e fuso local, em horas.
+    n = t.tm_yday
+    offset = -time.altzone / 3600 if t.tm_isdst else -time.timezone / 3600
+
+    rad = math.pi / 180
+    # Ângulo fracionário do ano.
+    gamma = 2 * math.pi / 365 * (n - 1 + 0.5)
+    # Equação do tempo, em minutos.
+    eqtime = 229.18 * (0.000075
+                       + 0.001868 * math.cos(gamma)
+                       - 0.032077 * math.sin(gamma)
+                       - 0.014615 * math.cos(2 * gamma)
+                       - 0.040849 * math.sin(2 * gamma))
+    decl = (0.006918
+            - 0.399912 * math.cos(gamma)
+            + 0.070257 * math.sin(gamma)
+            - 0.006758 * math.cos(2 * gamma)
+            + 0.000907 * math.sin(2 * gamma)
+            - 0.002697 * math.cos(3 * gamma)
+            + 0.00148 * math.sin(3 * gamma))
+
+    # 90.833° inclui a refração atmosférica e o tamanho do disco solar.
+    cos_ha = (math.cos(90.833 * rad)
+              / (math.cos(lat * rad) * math.cos(decl))
+              - math.tan(lat * rad) * math.tan(decl))
+    if cos_ha > 1 or cos_ha < -1:
+        return None
+    ha = math.acos(cos_ha) / rad
+
+    sunrise = 720 - 4 * (lon + ha) - eqtime + offset * 60
+    sunset = 720 - 4 * (lon - ha) - eqtime + offset * 60
+    return (sunrise % 1440, sunset % 1440)
+
+
+def hhmm_to_min(text, fallback):
+    try:
+        h, m = text.split(":")
+        return (int(h) * 60 + int(m)) % 1440
+    except Exception:
+        return fallback
+
+
+def should_be_on(cfg, now_min=None):
+    """Se o filtro deveria estar ligado agora. None = sem agendamento."""
+    mode = cfg.get("schedule", "off")
+    if mode not in ("sun", "fixed"):
+        return None
+
+    if now_min is None:
+        t = time.localtime()
+        now_min = t.tm_hour * 60 + t.tm_min
+
+    if mode == "sun":
+        times = sun_times(cfg.get("lat", 0.0), cfg.get("lon", 0.0))
+        if not times:
+            return None
+        start, end = times[1], times[0]     # liga no pôr, desliga no nascer
+    else:
+        start = hhmm_to_min(cfg.get("start", "19:00"), 19 * 60)
+        end = hhmm_to_min(cfg.get("end", "07:00"), 7 * 60)
+
+    if start == end:
+        return None
+    # A janela atravessa a meia-noite no caso normal (pôr -> nascer).
+    if start < end:
+        return start <= now_min < end
+    return now_min >= start or now_min < end
+
+
+def fmt(minutes):
+    return "%02d:%02d" % (int(minutes) // 60, int(minutes) % 60)
+
+
+# ------------------------------------------------------------ comandos
+
+def cmd_status(cfg):
+    info = {
+        "active": running(),
+        "temp": cfg["temp"],
+        "schedule": cfg.get("schedule", "off"),
+        "start": cfg.get("start", "19:00"),
+        "end": cfg.get("end", "07:00"),
+        "lat": cfg.get("lat"),
+        "lon": cfg.get("lon"),
+    }
+    times = sun_times(cfg.get("lat", 0.0), cfg.get("lon", 0.0))
+    if times:
+        info["sunrise"] = fmt(times[0])
+        info["sunset"] = fmt(times[1])
+    want = should_be_on(cfg)
+    if want is not None:
+        info["scheduled_on"] = want
+    print(json.dumps(info, ensure_ascii=False))
+
+
+def cmd_auto(cfg):
+    want = should_be_on(cfg)
+    if want is None:
+        return
+    # Respeita um toggle manual recente: desligar o filtro à noite não pode ser
+    # desfeito pelo agendamento no minuto seguinte.
+    if time.time() < cfg.get("manual_until", 0):
+        return
+    if want and not running():
+        apply_on(cfg["temp"])
+    elif not want and running():
+        apply_off()
+
+
+def main():
+    args = sys.argv[1:]
+    cmd = args[0] if args else "status"
+    cfg = load()
+
+    # Quanto tempo um toggle manual segura o agendamento. Uma janela curta
+    # bastaria para o `auto` desfazer na próxima passagem; 4h cobre uma noite
+    # de uso sem travar o comportamento no dia seguinte.
+    MANUAL_HOLD = 4 * 3600
+
+    if cmd == "status":
+        cmd_status(cfg)
+    elif cmd == "auto":
+        cmd_auto(cfg)
+    elif cmd == "on":
+        if len(args) > 1:
+            try:
+                cfg["temp"] = int(args[1])
+            except ValueError:
+                pass
+        cfg["manual_until"] = time.time() + MANUAL_HOLD
+        save(cfg)
+        apply_on(cfg["temp"])
+        print("OK")
+    elif cmd == "off":
+        cfg["manual_until"] = time.time() + MANUAL_HOLD
+        save(cfg)
+        apply_off()
+        print("OK")
+    elif cmd == "toggle":
+        cfg["manual_until"] = time.time() + MANUAL_HOLD
+        save(cfg)
+        if running():
+            apply_off()
+        else:
+            apply_on(cfg["temp"])
+        print("OK")
+    elif cmd == "set":
+        try:
+            cfg["temp"] = int(args[1])
+        except (IndexError, ValueError):
+            print("uso: rice-nightlight set <kelvin>", file=sys.stderr)
+            return 2
+        save(cfg)
+        if running():
+            apply_on(cfg["temp"])
+        print("OK")
+    elif cmd == "schedule":
+        mode = args[1] if len(args) > 1 else ""
+        if mode not in ("off", "sun", "fixed"):
+            print("modos: off, sun, fixed", file=sys.stderr)
+            return 2
+        cfg["schedule"] = mode
+        cfg["manual_until"] = 0      # escolher o agendamento vale agora
+        save(cfg)
+        cmd_auto(cfg)
+        print("OK")
+    elif cmd == "times":
+        if len(args) < 3:
+            print("uso: rice-nightlight times <HH:MM> <HH:MM>", file=sys.stderr)
+            return 2
+        cfg["start"], cfg["end"] = args[1], args[2]
+        cfg["manual_until"] = 0
+        save(cfg)
+        cmd_auto(cfg)
+        print("OK")
+    elif cmd == "location":
+        try:
+            cfg["lat"], cfg["lon"] = float(args[1]), float(args[2])
+        except (IndexError, ValueError):
+            print("uso: rice-nightlight location <lat> <lon>", file=sys.stderr)
+            return 2
+        cfg["manual_until"] = 0
+        save(cfg)
+        cmd_auto(cfg)
+        print("OK")
+    else:
+        print(__doc__.strip().splitlines()[-7:] and
+              "uso: rice-nightlight [status|on|off|toggle|set|auto|schedule|times|location]",
+              file=sys.stderr)
+        return 2
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main() or 0)

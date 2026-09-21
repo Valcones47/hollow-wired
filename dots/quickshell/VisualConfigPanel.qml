@@ -378,6 +378,11 @@ PanelWindow {
     // Efeitos / Hyprland
     property bool nightlightActive: false
     property int nightlightTemp: 4500
+    property string nightlightSchedule: "off"
+    property string nightlightStart: "19:00"
+    property string nightlightEnd: "07:00"
+    property string nightlightSunrise: ""
+    property string nightlightSunset: ""
     property bool dimInactive: false
     property real dimStrength: 0.2
     property int rounding: 8
@@ -628,6 +633,11 @@ PanelWindow {
                     const d = JSON.parse(text);
                     win.nightlightActive = !!d.active;
                     win.nightlightTemp = d.temp || 4500;
+                    if (d.schedule !== undefined) win.nightlightSchedule = d.schedule;
+                    if (d.start !== undefined) win.nightlightStart = d.start;
+                    if (d.end !== undefined) win.nightlightEnd = d.end;
+                    win.nightlightSunrise = d.sunrise || "";
+                    win.nightlightSunset = d.sunset || "";
                 } catch (e) {}
             }
         }
@@ -5074,6 +5084,118 @@ PanelWindow {
                                             Quickshell.execDetached(["rice-nightlight", "set", String(win.nightlightTemp)]);
                                         });
                                     }
+                                }
+
+                                SectionHeader {
+                                    title: Theme.t("effects.nightlight_sched", "Ligar sozinha")
+                                    subtitle: Theme.t("effects.nightlight_sched_sub", "O horário do sol é calculado no próprio computador, sem internet — continua certo com o notebook fora de casa.")
+                                }
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 12
+
+                                    Repeater {
+                                        model: [
+                                            { id: "off",   name: Theme.t("effects.nl_off", "Só no botão"), desc: Theme.t("effects.nl_off_desc", "Nunca liga sozinha") },
+                                            { id: "sun",   name: Theme.t("effects.nl_sun", "Pelo sol"), desc: Theme.t("effects.nl_sun_desc", "Do pôr ao nascer do sol") },
+                                            { id: "fixed", name: Theme.t("effects.nl_fixed", "Horário fixo"), desc: Theme.t("effects.nl_fixed_desc", "Você escolhe as horas") }
+                                        ]
+                                        delegate: Rectangle {
+                                            required property var modelData
+                                            readonly property bool active: win.nightlightSchedule === modelData.id
+                                            Layout.fillWidth: true
+                                            implicitHeight: 52
+                                            radius: 10
+                                            color: active ? Theme.withAlpha(Theme.primary, 0.22) : (nlArea.containsMouse ? Theme.tileHigh : Theme.tile)
+                                            border.width: active ? 1.5 : 0
+                                            border.color: Theme.primary
+
+                                            ColumnLayout {
+                                                anchors.centerIn: parent
+                                                spacing: 2
+                                                Text {
+                                                    Layout.alignment: Qt.AlignHCenter
+                                                    text: parent.parent.modelData.name
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 12
+                                                    font.weight: parent.parent.active ? Font.DemiBold : Font.Normal
+                                                    color: Theme.textColor
+                                                }
+                                                Text {
+                                                    Layout.alignment: Qt.AlignHCenter
+                                                    text: parent.parent.modelData.desc
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 10
+                                                    color: parent.parent.active ? Theme.primary : Theme.subtext
+                                                }
+                                            }
+
+                                            MouseArea {
+                                                id: nlArea
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: {
+                                                    win.nightlightSchedule = parent.modelData.id;
+                                                    Quickshell.execDetached(["rice-nightlight", "schedule", parent.modelData.id]);
+                                                    nlRecheck.restart();
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    visible: win.nightlightSchedule === "sun" && win.nightlightSunset !== ""
+                                    text: Theme.t("effects.nl_today", "Hoje aqui: o sol se põe às ") + win.nightlightSunset
+                                        + Theme.t("effects.nl_today2", " e nasce às ") + win.nightlightSunrise + "."
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 11
+                                    color: Theme.subtext
+                                }
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 12
+                                    visible: win.nightlightSchedule === "fixed"
+
+                                    CfgSlider {
+                                        Layout.fillWidth: true
+                                        title: Theme.t("effects.nl_start", "Liga às")
+                                        minVal: 0; maxVal: 23
+                                        value: parseInt(win.nightlightStart.split(":")[0]) || 19
+                                        unit: "h"
+                                        onChanged: newVal => {
+                                            win.nightlightStart = ("0" + Math.round(newVal)).slice(-2) + ":00";
+                                            debounceTimer.exec(() => {
+                                                Quickshell.execDetached(["rice-nightlight", "times",
+                                                    win.nightlightStart, win.nightlightEnd]);
+                                            });
+                                        }
+                                    }
+
+                                    CfgSlider {
+                                        Layout.fillWidth: true
+                                        title: Theme.t("effects.nl_end", "Desliga às")
+                                        minVal: 0; maxVal: 23
+                                        value: parseInt(win.nightlightEnd.split(":")[0]) || 7
+                                        unit: "h"
+                                        onChanged: newVal => {
+                                            win.nightlightEnd = ("0" + Math.round(newVal)).slice(-2) + ":00";
+                                            debounceTimer.exec(() => {
+                                                Quickshell.execDetached(["rice-nightlight", "times",
+                                                    win.nightlightStart, win.nightlightEnd]);
+                                            });
+                                        }
+                                    }
+                                }
+
+                                Timer {
+                                    id: nlRecheck
+                                    interval: 1200
+                                    onTriggered: loadNightlightProc.running = true
                                 }
 
                                 SectionHeader {

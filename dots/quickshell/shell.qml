@@ -44,6 +44,18 @@ ShellRoot {
     Frame { id: frameScope }
     WallpaperFade { id: wallFade }
 
+    // Luz noturna agendada. O `rice-nightlight auto` decide sozinho se o filtro
+    // deve estar ligado no horário atual e não faz nada quando o agendamento
+    // está desligado — por isso dá para chamar sempre, sem daemon novo nem
+    // serviço que o usuário precise habilitar.
+    Timer {
+        interval: 5 * 60 * 1000
+        running: true
+        repeat: true
+        triggeredOnStart: true
+        onTriggered: Quickshell.execDetached(["rice-nightlight", "auto"])
+    }
+
     // ---------- modo de captura limpa ----------
     // `qs ipc call capture hide` esconde tudo que o Quickshell desenha por cima
     // do wallpaper (barra, moldura, dock e widgets) para que o
