@@ -800,23 +800,59 @@ PanelWindow {
                         onAmpChanged: requestPaint()
                         onPhaseChanged: requestPaint()
                         onImageLoaded: {
-                            artReady = w.artUrl !== "" && isImageLoaded(w.artUrl);
+                            artReady = loaded !== "" && isImageLoaded(loaded);
                             requestPaint();
                         }
 
                         // Carrega a capa nova e solta a anterior.
+                        //
+                        // A capa às vezes não aparecia: o YouTube Music (Chromium)
+                        // grava a capa num arquivo em /tmp, às vezes reaproveitando
+                        // o mesmo caminho entre faixas, e o aviso de troca chega
+                        // antes de o arquivo estar escrito. O Canvas guarda a
+                        // imagem pelo endereço, então uma leitura que falhou ou
+                        // pegou o arquivo pela metade nunca era refeita. Agora cada
+                        // carga ganha um endereço próprio (?v=...), recarrega
+                        // também quando a faixa muda, e tenta de novo por alguns
+                        // segundos enquanto a imagem não fica pronta.
                         Connections {
                             target: w
                             function onArtUrlChanged() { discCanvas.swapArt(); }
                         }
+                        Connections {
+                            target: w.player
+                            function onTrackTitleChanged() { discCanvas.swapArt(); }
+                        }
+                        property int tries: 0
                         function swapArt() {
-                            if (loaded !== "" && loaded !== w.artUrl)
-                                unloadImage(loaded);
-                            loaded = w.artUrl;
-                            artReady = loaded !== "" && isImageLoaded(loaded);
+                            tries = 0;
+                            reload();
+                        }
+                        function reload() {
                             if (loaded !== "")
+                                unloadImage(loaded);
+                            const url = w.artUrl;
+                            loaded = url === "" ? "" : url + (url.indexOf("?") >= 0 ? "&" : "?") + "v=" + Date.now();
+                            artReady = false;
+                            if (loaded !== "") {
                                 loadImage(loaded);
+                                retryTimer.restart();
+                            }
                             requestPaint();
+                        }
+                        Timer {
+                            id: retryTimer
+                            interval: 700
+                            onTriggered: {
+                                if (discCanvas.loaded === "" || discCanvas.artReady)
+                                    return;
+                                if (discCanvas.isImageLoaded(discCanvas.loaded)) {
+                                    discCanvas.artReady = true;
+                                    discCanvas.requestPaint();
+                                } else if (++discCanvas.tries < 6) {
+                                    discCanvas.reload();
+                                }
+                            }
                         }
                         Component.onCompleted: swapArt()
 
@@ -852,7 +888,7 @@ PanelWindow {
                                 shape(0, 7, 11, 1.0);
                                 ctx.clip();
                                 const s = (base + 4) * 2;
-                                ctx.drawImage(w.artUrl, cx - s / 2, cy - s / 2, s, s);
+                                ctx.drawImage(loaded, cx - s / 2, cy - s / 2, s, s);
                                 ctx.restore();
                             }
                             ctx.strokeStyle = "white";
