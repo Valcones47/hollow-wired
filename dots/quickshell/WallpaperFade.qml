@@ -53,7 +53,7 @@ Scope {
     // Mais lento que a entrada de propósito: a saída é quando o olho está
     // procurando o wallpaper novo, e qualquer tranco do renderizador que ainda
     // sobrar fica diluído num esmaecer longo.
-    property int revealMs: 750
+    property int revealMs: 500
 
     property string source: ""
     property bool covering: false
@@ -435,7 +435,9 @@ Scope {
         // Revela o wallpaper novo, agora que o renderizador dele está no ar.
         function reveal(): void { fadeScope.reveal(); }
         // Quanto tempo o chamador deve esperar antes de aplicar a troca.
-        function coverDelay(): string { return String(fadeScope.coverMs + 180); }
+        // Começa a troca com a imagem em ~85%: o resto da animação corre
+        // enquanto o backend já está trocando, em vez de esperar parado.
+        function coverDelay(): string { return String(Math.round(fadeScope.coverMs * 0.85)); }
         // Troca o estilo sem reiniciar o shell (usado pelo painel e para teste).
         function setStyle(name: string): void { fadeScope.style = name; }
         function currentStyle(): string { return fadeScope.style; }
