@@ -74,39 +74,104 @@ case "${1:-}" in
         exit 0
         ;;
     --reveal-when-ready)
-        # Tira a camada assim que o wallpaper novo estiver de fato no ar.
+        # Tira a camada quando o wallpaper novo estiver de fato no ar E assentado.
         #
-        # Antes a camada saía por tempo fixo. Quando o backend demorava mais que
-        # isso, ela começava a sumir com o wallpaper antigo ainda desenhando, e
-        # os dois apareciam ao mesmo tempo meio transparentes. E quando o
-        # backend era rápido, a tela ficava coberta à toa.
+        #   rice-wallpaper-fade --reveal-when-ready <pasta do item> [--colors <imagem>]
         #
         # O waywallen sobe um processo por wallpaper —
         # `waywallen-video-renderer --path <arquivo>` para vídeo e
         # `waywallen-wescene-renderer --path <scene.pkg>` para cena — com o
-        # caminho do item na linha de comando. A presença dele é o sinal.
+        # caminho do item na linha de comando. A presença dele é o primeiro sinal.
+        #
+        # Só a presença não basta: o processo aparece e passa ainda um ou dois
+        # segundos carregando texturas e shaders, com quadros engasgando. Antes
+        # a camada saía 0,45s depois de ele aparecer, e esse carregamento ficava
+        # à vista como "microlag depois da transição". Agora ela espera o uso
+        # de CPU do renderizador baixar e estabilizar.
+        #
+        # Com --colors, a paleta nova (wallust) também é gerada aqui, com a tela
+        # ainda coberta: recolorir o shell inteiro redesenha todas as superfícies,
+        # e fazer isso com o wallpaper novo já à vista era o segundo tranco.
         target="${2:-}"
+        colors=""
+        [ "${3:-}" = "--colors" ] && colors="${4:-}"
         [ -n "$target" ] || { qs_call reveal >/dev/null 2>&1; exit 0; }
 
+        wallust_pid=""
+        if [ -n "$colors" ] && [ -f "$colors" ] && command -v wallust >/dev/null 2>&1; then
+            nice -n 10 wallust run "$colors" >/dev/null 2>&1 &
+            wallust_pid=$!
+        fi
+
         deadline=$(( $(date +%s) + 8 ))
-        ready=0
+        pid=""
         while [ "$(date +%s)" -lt "$deadline" ]; do
-            if pgrep -f "waywallen-.*-renderer.*$target" >/dev/null 2>&1; then
-                ready=1
-                break
-            fi
+            pid=$(pgrep -f "waywallen-.*-renderer.*$target" 2>/dev/null | head -1)
+            [ -n "$pid" ] && break
             sleep 0.12
         done
 
-        # Um instante a mais depois de o processo aparecer: ele ainda precisa
-        # desenhar o primeiro quadro, e revelar antes disso mostra preto.
-        if [ "$ready" = "1" ]; then
-            trace "renderizador novo no ar: $target"
-            sleep 0.45
+        if [ -n "$pid" ]; then
+            # Cena (scene.pkg) carrega mais coisa que vídeo.
+            min_ms=900
+            grep -qa "wescene" "/proc/$pid/cmdline" 2>/dev/null && min_ms=1400
+            max_ms=4000
+            tick=$(getconf CLK_TCK 2>/dev/null || echo 100)
+            cpu_ticks() { awk '{print $14 + $15}' "/proc/$1/stat" 2>/dev/null; }
+            start_ms=$(date +%s%3N)
+            prev=$(cpu_ticks "$pid"); last_pct=999; calm=0
+            while :; do
+                sleep 0.2
+                now_ms=$(date +%s%3N)
+                el=$(( now_ms - start_ms ))
+                cur=$(cpu_ticks "$pid")
+                [ -z "$cur" ] && break                       # processo sumiu
+                # % de um núcleo nos últimos 200ms
+                pct=$(( (cur - prev) * 100 * 5 / tick ))
+                prev=$cur
+                # "Assentou": duas amostras seguidas abaixo de 60%, ou quase
+                # iguais abaixo de 90% (o decode de vídeo em regime tem custo
+                # constante). Um núcleo cravado em 100% é carregamento, mesmo
+                # estável — no teste com um processo ocupado isso passava.
+                diff=$(( pct > last_pct ? pct - last_pct : last_pct - pct ))
+                if [ "$pct" -lt 60 ] || { [ "$pct" -lt 90 ] && [ "$diff" -le $(( pct / 5 + 5 )) ]; }; then
+                    calm=$(( calm + 1 ))
+                else
+                    calm=0
+                fi
+                last_pct=$pct
+                if [ "$el" -ge "$min_ms" ] && [ "$calm" -ge 2 ]; then
+                    break
+                fi
+                [ "$el" -ge "$max_ms" ] && break
+            done
+            trace "renderizador assentou em ${el:-?}ms (cpu ${pct:-?}%): $target"
         else
             trace "renderizador novo NÃO apareceu em 8s: $target"
         fi
+
+        # Paleta nova aplicada antes de revelar (limite de 4s: um wallust
+        # travado não pode segurar a tela coberta).
+        if [ -n "$wallust_pid" ]; then
+            for _ in $(seq 1 20); do
+                kill -0 "$wallust_pid" 2>/dev/null || break
+                sleep 0.2
+            done
+            # O shell relê as cores do arquivo e redesenha; um instante para isso
+            # acontecer ainda por trás da imagem.
+            sleep 0.3
+            trace "paleta aplicada antes de revelar"
+        fi
+
         qs_call reveal >/dev/null 2>&1 || true
+
+        # Fundo da tela de login: invisível para o usuário, então roda depois,
+        # com prioridade mínima, para não disputar CPU com o wallpaper que
+        # acabou de subir.
+        if [ -n "$colors" ] && [ -x "$HOME/.local/bin/rice-sddm-sync-wallpaper" ]; then
+            sleep 1.5
+            nice -n 19 "$HOME/.local/bin/rice-sddm-sync-wallpaper" --quiet >/dev/null 2>&1 || true
+        fi
         exit 0
         ;;
     --dismiss)

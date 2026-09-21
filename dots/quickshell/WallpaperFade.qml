@@ -24,7 +24,7 @@ import "."
 // Estilos de entrada (user-prefs.json > wallpaper_transition):
 //   fade   crossfade simples
 //   wipe   varredura lateral
-//   wave   varredura com a borda ondulada
+//   wave   ondas circulares saindo do canto superior direito
 //   grow   círculo que abre do centro
 //
 // Uso (ver rice-wallpaper-fade):
@@ -47,8 +47,13 @@ Scope {
     // Antes era um tempo fixo de 1200ms, e quando o backend demorava mais que
     // isso a camada começava a sumir com o wallpaper antigo ainda na tela — os
     // dois apareciam ao mesmo tempo, meio transparentes.
-    property int hold: 6000
-    property int revealMs: 450
+    // Com a espera pelo renderizador assentar e pela paleta nova (ver
+    // rice-wallpaper-fade), o caminho normal leva de 1,5 a 4s depois de cobrir.
+    property int hold: 9000
+    // Mais lento que a entrada de propósito: a saída é quando o olho está
+    // procurando o wallpaper novo, e qualquer tranco do renderizador que ainda
+    // sobrar fica diluído num esmaecer longo.
+    property int revealMs: 750
 
     property string source: ""
     property bool covering: false
@@ -140,10 +145,13 @@ Scope {
         from: 0
         to: 1
         duration: fadeScope.coverMs
-        // Mesma curva do swww (--transition-bezier 0.25,0.1,0.25,1.0), que é
-        // o ease padrão do CSS: arranca rápido e assenta devagar.
+        // Na onda a frente anda quase por igual do começo ao fim — com o ease
+        // do CSS ela cobria 70% da tela no primeiro terço e os anéis mal
+        // apareciam. Os outros estilos seguem a curva do swww
+        // (0.25,0.1,0.25,1.0), que arranca rápido e assenta devagar.
         easing.type: Easing.Bezier
-        easing.bezierCurve: [0.25, 0.1, 0.25, 1.0, 1.0, 1.0]
+        easing.bezierCurve: fadeScope.style === "wave" ? [0.45, 0.05, 0.55, 0.95, 1.0, 1.0]
+                                                       : [0.25, 0.1, 0.25, 1.0, 1.0, 1.0]
     }
 
     // Limite: se o sinal de "renderizador novo no ar" nunca chegar, revela
@@ -276,10 +284,14 @@ Scope {
                 }
             }
 
-            // Varredura com a borda ondulada. O Canvas desenha em coordenadas
-            // do próprio item — na primeira versão ele tinha `canvasSize` de
-            // 320x180 mas desenhava em coordenadas de 1920, então quase tudo
-            // caía fora da área pintada.
+            // Onda: ondas circulares que nascem no canto superior direito e se
+            // espalham pela tela, como uma pedra na água. A frente é um arco
+            // de círculo com a borda ondulando (e a ondulação anda enquanto
+            // cresce), e à frente dela correm dois anéis mais fracos, por onde
+            // o wallpaper novo já aparece em faixas.
+            //
+            // Tudo desenhado aqui dentro, em coordenadas de pintura: um `Item`
+            // girado dentro da máscara faz o alfa sair uniforme (regra 3).
             Canvas {
                 id: waveMask
                 width: fadeWin.width
@@ -288,7 +300,6 @@ Scope {
                 layer.enabled: true
                 renderTarget: Canvas.FramebufferObject
 
-                readonly property real feather: 0.16
                 readonly property real p: fadeScope.progress
 
                 onPChanged: requestPaint()
@@ -301,45 +312,81 @@ Scope {
                     ctx.reset();
                     const w = width;
                     const h = height;
-                    const band = feather * w;
-                    const amp = w * 0.035;
-                    const cycles = 2.4;
-                    const steps = 64;
+                    const cx = w;          // canto superior direito
+                    const cy = 0;
+                    const diag = Math.sqrt(w * w + h * h);
+                    const band = diag * 0.09;   // largura da borda macia
+                    const amp = diag * 0.03;    // altura da ondulação
+                    const gap = diag * 0.085;   // distância entre os anéis
+                    const lobes = 6;
+                    const phase = p * Math.PI * 4;
+                    // Em p = 1 a parte sólida já passou do canto oposto.
+                    const R = p * (diag + band + amp * 2);
 
-                    // Varre do canto superior DIREITO para o inferior esquerdo.
-                    //
-                    // A diagonal é desenhada aqui dentro, em coordenadas de
-                    // pintura. Tentar girar um `Item` que contém a máscara não
-                    // funciona: com contêiner girado o alfa volta a sair
-                    // uniforme e a transição some.
-                    //
-                    // Para cada fatia, a fronteira fica em
-                    //   xb = w * (1 - 2p + t)
-                    // com t indo de 0 no topo a 1 embaixo — o topo vai na
-                    // frente. Em p=0 xb cai fora da tela à direita (nada
-                    // coberto) e em p=1 cai fora à esquerda (tudo coberto).
-                    const sliceH = h / steps;
-                    for (let i = 0; i < steps; i++) {
-                        const t = (i + 0.5) / steps;
-                        const xb = w * (1 - 2 * p + t)
-                                 + Math.sin(t * Math.PI * 2 * cycles) * amp;
+                    function radius(base, th, shift) {
+                        return base + amp * Math.sin(th * lobes + phase + shift)
+                                    + amp * 0.45 * Math.sin(th * lobes * 2.3 - phase * 1.6 + shift);
+                    }
+                    // Arco de 90° a 180° (para baixo até para a esquerda), com
+                    // uma folga para a ondulação não deixar frestas nas bordas.
+                    const a0 = Math.PI / 2 - 0.08;
+                    const a1 = Math.PI + 0.08;
+                    const steps = 90;
 
-                        // Coberto: da fronteira até a borda direita.
-                        if (xb < w) {
-                            ctx.fillStyle = "rgba(255,255,255,1)";
-                            ctx.fillRect(Math.max(0, xb), i * sliceH,
-                                         w - Math.max(0, xb), sliceH + 1);
+                    function fillWave(base, shift) {
+                        if (base <= 0)
+                            return;
+                        ctx.beginPath();
+                        ctx.moveTo(cx, cy);
+                        for (let i = 0; i <= steps; i++) {
+                            const th = a0 + (a1 - a0) * i / steps;
+                            const r = Math.max(0, radius(base, th, shift));
+                            ctx.lineTo(cx + r * Math.cos(th), cy + r * Math.sin(th));
                         }
-                        // Borda macia, à esquerda da fronteira.
-                        if (xb > 0) {
-                            const g = ctx.createLinearGradient(xb - band, 0, xb, 0);
-                            g.addColorStop(0, "rgba(255,255,255,0)");
-                            g.addColorStop(1, "rgba(255,255,255,1)");
-                            ctx.fillStyle = g;
-                            ctx.fillRect(Math.max(0, xb - band), i * sliceH,
-                                         Math.min(band, xb), sliceH + 1);
+                        ctx.closePath();
+                        ctx.fill();
+                    }
+                    function strokeWave(base, shift) {
+                        ctx.beginPath();
+                        for (let i = 0; i <= steps; i++) {
+                            const th = a0 + (a1 - a0) * i / steps;
+                            const r = Math.max(0, radius(base, th, shift));
+                            const x = cx + r * Math.cos(th);
+                            const y = cy + r * Math.sin(th);
+                            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                        }
+                        ctx.stroke();
+                    }
+
+                    ctx.fillStyle = "white";
+                    // Miolo sólido.
+                    fillWave(R - band, 0);
+                    // Borda macia: camadas finas empilhadas até a frente. O
+                    // alfa se acumula, então o miolo chega a opaco e a frente
+                    // fica quase transparente, sem perder o contorno ondulado.
+                    const layers = 7;
+                    ctx.globalAlpha = 0.22;
+                    for (let k = 1; k <= layers; k++)
+                        fillWave(R - band + band * k / layers, 0);
+
+                    // Anéis à frente. Aparecem logo no começo e somem no fim,
+                    // quando a tela já está quase coberta.
+                    const fadeIn = Math.min(1, p * 5);
+                    ctx.lineCap = "round";
+                    ctx.strokeStyle = "white";
+                    for (let k = 1; k <= 3; k++) {
+                        const base = R + gap * k;
+                        const lw = gap * (0.55 - 0.1 * k);
+                        const a = (0.95 - 0.25 * k) * fadeIn;
+                        // Três passadas de largura decrescente: anel com borda
+                        // suave em vez de uma linha dura.
+                        for (const f of [1.0, 0.6, 0.3]) {
+                            ctx.globalAlpha = a * 0.5;
+                            ctx.lineWidth = lw * f;
+                            strokeWave(base, k * 0.9);
                         }
                     }
+                    ctx.globalAlpha = 1;
                 }
             }
 

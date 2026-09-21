@@ -416,6 +416,22 @@ PanelWindow {
                 }
             }
 
+            // Equalizador: ícone pequeno colado no relógio. Ele saiu da aba
+            // Mídia do hub, que ficava apertada demais com ele dentro. Fica
+            // colorido enquanto o equalizador está ligado.
+            Module {
+                id: eqMod
+                kind: "eq"
+                anchors.left: clockMod.right
+                anchors.leftMargin: 2
+                anchors.verticalCenter: parent.verticalCenter
+                onClicked: bar.showPopNow("eq", eqMod)
+                BarIcon {
+                    text: Theme.icons.music
+                    color: EqService.enabled ? Theme.primary : Theme.subtext
+                }
+            }
+
             // ---------- direita ----------
             RowLayout {
                 anchors.right: parent.right
@@ -578,7 +594,7 @@ PanelWindow {
                 width: implicitWidth
                 height: implicitHeight
                 // Arrastando um slider: não fecha nem se o mouse escapar do popup.
-                readonly property bool busy: audioPop.dragging || brightnessPop.dragging
+                readonly property bool busy: audioPop.dragging || brightnessPop.dragging || EqService.dragging
                 readonly property Item current: {
                     switch (bar.pop) {
                     case "audio": return audioPop;
@@ -587,12 +603,26 @@ PanelWindow {
                     case "wifi": return wifiPop;
                     case "bt": return btPop;
                     case "record": return recordPop;
+                    case "eq": return eqPop;
                     }
                     return null;
                 }
                 opacity: root.popTargetW > 0 && Math.abs(root.popW - root.popTargetW) < 30
                     && Math.abs(root.popH - root.popTargetH) < 30 ? 1 : 0
                 Behavior on opacity { NumberAnimation { duration: 140 } }
+
+                // ---------- equalizador ----------
+                Item {
+                    id: eqPop
+                    visible: popContent.current === eqPop
+                    width: 440
+                    implicitWidth: 440
+                    implicitHeight: 270
+                    Equalizer {
+                        anchors.fill: parent
+                        compact: true
+                    }
+                }
 
                 // ---------- gravação ----------
                 ColumnLayout {
@@ -1033,7 +1063,7 @@ PanelWindow {
     IpcHandler {
         target: "bar"
         function popup(kind: string): void {
-            const m = { audio: audioMod, brightness: brMod, battery: batMod, wifi: wifiMod, bt: btMod }[kind];
+            const m = { audio: audioMod, brightness: brMod, battery: batMod, wifi: wifiMod, bt: btMod, eq: eqMod }[kind];
             if (m) bar.showPopNow(kind, m);
         }
         function hide(): void { bar.pop = ""; }

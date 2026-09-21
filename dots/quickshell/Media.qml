@@ -87,7 +87,7 @@ Item {
     property bool lyricsSynced: false
     property string lyricsStatus: "idle"
     // A letra só é buscada com o painel dela à vista.
-    readonly property bool lyricsOpen: root.visible && root.layout === "ring" && root.sideTab === "lyrics"
+    readonly property bool lyricsOpen: root.visible && root.layout === "ring"
     // Faixa da letra carregada: ao reabrir o painel depois de trocar de música
     // com ele fechado, a letra antiga não pode continuar ali.
     property string lyricsKey: ""
@@ -152,13 +152,11 @@ Item {
     }
 
     // ---------- layout ----------
-    // Dois jeitos de montar a aba, escolhidos pelo botão no canto (ou no painel
-    // Rice). "disc": disco girando em cima e o equalizador inteiro embaixo.
-    // "ring": capa com o espectro em volta, controles no meio e um painel à
-    // direita que alterna entre a letra e o equalizador — assim o equalizador
-    // continua a um clique de distância nos dois.
+    // Dois jeitos de montar a aba, escolhidos pelo botão no canto. "disc": disco grande girando e as informações ao lado.
+    // "ring": capa com o espectro em volta, controles no meio e a letra à
+    // direita. O equalizador fica no ícone de música ao lado do relógio da
+    // barra — dentro da aba ele deixava tudo apertado demais.
     readonly property string layout: ShellCustomization.getMediaLayout()
-    property string sideTab: "lyrics"
 
     readonly property var sink: Pipewire.defaultAudioSink
     readonly property string sinkName: sink ? (sink.description || sink.nickname || sink.name || "") : ""
@@ -654,92 +652,76 @@ Item {
     }
 
     // ================= layout "disc" =================
-    ColumnLayout {
+    RowLayout {
         anchors.fill: parent
-        spacing: Theme.gap + 4
+        anchors.leftMargin: Theme.gap
+        anchors.rightMargin: Theme.gap
+        spacing: Theme.gap * 4
         visible: root.player !== null && root.layout === "disc"
 
-        RowLayout {
-            Layout.fillWidth: true
-            // Sem o teto, a coluna da direita (que preenche a altura) puxava a
-            // linha para a aba inteira e o equalizador sumia embaixo.
-            Layout.fillHeight: false
-            Layout.preferredHeight: 150
-            Layout.maximumHeight: 150
-            spacing: Theme.gap * 2
-
-            ArtRing {
-                m: root
-                vinyl: true
-                Layout.preferredWidth: 150
-                Layout.preferredHeight: 150
-                artSize: 112
-            }
-
-            ColumnLayout {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                spacing: 4
-
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 8
-                    Marquee {
-                        Layout.fillWidth: true
-                        text: root.player ? root.player.trackTitle : ""
-                        pixelSize: 16
-                    }
-                    LayoutSwitch { m: root }
-                }
-                Text {
-                    Layout.fillWidth: true
-                    text: root.player && root.player.trackArtist
-                          ? Theme.t("media.by", "Por") + " " + root.player.trackArtist : ""
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 12
-                    color: Theme.subtext
-                    elide: Text.ElideRight
-                }
-                Row {
-                    Layout.topMargin: 2
-                    spacing: 6
-                    Chip {
-                        visible: root.sinkName !== ""
-                        icon: root.sinkIsHeadset ? Theme.icons.headphones : Theme.icons.speaker
-                        label: root.sinkName
-                    }
-                    Chip {
-                        icon: Theme.icons.media
-                        label: Theme.t("media.via", "Via") + " " + (root.player ? root.player.identity : "")
-                        clickable: root.players.length > 1
-                        onClicked: root.cyclePlayer()
-                    }
-                }
-                Item { Layout.fillHeight: true }
-                SeekBar {
-                    m: root
-                    Layout.fillWidth: true
-                }
-                Controls {
-                    m: root
-                    Layout.alignment: Qt.AlignHCenter
-                    playSize: 42
-                }
-            }
+        ArtRing {
+            m: root
+            vinyl: true
+            Layout.preferredWidth: 280
+            Layout.preferredHeight: 280
+            Layout.alignment: Qt.AlignVCenter
+            artSize: 204
         }
 
-        Rectangle {
+        ColumnLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            radius: Theme.radius / 1.5
-            color: Theme.tile
-            border.width: 1
-            border.color: Theme.withAlpha(Theme.subtext, 0.12)
+            spacing: 8
 
-            Equalizer {
-                anchors.fill: parent
-                anchors.margins: 12
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.topMargin: Theme.gap
+                Item { Layout.fillWidth: true }
+                LayoutSwitch { m: root }
             }
+            Item { Layout.fillHeight: true }
+            Marquee {
+                Layout.fillWidth: true
+                text: root.player ? root.player.trackTitle : ""
+                pixelSize: 24
+            }
+            Text {
+                Layout.fillWidth: true
+                text: root.player && root.player.trackArtist
+                      ? Theme.t("media.by", "Por") + " " + root.player.trackArtist : ""
+                font.family: Theme.fontFamily
+                font.pixelSize: 14
+                color: Theme.subtext
+                elide: Text.ElideRight
+            }
+            Row {
+                Layout.topMargin: 4
+                spacing: 6
+                Chip {
+                    visible: root.sinkName !== ""
+                    icon: root.sinkIsHeadset ? Theme.icons.headphones : Theme.icons.speaker
+                    label: root.sinkName
+                }
+                Chip {
+                    icon: Theme.icons.media
+                    label: Theme.t("media.via", "Via") + " " + (root.player ? root.player.identity : "")
+                           + (root.players.length > 1 ? "  ▾" : "")
+                    clickable: root.players.length > 1
+                    onClicked: root.cyclePlayer()
+                }
+            }
+            SeekBar {
+                m: root
+                Layout.fillWidth: true
+                Layout.topMargin: 14
+            }
+            Controls {
+                m: root
+                Layout.alignment: Qt.AlignHCenter
+                playSize: 52
+                playWidth: 84
+            }
+            Item { Layout.fillHeight: true }
         }
     }
 
@@ -817,69 +799,27 @@ Item {
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 6
-
-                    Repeater {
-                        model: [
-                            { id: "lyrics", icon: Theme.icons.lyrics, label: Theme.t("media.lyrics", "Letra") },
-                            { id: "eq", icon: Theme.icons.equalizer, label: Theme.t("eq.short", "EQ") }
-                        ]
-                        delegate: Rectangle {
-                            id: tabBtn
-                            required property var modelData
-                            readonly property bool active: root.sideTab === modelData.id
-                            implicitWidth: tabRow.implicitWidth + 20
-                            implicitHeight: 26
-                            radius: 13
-                            color: active ? Theme.withAlpha(Theme.accent2, 0.22)
-                                          : (tabMouse.containsMouse ? Theme.withAlpha(Theme.subtext, 0.15) : "transparent")
-                            border.width: 1
-                            border.color: active ? Theme.accent2 : Theme.withAlpha(Theme.subtext, 0.25)
-                            Row {
-                                id: tabRow
-                                anchors.centerIn: parent
-                                spacing: 6
-                                Text {
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    text: tabBtn.modelData.icon
-                                    font.family: Theme.iconFontFamily
-                                    font.pixelSize: 12
-                                    color: tabBtn.active ? Theme.accent2 : Theme.subtext
-                                }
-                                Text {
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    text: tabBtn.modelData.label
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: 11
-                                    color: tabBtn.active ? Theme.accent2 : Theme.subtext
-                                }
-                            }
-                            MouseArea {
-                                id: tabMouse
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: root.sideTab = tabBtn.modelData.id
-                            }
-                        }
+                    Text {
+                        text: Theme.icons.lyrics
+                        font.family: Theme.iconFontFamily
+                        font.pixelSize: 13
+                        color: Theme.accent2
+                    }
+                    Text {
+                        text: Theme.t("media.lyrics", "Letra")
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 12
+                        font.weight: Font.DemiBold
+                        color: Theme.foreground
                     }
                     Item { Layout.fillWidth: true }
                     LayoutSwitch { m: root }
                 }
 
-                Item {
+                LyricsPane {
+                    m: root
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-
-                    LyricsPane {
-                        m: root
-                        anchors.fill: parent
-                        visible: root.sideTab === "lyrics"
-                    }
-                    Equalizer {
-                        anchors.fill: parent
-                        compact: true
-                        visible: root.sideTab === "eq"
-                    }
                 }
 
                 Chip {
