@@ -296,8 +296,8 @@ Scope {
                 }
             }
 
-            // "Onda": o wallpaper novo entra pela direita, com o centro um
-            // pouco acima do meio da tela, numa mancha arredondada de borda
+            // "Onda": o wallpaper novo entra pela direita numa rampa suave —
+            // topo primeiro, depois meio, depois base —, com borda
             // muito macia — como se viesse desfocado. Não é uma linha nem um
             // anel: a frente é um disco grande de borda larga, cercado de
             // bolhas também desfocadas que deixam o contorno irregular e
@@ -325,17 +325,19 @@ Scope {
                     ctx.reset();
                     const w = width;
                     const h = height;
-                    // Origem: fora da borda direita, um pouco acima do meio.
-                    const cx = w * 1.04;
-                    const cy = h * 0.42;
+                    // Centro do arco acima e à direita da tela, fora dela: a
+                    // frente vira uma rampa — o topo chega primeiro, depois o
+                    // meio, depois a base. Com o centro à altura do meio da
+                    // tela ela parecia sair do meio.
+                    const cx = w * 1.1;
+                    const cy = -h * 0.45;
                     // Borda macia bem larga: é o que dá o ar de desfoque.
-                    const feather = w * 0.26;
-                    // Distância até o canto mais longe (inferior esquerdo).
+                    const feather = w * 0.24;
                     const far = Math.sqrt(cx * cx + (h - cy) * (h - cy));
-                    // Em p = 1 a parte opaca já passou do canto mais longe.
-                    const R = p * (far + feather * 1.15);
-                    if (R <= 0)
-                        return;
+                    // Começa com a frente já encostando no canto superior
+                    // direito, sem gastar o começo da animação fora da tela.
+                    const near = Math.sqrt((cx - w) * (cx - w) + cy * cy) * 0.9;
+                    const R = near + p * (far + feather * 1.15 - near);
 
                     function softDisc(x, y, r, solid) {
                         // Opaco até `solid` do raio, some até a borda.
@@ -347,27 +349,32 @@ Scope {
                         ctx.fillRect(x - r, y - r, r * 2, r * 2);
                     }
 
+                    // Em p = 0 nada coberto: a frente ainda está fora da tela
+                    // e o alfa sobe junto com o começo do movimento.
+                    ctx.globalAlpha = Math.min(1, p * 6);
+
                     // Disco principal.
                     softDisc(cx, cy, R, (R - feather) / R);
 
-                    // Bolhas na frente, voltadas para a esquerda (de ~105° a
-                    // ~255°). Cada uma tem tamanho e fase próprios, fixos, para
-                    // o contorno ser sempre o mesmo desenho e não tremer.
+                    // Bolhas na frente, espalhadas entre a direção do canto
+                    // inferior direito e a do canto superior esquerdo. Tamanho
+                    // e fase fixos por bolha, para o contorno não tremer.
+                    const a0 = Math.atan2(h - cy, w - cx);
+                    const a1 = Math.atan2(-cy, -cx);
                     const blobs = 9;
                     for (let i = 0; i < blobs; i++) {
                         const t = i / (blobs - 1);
-                        const ang = Math.PI * (0.58 + 0.84 * t);
+                        const ang = a0 + (a1 - a0) * t;
                         const seed = Math.sin(i * 12.9898) * 43758.5453;
                         const rnd = seed - Math.floor(seed);
                         const breathe = 0.85 + 0.3 * Math.sin(p * Math.PI * 2 + i * 1.7);
-                        const br = R * (0.2 + 0.14 * rnd) * breathe + feather * 0.35;
+                        const br = (w * 0.16 + w * 0.08 * rnd) * breathe + feather * 0.3;
                         const dist = R - feather * (0.55 + 0.35 * rnd);
                         if (dist <= 0)
                             continue;
-                        const bx = cx + Math.cos(ang) * dist;
-                        const by = cy + Math.sin(ang) * dist;
-                        softDisc(bx, by, br, 0.35);
+                        softDisc(cx + Math.cos(ang) * dist, cy + Math.sin(ang) * dist, br, 0.35);
                     }
+                    ctx.globalAlpha = 1;
                 }
             }
 
