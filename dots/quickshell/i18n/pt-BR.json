@@ -977,5 +977,6 @@
   "anim.st_slidefadevert": "Vertical + esmaecer",
   "anim.duration": "Duração",
   "anim.hint": "Arraste os pontos da curva. Mexer em qualquer grupo passa o estilo para Personalizado, partindo do preset que estava ativo.",
-  "wallust.tr_wave_desc3": "Suave, vindo da direita"
+  "wallust.tr_wave_desc3": "Suave, vindo da direita",
+  "sidebar.restart_shell": "Reiniciar a interface (barra, dock, widgets)"
 }

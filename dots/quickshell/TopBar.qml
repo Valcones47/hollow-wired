@@ -386,6 +386,72 @@ PanelWindow {
                     }
                 }
 
+                // Área especial (Super + A): um workspace "escondido" que abre
+                // por cima do atual. Colorido enquanto está aberta; o número é
+                // quantas janelas estão guardadas nela.
+                Rectangle {
+                    id: specialBtn
+                    property bool open: false
+                    readonly property var ws: Hyprland.workspaces.values.find(w => w.name === "special:magic") || null
+                    readonly property int count: ws && ws.toplevels ? ws.toplevels.values.length : 0
+                    implicitWidth: specialRow.implicitWidth + 16
+                    implicitHeight: bar.barH - 10
+                    radius: height / 2
+                    color: open ? Theme.withAlpha(Theme.primary, 0.3)
+                         : specialArea.containsMouse ? Theme.tileHigh : Theme.tile
+                    border.width: open ? 1 : 0
+                    border.color: Theme.primary
+                    Behavior on color { ColorAnimation { duration: 140 } }
+
+                    Row {
+                        id: specialRow
+                        anchors.centerIn: parent
+                        spacing: 4
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: specialBtn.open ? Theme.icons.star : Theme.icons.starOutline
+                            font.family: Theme.iconFontFamily
+                            font.pixelSize: 12
+                            color: specialBtn.open ? Theme.primary : Theme.subtext
+                        }
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            visible: specialBtn.count > 0
+                            text: specialBtn.count
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 10
+                            color: specialBtn.open ? Theme.primary : Theme.subtext
+                        }
+                    }
+                    MouseArea {
+                        id: specialArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: Hyprland.dispatch('hl.dsp.workspace.toggle_special("magic")')
+                    }
+                    // Aberta ou fechada: vem do evento do Hyprland, que também
+                    // cobre quem usa o atalho em vez do botão.
+                    Connections {
+                        target: Hyprland
+                        function onRawEvent(event) {
+                            if (event.name === "activespecial")
+                                specialBtn.open = String(event.data).split(",")[0] === "special:magic";
+                        }
+                    }
+                    Process {
+                        running: true
+                        command: ["hyprctl", "monitors", "-j"]
+                        stdout: StdioCollector {
+                            onStreamFinished: {
+                                try {
+                                    specialBtn.open = JSON.parse(text).some(m => m.specialWorkspace && m.specialWorkspace.name === "special:magic");
+                                } catch (e) {}
+                            }
+                        }
+                    }
+                }
+
                 BarText {
                     Layout.maximumWidth: 420
                     text: Hyprland.activeToplevel && Hyprland.activeToplevel.workspace === Hyprland.focusedWorkspace

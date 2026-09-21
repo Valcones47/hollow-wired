@@ -853,6 +853,19 @@ PanelWindow {
                             sidebar.open = false;
                         }
                     }
+                    // Reinicia só a interface (barra, dock, hub, widgets): o
+                    // conserto rápido quando algo do shell trava ou some, sem
+                    // fechar os programas. Mesmo que Super + Ctrl + R. Pedido
+                    // pelo compositor para o processo novo não morrer junto
+                    // com o shell que está sendo encerrado.
+                    PopAction {
+                        icon: Theme.icons.restart
+                        label: Theme.t("sidebar.restart_shell", "Reiniciar a interface (barra, dock, widgets)")
+                        onActivated: {
+                            sidebar.open = false;
+                            Hyprland.dispatch('hl.dsp.exec_cmd("' + Quickshell.env("HOME") + '/.local/bin/rice-restart")');
+                        }
+                    }
                     PopAction {
                         icon: Theme.icons.health
                         label: Theme.t("sidebar.rice_fix", "Procurar e consertar problemas")
