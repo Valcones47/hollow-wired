@@ -4,6 +4,7 @@ import Qt5Compat.GraphicalEffects
 import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Mpris
+import Quickshell.Services.Pipewire
 import "."
 
 Item {
@@ -85,7 +86,12 @@ Item {
     property var lyricsLines: []
     property bool lyricsSynced: false
     property string lyricsStatus: "idle"
-    property bool lyricsOpen: false
+    // A letra só é buscada com o painel dela à vista.
+    readonly property bool lyricsOpen: root.visible && root.layout === "ring" && root.sideTab === "lyrics"
+    // Faixa da letra carregada: ao reabrir o painel depois de trocar de música
+    // com ele fechado, a letra antiga não pode continuar ali.
+    property string lyricsKey: ""
+    readonly property string trackKey: root.player ? root.player.trackTitle + "\u0000" + root.player.trackArtist : ""
 
     // Linha que corresponde ao instante atual. -1 quando a letra não é
     // sincronizada (aí ela vira só um texto rolável).
@@ -124,6 +130,7 @@ Item {
     // Trocar de faixa invalida a letra na hora, senão a anterior fica na tela
     // enquanto a nova é buscada.
     function reloadLyrics() {
+        root.lyricsKey = root.trackKey;
         root.lyricsLines = [];
         root.lyricsStatus = "carregando";
         lyricsProc.running = false;
@@ -134,7 +141,7 @@ Item {
         target: root.player
         function onTrackTitleChanged() { if (root.lyricsOpen) root.reloadLyrics(); }
     }
-    onLyricsOpenChanged: if (lyricsOpen && lyricsLines.length === 0) reloadLyrics()
+    onLyricsOpenChanged: if (lyricsOpen && lyricsKey !== trackKey) reloadLyrics()
 
     function fmtTime(seconds) {
         if (!seconds || seconds < 0 || isNaN(seconds))
@@ -144,631 +151,747 @@ Item {
         return m + ":" + (s < 10 ? "0" : "") + s;
     }
 
-    ColumnLayout {
-        anchors.fill: parent
-        spacing: Theme.gap * 2
-        visible: root.player !== null
+    // ---------- layout ----------
+    // Dois jeitos de montar a aba, escolhidos pelo botão no canto (ou no painel
+    // Rice). "disc": disco girando em cima e o equalizador inteiro embaixo.
+    // "ring": capa com o espectro em volta, controles no meio e um painel à
+    // direita que alterna entre a letra e o equalizador — assim o equalizador
+    // continua a um clique de distância nos dois.
+    readonly property string layout: ShellCustomization.getMediaLayout()
+    property string sideTab: "lyrics"
 
-        // ---------- capa + metadados ----------
-        RowLayout {
-            Layout.fillWidth: true
-            spacing: Theme.gap * 2
+    readonly property var sink: Pipewire.defaultAudioSink
+    readonly property string sinkName: sink ? (sink.description || sink.nickname || sink.name || "") : ""
+    readonly property bool sinkIsHeadset: sink !== null && /bluez|headset|headphone|fone/i.test((sink.name || "") + " " + sinkName)
 
-            // Capa redonda com o espectro de áudio desenhado em volta, como um
-            // anel. Substitui as barrinhas horizontais que ficavam soltas
-            // embaixo dos controles.
-            Item {
-                id: artRing
-                Layout.preferredWidth: 168
-                Layout.preferredHeight: 168
-                Layout.alignment: Qt.AlignTop
+    function cyclePlayer() {
+        const list = root.players;
+        if (list.length < 2)
+            return;
+        const i = list.indexOf(root.player);
+        root.preferredPlayer = list[(i + 1) % list.length].dbusName;
+    }
 
-                readonly property real artSize: 104
-                readonly property real ringGap: 7
-                readonly property real maxBar: (width - artSize) / 2 - ringGap
+    // ================= componentes compartilhados =================
 
-                Canvas {
-                    id: ringCanvas
-                    anchors.fill: parent
-                    // Enquanto nada toca o anel some, em vez de deixar um
-                    // círculo de tocos parados em volta da capa.
-                    opacity: root.player && root.player.isPlaying ? 1 : 0
-                    Behavior on opacity { NumberAnimation { duration: 220 } }
+    // Capa redonda com o espectro de áudio em volta. Com `vinyl` a capa vira um
+    // disco: gira enquanto toca e ganha o furo e os sulcos no meio.
+    component ArtRing: Item {
+        id: ring
+        required property Item m
+        property bool vinyl: false
+        property real artSize: width * 0.62
+        readonly property real ringGap: 7
+        readonly property real maxBar: (width - artSize) / 2 - ringGap
 
-                    onPaint: {
-                        const ctx = getContext("2d");
-                        ctx.reset();
-                        const bars = root.barValues;
-                        if (!bars || bars.length === 0)
-                            return;
+        Canvas {
+            id: ringCanvas
+            anchors.fill: parent
+            opacity: ring.m.player && ring.m.player.isPlaying ? 1 : 0
+            Behavior on opacity { NumberAnimation { duration: 220 } }
 
-                        const cx = width / 2;
-                        const cy = height / 2;
-                        const inner = artRing.artSize / 2 + artRing.ringGap;
-                        const step = (Math.PI * 2) / bars.length;
-                        const thickness = Math.max(2, step * inner * 0.55);
-
-                        ctx.lineCap = "round";
-                        ctx.lineWidth = thickness;
-                        ctx.strokeStyle = Theme.accent2;
-
-                        for (let i = 0; i < bars.length; i++) {
-                            const level = Math.max(0, Math.min(100, bars[i])) / 100;
-                            const len = 2 + level * artRing.maxBar;
-                            // Começa no topo e gira no sentido horário.
-                            const a = -Math.PI / 2 + i * step;
-                            const cos = Math.cos(a);
-                            const sin = Math.sin(a);
-                            ctx.globalAlpha = 0.35 + level * 0.65;
-                            ctx.beginPath();
-                            ctx.moveTo(cx + cos * inner, cy + sin * inner);
-                            ctx.lineTo(cx + cos * (inner + len), cy + sin * (inner + len));
-                            ctx.stroke();
-                        }
-                    }
+            onPaint: {
+                const ctx = getContext("2d");
+                ctx.reset();
+                const bars = ring.m.barValues;
+                if (!bars || bars.length === 0)
+                    return;
+                const cx = width / 2;
+                const cy = height / 2;
+                const inner = ring.artSize / 2 + ring.ringGap;
+                const step = (Math.PI * 2) / bars.length;
+                ctx.lineCap = "round";
+                ctx.lineWidth = Math.max(2, step * inner * 0.55);
+                ctx.strokeStyle = Theme.accent2;
+                for (let i = 0; i < bars.length; i++) {
+                    const level = Math.max(0, Math.min(100, bars[i])) / 100;
+                    const len = 2 + level * ring.maxBar;
+                    const a = -Math.PI / 2 + i * step;
+                    const cos = Math.cos(a);
+                    const sin = Math.sin(a);
+                    ctx.globalAlpha = 0.35 + level * 0.65;
+                    ctx.beginPath();
+                    ctx.moveTo(cx + cos * inner, cy + sin * inner);
+                    ctx.lineTo(cx + cos * (inner + len), cy + sin * (inner + len));
+                    ctx.stroke();
                 }
+            }
+            Connections {
+                target: ring.m
+                function onBarValuesChanged() { ringCanvas.requestPaint(); }
+            }
+        }
 
-                Connections {
-                    target: root
-                    function onBarValuesChanged() { ringCanvas.requestPaint(); }
+        // Máscara redonda fora da vista: `visible: false` não gera a textura
+        // que o OpacityMask precisa, e declarar a máscara dentro do effect a
+        // congela no primeiro quadro.
+        Rectangle {
+            id: artMask
+            x: -ring.artSize * 2
+            width: ring.artSize
+            height: ring.artSize
+            radius: width / 2
+            layer.enabled: true
+        }
+
+        Rectangle {
+            id: disc
+            anchors.centerIn: parent
+            width: ring.artSize
+            height: ring.artSize
+            radius: width / 2
+            color: ring.vinyl ? "#0c0c10" : Theme.withAlpha(Theme.accent1, 0.15)
+            border.width: 1
+            border.color: Theme.withAlpha(Theme.accent1, 0.35)
+
+            RotationAnimation on rotation {
+                from: 0
+                to: 360
+                duration: 14000
+                loops: Animation.Infinite
+                running: ring.vinyl && ring.m.visible && ring.m.player !== null && ring.m.player.isPlaying
+                // Parar no meio deixa o disco onde estava, como um toca-discos.
+                alwaysRunToEnd: false
+            }
+
+            Image {
+                id: artImage
+                anchors.fill: parent
+                source: ring.m.player && ring.m.player.trackArtUrl ? ring.m.player.trackArtUrl : ""
+                fillMode: Image.PreserveAspectCrop
+                asynchronous: true
+                visible: status === Image.Ready
+                layer.enabled: true
+                layer.effect: OpacityMask { maskSource: artMask }
+            }
+
+            Text {
+                anchors.centerIn: parent
+                visible: artImage.status !== Image.Ready && !ring.vinyl
+                text: Theme.icons.music
+                font.family: Theme.iconFontFamily
+                font.pixelSize: ring.artSize * 0.3
+                color: Theme.withAlpha(Theme.accent1, 0.6)
+            }
+
+            // Sulcos e furo do disco.
+            Repeater {
+                model: ring.vinyl ? 4 : 0
+                delegate: Rectangle {
+                    required property int index
+                    anchors.centerIn: parent
+                    width: ring.artSize * (0.92 - index * 0.14)
+                    height: width
+                    radius: width / 2
+                    color: "transparent"
+                    border.width: 1
+                    border.color: Qt.rgba(0, 0, 0, artImage.visible ? 0.22 : 0.6)
                 }
-
+            }
+            Rectangle {
+                visible: ring.vinyl
+                anchors.centerIn: parent
+                width: ring.artSize * 0.3
+                height: width
+                radius: width / 2
+                color: Qt.rgba(0.05, 0.05, 0.07, 0.85)
+                border.width: 2
+                border.color: Theme.withAlpha(Theme.accent2, 0.5)
                 Rectangle {
                     anchors.centerIn: parent
-                    width: artRing.artSize
-                    height: artRing.artSize
+                    width: parent.width * 0.26
+                    height: width
                     radius: width / 2
-                    color: Theme.withAlpha(Theme.accent1, 0.15)
-                    border.width: 1
-                    border.color: Theme.withAlpha(Theme.accent1, 0.35)
-                    clip: true
-
-                    Image {
-                        id: artImage
-                        anchors.fill: parent
-                        source: root.player && root.player.trackArtUrl ? root.player.trackArtUrl : ""
-                        fillMode: Image.PreserveAspectCrop
-                        asynchronous: true
-                        // O `clip` do Rectangle recorta em retângulo, não no
-                        // raio: sem a máscara a capa sai quadrada por cima do
-                        // círculo.
-                        layer.enabled: true
-                        layer.effect: OpacityMask {
-                            maskSource: Rectangle {
-                                width: artRing.artSize
-                                height: artRing.artSize
-                                radius: width / 2
-                            }
-                        }
-                        visible: status === Image.Ready
-                    }
-
-                    Text {
-                        anchors.centerIn: parent
-                        visible: artImage.status !== Image.Ready
-                        text: Theme.icons.music
-                        font.family: Theme.iconFontFamily
-                        font.pixelSize: 34
-                        color: Theme.withAlpha(Theme.accent1, 0.6)
-                    }
+                    color: Theme.withAlpha(Theme.foreground, 0.85)
                 }
+            }
+        }
+    }
+
+    // Título que rola de lado quando não cabe, em vez de cortar com "...".
+    component Marquee: Item {
+        id: mq
+        property string text: ""
+        property int pixelSize: 15
+        property color color: Theme.foreground
+        implicitHeight: label.implicitHeight
+        clip: true
+        readonly property bool overflow: label.implicitWidth > width
+
+        Text {
+            id: label
+            text: mq.text
+            font.family: Theme.fontFamily
+            font.pixelSize: mq.pixelSize
+            font.bold: true
+            color: mq.color
+            x: 0
+        }
+        SequentialAnimation {
+            running: mq.overflow && mq.visible
+            loops: Animation.Infinite
+            onRunningChanged: if (!running) label.x = 0
+            PauseAnimation { duration: 1800 }
+            NumberAnimation {
+                target: label
+                property: "x"
+                to: mq.width - label.implicitWidth
+                duration: Math.max(1500, (label.implicitWidth - mq.width) * 35)
+                easing.type: Easing.InOutSine
+            }
+            PauseAnimation { duration: 1400 }
+            NumberAnimation {
+                target: label
+                property: "x"
+                to: 0
+                duration: 600
+                easing.type: Easing.OutCubic
+            }
+        }
+        onTextChanged: label.x = 0
+    }
+
+    // Etiqueta pequena com ícone (saída de áudio, player).
+    component Chip: Rectangle {
+        id: chip
+        property string icon: ""
+        property string label: ""
+        property bool clickable: false
+        signal clicked()
+        implicitWidth: chipRow.implicitWidth + 18
+        implicitHeight: 22
+        radius: 11
+        color: chipMouse.containsMouse && clickable ? Theme.withAlpha(Theme.subtext, 0.2)
+                                                    : Theme.withAlpha(Theme.subtext, 0.1)
+        border.width: 1
+        border.color: Theme.withAlpha(Theme.subtext, 0.22)
+        Row {
+            id: chipRow
+            anchors.centerIn: parent
+            spacing: 5
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: chip.icon
+                visible: text !== ""
+                font.family: Theme.iconFontFamily
+                font.pixelSize: 11
+                color: Theme.accent2
+            }
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: chip.label
+                font.family: Theme.fontFamily
+                font.pixelSize: 10
+                color: Theme.foreground
+                elide: Text.ElideRight
+                width: Math.min(implicitWidth, 170)
+            }
+        }
+        MouseArea {
+            id: chipMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            enabled: chip.clickable
+            cursorShape: Qt.PointingHandCursor
+            onClicked: chip.clicked()
+        }
+    }
+
+    // Barra de progresso arrastável com os tempos embaixo.
+    component SeekBar: ColumnLayout {
+        id: seekArea
+        required property Item m
+        spacing: 4
+
+        readonly property real trackLength: m.player && m.player.length > 0 ? m.player.length : 0
+        readonly property bool seekable: m.player !== null && m.player.canSeek && trackLength > 0
+        // Enquanto arrasta, a barra segue o mouse e ignora a posição que o
+        // player continua mandando — senão ela pula de volta a cada evento.
+        property bool scrubbing: false
+        property real scrubFraction: 0
+        readonly property real fraction: scrubbing
+            ? scrubFraction
+            : (trackLength > 0 ? Math.min(1, m.tickPosition / trackLength) : 0)
+
+        Item {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 16
+
+            Rectangle {
+                id: seekTrack
+                anchors.verticalCenter: parent.verticalCenter
+                width: parent.width
+                height: seekMouse.containsMouse || seekArea.scrubbing ? 7 : 5
+                radius: height / 2
+                color: Theme.withAlpha(Theme.subtext, 0.25)
+                Behavior on height { NumberAnimation { duration: 110 } }
+
+                Rectangle {
+                    height: parent.height
+                    radius: parent.radius
+                    color: Theme.accent2
+                    width: parent.width * seekArea.fraction
+                }
+                Rectangle {
+                    width: 12
+                    height: 12
+                    radius: 6
+                    color: Theme.accent2
+                    opacity: seekMouse.containsMouse || seekArea.scrubbing ? 1 : 0
+                    anchors.verticalCenter: parent.verticalCenter
+                    x: Math.max(0, Math.min(parent.width - width, parent.width * seekArea.fraction - width / 2))
+                    Behavior on opacity { NumberAnimation { duration: 110 } }
+                }
+            }
+
+            MouseArea {
+                id: seekMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                enabled: seekArea.seekable
+                cursorShape: seekArea.seekable ? Qt.PointingHandCursor : Qt.ArrowCursor
+                function fractionAt(px) {
+                    return Math.max(0, Math.min(1, px / Math.max(1, seekTrack.width)));
+                }
+                onPressed: mouse => {
+                    seekArea.scrubFraction = fractionAt(mouse.x);
+                    seekArea.scrubbing = true;
+                }
+                onPositionChanged: mouse => {
+                    if (seekArea.scrubbing)
+                        seekArea.scrubFraction = fractionAt(mouse.x);
+                }
+                onReleased: mouse => {
+                    if (!seekArea.scrubbing)
+                        return;
+                    const target = fractionAt(mouse.x) * seekArea.trackLength;
+                    seekArea.scrubbing = false;
+                    seekArea.m.player.position = target;
+                    // O player leva um instante para confirmar a posição nova.
+                    seekArea.m.tickPosition = target;
+                }
+                onCanceled: seekArea.scrubbing = false
+            }
+        }
+
+        RowLayout {
+            Layout.fillWidth: true
+            Text {
+                text: seekArea.m.fmtTime(seekArea.scrubbing ? seekArea.scrubFraction * seekArea.trackLength
+                                                            : seekArea.m.tickPosition)
+                font.family: Theme.fontFamily
+                font.pixelSize: 10
+                color: seekArea.scrubbing ? Theme.accent2 : Theme.subtext
+            }
+            Item { Layout.fillWidth: true }
+            Text {
+                text: seekArea.m.fmtTime(seekArea.trackLength)
+                font.family: Theme.fontFamily
+                font.pixelSize: 10
+                color: Theme.subtext
+            }
+        }
+    }
+
+    component RoundBtn: Rectangle {
+        id: btn
+        property string icon: ""
+        property real size: 36
+        property bool active: false
+        property bool supported: true
+        property bool primary: false
+        signal clicked()
+        implicitWidth: size
+        implicitHeight: size
+        radius: height / 2
+        opacity: supported ? 1 : 0.3
+        color: primary ? Theme.withAlpha(Theme.accent2, btnMouse.containsMouse ? 0.42 : 0.26)
+             : active ? Theme.withAlpha(Theme.accent2, 0.25)
+             : (btnMouse.containsMouse ? Theme.withAlpha(Theme.subtext, 0.15) : "transparent")
+        border.width: 1
+        border.color: primary || active ? Theme.accent2 : Theme.withAlpha(Theme.subtext, 0.35)
+        scale: btnMouse.pressed ? 0.92 : 1
+        Behavior on color { ColorAnimation { duration: 100 } }
+        Behavior on scale { NumberAnimation { duration: 90 } }
+        Text {
+            anchors.centerIn: parent
+            text: btn.icon
+            font.family: Theme.iconFontFamily
+            font.pixelSize: Math.round(btn.height * (btn.primary ? 0.4 : 0.38))
+            color: btn.primary || btn.active ? Theme.accent2 : Theme.foreground
+        }
+        MouseArea {
+            id: btnMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            enabled: btn.supported
+            cursorShape: Qt.PointingHandCursor
+            onClicked: btn.clicked()
+        }
+    }
+
+    // Aleatório, anterior, tocar, próxima, repetir. Aleatório e repetir ficam
+    // apagados quando o player não suporta (o navegador, por exemplo).
+    component Controls: RowLayout {
+        id: ctl
+        required property Item m
+        property real playSize: 50
+        property real playWidth: playSize
+        spacing: 10
+
+        readonly property bool loopSupported: m.player !== null && m.player.loopSupported
+        readonly property int loopMode: loopSupported ? m.player.loopState : MprisLoopState.None
+
+        RoundBtn {
+            size: 32
+            icon: Theme.icons.shuffle
+            supported: ctl.m.player !== null && ctl.m.player.shuffleSupported
+            active: supported && ctl.m.player.shuffle
+            onClicked: ctl.m.player.shuffle = !ctl.m.player.shuffle
+        }
+        RoundBtn {
+            size: 38
+            icon: Theme.icons.prev
+            onClicked: ctl.m.player && ctl.m.player.previous()
+        }
+        RoundBtn {
+            primary: true
+            size: ctl.playSize
+            implicitWidth: ctl.playWidth
+            icon: ctl.m.player && ctl.m.player.isPlaying ? Theme.icons.pause : Theme.icons.play
+            onClicked: ctl.m.player && ctl.m.player.togglePlaying()
+        }
+        RoundBtn {
+            size: 38
+            icon: Theme.icons.next
+            onClicked: ctl.m.player && ctl.m.player.next()
+        }
+        RoundBtn {
+            size: 32
+            icon: ctl.loopMode === MprisLoopState.Track ? Theme.icons.repeatOne : Theme.icons.repeat
+            supported: ctl.loopSupported
+            active: ctl.loopMode !== MprisLoopState.None
+            // desligado -> playlist -> faixa, como nos players comuns
+            onClicked: {
+                const s = ctl.m.player.loopState;
+                ctl.m.player.loopState = s === MprisLoopState.None ? MprisLoopState.Playlist
+                                       : s === MprisLoopState.Playlist ? MprisLoopState.Track
+                                       : MprisLoopState.None;
+            }
+        }
+    }
+
+    // Letra: sincronizada (linha atual destacada e centralizada) ou texto
+    // simples rolável.
+    component LyricsPane: Item {
+        id: lp
+        required property Item m
+
+        Text {
+            anchors.centerIn: parent
+            width: parent.width - 20
+            horizontalAlignment: Text.AlignHCenter
+            wrapMode: Text.WordWrap
+            visible: lp.m.lyricsLines.length === 0
+            text: {
+                const st = lp.m.lyricsStatus;
+                if (st === "carregando") return Theme.t("media.lyrics_loading", "Procurando a letra...");
+                if (st === "offline") return Theme.t("media.lyrics_offline", "Sem internet e sem cópia guardada.");
+                if (st === "none") return Theme.t("media.lyrics_none", "Não achei a letra desta música.");
+                return "";
+            }
+            font.family: Theme.fontFamily
+            font.pixelSize: 11
+            color: Theme.subtext
+        }
+
+        ListView {
+            id: lyricsView
+            anchors.fill: parent
+            model: lp.m.lyricsLines
+            spacing: 6
+            clip: true
+            interactive: !lp.m.lyricsSynced
+            boundsBehavior: Flickable.StopAtBounds
+            highlightRangeMode: ListView.ApplyRange
+            preferredHighlightBegin: height / 2 - 14
+            preferredHighlightEnd: height / 2 + 14
+            highlightMoveDuration: 380
+
+            delegate: Text {
+                required property var modelData
+                required property int index
+                readonly property bool current: index === lp.m.lyricsIndex
+                width: lyricsView.width
+                text: modelData.text
+                horizontalAlignment: lp.m.lyricsSynced ? Text.AlignHCenter : Text.AlignLeft
+                wrapMode: Text.WordWrap
+                font.family: Theme.fontFamily
+                font.pixelSize: current ? 14 : 12
+                font.weight: current ? Font.DemiBold : Font.Normal
+                color: !lp.m.lyricsSynced ? Theme.foreground
+                     : (current ? Theme.accent2 : Theme.withAlpha(Theme.subtext, 0.7))
+                Behavior on font.pixelSize { NumberAnimation { duration: 120 } }
+                Behavior on color { ColorAnimation { duration: 160 } }
+            }
+
+            Connections {
+                target: lp.m
+                function onLyricsIndexChanged() {
+                    if (lp.m.lyricsSynced && lp.m.lyricsIndex >= 0)
+                        lyricsView.currentIndex = lp.m.lyricsIndex;
+                }
+            }
+        }
+    }
+
+    // Botão que troca entre os dois layouts.
+    component LayoutSwitch: RoundBtn {
+        required property Item m
+        size: 28
+        icon: m.layout === "disc" ? Theme.icons.lyrics : Theme.icons.album
+        onClicked: ShellCustomization.setMediaLayout(m.layout === "disc" ? "ring" : "disc")
+    }
+
+    // ================= layout "disc" =================
+    ColumnLayout {
+        anchors.fill: parent
+        spacing: Theme.gap + 4
+        visible: root.player !== null && root.layout === "disc"
+
+        RowLayout {
+            Layout.fillWidth: true
+            // Sem o teto, a coluna da direita (que preenche a altura) puxava a
+            // linha para a aba inteira e o equalizador sumia embaixo.
+            Layout.fillHeight: false
+            Layout.preferredHeight: 150
+            Layout.maximumHeight: 150
+            spacing: Theme.gap * 2
+
+            ArtRing {
+                m: root
+                vinyl: true
+                Layout.preferredWidth: 150
+                Layout.preferredHeight: 150
+                artSize: 112
             }
 
             ColumnLayout {
                 Layout.fillWidth: true
-                Layout.alignment: Qt.AlignTop
-                spacing: 6
+                Layout.fillHeight: true
+                spacing: 4
 
-                Text {
+                RowLayout {
                     Layout.fillWidth: true
-                    text: root.player ? root.player.trackTitle : ""
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 15
-                    font.bold: true
-                    color: Theme.foreground
-                    elide: Text.ElideRight
-                    wrapMode: Text.NoWrap
+                    spacing: 8
+                    Marquee {
+                        Layout.fillWidth: true
+                        text: root.player ? root.player.trackTitle : ""
+                        pixelSize: 16
+                    }
+                    LayoutSwitch { m: root }
                 }
                 Text {
                     Layout.fillWidth: true
-                    text: root.player ? root.player.trackArtist : ""
+                    text: root.player && root.player.trackArtist
+                          ? Theme.t("media.by", "Por") + " " + root.player.trackArtist : ""
                     font.family: Theme.fontFamily
                     font.pixelSize: 12
-                    color: Theme.inactive
-                    elide: Text.ElideRight
-                }
-                Text {
-                    Layout.fillWidth: true
-                    text: root.player ? root.player.trackAlbum : ""
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 11
-                    font.italic: true
-                    color: Theme.withAlpha(Theme.inactive, 0.7)
-                    elide: Text.ElideRight
-                    visible: text !== ""
-                }
-
-                Rectangle {
-                    Layout.topMargin: 4
-                    Layout.preferredWidth: sourceLabel.implicitWidth + 16
-                    Layout.preferredHeight: 20
-                    radius: 10
-                    color: Theme.withAlpha(Theme.accent2, 0.2)
-                    border.width: 1
-                    border.color: Theme.withAlpha(Theme.accent2, 0.4)
-                    visible: root.player !== null
-
-                    Text {
-                        id: sourceLabel
-                        anchors.centerIn: parent
-                        text: root.player ? root.player.identity : ""
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 10
-                        color: Theme.accent2
-                    }
-                }
-            }
-        }
-
-        // ---------- barra de progresso (arrastável) ----------
-        ColumnLayout {
-            id: seekArea
-            Layout.fillWidth: true
-            spacing: 4
-            visible: root.player !== null
-
-            readonly property real trackLength: root.player && root.player.length > 0 ? root.player.length : 0
-            readonly property bool seekable: root.player !== null && root.player.canSeek && trackLength > 0
-            // Enquanto o usuário arrasta, a barra segue o dedo e ignora a
-            // posição que o player continua mandando — senão ela pula de volta
-            // a cada evento de MPRIS no meio do arrasto.
-            property bool scrubbing: false
-            property real scrubFraction: 0
-
-            readonly property real fraction: scrubbing
-                ? scrubFraction
-                : (trackLength > 0 ? Math.min(1, root.tickPosition / trackLength) : 0)
-
-            Item {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 18
-
-                Rectangle {
-                    id: seekTrack
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: parent.width
-                    height: seekMouse.containsMouse || seekArea.scrubbing ? 7 : 5
-                    radius: height / 2
-                    color: Theme.withAlpha(Theme.inactive, 0.25)
-                    Behavior on height { NumberAnimation { duration: 110 } }
-
-                    Rectangle {
-                        height: parent.height
-                        radius: parent.radius
-                        color: Theme.accent2
-                        width: parent.width * seekArea.fraction
-                    }
-
-                    Rectangle {
-                        width: 12
-                        height: 12
-                        radius: 6
-                        color: Theme.accent2
-                        opacity: seekMouse.containsMouse || seekArea.scrubbing ? 1 : 0
-                        anchors.verticalCenter: parent.verticalCenter
-                        x: Math.max(0, Math.min(parent.width - width,
-                                                parent.width * seekArea.fraction - width / 2))
-                        Behavior on opacity { NumberAnimation { duration: 110 } }
-                    }
-                }
-
-                MouseArea {
-                    id: seekMouse
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    enabled: seekArea.seekable
-                    cursorShape: seekArea.seekable ? Qt.PointingHandCursor : Qt.ArrowCursor
-
-                    function fractionAt(px) {
-                        return Math.max(0, Math.min(1, px / Math.max(1, seekTrack.width)));
-                    }
-
-                    onPressed: mouse => {
-                        seekArea.scrubFraction = fractionAt(mouse.x);
-                        seekArea.scrubbing = true;
-                    }
-                    onPositionChanged: mouse => {
-                        if (seekArea.scrubbing)
-                            seekArea.scrubFraction = fractionAt(mouse.x);
-                    }
-                    onReleased: mouse => {
-                        if (!seekArea.scrubbing)
-                            return;
-                        const frac = fractionAt(mouse.x);
-                        seekArea.scrubbing = false;
-                        const target = frac * seekArea.trackLength;
-                        root.player.position = target;
-                        // O player leva um instante para confirmar a posição
-                        // nova; sem isso a barra volta para onde estava até o
-                        // próximo evento chegar.
-                        root.tickPosition = target;
-                    }
-                    onCanceled: seekArea.scrubbing = false
-                }
-            }
-
-            RowLayout {
-                Layout.fillWidth: true
-                Text {
-                    text: root.fmtTime(seekArea.scrubbing
-                                       ? seekArea.scrubFraction * seekArea.trackLength
-                                       : root.tickPosition)
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 10
-                    color: seekArea.scrubbing ? Theme.accent2 : Theme.inactive
-                }
-                Item { Layout.fillWidth: true }
-                Text {
-                    text: root.fmtTime(seekArea.trackLength)
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 10
-                    color: Theme.inactive
-                }
-            }
-        }
-
-
-        // ---------- controles ----------
-        RowLayout {
-            Layout.fillWidth: true
-            Layout.alignment: Qt.AlignHCenter
-            spacing: Theme.gap * 2
-            visible: root.player !== null
-
-            // Aleatório e repetir: o MPRIS avisa quando o player não suporta
-            // (o navegador, por exemplo), e aí o botão fica apagado e sem
-            // clique em vez de mandar um comando que não faz nada.
-            Rectangle {
-                id: shuffleBtn
-                property bool hovered: false
-                readonly property bool supported: root.player !== null && root.player.shuffleSupported
-                readonly property bool active: supported && root.player.shuffle
-                Layout.preferredWidth: 34
-                Layout.preferredHeight: 34
-                radius: 17
-                opacity: supported ? 1 : 0.3
-                color: active ? Theme.withAlpha(Theme.accent2, 0.25)
-                              : (hovered ? Theme.withAlpha(Theme.inactive, 0.15) : "transparent")
-                border.width: 1
-                border.color: active ? Theme.accent2 : Theme.withAlpha(Theme.inactive, 0.3)
-                Behavior on color { ColorAnimation { duration: 100 } }
-
-                Text {
-                    anchors.centerIn: parent
-                    text: Theme.icons.shuffle
-                    font.family: Theme.iconFontFamily
-                    font.pixelSize: 13
-                    color: shuffleBtn.active ? Theme.accent2 : Theme.inactive
-                }
-                MouseArea {
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    enabled: shuffleBtn.supported
-                    cursorShape: Qt.PointingHandCursor
-                    onEntered: shuffleBtn.hovered = true
-                    onExited: shuffleBtn.hovered = false
-                    onClicked: root.player.shuffle = !root.player.shuffle
-                }
-            }
-
-
-            Rectangle {
-                id: prevBtn
-                property bool hovered: false
-                Layout.preferredWidth: 40
-                Layout.preferredHeight: 40
-                radius: 20
-                color: hovered ? Theme.withAlpha(Theme.inactive, 0.15) : "transparent"
-                border.width: 1
-                border.color: Theme.withAlpha(Theme.inactive, 0.4)
-                Behavior on color { ColorAnimation { duration: 100 } }
-
-                Text {
-                    anchors.centerIn: parent
-                    text: ""
-                    font.family: Theme.iconFontFamily
-                    font.pixelSize: 14
-                    color: Theme.foreground
-                }
-                MouseArea {
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onEntered: prevBtn.hovered = true
-                    onExited: prevBtn.hovered = false
-                    onClicked: root.player && root.player.previous()
-                }
-            }
-
-            Rectangle {
-                id: playBtn
-                property bool hovered: false
-                Layout.preferredWidth: 52
-                Layout.preferredHeight: 52
-                radius: 26
-                color: Theme.withAlpha(Theme.accent2, hovered ? 0.4 : 0.25)
-                border.width: 1
-                border.color: Theme.accent2
-                scale: hovered ? 1.06 : 1.0
-                Behavior on color { ColorAnimation { duration: 100 } }
-                Behavior on scale { NumberAnimation { duration: 100; easing.type: Easing.OutBack } }
-
-                Text {
-                    anchors.centerIn: parent
-                    text: root.player && root.player.isPlaying ? "" : ""
-                    font.family: Theme.iconFontFamily
-                    font.pixelSize: 18
-                    color: Theme.accent2
-                }
-                MouseArea {
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onEntered: playBtn.hovered = true
-                    onExited: playBtn.hovered = false
-                    onClicked: root.player && root.player.togglePlaying()
-                }
-            }
-
-            Rectangle {
-                id: nextBtn
-                property bool hovered: false
-                Layout.preferredWidth: 40
-                Layout.preferredHeight: 40
-                radius: 20
-                color: hovered ? Theme.withAlpha(Theme.inactive, 0.15) : "transparent"
-                border.width: 1
-                border.color: Theme.withAlpha(Theme.inactive, 0.4)
-                Behavior on color { ColorAnimation { duration: 100 } }
-
-                Text {
-                    anchors.centerIn: parent
-                    text: ""
-                    font.family: Theme.iconFontFamily
-                    font.pixelSize: 14
-                    color: Theme.foreground
-                }
-                MouseArea {
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onEntered: nextBtn.hovered = true
-                    onExited: nextBtn.hovered = false
-                    onClicked: root.player && root.player.next()
-                }
-            }
-
-            Rectangle {
-                id: repeatBtn
-                property bool hovered: false
-                readonly property bool supported: root.player !== null && root.player.loopSupported
-                readonly property int mode: supported ? root.player.loopState : MprisLoopState.None
-                readonly property bool active: supported && mode !== MprisLoopState.None
-                Layout.preferredWidth: 34
-                Layout.preferredHeight: 34
-                radius: 17
-                opacity: supported ? 1 : 0.3
-                color: active ? Theme.withAlpha(Theme.accent2, 0.25)
-                              : (hovered ? Theme.withAlpha(Theme.inactive, 0.15) : "transparent")
-                border.width: 1
-                border.color: active ? Theme.accent2 : Theme.withAlpha(Theme.inactive, 0.3)
-                Behavior on color { ColorAnimation { duration: 100 } }
-
-                Text {
-                    anchors.centerIn: parent
-                    text: repeatBtn.mode === MprisLoopState.Track ? Theme.icons.repeatOne
-                                                                  : Theme.icons.repeat
-                    font.family: Theme.iconFontFamily
-                    font.pixelSize: 13
-                    color: repeatBtn.active ? Theme.accent2 : Theme.inactive
-                }
-                MouseArea {
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    enabled: repeatBtn.supported
-                    cursorShape: Qt.PointingHandCursor
-                    onEntered: repeatBtn.hovered = true
-                    onExited: repeatBtn.hovered = false
-                    // Roda entre desligado -> playlist -> faixa, como nos
-                    // players comuns.
-                    onClicked: {
-                        const s = root.player.loopState;
-                        if (s === MprisLoopState.None)
-                            root.player.loopState = MprisLoopState.Playlist;
-                        else if (s === MprisLoopState.Playlist)
-                            root.player.loopState = MprisLoopState.Track;
-                        else
-                            root.player.loopState = MprisLoopState.None;
-                    }
-                }
-            }
-
-        }
-
-        // ---------- letras ----------
-        ColumnLayout {
-            Layout.fillWidth: true
-            Layout.topMargin: 4
-            spacing: 6
-            visible: root.player !== null
-
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 8
-
-                Rectangle {
-                    id: lyricsBtn
-                    property bool hovered: false
-                    Layout.preferredWidth: lyricsBtnLabel.implicitWidth + 26
-                    Layout.preferredHeight: 26
-                    radius: 13
-                    color: root.lyricsOpen ? Theme.withAlpha(Theme.accent2, 0.22)
-                                           : (hovered ? Theme.withAlpha(Theme.inactive, 0.15) : "transparent")
-                    border.width: 1
-                    border.color: root.lyricsOpen ? Theme.accent2 : Theme.withAlpha(Theme.inactive, 0.3)
-                    Behavior on color { ColorAnimation { duration: 100 } }
-
-                    Row {
-                        id: lyricsBtnLabel
-                        anchors.centerIn: parent
-                        spacing: 6
-                        Text {
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: Theme.icons.lyrics
-                            font.family: Theme.iconFontFamily
-                            font.pixelSize: 11
-                            color: root.lyricsOpen ? Theme.accent2 : Theme.inactive
-                        }
-                        Text {
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: Theme.t("media.lyrics", "Letra")
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 11
-                            color: root.lyricsOpen ? Theme.accent2 : Theme.inactive
-                        }
-                    }
-
-                    MouseArea {
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onEntered: lyricsBtn.hovered = true
-                        onExited: lyricsBtn.hovered = false
-                        onClicked: root.lyricsOpen = !root.lyricsOpen
-                    }
-                }
-
-                Text {
-                    Layout.fillWidth: true
-                    visible: root.lyricsOpen
-                    text: {
-                        if (root.lyricsStatus === "carregando") return Theme.t("media.lyrics_loading", "Procurando a letra...");
-                        if (root.lyricsStatus === "offline")    return Theme.t("media.lyrics_offline", "Sem internet e sem cópia guardada.");
-                        if (root.lyricsStatus === "none")       return Theme.t("media.lyrics_none", "Não achei a letra desta música.");
-                        if (root.lyricsLines.length > 0 && !root.lyricsSynced)
-                            return Theme.t("media.lyrics_plain", "Letra sem sincronia — role para acompanhar.");
-                        return "";
-                    }
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 10
                     color: Theme.subtext
                     elide: Text.ElideRight
                 }
-            }
-
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 132
-                visible: root.lyricsOpen && root.lyricsLines.length > 0
-                radius: Theme.radius / 2
-                color: Theme.withAlpha(Theme.inactive, 0.08)
-                clip: true
-
-                ListView {
-                    id: lyricsView
-                    anchors.fill: parent
-                    anchors.margins: 10
-                    model: root.lyricsLines
-                    spacing: 4
-                    // Sem letra sincronizada quem rola é o usuário.
-                    interactive: !root.lyricsSynced
-                    boundsBehavior: Flickable.StopAtBounds
-
-                    delegate: Text {
-                        required property var modelData
-                        required property int index
-                        width: lyricsView.width
-                        text: modelData.text
-                        horizontalAlignment: root.lyricsSynced ? Text.AlignHCenter : Text.AlignLeft
-                        wrapMode: Text.WordWrap
-                        font.family: Theme.fontFamily
-                        font.pixelSize: index === root.lyricsIndex ? 14 : 12
-                        font.weight: index === root.lyricsIndex ? Font.DemiBold : Font.Normal
-                        color: !root.lyricsSynced ? Theme.foreground
-                             : (index === root.lyricsIndex ? Theme.accent2
-                                                           : Theme.withAlpha(Theme.inactive, 0.75))
-                        Behavior on font.pixelSize { NumberAnimation { duration: 120 } }
-                        Behavior on color { ColorAnimation { duration: 160 } }
+                Row {
+                    Layout.topMargin: 2
+                    spacing: 6
+                    Chip {
+                        visible: root.sinkName !== ""
+                        icon: root.sinkIsHeadset ? Theme.icons.headphones : Theme.icons.speaker
+                        label: root.sinkName
                     }
-
-                    // Mantém a linha atual no meio do quadro.
-                    Connections {
-                        target: root
-                        function onLyricsIndexChanged() {
-                            if (root.lyricsSynced && root.lyricsIndex >= 0)
-                                lyricsView.positionViewAtIndex(root.lyricsIndex, ListView.Center);
-                        }
+                    Chip {
+                        icon: Theme.icons.media
+                        label: Theme.t("media.via", "Via") + " " + (root.player ? root.player.identity : "")
+                        clickable: root.players.length > 1
+                        onClicked: root.cyclePlayer()
                     }
+                }
+                Item { Layout.fillHeight: true }
+                SeekBar {
+                    m: root
+                    Layout.fillWidth: true
+                }
+                Controls {
+                    m: root
+                    Layout.alignment: Qt.AlignHCenter
+                    playSize: 42
                 }
             }
         }
 
-        // ---------- escolha do player ----------
-        // Só aparece com mais de um player: com um só a linha seria um botão
-        // solitário sem função.
-        Flow {
+        Rectangle {
             Layout.fillWidth: true
-            Layout.topMargin: 4
+            Layout.fillHeight: true
+            radius: Theme.radius / 1.5
+            color: Theme.tile
+            border.width: 1
+            border.color: Theme.withAlpha(Theme.subtext, 0.12)
+
+            Equalizer {
+                anchors.fill: parent
+                anchors.margins: 12
+            }
+        }
+    }
+
+    // ================= layout "ring" =================
+    RowLayout {
+        anchors.fill: parent
+        spacing: Theme.gap * 2
+        visible: root.player !== null && root.layout === "ring"
+
+        ArtRing {
+            m: root
+            Layout.preferredWidth: 220
+            Layout.preferredHeight: 220
+            Layout.alignment: Qt.AlignVCenter
+            artSize: 142
+        }
+
+        ColumnLayout {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
             spacing: 6
-            visible: root.players.length > 1
 
-            Repeater {
-                model: root.players
+            Item { Layout.fillHeight: true }
+            Marquee {
+                Layout.fillWidth: true
+                text: root.player ? root.player.trackTitle : ""
+                pixelSize: 22
+            }
+            Text {
+                Layout.fillWidth: true
+                text: root.player ? root.player.trackArtist : ""
+                font.family: Theme.fontFamily
+                font.pixelSize: 13
+                color: Theme.subtext
+                elide: Text.ElideRight
+            }
+            Text {
+                Layout.fillWidth: true
+                text: root.player ? root.player.trackAlbum : ""
+                visible: text !== ""
+                font.family: Theme.fontFamily
+                font.pixelSize: 11
+                font.italic: true
+                color: Theme.withAlpha(Theme.subtext, 0.7)
+                elide: Text.ElideRight
+            }
+            SeekBar {
+                m: root
+                Layout.fillWidth: true
+                Layout.topMargin: 10
+            }
+            Controls {
+                m: root
+                Layout.alignment: Qt.AlignHCenter
+                playSize: 46
+                playWidth: 76
+            }
+            Item { Layout.fillHeight: true }
+        }
 
-                delegate: Rectangle {
-                    id: playerChip
-                    required property var modelData
-                    readonly property bool current: root.player === modelData
+        // Painel à direita: letra ou equalizador.
+        Rectangle {
+            Layout.preferredWidth: 300
+            Layout.fillHeight: true
+            radius: Theme.radius / 1.5
+            color: Theme.tile
+            border.width: 1
+            border.color: Theme.withAlpha(Theme.subtext, 0.12)
 
-                    height: 24
-                    width: chipLabel.implicitWidth + 22
-                    radius: 12
-                    color: current ? Theme.withAlpha(Theme.accent2, 0.22) : "transparent"
-                    border.width: 1
-                    border.color: current ? Theme.accent2 : Theme.withAlpha(Theme.inactive, 0.3)
-                    Behavior on color { ColorAnimation { duration: 100 } }
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: 12
+                spacing: 10
 
-                    Row {
-                        id: chipLabel
-                        anchors.centerIn: parent
-                        spacing: 5
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 6
 
-                        Text {
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: playerChip.modelData.isPlaying ? Theme.icons.play : Theme.icons.pause
-                            font.family: Theme.iconFontFamily
-                            font.pixelSize: 9
-                            color: playerChip.current ? Theme.accent2 : Theme.inactive
-                        }
-                        Text {
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: playerChip.modelData.identity
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 10
-                            color: playerChip.current ? Theme.accent2 : Theme.inactive
+                    Repeater {
+                        model: [
+                            { id: "lyrics", icon: Theme.icons.lyrics, label: Theme.t("media.lyrics", "Letra") },
+                            { id: "eq", icon: Theme.icons.equalizer, label: Theme.t("eq.short", "EQ") }
+                        ]
+                        delegate: Rectangle {
+                            id: tabBtn
+                            required property var modelData
+                            readonly property bool active: root.sideTab === modelData.id
+                            implicitWidth: tabRow.implicitWidth + 20
+                            implicitHeight: 26
+                            radius: 13
+                            color: active ? Theme.withAlpha(Theme.accent2, 0.22)
+                                          : (tabMouse.containsMouse ? Theme.withAlpha(Theme.subtext, 0.15) : "transparent")
+                            border.width: 1
+                            border.color: active ? Theme.accent2 : Theme.withAlpha(Theme.subtext, 0.25)
+                            Row {
+                                id: tabRow
+                                anchors.centerIn: parent
+                                spacing: 6
+                                Text {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: tabBtn.modelData.icon
+                                    font.family: Theme.iconFontFamily
+                                    font.pixelSize: 12
+                                    color: tabBtn.active ? Theme.accent2 : Theme.subtext
+                                }
+                                Text {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: tabBtn.modelData.label
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 11
+                                    color: tabBtn.active ? Theme.accent2 : Theme.subtext
+                                }
+                            }
+                            MouseArea {
+                                id: tabMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.sideTab = tabBtn.modelData.id
+                            }
                         }
                     }
+                    Item { Layout.fillWidth: true }
+                    LayoutSwitch { m: root }
+                }
 
-                    MouseArea {
+                Item {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+
+                    LyricsPane {
+                        m: root
                         anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: root.preferredPlayer = playerChip.modelData.dbusName
+                        visible: root.sideTab === "lyrics"
                     }
+                    Equalizer {
+                        anchors.fill: parent
+                        compact: true
+                        visible: root.sideTab === "eq"
+                    }
+                }
+
+                Chip {
+                    Layout.alignment: Qt.AlignHCenter
+                    icon: Theme.icons.media
+                    label: (root.player ? root.player.identity : "")
+                           + (root.players.length > 1 ? "  ▾" : "")
+                    clickable: root.players.length > 1
+                    onClicked: root.cyclePlayer()
                 }
             }
         }
-
-        Item { Layout.fillHeight: true }
     }
 
     // ---------- estado vazio ----------
@@ -782,16 +905,16 @@ Item {
             width: 72
             height: 72
             radius: 36
-            color: Theme.withAlpha(Theme.inactive, 0.08)
+            color: Theme.withAlpha(Theme.subtext, 0.08)
             border.width: 1
-            border.color: Theme.withAlpha(Theme.inactive, 0.2)
+            border.color: Theme.withAlpha(Theme.subtext, 0.2)
 
             Text {
                 anchors.centerIn: parent
                 text: ""
                 font.family: Theme.iconFontFamily
                 font.pixelSize: 32
-                color: Theme.withAlpha(Theme.inactive, 0.6)
+                color: Theme.withAlpha(Theme.subtext, 0.6)
             }
         }
 

@@ -373,7 +373,9 @@ Item {
                             model: [
                                 { id: "snappy", name: Theme.t("appearance.anim_snappy", "Rápido"), desc: Theme.t("appearance.anim_snappy_desc", "Snap") },
                                 { id: "smooth", name: Theme.t("appearance.anim_smooth", "Suave"), desc: Theme.t("appearance.anim_smooth_desc", "Padrão") },
-                                { id: "bouncy", name: Theme.t("appearance.anim_bouncy", "Elástico"), desc: Theme.t("appearance.anim_bouncy_desc", "Caelestia") }
+                                { id: "bouncy", name: Theme.t("appearance.anim_bouncy", "Elástico"), desc: Theme.t("appearance.anim_bouncy_desc", "Caelestia") },
+                                { id: "wind", name: Theme.t("anim.wind", "Vento"), desc: "end-4" },
+                                { id: "material", name: "Material", desc: "Android" }
                             ]
                             delegate: Rectangle {
                                 required property var modelData

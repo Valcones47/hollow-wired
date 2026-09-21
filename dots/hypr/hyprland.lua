@@ -260,6 +260,9 @@ hl.on("hyprland.start", function()
     -- Aplica preferências de aparência salvas pelo Hub do Quickshell
     hl.exec_cmd(home .. "/.local/bin/rice-hypr-prefs apply")
 
+    -- Equalizador (rice-eq): sobe o filtro do PipeWire se ficou ligado.
+    hl.exec_cmd(home .. "/.local/bin/rice-eq restore")
+
     -- Remove modificador Mod2 do Num_Lock no XWayland (evita que Discord/jogos detectem NumLock indevidamente)
     hl.exec_cmd(home .. "/.local/bin/rice-fix-xwayland-numlock")
 
@@ -381,6 +384,20 @@ hl.animation({ leaf = "border",           enabled = true, speed = 10, bezier = "
 -- borderangle loop desativado: força o compositor a redesenhar TODO frame
 -- mesmo sem nenhuma mudança na tela — gasta GPU de graça na Intel UHD.
 -- hl.animation({ leaf = "borderangle", enabled = true, speed = 30, bezier = "wallustSmooth", style = "loop" })
+
+-- Curvas escolhidas no painel Rice (presets ou personalizadas), geradas pelo
+-- rice-anim. Vêm depois das de cima e têm prioridade; sem o arquivo (instalação
+-- nova) valem as de cima. Carregar aqui é o que faz a escolha sobreviver a um
+-- `hyprctl reload` — antes ela era aplicada só com `hyprctl eval` e se perdia.
+do
+    local animFile = home .. "/.config/hypr/animations.lua"
+    local f = io.open(animFile, "r")
+    if f then
+        f:close()
+        local ok, err = pcall(dofile, animFile)
+        if not ok then print("Erro ao carregar animations.lua: " .. tostring(err)) end
+    end
+end
 
 hl.config({
     dwindle = {

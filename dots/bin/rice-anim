@@ -1,0 +1,246 @@
+#!/usr/bin/env python3
+"""rice-anim — curvas e velocidades das animações do Hyprland.
+
+Presets prontos (suave, elástico, rápido, vento, material) e um modo
+"personalizado" em que cada grupo de animação tem a própria curva de Bézier,
+velocidade e estilo, editáveis no painel Rice.
+
+O resultado vai para ~/.config/hypr/animations.lua, que o hyprland.lua carrega
+no fim. Antes as animações escolhidas no painel eram aplicadas só com
+`hyprctl eval` e sumiam no primeiro `hyprctl reload`, voltando ao padrão fixo
+do hyprland.lua.
+
+Toda aplicação define TODAS as folhas (windowsIn, fadeOut...), não só as
+"mães": no Hyprland um filho configurado uma vez não volta a herdar da mãe, então
+trocar de "vento" para "suave" deixava a abertura de janela ainda com a curva
+do vento.
+
+Uso:
+  rice-anim dump                                  # JSON: preset, grupos, curvas efetivas
+  rice-anim preset <smooth|bouncy|snappy|wind|material>
+  rice-anim set <grupo> curve <x1> <y1> <x2> <y2>  # vira "custom"
+  rice-anim set <grupo> speed <1-20>
+  rice-anim set <grupo> style <estilo>
+  rice-anim apply                                 # regrava e aplica o que está salvo
+"""
+
+import copy
+import json
+import os
+import subprocess
+import sys
+
+HOME = os.path.expanduser("~")
+PREFS = os.path.join(HOME, ".config/hypr/user-prefs.json")
+OUT = os.path.join(HOME, ".config/hypr/animations.lua")
+
+# Grupos editáveis -> folhas do Hyprland que cada um controla.
+GROUPS = {
+    "open":       ["windowsIn"],
+    "close":      ["windowsOut"],
+    "move":       ["windowsMove"],
+    "fade":       ["fadeIn", "fadeOut", "fadeSwitch", "fadeShadow", "fadeDim"],
+    "workspaces": ["workspacesIn", "workspacesOut"],
+    "special":    ["specialWorkspaceIn", "specialWorkspaceOut"],
+}
+
+# Estilos aceitos por grupo (o primeiro é o padrão).
+STYLES = {
+    "open":       ["popin 85%", "popin 70%", "slide", "gnomed"],
+    "close":      ["popin 85%", "popin 70%", "slide", "gnomed"],
+    "move":       [""],
+    "fade":       [""],
+    "workspaces": ["slidefade 15%", "slide", "slidevert", "fade", "slidefadevert 15%"],
+    "special":    ["slidevert", "slidefadevert 15%", "fade", "slide"],
+}
+
+
+def g(curve, speed, style=""):
+    return {"curve": list(curve), "speed": speed, "style": style}
+
+
+SMOOTH_C = [0.25, 0.1, 0.25, 1]
+OVERSHOOT = [0.34, 1.56, 0.64, 1]
+SNAP = [0.16, 1, 0.3, 1]
+
+PRESETS = {
+    "smooth": {
+        "open": g(OVERSHOOT, 4, "popin 85%"),
+        "close": g(SNAP, 3, "popin 85%"),
+        "move": g(SMOOTH_C, 4),
+        "fade": g(SMOOTH_C, 4),
+        "workspaces": g(SMOOTH_C, 5, "slidefade 15%"),
+        "special": g(SMOOTH_C, 5, "slidevert"),
+    },
+    "bouncy": {
+        "open": g(OVERSHOOT, 5.5, "popin 75%"),
+        "close": g(OVERSHOOT, 4, "popin 80%"),
+        "move": g(OVERSHOOT, 5),
+        "fade": g(SMOOTH_C, 4),
+        "workspaces": g(OVERSHOOT, 6, "slidefade 20%"),
+        "special": g(OVERSHOOT, 5, "slidevert"),
+    },
+    "snappy": {
+        "open": g(SNAP, 2.5, "popin 80%"),
+        "close": g(SNAP, 2, "popin 80%"),
+        "move": g(SNAP, 3),
+        "fade": g(SNAP, 3),
+        "workspaces": g(SNAP, 3, "slidefade 10%"),
+        "special": g(SNAP, 3, "slidevert"),
+    },
+    # As curvas "wind/winIn/winOut" dos dotfiles do end-4 e do ML4W: janela
+    # entra deslizando com um leve passe do ponto e sai puxada para trás.
+    "wind": {
+        "open": g([0.1, 1.1, 0.1, 1.1], 6, "slide"),
+        "close": g([0.3, -0.3, 0, 1], 5, "slide"),
+        "move": g([0.05, 0.9, 0.1, 1.05], 5),
+        "fade": g([0.05, 0.9, 0.1, 1.05], 6),
+        "workspaces": g([0.05, 0.9, 0.1, 1.05], 5, "slide"),
+        "special": g([0.05, 0.9, 0.1, 1.05], 5, "slidevert"),
+    },
+    # Curvas "emphasized" do Material Design 3.
+    "material": {
+        "open": g([0.05, 0.7, 0.1, 1], 4.5, "popin 80%"),
+        "close": g([0.3, 0, 0.8, 0.15], 2.5, "popin 90%"),
+        "move": g([0.2, 0, 0, 1], 4),
+        "fade": g([0.2, 0, 0, 1], 3),
+        "workspaces": g([0.2, 0, 0, 1], 5, "slidefade 20%"),
+        "special": g([0.05, 0.7, 0.1, 1], 4.5, "slidefadevert 15%"),
+    },
+}
+
+
+def load_prefs():
+    try:
+        with open(PREFS, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+def save_prefs(prefs):
+    tmp = PREFS + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(prefs, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+    os.replace(tmp, PREFS)
+
+
+def effective(prefs):
+    preset = prefs.get("anim_preset") or "smooth"
+    if preset == "custom":
+        base = copy.deepcopy(PRESETS["smooth"])
+        for name, val in (prefs.get("anim_custom") or {}).items():
+            if name in base and isinstance(val, dict):
+                base[name].update({k: val[k] for k in ("curve", "speed", "style") if k in val})
+        return preset, base
+    return preset, copy.deepcopy(PRESETS.get(preset, PRESETS["smooth"]))
+
+
+def num(v):
+    return ("%.3f" % float(v)).rstrip("0").rstrip(".") or "0"
+
+
+def render(groups):
+    lines = [
+        "-- Gerado por rice-anim (painel Rice > Efeitos > Animação). Não editar à mão:",
+        "-- é regravado a cada mudança no painel.",
+    ]
+    for name, cfg in groups.items():
+        x1, y1, x2, y2 = cfg["curve"]
+        lines.append(
+            f'hl.curve("rice_{name}", {{ type = "bezier", points = {{ {{{num(x1)}, {num(y1)}}}, {{{num(x2)}, {num(y2)}}} }} }})'
+        )
+    # Ligar/desligar as animações todas é o `animations.enabled`, que o
+    # rice-hypr-prefs cuida; aqui as folhas ficam sempre ligadas.
+    on = "true"
+    # Borda: a cor da borda ativa muda ao trocar de janela; linear e curta.
+    lines.append('hl.curve("rice_linear", { type = "bezier", points = { {0, 0}, {1, 1} } })')
+    lines.append(f'hl.animation({{ leaf = "border", enabled = {on}, speed = 6, bezier = "rice_linear" }})')
+    for name, leaves in GROUPS.items():
+        cfg = groups[name]
+        style = cfg.get("style") or ""
+        style_part = f', style = "{style}"' if style else ""
+        for leaf in leaves:
+            lines.append(
+                f'hl.animation({{ leaf = "{leaf}", enabled = {on}, speed = {num(cfg["speed"])}, '
+                f'bezier = "rice_{name}"{style_part} }})'
+            )
+    return "\n".join(lines) + "\n"
+
+
+def apply(prefs):
+    preset, groups = effective(prefs)
+    text = render(groups)
+    tmp = OUT + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(text)
+    os.replace(tmp, OUT)
+    if os.environ.get("HYPRLAND_INSTANCE_SIGNATURE"):
+        # Sem as linhas de comentário: um argumento começando com "--" é
+        # lido pelo hyprctl como opção e ele só imprime a ajuda.
+        code = "\n".join(l for l in text.splitlines() if not l.startswith("--"))
+        r = subprocess.run(["hyprctl", "eval", code], capture_output=True, text=True)
+        if r.returncode != 0 or "error" in (r.stdout + r.stderr).lower():
+            print((r.stdout + r.stderr).strip(), file=sys.stderr)
+    return preset, groups
+
+
+def dump(prefs):
+    preset, groups = effective(prefs)
+    print(json.dumps({
+        "preset": preset,
+        "enabled": prefs.get("anim_enabled", True) is not False,
+        "groups": groups,
+        "order": list(GROUPS.keys()),
+        "styles": STYLES,
+        "presets": {k: v for k, v in PRESETS.items()},
+    }))
+
+
+def main(argv):
+    cmd = argv[0] if argv else "dump"
+    prefs = load_prefs()
+
+    if cmd == "dump":
+        dump(prefs)
+    elif cmd == "apply":
+        apply(prefs)
+    elif cmd == "preset" and len(argv) > 1 and (argv[1] in PRESETS or argv[1] == "custom"):
+        prefs["anim_preset"] = argv[1]
+        save_prefs(prefs)
+        apply(prefs)
+        dump(prefs)
+    elif cmd == "set" and len(argv) > 3 and argv[1] in GROUPS:
+        group, field = argv[1], argv[2]
+        # Mexer em qualquer grupo parte do que está valendo agora: quem estava
+        # no "vento" e ajusta só a abertura continua com o resto do vento.
+        _, current = effective(prefs)
+        custom = prefs.get("anim_custom") if prefs.get("anim_preset") == "custom" else None
+        custom = copy.deepcopy(custom) if isinstance(custom, dict) else copy.deepcopy(current)
+        entry = custom.setdefault(group, copy.deepcopy(current[group]))
+        if field == "curve" and len(argv) >= 7:
+            x1, y1, x2, y2 = (float(v) for v in argv[3:7])
+            # x precisa ficar entre 0 e 1 (é tempo); y pode passar do ponto.
+            entry["curve"] = [max(0.0, min(1.0, x1)), max(-1.0, min(2.0, y1)),
+                              max(0.0, min(1.0, x2)), max(-1.0, min(2.0, y2))]
+        elif field == "speed":
+            entry["speed"] = max(0.5, min(20.0, float(argv[3])))
+        elif field == "style":
+            entry["style"] = " ".join(argv[3:]) if argv[3] else ""
+        else:
+            print(__doc__.strip(), file=sys.stderr)
+            return 1
+        prefs["anim_preset"] = "custom"
+        prefs["anim_custom"] = custom
+        save_prefs(prefs)
+        apply(prefs)
+        dump(prefs)
+    else:
+        print(__doc__.strip(), file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

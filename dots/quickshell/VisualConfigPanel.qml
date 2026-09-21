@@ -5256,61 +5256,14 @@ PanelWindow {
 
                                 SectionHeader {
                                     title: Theme.t("effects.anim_title", "Estilo de Animação")
-                                    subtitle: Theme.t("effects.anim_sub", "Curvas de Bézier e velocidade para abertura, fechamento e workspaces")
+                                    subtitle: Theme.t("effects.anim_sub", "Curvas de Bézier e velocidade para abertura, fechamento e workspaces — escolha um preset ou ajuste cada parte")
                                 }
 
-                                RowLayout {
+                                // Presets, curva de Bézier por grupo, duração e estilo
+                                // (rice-anim). Ver AnimCurveEditor.qml.
+                                AnimCurveEditor {
                                     Layout.fillWidth: true
-                                    spacing: 12
-                                    Repeater {
-                                        model: [
-                                            { id: "smooth", name: "Suave (Padrão)", desc: Theme.t("effects.anim_smooth_desc", "Fluido e equilibrado") },
-                                            { id: "bouncy", name: "Elástico (Bouncy)", desc: Theme.t("effects.anim_bouncy_desc", "Com leve overshoot") },
-                                            { id: "snappy", name: Theme.t("effects.anim_snappy", "Rápido (Snappy)"), desc: "Imediato e seco" }
-                                        ]
-                                        delegate: Rectangle {
-                                            required property var modelData
-                                            readonly property bool active: win.animPreset === modelData.id
-                                            Layout.fillWidth: true
-                                            implicitHeight: 52
-                                            radius: 10
-                                            color: active ? Theme.withAlpha(Theme.primary, 0.22) : (animArea.containsMouse ? Theme.tileHigh : Theme.tile)
-                                            border.width: active ? 1.5 : 0
-                                            border.color: Theme.primary
-
-                                            ColumnLayout {
-                                                anchors.centerIn: parent
-                                                spacing: 2
-                                                Text {
-                                                    Layout.alignment: Qt.AlignHCenter
-                                                    text: parent.parent.modelData.name
-                                                    font.family: Theme.fontFamily
-                                                    font.pixelSize: 12
-                                                    font.weight: parent.parent.active ? Font.DemiBold : Font.Normal
-                                                    color: parent.parent.active ? Theme.textColor : Theme.textColor
-                                                }
-                                                Text {
-                                                    Layout.alignment: Qt.AlignHCenter
-                                                    text: parent.parent.modelData.desc
-                                                    font.family: Theme.fontFamily
-                                                    font.pixelSize: 10
-                                                    color: parent.parent.active ? Theme.primary : Theme.subtext
-                                                }
-                                            }
-
-                                            MouseArea {
-                                                id: animArea
-                                                anchors.fill: parent
-                                                hoverEnabled: true
-                                                cursorShape: Qt.PointingHandCursor
-                                                onClicked: {
-                                                    win.animPreset = parent.modelData.id;
-                                                    Quickshell.execDetached(["rice-hypr-prefs", "set", "anim_preset", parent.modelData.id]);
-                                                    win.showToast(Theme.t("toast.anim_style", "Estilo de animação: ") + parent.modelData.name);
-                                                }
-                                            }
-                                        }
-                                    }
+                                    onToast: msg => win.showToast(msg)
                                 }
 
                                 SectionHeader {

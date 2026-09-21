@@ -1,0 +1,249 @@
+#!/usr/bin/env python3
+"""rice-eq — equalizador de 10 bandas usando só o PipeWire.
+
+Não precisa de EasyEffects nem de pacote extra: o PipeWire já traz filtros
+biquad embutidos (`filter-chain`). O script gera a configuração de um
+filter-chain com 10 bandas e sobe um `pipewire -c` separado como unidade
+transitória do systemd (`hollow-eq`), o que o deixa independente do shell e
+fácil de parar.
+
+O filtro é registrado como *smart filter* do WirePlumber: ele se encaixa sozinho
+na frente da saída padrão (caixa, fone Bluetooth, HDMI) e acompanha quando ela
+muda. O dispositivo padrão continua sendo o de verdade, então o controle de
+volume, o OSD e a lista de saídas não enxergam um "Equalizer Sink" no meio.
+
+Mexer nos ganhos com o filtro rodando é instantâneo (`pw-cli set-param`), sem
+cortar o som. O estado fica em ~/.config/hypr/eq.json.
+
+Uso:
+  rice-eq status                  # JSON: enabled, preset, gains, bands, presets
+  rice-eq on | off | toggle
+  rice-eq preset <nome>           # flat, bass, treble, vocal, pop, rock, jazz, classic
+  rice-eq band <índice 0-9> <dB>  # vira o preset "custom"
+  rice-eq gains <g0> ... <g9>
+  rice-eq restore                 # autostart: sobe o filtro se estava ligado
+"""
+
+import json
+import os
+import subprocess
+import sys
+import time
+
+HOME = os.path.expanduser("~")
+STATE = os.path.join(HOME, ".config/hypr/eq.json")
+CONF_DIR = os.path.join(HOME, ".cache/hollow-wired")
+CONF = os.path.join(CONF_DIR, "eq-filter.conf")
+UNIT = "hollow-eq"
+NODE = "hollow_eq_sink"
+
+BANDS = [31, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000]
+LIMIT = 12.0
+
+PRESETS = {
+    "flat":    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    "bass":    [6, 5, 4, 2, 0.5, 0, 0, 0, 0, 0],
+    "treble":  [0, 0, 0, 0, 0, 0.5, 2, 4, 5, 6],
+    "vocal":   [-2, -1.5, -1, 1, 3, 4, 3.5, 2, 0, -1],
+    "pop":     [-1, 0.5, 2.5, 4, 3, 0, -1, -1, 1, 2],
+    "rock":    [5, 4, 2, -1, -2, -1, 1.5, 3, 4, 4.5],
+    "jazz":    [3, 2, 1, 2, -1, -1, 0, 1, 2, 3],
+    "classic": [4, 3, 2, 1, -1, -1, 0, 2, 3, 4],
+}
+
+
+def load():
+    st = {"enabled": False, "preset": "flat", "gains": list(PRESETS["flat"])}
+    try:
+        with open(STATE, encoding="utf-8") as f:
+            data = json.load(f)
+        st.update({k: data[k] for k in ("enabled", "preset", "gains") if k in data})
+    except (OSError, ValueError):
+        pass
+    g = [float(x) for x in st.get("gains", [])][:len(BANDS)]
+    st["gains"] = g + [0.0] * (len(BANDS) - len(g))
+    return st
+
+
+def save(st):
+    os.makedirs(os.path.dirname(STATE), exist_ok=True)
+    tmp = STATE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(st, f, indent=2)
+    os.replace(tmp, STATE)
+
+
+def preamp(gains):
+    # Reforçar uma banda soma energia e pode estourar (clipping) com a música
+    # já masterizada alta. Baixar o volume geral na mesma medida do maior
+    # reforço evita a distorção; o controle de volume compensa.
+    return 10 ** (-max(0.0, max(gains)) / 20.0)
+
+
+def write_conf(gains):
+    nodes = []
+    for i, (freq, gain) in enumerate(zip(BANDS, gains)):
+        label = "bq_lowshelf" if i == 0 else "bq_highshelf" if i == len(BANDS) - 1 else "bq_peaking"
+        nodes.append(
+            f'{{ type = builtin name = b{i} label = {label} '
+            f'control = {{ "Freq" = {float(freq)} "Q" = 1.41 "Gain" = {float(gain)} }} }}'
+        )
+    nodes.append(f'{{ type = builtin name = pre label = linear control = {{ "Mult" = {preamp(gains):.5f} "Add" = 0.0 }} }}')
+    links = [f'{{ output = "b{i}:Out" input = "b{i + 1}:In" }}' for i in range(len(BANDS) - 1)]
+    links.append(f'{{ output = "b{len(BANDS) - 1}:Out" input = "pre:In" }}')
+    conf = f"""# Gerado por rice-eq — não editar à mão.
+context.properties = {{ log.level = 0 }}
+context.spa-libs = {{
+    audio.convert.* = audioconvert/libspa-audioconvert
+    support.*       = support/libspa-support
+}}
+context.modules = [
+    {{ name = libpipewire-module-rt flags = [ ifexists nofail ] }}
+    {{ name = libpipewire-module-protocol-native }}
+    {{ name = libpipewire-module-client-node }}
+    {{ name = libpipewire-module-adapter }}
+    {{ name = libpipewire-module-filter-chain
+        args = {{
+            node.description = "Equalizador"
+            media.name       = "Equalizador"
+            filter.graph = {{
+                nodes = [
+                    {chr(10).join('                    ' + n for n in nodes).lstrip()}
+                ]
+                links = [
+                    {chr(10).join('                    ' + l for l in links).lstrip()}
+                ]
+            }}
+            audio.channels = 2
+            audio.position = [ FL FR ]
+            capture.props = {{
+                node.name   = "{NODE}"
+                media.class = Audio/Sink
+                filter.smart = true
+                filter.smart.name = "hollow-eq"
+            }}
+            playback.props = {{
+                node.name    = "hollow_eq_out"
+                node.passive = true
+                filter.smart = true
+                filter.smart.name = "hollow-eq"
+            }}
+        }}
+    }}
+]
+"""
+    os.makedirs(CONF_DIR, exist_ok=True)
+    with open(CONF, "w", encoding="utf-8") as f:
+        f.write(conf)
+
+
+def running():
+    r = subprocess.run(["systemctl", "--user", "is-active", "--quiet", UNIT])
+    return r.returncode == 0
+
+
+def node_id():
+    try:
+        out = subprocess.run(["pw-dump"], capture_output=True, text=True, timeout=5).stdout
+        for obj in json.loads(out):
+            props = (obj.get("info") or {}).get("props") or {}
+            if obj.get("type") == "PipeWire:Interface:Node" and props.get("node.name") == NODE:
+                return obj["id"]
+    except (subprocess.SubprocessError, ValueError, OSError):
+        pass
+    return None
+
+
+def start(gains):
+    write_conf(gains)
+    subprocess.run(["systemctl", "--user", "stop", UNIT], capture_output=True)
+    subprocess.run(["systemctl", "--user", "reset-failed", UNIT], capture_output=True)
+    subprocess.run(
+        ["systemd-run", "--user", "--quiet", f"--unit={UNIT}",
+         "--description=Equalizador do hollow-wired",
+         "pipewire", "-c", CONF],
+        capture_output=True,
+    )
+
+
+def stop():
+    subprocess.run(["systemctl", "--user", "stop", UNIT], capture_output=True)
+
+
+def push(gains):
+    """Aplica os ganhos no filtro que já está rodando, sem reiniciar o áudio."""
+    nid = node_id()
+    if nid is None:
+        return False
+    params = []
+    for i, g in enumerate(gains):
+        params += [f'"b{i}:Gain"', f"{float(g):.2f}"]
+    params += ['"pre:Mult"', f"{preamp(gains):.5f}"]
+    r = subprocess.run(
+        ["pw-cli", "set-param", str(nid), "Props", "{ params = [ " + " ".join(params) + " ] }"],
+        capture_output=True, text=True,
+    )
+    return r.returncode == 0
+
+
+def apply(st):
+    save(st)
+    if not st["enabled"]:
+        return
+    write_conf(st["gains"])  # a próxima subida já nasce com os ganhos certos
+    if not running() or not push(st["gains"]):
+        start(st["gains"])
+
+
+def status(st):
+    st = dict(st)
+    st["running"] = running()
+    st["bands"] = BANDS
+    st["presets"] = list(PRESETS.keys())
+    print(json.dumps(st))
+
+
+def main(argv):
+    cmd = argv[0] if argv else "status"
+    st = load()
+    if cmd == "status":
+        status(st)
+    elif cmd in ("on", "off", "toggle"):
+        st["enabled"] = (not st["enabled"]) if cmd == "toggle" else cmd == "on"
+        save(st)
+        if st["enabled"]:
+            start(st["gains"])
+        else:
+            stop()
+        status(st)
+    elif cmd == "preset" and len(argv) > 1 and argv[1] in PRESETS:
+        st["preset"] = argv[1]
+        st["gains"] = [float(x) for x in PRESETS[argv[1]]]
+        st["enabled"] = True
+        apply(st)
+        status(st)
+    elif cmd == "band" and len(argv) > 2:
+        i = int(argv[1])
+        if 0 <= i < len(BANDS):
+            st["gains"][i] = max(-LIMIT, min(LIMIT, float(argv[2])))
+            st["preset"] = "custom"
+            st["enabled"] = True
+            apply(st)
+        status(st)
+    elif cmd == "gains" and len(argv) > len(BANDS):
+        st["gains"] = [max(-LIMIT, min(LIMIT, float(x))) for x in argv[1:len(BANDS) + 1]]
+        st["preset"] = "custom"
+        st["enabled"] = True
+        apply(st)
+        status(st)
+    elif cmd == "restore":
+        if st["enabled"] and not running():
+            start(st["gains"])
+    else:
+        print(__doc__.strip(), file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

@@ -204,38 +204,13 @@ hl.device({
 }
 
 apply_anim_preset() {
-    local preset="$1"
+    # As curvas moram no rice-anim (presets, modo personalizado e o arquivo
+    # animations.lua que o hyprland.lua carrega). O preset recebido aqui já
+    # foi salvo em anim_preset; só falta regravar e aplicar.
     get_instance
-
-    case "$preset" in
-        snappy)
-            hyprctl eval '
-hl.animation({ leaf = "windows", enabled = true, speed = 2.5, bezier = "wallustSnap", style = "popin 80%" })
-hl.animation({ leaf = "windowsOut", enabled = true, speed = 2, bezier = "wallustSnap", style = "popin 80%" })
-hl.animation({ leaf = "windowsMove", enabled = true, speed = 3, bezier = "wallustSnap" })
-hl.animation({ leaf = "fade", enabled = true, speed = 3, bezier = "wallustSnap" })
-hl.animation({ leaf = "workspaces", enabled = true, speed = 3, bezier = "wallustSnap", style = "slidefade 10%" })
-' &>/dev/null
-            ;;
-        bouncy)
-            hyprctl eval '
-hl.animation({ leaf = "windows", enabled = true, speed = 5.5, bezier = "wallustOvershoot", style = "popin 75%" })
-hl.animation({ leaf = "windowsOut", enabled = true, speed = 4, bezier = "wallustOvershoot", style = "popin 80%" })
-hl.animation({ leaf = "windowsMove", enabled = true, speed = 5, bezier = "wallustOvershoot" })
-hl.animation({ leaf = "fade", enabled = true, speed = 4, bezier = "wallustSmooth" })
-hl.animation({ leaf = "workspaces", enabled = true, speed = 6, bezier = "wallustOvershoot", style = "slidefade 20%" })
-' &>/dev/null
-            ;;
-        smooth|*)
-            hyprctl eval '
-hl.animation({ leaf = "windows", enabled = true, speed = 4, bezier = "wallustOvershoot", style = "popin 85%" })
-hl.animation({ leaf = "windowsOut", enabled = true, speed = 3, bezier = "wallustSnap", style = "popin 85%" })
-hl.animation({ leaf = "windowsMove", enabled = true, speed = 4, bezier = "wallustSmooth" })
-hl.animation({ leaf = "fade", enabled = true, speed = 4, bezier = "wallustSmooth" })
-hl.animation({ leaf = "workspaces", enabled = true, speed = 5, bezier = "wallustSmooth", style = "slidefade 15%" })
-' &>/dev/null
-            ;;
-    esac
+    if command -v rice-anim >/dev/null 2>&1; then
+        rice-anim apply >/dev/null 2>&1 || true
+    fi
 }
 
 cmd="${1:-get}"

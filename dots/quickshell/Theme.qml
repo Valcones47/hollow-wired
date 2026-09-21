@@ -135,7 +135,8 @@ QtObject {
         sleep: "\u{F0904}",
         tune: "\u{F062E}", palette: "\u{F03D8}", settings: "\u{F08B8}",
         check: "\u{F012C}",
-        calendar: "\u{F00ED}", timer: "\u{F051B}", quote: "\u{F0281}", speed: "\u{F04C5}"
+        calendar: "\u{F00ED}", timer: "\u{F051B}", quote: "\u{F0281}", speed: "\u{F04C5}",
+        equalizer: "\u{F0EA2}", album: "\u{F0025}", bezier: "\u{F0AE8}"
     })
 
     property FileView colorFile: FileView {

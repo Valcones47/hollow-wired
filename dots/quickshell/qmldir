@@ -32,3 +32,6 @@ VisualConfigPanel 1.0 VisualConfigPanel.qml
 singleton ShellCustomization 1.0 ShellCustomization.qml
 Welcome 1.0 Welcome.qml
 WallpaperFade 1.0 WallpaperFade.qml
+singleton EqService 1.0 EqService.qml
+Equalizer 1.0 Equalizer.qml
+AnimCurveEditor 1.0 AnimCurveEditor.qml

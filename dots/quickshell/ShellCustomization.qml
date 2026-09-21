@@ -103,12 +103,24 @@ QtObject {
         save();
     }
 
+    // Layout da aba Mídia do hub: "disc" (disco + equalizador) ou "ring"
+    // (espectro + letra). Mora aqui para ir junto com o resto do visual.
+    function getMediaLayout() {
+        const l = config.media && config.media.layout;
+        return l === "ring" ? "ring" : "disc";
+    }
+
+    function setMediaLayout(layout) {
+        setComponentProp("media", "layout", layout === "ring" ? "ring" : "disc");
+    }
+
     function applyToAll(sourceComp) {
         const src = config[sourceComp] || { style: "glass", scale: 1.0, opacity: 0.85, accent: "" };
         config = {
             hub: Object.assign({}, src),
             sidebar: Object.assign({}, src),
-            dock: Object.assign({}, src)
+            dock: Object.assign({}, src),
+            media: Object.assign({}, config.media || {})
         };
         save();
     }
@@ -124,7 +136,8 @@ QtObject {
             config = {
                 hub: Object.assign({}, defaults),
                 sidebar: Object.assign({}, defaults),
-                dock: Object.assign({}, defaults)
+                dock: Object.assign({}, defaults),
+                media: Object.assign({}, config.media || {})
             };
             save();
         }
