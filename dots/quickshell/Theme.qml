@@ -12,7 +12,7 @@ QtObject {
     id: root
 
     property color background: "#111218"
-    property color foreground: "#e2e8f0"
+    property color foregroundRaw: "#e2e8f0"
     property color color0: "#181922"
     property color color1: "#f43f5e"
     property color color2: "#10b981"
@@ -33,6 +33,35 @@ QtObject {
     // Aliases semânticos, no mesmo espírito das variáveis @wallust_* do
     // waybar/eww (mesmo mapeamento: accent1=color4, accent2=color6,
     // inactive=color8, warning=color3, critical=color11).
+    // ---------- cor de texto legível ----------
+    // O wallust às vezes devolve um "foreground" colorido (num papel de parede
+    // vermelho veio #DA4B5B): o texto ficava vermelho-escuro sobre fundo quase
+    // preto e não dava para ler. A cor de texto mantém só uma pitada do matiz e
+    // é clareada até ter contraste de verdade com o fundo.
+    function _lum(c) {
+        const f = x => x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4);
+        return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b);
+    }
+    function contrast(a, b) {
+        const l1 = Math.max(root._lum(a), root._lum(b));
+        const l2 = Math.min(root._lum(a), root._lum(b));
+        return (l1 + 0.05) / (l2 + 0.05);
+    }
+    readonly property color foreground: {
+        const raw = root.foregroundRaw;
+        const h = raw.hslHue < 0 ? 0 : raw.hslHue;
+        let c = Qt.hsla(h, Math.min(raw.hslSaturation, 0.18), Math.max(raw.hslLightness, 0.88), 1);
+        // Fundo claro (papel de parede claro): escurece em vez de clarear.
+        const goDark = root._lum(root.background) > 0.4;
+        if (goDark) c = Qt.hsla(h, Math.min(raw.hslSaturation, 0.25), Math.min(raw.hslLightness, 0.18), 1);
+        let guard = 0;
+        while (root.contrast(c, root.background) < 8 && guard < 14) {
+            c = root.mix(c, goDark ? "#000000" : "#ffffff", 0.12);
+            guard++;
+        }
+        return c;
+    }
+
     readonly property color accent1: color4
     readonly property color accent2: color6
     readonly property color inactive: color8
@@ -58,9 +87,18 @@ QtObject {
     // mais vivas da paleta (com matizes diferentes entre si) e garante um
     // mínimo de saturação e de claridade para elas aparecerem sobre o fundo.
     function _vivid(c, minS, lo, hi) {
-        const s = Math.max(c.hslSaturation, minS);
-        const l = Math.min(hi, Math.max(lo, c.hslLightness));
-        return Qt.hsla(c.hslHue < 0 ? 0 : c.hslHue, s, l, 1);
+        const sat = Math.max(c.hslSaturation, minS);
+        const h = c.hslHue < 0 ? 0 : c.hslHue;
+        let out = Qt.hsla(h, sat, Math.min(hi, Math.max(lo, c.hslLightness)), 1);
+        // Piso de contraste contra o fundo: numa paleta escura (vermelho, roxo)
+        // o destaque saía quase invisível em cima do fundo quase preto.
+        let l = out.hslLightness, guard = 0;
+        while (root.contrast(out, root.background) < 4.5 && guard < 14) {
+            l = root._lum(root.background) > 0.4 ? Math.max(0.08, l - 0.05) : Math.min(0.92, l + 0.05);
+            out = Qt.hsla(h, sat, l, 1);
+            guard++;
+        }
+        return out;
     }
     function _score(c) {
         // Saturação manda; claridade no meio da faixa ajuda a legibilidade.
@@ -212,7 +250,7 @@ QtObject {
                 const data = JSON.parse(text());
                 if (!data) return;
                 if (data.background) root.background = data.background;
-                if (data.foreground) root.foreground = data.foreground;
+                if (data.foreground) root.foregroundRaw = data.foreground;
                 if (data.color0) root.color0 = data.color0;
                 if (data.color1) root.color1 = data.color1;
                 if (data.color2) root.color2 = data.color2;
