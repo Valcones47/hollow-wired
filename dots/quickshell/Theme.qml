@@ -114,7 +114,11 @@ QtObject {
     // `undefined` e o QML desenhava preto (o medidor da GPU nos widgets).
     readonly property color secondary: tertiary
     readonly property color textColor: foreground
-    readonly property color subtext: color7
+    // O color7 da paleta costuma vir quase branco: texto de apoio ficava com a
+    // mesma cor do título e tudo virava um bloco só. O subtexto agora é o
+    // foreground apagado, sempre um degrau abaixo do título.
+    readonly property color subtext: withAlpha(mix(background, foreground, 0.72), 0.85)
+    readonly property color subtextSoft: withAlpha(mix(background, foreground, 0.58), 0.8)
     readonly property color outline: color8
     readonly property color surface: withAlpha(background, 0.85) // = fundo da waybar
     readonly property color tile: withAlpha(mix(background, foreground, 0.07), 0.9)
