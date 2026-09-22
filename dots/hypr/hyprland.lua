@@ -140,14 +140,32 @@ end
 local blurQuality = prefStr("blur_quality", "padrao")
 -- size/passes custam GPU; xray = desfocar só o fundo (não reprocessa por
 -- janela) e ignore_opacity = false evita desfocar atrás do que é opaco.
+local function prefNum(key, default)
+    local f = io.open(home .. "/.config/hypr/user-prefs.json", "r")
+    if not f then return default end
+    local txt = f:read("*a")
+    f:close()
+    return tonumber(txt:match('"' .. key .. '"%s*:%s*([%d%.]+)')) or default
+end
 local blurCfg = ({
     leve   = { size = 2, passes = 1, xray = true,  ignore_opacity = false, vibrancy = 0.10 },
     padrao = { size = 3, passes = 1, xray = false, ignore_opacity = true,  vibrancy = 0.20 },
     forte  = { size = 6, passes = 3, xray = false, ignore_opacity = true,  vibrancy = 0.25 },
 })[blurQuality] or { size = 3, passes = 1, xray = false, ignore_opacity = true, vibrancy = 0.20 }
+-- "manual": o usuário mexeu nos controles finos do painel.
+if blurQuality == "manual" then
+    blurCfg = {
+        size           = prefNum("blur_size", 3),
+        passes         = prefNum("blur_passes", 1),
+        vibrancy       = prefNum("blur_vibrancy", 0.20),
+        xray           = prefBool("blur_xray", false),
+        ignore_opacity = prefBool("blur_ignore_opacity", true),
+    }
+end
 -- No modo leve os painéis que cobrem a tela inteira ficam sem desfoque: são
 -- eles que derrubam o desempenho em iGPU (desfocar 1920x1080 a cada quadro).
 local blurBigPanels = blurQuality ~= "leve"
+    and not (blurQuality == "manual" and prefBool("blur_xray", false))
 
 local function systemKbLayout()
     local f = io.open("/etc/vconsole.conf", "r")

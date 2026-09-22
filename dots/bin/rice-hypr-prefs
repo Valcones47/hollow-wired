@@ -99,6 +99,14 @@ apply_all() {
     case "$blur_quality" in
         leve)  blur_size=2; blur_passes=1; blur_xray=true;  blur_ign=false; blur_vib=0.10 ;;
         forte) blur_size=6; blur_passes=3; blur_xray=false; blur_ign=true;  blur_vib=0.25 ;;
+        manual)
+            # Controles finos do painel (aba Efeitos & Janelas).
+            blur_size=$(jq -r '.blur_size // 3' "$PREFS_FILE")
+            blur_passes=$(jq -r '.blur_passes // 1' "$PREFS_FILE")
+            blur_vib=$(jq -r '.blur_vibrancy // 0.20' "$PREFS_FILE")
+            blur_xray=$(jq -r 'if .blur_xray == true then true else false end' "$PREFS_FILE")
+            blur_ign=$(jq -r 'if .blur_ignore_opacity == false then false else true end' "$PREFS_FILE")
+            ;;
         *)     blur_size=3; blur_passes=1; blur_xray=false; blur_ign=true;  blur_vib=0.20 ;;
     esac
     local run="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
@@ -256,10 +264,11 @@ case "$cmd" in
         apply_all
         # As regras de camada (quais painéis têm desfoque) só saem do arquivo de
         # configuração: o eval do apply_all não as alcança.
-        if [ "$key" = "blur_quality" ]; then
+        case "$key" in blur_quality|blur_size|blur_passes|blur_vibrancy|blur_xray|blur_ignore_opacity) blur_changed=1 ;; *) blur_changed=0 ;; esac
+        if [ "$blur_changed" = 1 ]; then
             hyprctl reload >/dev/null 2>&1 || true
             notify-send -a "Hyprland" -i preferences-desktop-theme -r 91197 -t 2500 \
-                "Desfoque: $val" "$([ "$val" = leve ] && echo 'Mais leve para placas integradas' || echo 'Aparência atualizada')" 2>/dev/null || true
+                "Desfoque atualizado" "$([ "$val" = leve ] && echo 'Mais leve para placas integradas' || echo 'Aparência atualizada')" 2>/dev/null || true
         fi
         if [ "$key" = "monitor_scale" ]; then
             command -v rice-wallpaper-reload >/dev/null 2>&1 && rice-wallpaper-reload >/dev/null 2>&1 &

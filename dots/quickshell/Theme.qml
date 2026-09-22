@@ -52,10 +52,57 @@ QtObject {
     // somem em cima do background), por isso o "primary" usa a cor viva
     // mais clara (color10) e os cards são o background clareado um pouco na
     // direção do foreground, em vez de bordas finas.
-    readonly property color primary: color10
+    // ---------- escolha dos destaques ----------
+    // Papéis de parede escuros/dessaturados davam uma paleta quase cinza: o
+    // painel inteiro saía de uma cor só. Aqui a interface escolhe as duas cores
+    // mais vivas da paleta (com matizes diferentes entre si) e garante um
+    // mínimo de saturação e de claridade para elas aparecerem sobre o fundo.
+    function _vivid(c, minS, lo, hi) {
+        const s = Math.max(c.hslSaturation, minS);
+        const l = Math.min(hi, Math.max(lo, c.hslLightness));
+        return Qt.hsla(c.hslHue < 0 ? 0 : c.hslHue, s, l, 1);
+    }
+    function _score(c) {
+        // Saturação manda; claridade no meio da faixa ajuda a legibilidade.
+        const l = c.hslLightness;
+        return c.hslSaturation * (1 - Math.abs(l - 0.58) * 0.9);
+    }
+    function _hueGap(a, b) {
+        if (a.hslHue < 0 || b.hslHue < 0) return 1;
+        const d = Math.abs(a.hslHue - b.hslHue);
+        return Math.min(d, 1 - d);
+    }
+    readonly property var _accentPool: [color10, color13, color12, color9, color14, color11, color5, color4, color6, color2, color3, color1]
+    readonly property color _pick1: {
+        let best = color10, bestScore = -1;
+        for (const c of _accentPool) {
+            const sc = root._score(c);
+            if (sc > bestScore) { best = c; bestScore = sc; }
+        }
+        return best;
+    }
+    readonly property color _pick2: {
+        // Segunda cor: a mais viva entre as de matiz bem diferente da primeira.
+        let best = null, bestScore = -1;
+        for (const c of _accentPool) {
+            if (root._hueGap(c, root._pick1) < 0.12) continue;
+            const sc = root._score(c);
+            if (sc > bestScore) { best = c; bestScore = sc; }
+        }
+        // Paleta de matiz único (papel de parede monocromático): em vez de
+        // repetir a mesma cor, gira o matiz para ter um segundo destaque.
+        if (!best || bestScore < 0.12) {
+            const h = root._pick1.hslHue < 0 ? 0.55 : root._pick1.hslHue;
+            return Qt.hsla((h + 0.42) % 1, 0.5, 0.66, 1);
+        }
+        return best;
+    }
+    readonly property color primary: _vivid(_pick1, 0.45, 0.52, 0.74)
+    readonly property color tertiary: _vivid(_pick2, 0.40, 0.58, 0.78)
+    readonly property color primaryOld: color10
     // Usado em vários lugares mas nunca tinha sido definido: virava
     // `undefined` e o QML desenhava preto (o medidor da GPU nos widgets).
-    readonly property color secondary: color13
+    readonly property color secondary: tertiary
     readonly property color textColor: foreground
     readonly property color subtext: color7
     readonly property color outline: color8

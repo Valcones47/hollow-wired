@@ -62,7 +62,7 @@ PanelWindow {
             icon: Theme.icons.camera,
             keys: ["Print"],
             title: Theme.t("welcome.step_screenshot_title", "Captura de tela"),
-            desc: Theme.t("welcome.step_screenshot_desc", "Selecione uma área — ou aperte Esc para capturar a tela inteira. Sempre salva e copia.")
+            desc: Theme.t("welcome.step_screenshot_desc", "Selecione uma área com o mouse. Ela é salva e copiada. Esc cancela.")
         },
         {
             icon: Theme.icons.workspaces,

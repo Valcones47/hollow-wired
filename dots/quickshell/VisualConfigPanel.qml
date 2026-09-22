@@ -389,6 +389,13 @@ PanelWindow {
     property bool dimInactive: false
     property real dimStrength: 0.2
     property string blurQuality: "padrao"
+    property bool blurAdvanced: false
+    property int blurSize: 3
+    property int blurPasses: 1
+    property real blurVibrancy: 0.20
+    property bool blurXray: false
+    property bool blurIgnoreOpacity: true
+    property bool animAdvanced: false
     property int rounding: 8
     property int gapsIn: 6
     property string animPreset: "smooth"
@@ -657,6 +664,12 @@ PanelWindow {
                     if (d.dim_inactive !== undefined) win.dimInactive = !!d.dim_inactive;
                     if (d.dim_strength !== undefined) win.dimStrength = d.dim_strength;
                     if (d.blur_quality !== undefined) win.blurQuality = d.blur_quality;
+                    if (d.blur_size !== undefined) win.blurSize = parseInt(d.blur_size);
+                    if (d.blur_passes !== undefined) win.blurPasses = parseInt(d.blur_passes);
+                    if (d.blur_vibrancy !== undefined) win.blurVibrancy = parseFloat(d.blur_vibrancy);
+                    if (d.blur_xray !== undefined) win.blurXray = !!d.blur_xray;
+                    if (d.blur_ignore_opacity !== undefined) win.blurIgnoreOpacity = !!d.blur_ignore_opacity;
+                    win.blurAdvanced = win.blurQuality === "manual";
                     if (d.rounding !== undefined) win.rounding = d.rounding;
                     if (d.gaps_in !== undefined) win.gapsIn = d.gaps_in;
                     if (d.anim_preset !== undefined) win.animPreset = d.anim_preset;
@@ -1084,14 +1097,14 @@ PanelWindow {
             Text {
                 text: csld.title
                 font.family: Theme.fontFamily
-                font.pixelSize: 12
+                font.pixelSize: 13
                 color: Theme.textColor
             }
             Item { Layout.fillWidth: true }
             Text {
                 text: csld.decimals > 0 ? csld.value.toFixed(csld.decimals) + csld.unit : Math.round(csld.value) + csld.unit
                 font.family: Theme.monoFamily
-                font.pixelSize: 11
+                font.pixelSize: 12
                 color: Theme.primary
             }
         }
@@ -1177,20 +1190,20 @@ PanelWindow {
             Text {
                 text: csw.title
                 font.family: Theme.fontFamily
-                font.pixelSize: 12
+                font.pixelSize: 13
                 color: Theme.textColor
             }
             Text {
                 visible: csw.subtitle !== ""
                 text: csw.subtitle
                 font.family: Theme.fontFamily
-                font.pixelSize: 10
+                font.pixelSize: 11
                 color: Theme.subtext
             }
         }
 
         Rectangle {
-            implicitWidth: 38
+            implicitWidth: 43
             implicitHeight: 20
             radius: 10
             color: csw.checked ? Theme.primary : Theme.tileHigh
@@ -1216,7 +1229,7 @@ PanelWindow {
         property bool checked: false
         signal toggled(bool nextVal)
 
-        implicitWidth: 38
+        implicitWidth: 43
         implicitHeight: 20
         radius: 10
         color: swt.checked ? Theme.primary : Theme.tileHigh
@@ -1311,7 +1324,7 @@ PanelWindow {
                 Text {
                     text: mc.title
                     font.family: Theme.fontFamily
-                    font.pixelSize: 15
+                    font.pixelSize: 17
                     font.weight: Font.Bold
                     color: Theme.textColor
                 }
@@ -1327,7 +1340,7 @@ PanelWindow {
                         anchors.centerIn: parent
                         text: Theme.t("mode.active", "Em uso")
                         font.family: Theme.fontFamily
-                        font.pixelSize: 11
+                        font.pixelSize: 12
                         font.weight: Font.Bold
                         color: Theme.background
                     }
@@ -1338,7 +1351,7 @@ PanelWindow {
                 wrapMode: Text.WordWrap
                 text: mc.desc
                 font.family: Theme.fontFamily
-                font.pixelSize: 12
+                font.pixelSize: 13
                 color: Theme.subtext
             }
             Repeater {
@@ -1350,7 +1363,7 @@ PanelWindow {
                     Text {
                         text: Theme.icons.check
                         font.family: Theme.iconFontFamily
-                        font.pixelSize: 13
+                        font.pixelSize: 15
                         color: Theme.primary
                     }
                     Text {
@@ -1358,7 +1371,7 @@ PanelWindow {
                         wrapMode: Text.WordWrap
                         text: modelData
                         font.family: Theme.fontFamily
-                        font.pixelSize: 11
+                        font.pixelSize: 12
                         color: Theme.textColor
                     }
                 }
@@ -1374,6 +1387,19 @@ PanelWindow {
         }
     }
 
+    // Barra de rolagem das abas: fina, some quando não precisa.
+    component PanelScroll: ScrollBar {
+        id: psb
+        policy: size < 1 ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff
+        width: 8
+        contentItem: Rectangle {
+            implicitWidth: 5
+            radius: 3
+            color: psb.pressed ? Theme.primary : Theme.withAlpha(Theme.primary, psb.hovered ? 0.6 : 0.35)
+            Behavior on color { ColorAnimation { duration: 120 } }
+        }
+    }
+
     component SectionHeader: ColumnLayout {
         property string title: ""
         property string subtitle: ""
@@ -1383,15 +1409,15 @@ PanelWindow {
         Text {
             text: parent.title
             font.family: Theme.fontFamily
-            font.pixelSize: 13
+            font.pixelSize: 15
             font.weight: Font.DemiBold
-            color: Theme.textColor
+            color: Theme.secondary
         }
         Text {
             visible: parent.subtitle !== ""
             text: parent.subtitle
             font.family: Theme.fontFamily
-            font.pixelSize: 11
+            font.pixelSize: 12
             color: Theme.subtext
         }
     }
@@ -1403,7 +1429,7 @@ PanelWindow {
         property bool primary: false
         signal clicked()
 
-        implicitHeight: 34
+        implicitHeight: 38
         implicitWidth: btnRow.implicitWidth + 24
         radius: 8
         color: abtn.primary ? (abtnArea.pressed ? Theme.withAlpha(Theme.primary, 0.7) : Theme.primary)
@@ -1420,13 +1446,13 @@ PanelWindow {
                 visible: abtn.icon !== ""
                 text: abtn.icon
                 font.family: Theme.iconFontFamily
-                font.pixelSize: 14
+                font.pixelSize: 16
                 color: abtn.primary ? Theme.background : Theme.textColor
             }
             Text {
                 text: abtn.text
                 font.family: Theme.fontFamily
-                font.pixelSize: 12
+                font.pixelSize: 13
                 font.weight: Font.Medium
                 color: abtn.primary ? Theme.background : Theme.textColor
             }
@@ -1459,14 +1485,45 @@ PanelWindow {
         // ficava apertado demais (listas de 3 itens por vez, textos cortados) e
         // em telas maiores desperdiçava espaço. Mantém um piso pra não quebrar
         // o layout em telas pequenas.
-        width: Math.max(1040, Math.min(1560, win.width * 0.88))
-        height: Math.max(640, Math.min(950, win.height * 0.90))
+        width: Math.max(1100, Math.min(1660, win.width * 0.92))
+        height: Math.max(660, Math.min(1000, win.height * 0.92))
         anchors.centerIn: parent
         radius: 20
         color: Theme.mix(Theme.background, "#0a0a12", 0.4)
         border.width: 1.5
         border.color: Theme.withAlpha(Theme.primary, 0.4)
         focus: win.open
+
+        // X sempre no mesmo lugar: canto superior direito do painel, acima de
+        // tudo (antes ele vinha junto do título de cada aba).
+        Rectangle {
+            id: closeBtn
+            anchors.top: parent.top
+            anchors.right: parent.right
+            anchors.topMargin: 14
+            anchors.rightMargin: 14
+            z: 999
+            implicitWidth: 38
+            implicitHeight: 38
+            radius: 19
+            color: closeArea.containsMouse ? Theme.withAlpha(Theme.critical, 0.85) : Theme.withAlpha(Theme.tileHigh, 0.6)
+            Behavior on color { ColorAnimation { duration: 140 } }
+
+            Text {
+                anchors.centerIn: parent
+                text: Theme.icons.close
+                font.family: Theme.iconFontFamily
+                font.pixelSize: 19
+                color: closeArea.containsMouse ? Theme.background : Theme.textColor
+            }
+            MouseArea {
+                id: closeArea
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: win.open = false
+            }
+        }
         // Durante a gravação de um atalho o Esc é uma tecla como outra
         // qualquer (Super+Esc, por exemplo): não pode fechar o painel.
         Keys.onEscapePressed: if (!win.bindCapturing) win.open = false
@@ -1495,7 +1552,7 @@ PanelWindow {
                 Text {
                     text: Theme.icons.cursor
                     font.family: Theme.iconFontFamily
-                    font.pixelSize: 20
+                    font.pixelSize: 22
                     color: Theme.primary
                 }
                 ColumnLayout {
@@ -1504,14 +1561,14 @@ PanelWindow {
                     Text {
                         text: Theme.t("binds.sub_capturing", "Aperte a combinação de teclas agora...")
                         font.family: Theme.fontFamily
-                        font.pixelSize: 13
+                        font.pixelSize: 15
                         font.weight: Font.DemiBold
                         color: Theme.textColor
                     }
                     Text {
                         text: win.bindRecordingName + " · " + Theme.t("binds.sub_capturing_hint", "qualquer tecla vale, inclusive o Esc")
                         font.family: Theme.fontFamily
-                        font.pixelSize: 11
+                        font.pixelSize: 12
                         color: Theme.subtext
                     }
                 }
@@ -1571,20 +1628,20 @@ PanelWindow {
                     Text {
                         text: Theme.t("monitor.confirm_title", "Manter esta configuração de tela?")
                         font.family: Theme.fontFamily
-                        font.pixelSize: 12
+                        font.pixelSize: 13
                         font.weight: Font.Bold
                         color: Theme.textColor
                     }
                     Text {
                         text: Theme.t("monitor.confirm_sub", "Voltando à configuração anterior em ") + win.revertSeconds + "s"
                         font.family: Theme.fontFamily
-                        font.pixelSize: 10
+                        font.pixelSize: 11
                         color: Theme.subtext
                     }
                 }
 
                 Rectangle {
-                    implicitHeight: 30
+                    implicitHeight: 34
                     implicitWidth: keepLabel.implicitWidth + 24
                     radius: 15
                     color: keepArea.containsMouse ? Theme.primary : Theme.withAlpha(Theme.primary, 0.85)
@@ -1593,7 +1650,7 @@ PanelWindow {
                         anchors.centerIn: parent
                         text: Theme.t("monitor.confirm_keep", "Manter")
                         font.family: Theme.fontFamily
-                        font.pixelSize: 11
+                        font.pixelSize: 12
                         font.weight: Font.Bold
                         color: Theme.background
                     }
@@ -1607,7 +1664,7 @@ PanelWindow {
                 }
 
                 Rectangle {
-                    implicitHeight: 30
+                    implicitHeight: 34
                     implicitWidth: undoLabel.implicitWidth + 24
                     radius: 15
                     color: undoArea.containsMouse ? Theme.tileHigh : Theme.tile
@@ -1618,7 +1675,7 @@ PanelWindow {
                         anchors.centerIn: parent
                         text: Theme.t("monitor.confirm_revert", "Reverter agora")
                         font.family: Theme.fontFamily
-                        font.pixelSize: 11
+                        font.pixelSize: 12
                         color: Theme.textColor
                     }
                     MouseArea {
@@ -1638,7 +1695,7 @@ PanelWindow {
 
             // ==================== LADO ESQUERDO: BARRA LATERAL ====================
             Rectangle {
-                Layout.preferredWidth: 292
+                Layout.preferredWidth: 320
                 Layout.fillHeight: true
                 topLeftRadius: 20
                 bottomLeftRadius: 20
@@ -1655,8 +1712,8 @@ PanelWindow {
                         spacing: 10
 
                         Rectangle {
-                            implicitWidth: 36
-                            implicitHeight: 36
+                            implicitWidth: 40
+                            implicitHeight: 40
                             radius: 10
                             color: Theme.withAlpha(Theme.primary, 0.2)
 
@@ -1664,7 +1721,7 @@ PanelWindow {
                                 anchors.centerIn: parent
                                 text: Theme.icons.tune
                                 font.family: Theme.iconFontFamily
-                                font.pixelSize: 18
+                                font.pixelSize: 20
                                 color: Theme.primary
                             }
                         }
@@ -1675,14 +1732,14 @@ PanelWindow {
                             Text {
                                 text: Theme.t("settings.panel_title", "Painel Rice")
                                 font.family: Theme.fontFamily
-                                font.pixelSize: 15
+                                font.pixelSize: 17
                                 font.weight: Font.Bold
                                 color: Theme.textColor
                             }
                             Text {
                                 text: Theme.t("settings.panel_subtitle", "Central de Controle Gráfica")
                                 font.family: Theme.fontFamily
-                                font.pixelSize: 10
+                                font.pixelSize: 11
                                 color: Theme.subtext
                             }
                         }
@@ -1698,7 +1755,7 @@ PanelWindow {
                     // Campo de Busca de Configurações
                     Rectangle {
                         Layout.fillWidth: true
-                        implicitHeight: 34
+                        implicitHeight: 38
                         radius: 8
                         color: Theme.withAlpha(Theme.background, 0.6)
                         border.width: 1
@@ -1713,7 +1770,7 @@ PanelWindow {
                             Text {
                                 text: Theme.icons.magnify
                                 font.family: Theme.iconFontFamily
-                                font.pixelSize: 13
+                                font.pixelSize: 15
                                 color: catSearchInput.activeFocus ? Theme.primary : Theme.subtext
                             }
 
@@ -1721,7 +1778,7 @@ PanelWindow {
                                 id: catSearchInput
                                 Layout.fillWidth: true
                                 font.family: Theme.fontFamily
-                                font.pixelSize: 11
+                                font.pixelSize: 12
                                 color: Theme.textColor
                                 selectByMouse: true
                                 clip: true
@@ -1731,7 +1788,7 @@ PanelWindow {
                                     visible: !catSearchInput.text && !catSearchInput.activeFocus
                                     text: Theme.t("settings.search_placeholder", "Buscar configurações...")
                                     font.family: Theme.fontFamily
-                                    font.pixelSize: 11
+                                    font.pixelSize: 12
                                     color: Theme.withAlpha(Theme.subtext, 0.6)
                                 }
 
@@ -1752,7 +1809,7 @@ PanelWindow {
                                 visible: catSearchInput.text.length > 0
                                 text: Theme.icons.close
                                 font.family: Theme.iconFontFamily
-                                font.pixelSize: 12
+                                font.pixelSize: 13
                                 color: Theme.subtext
                                 MouseArea {
                                     anchors.fill: parent
@@ -1794,7 +1851,7 @@ PanelWindow {
                             // numa lista corrida, sem separação: achar "Rede" ou
                             // "Armazenamento" exigia ler a lista inteira.
                             readonly property var navItems: [
-                                { group: "look", tabIndex: 8, name: Theme.t("settings.cat_wallust", "Cores & Wallust"), icon: Theme.icons.palette, desc: Theme.t("settings.desc_wallust", "Paleta Dinâmica"), keywords: "cores color colors wallust tema theme wallpaper papel de parede paleta palette dinamica accent visual fundo transicao transição transition onda wave varredura circulo fade" },
+                                { group: "look", tabIndex: 8, name: Theme.t("settings.cat_wallust", "Cores & Papel de Parede"), icon: Theme.icons.palette, desc: Theme.t("settings.desc_wallust", "Cores da tela toda"), keywords: "cores color colors wallust tema theme wallpaper papel de parede paleta palette dinamica accent visual fundo transicao transição transition onda wave varredura circulo fade" },
                                 { group: "look", tabIndex: 9, name: Theme.t("settings.cat_effects", "Efeitos & Janelas"), icon: Theme.icons.laptop, desc: Theme.t("settings.desc_effects", "Bordas & Animações"), keywords: "efeitos effects janelas windows blur desfoque bordas borders sombras shadows sddm animacoes animations transparência luz noturna curvas bezier curves velocidade" },
                                 { group: "look", tabIndex: 18, name: Theme.t("settings.cat_shell_custom", "Customização do Shell"), icon: Theme.icons.tune, desc: Theme.t("settings.desc_shell_custom", "Hub, Sidebar & Dock"), keywords: "shell quickshell customizacao dock topbar barra sidebar hub aparencia widgets glass solid glow borderless escala" },
                                 { group: "look", tabIndex: 2, name: Theme.t("settings.cat_mako", "Notificações"), icon: Theme.icons.bell, desc: Theme.t("settings.desc_mako", "Posição & Estilo"), keywords: "mako notificacoes notifications som posicao borda alert toast banner avisos" },
@@ -1873,7 +1930,7 @@ PanelWindow {
                                         anchors.verticalCenter: parent.verticalCenter
                                         text: navDelegate.modelData.name
                                         font.family: Theme.fontFamily
-                                        font.pixelSize: 9
+                                        font.pixelSize: 10
                                         font.weight: Font.Bold
                                         font.capitalization: Font.AllUppercase
                                         font.letterSpacing: 0.8
@@ -1903,7 +1960,7 @@ PanelWindow {
                                         Text {
                                             text: navDelegate.modelData.icon || ""
                                             font.family: Theme.iconFontFamily
-                                            font.pixelSize: 16
+                                            font.pixelSize: 18
                                             color: win.currentTab === navDelegate.targetTab ? Theme.primary : Theme.subtext
                                         }
 
@@ -1914,7 +1971,7 @@ PanelWindow {
                                             Text {
                                                 text: navDelegate.modelData.name
                                                 font.family: Theme.fontFamily
-                                                font.pixelSize: 12
+                                                font.pixelSize: 13
                                                 font.weight: win.currentTab === navDelegate.targetTab ? Font.Bold : Font.Normal
                                                 color: win.currentTab === navDelegate.targetTab ? Theme.textColor : Theme.subtext
                                                 elide: Text.ElideRight
@@ -1923,7 +1980,7 @@ PanelWindow {
                                             Text {
                                                 text: navDelegate.modelData.desc || ""
                                                 font.family: Theme.fontFamily
-                                                font.pixelSize: 10
+                                                font.pixelSize: 11
                                                 color: Theme.withAlpha(Theme.subtext, 0.6)
                                                 elide: Text.ElideRight
                                             }
@@ -1953,14 +2010,14 @@ PanelWindow {
                                         Layout.alignment: Qt.AlignHCenter
                                         text: Theme.icons.alert
                                         font.family: Theme.iconFontFamily
-                                        font.pixelSize: 20
+                                        font.pixelSize: 22
                                         color: Theme.subtext
                                     }
                                     Text {
                                         Layout.alignment: Qt.AlignHCenter
                                         text: Theme.t("settings.no_categories", "Nenhuma categoria encontrada")
                                         font.family: Theme.fontFamily
-                                        font.pixelSize: 10
+                                        font.pixelSize: 11
                                         color: Theme.subtext
                                     }
                                 }
@@ -1979,7 +2036,7 @@ PanelWindow {
 
                             Rectangle {
                                 Layout.fillWidth: true
-                                implicitHeight: 28
+                                implicitHeight: 31
                                 radius: 6
                                 color: Theme.locale === "pt-BR" ? Theme.primary : Theme.tile
                                 border.color: Theme.locale === "pt-BR" ? Theme.primary : Theme.withAlpha(Theme.outline, 0.2)
@@ -1989,7 +2046,7 @@ PanelWindow {
                                     anchors.centerIn: parent
                                     text: "Português"
                                     font.family: Theme.fontFamily
-                                    font.pixelSize: 10
+                                    font.pixelSize: 11
                                     font.weight: Theme.locale === "pt-BR" ? Font.Bold : Font.Normal
                                     color: Theme.locale === "pt-BR" ? Theme.background : Theme.textColor
                                 }
@@ -2004,7 +2061,7 @@ PanelWindow {
 
                             Rectangle {
                                 Layout.fillWidth: true
-                                implicitHeight: 28
+                                implicitHeight: 31
                                 radius: 6
                                 color: Theme.locale === "en" ? Theme.primary : Theme.tile
                                 border.color: Theme.locale === "en" ? Theme.primary : Theme.withAlpha(Theme.outline, 0.2)
@@ -2014,7 +2071,7 @@ PanelWindow {
                                     anchors.centerIn: parent
                                     text: "English"
                                     font.family: Theme.fontFamily
-                                    font.pixelSize: 10
+                                    font.pixelSize: 11
                                     font.weight: Theme.locale === "en" ? Font.Bold : Font.Normal
                                     color: Theme.locale === "en" ? Theme.background : Theme.textColor
                                 }
@@ -2030,14 +2087,14 @@ PanelWindow {
 
                         Rectangle {
                             Layout.fillWidth: true
-                            implicitHeight: 24
+                            implicitHeight: 27
                             radius: 6
                             color: Theme.tile
                             Text {
                                 anchors.centerIn: parent
                                 text: "Super + I · Quickshell"
                                 font.family: Theme.monoFamily
-                                font.pixelSize: 10
+                                font.pixelSize: 11
                                 color: Theme.subtext
                             }
                         }
@@ -2081,7 +2138,7 @@ PanelWindow {
                                     Theme.t("header.title_5", "Teclado, Mouse & Entradas"),
                                     Theme.t("header.title_6", "Energia & Bateria"),
                                     Theme.t("header.title_7", "Inicialização Automática (Boot)"),
-                                    Theme.t("header.title_8", "Cores & Wallust Dinâmico"),
+                                    Theme.t("header.title_8", "Cores do Papel de Parede"),
                                     Theme.t("header.title_9", "Efeitos Visuais, Bordas & SDDM"),
                                     Theme.t("header.title_10", "Bluetooth & Periféricos sem Fio"),
                                     Theme.t("header.title_11", "Rede, Conexões & Wi-Fi"),
@@ -2095,7 +2152,7 @@ PanelWindow {
                                     Theme.t("header.title_19", "Jeito de Usar")
                                 ][win.currentTab] || Theme.t("settings.panel_title", "Configurações")
                                 font.family: Theme.fontFamily
-                                font.pixelSize: 16
+                                font.pixelSize: 18
                                 font.weight: Font.Bold
                                 color: Theme.textColor
                             }
@@ -2124,7 +2181,7 @@ PanelWindow {
                                     Theme.t("header.sub_19", "Janelas lado a lado (Hyprland) ou soltas como no Windows. Troca na hora, sem sair da sessão.")
                                 ][win.currentTab] || ""
                                 font.family: Theme.fontFamily
-                                font.pixelSize: 11
+                                font.pixelSize: 12
                                 color: Theme.subtext
                             }
                         }
@@ -2132,7 +2189,7 @@ PanelWindow {
                         // Toast de aviso se ativo
                         Rectangle {
                             visible: win.toastMsg !== ""
-                            implicitHeight: 28
+                            implicitHeight: 31
                             implicitWidth: toastLabel.implicitWidth + 20
                             radius: 14
                             color: Theme.primary
@@ -2142,35 +2199,16 @@ PanelWindow {
                                 anchors.centerIn: parent
                                 text: win.toastMsg
                                 font.family: Theme.fontFamily
-                                font.pixelSize: 11
+                                font.pixelSize: 12
                                 font.weight: Font.DemiBold
                                 color: Theme.background
                             }
                         }
 
-                        // Botão Fechar
-                        Rectangle {
-                            implicitWidth: 32
-                            implicitHeight: 32
-                            radius: 16
-                            color: closeArea.containsMouse ? Theme.tileHigh : "transparent"
-
-                            Text {
-                                anchors.centerIn: parent
-                                text: Theme.icons.close
-                                font.family: Theme.iconFontFamily
-                                font.pixelSize: 16
-                                color: Theme.textColor
-                            }
-
-                            MouseArea {
-                                id: closeArea
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: win.open = false
-                            }
-                        }
+                        // O botão de fechar não fica mais aqui: virou um X
+                        // fixo no canto superior direito do painel (ver abaixo),
+                        // no mesmo lugar em todas as abas.
+                        Item { implicitWidth: 40; implicitHeight: 36 }
                     }
 
                     // Divisor
@@ -2187,7 +2225,7 @@ PanelWindow {
                     Item {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        Layout.maximumWidth: 1120
+                        Layout.maximumWidth: 1240
                         Layout.alignment: Qt.AlignHCenter
 
                         // ==================== ABA 0: FASTFETCH ====================
@@ -2197,6 +2235,7 @@ PanelWindow {
                             contentHeight: ffContentCol.implicitHeight
                             clip: true
                             boundsBehavior: Flickable.StopAtBounds
+                            ScrollBar.vertical: PanelScroll {}
 
                             ColumnLayout {
                                 id: ffContentCol
@@ -2238,14 +2277,14 @@ PanelWindow {
                                                 Layout.alignment: Qt.AlignHCenter
                                                 text: Theme.icons.arch
                                                 font.family: Theme.iconFontFamily
-                                                font.pixelSize: 38
+                                                font.pixelSize: 43
                                                 color: win.ffCurrentLogo === "" || win.ffCurrentLogo === "arch" ? Theme.primary : Theme.subtext
                                             }
                                             Text {
                                                 Layout.alignment: Qt.AlignHCenter
                                                 text: Theme.t("ff.default_arch", "Arch Padrão")
                                                 font.family: Theme.fontFamily
-                                                font.pixelSize: 11
+                                                font.pixelSize: 12
                                                 font.weight: Font.Medium
                                                 color: Theme.textColor
                                             }
@@ -2295,7 +2334,7 @@ PanelWindow {
                                                     Layout.fillWidth: true
                                                     text: parent.parent.modelData.name
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 10
+                                                    font.pixelSize: 11
                                                     horizontalAlignment: Text.AlignHCenter
                                                     elide: Text.ElideMiddle
                                                     color: win.ffCurrentLogo === parent.parent.modelData.path ? Theme.primary : Theme.subtext
@@ -2373,7 +2412,7 @@ PanelWindow {
                                         delegate: Rectangle {
                                             required property var modelData
                                             readonly property bool active: win.ffActiveModules.indexOf(modelData.key) !== -1
-                                            implicitHeight: 30
+                                            implicitHeight: 34
                                             implicitWidth: modRow.implicitWidth + 18
                                             radius: 8
                                             color: active ? Theme.withAlpha(Theme.primary, 0.22) : Theme.tile
@@ -2387,13 +2426,13 @@ PanelWindow {
                                                 Text {
                                                     text: parent.parent.modelData.icon
                                                     font.family: Theme.iconFontFamily
-                                                    font.pixelSize: 12
+                                                    font.pixelSize: 13
                                                     color: parent.parent.active ? Theme.primary : Theme.subtext
                                                 }
                                                 Text {
                                                     text: parent.parent.modelData.label
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 11
+                                                    font.pixelSize: 12
                                                     color: parent.parent.active ? Theme.textColor : Theme.subtext
                                                 }
                                             }
@@ -2442,6 +2481,7 @@ PanelWindow {
                             contentHeight: kittyCol.implicitHeight
                             clip: true
                             boundsBehavior: Flickable.StopAtBounds
+                            ScrollBar.vertical: PanelScroll {}
 
                             ColumnLayout {
                                 id: kittyCol
@@ -2507,7 +2547,7 @@ PanelWindow {
                                             required property var modelData
                                             readonly property bool active: win.kittyCursor === modelData.id
                                             Layout.fillWidth: true
-                                            implicitHeight: 38
+                                            implicitHeight: 43
                                             radius: 10
                                             color: active ? Theme.withAlpha(Theme.primary, 0.22) : (curArea.containsMouse ? Theme.tileHigh : Theme.tile)
                                             border.width: active ? 1.5 : 0
@@ -2519,13 +2559,13 @@ PanelWindow {
                                                 Text {
                                                     text: parent.parent.modelData.icon
                                                     font.family: Theme.iconFontFamily
-                                                    font.pixelSize: 13
+                                                    font.pixelSize: 15
                                                     color: parent.parent.active ? Theme.primary : Theme.subtext
                                                 }
                                                 Text {
                                                     text: parent.parent.modelData.name
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 11
+                                                    font.pixelSize: 12
                                                     font.weight: parent.parent.active ? Font.DemiBold : Font.Normal
                                                     color: parent.parent.active ? Theme.textColor : Theme.subtext
                                                 }
@@ -2594,6 +2634,7 @@ PanelWindow {
                             contentHeight: makoCol.implicitHeight
                             clip: true
                             boundsBehavior: Flickable.StopAtBounds
+                            ScrollBar.vertical: PanelScroll {}
 
                             ColumnLayout {
                                 id: makoCol
@@ -2621,14 +2662,14 @@ PanelWindow {
                                             Text {
                                                 text: Theme.t("mako.problem_title", "As notificações estão com problema")
                                                 color: "#ffb347"
-                                                font.pixelSize: 14
+                                                font.pixelSize: 16
                                                 font.bold: true
                                             }
                                             Text {
                                                 Layout.fillWidth: true
                                                 wrapMode: Text.WordWrap
                                                 color: Theme.subtext
-                                                font.pixelSize: 12
+                                                font.pixelSize: 13
                                                 text: {
                                                     const p = win.makoProblems;
                                                     let out = [];
@@ -2677,7 +2718,7 @@ PanelWindow {
                                             required property var modelData
                                             readonly property bool active: win.makoAnchor === modelData.id
                                             Layout.fillWidth: true
-                                            implicitHeight: 38
+                                            implicitHeight: 43
                                             radius: 10
                                             color: active ? Theme.withAlpha(Theme.primary, 0.22) : (posArea.containsMouse ? Theme.tileHigh : Theme.tile)
                                             border.width: active ? 1.5 : 0
@@ -2689,13 +2730,13 @@ PanelWindow {
                                                 Text {
                                                     text: Theme.icons.bell
                                                     font.family: Theme.iconFontFamily
-                                                    font.pixelSize: 13
+                                                    font.pixelSize: 15
                                                     color: parent.parent.active ? Theme.primary : Theme.subtext
                                                 }
                                                 Text {
                                                     text: parent.parent.modelData.name
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 11
+                                                    font.pixelSize: 12
                                                     font.weight: parent.parent.active ? Font.DemiBold : Font.Normal
                                                     color: parent.parent.active ? Theme.textColor : Theme.subtext
                                                 }
@@ -2782,6 +2823,7 @@ PanelWindow {
                             contentHeight: displayCol.implicitHeight
                             clip: true
                             boundsBehavior: Flickable.StopAtBounds
+                            ScrollBar.vertical: PanelScroll {}
 
                             ColumnLayout {
                                 id: displayCol
@@ -2825,15 +2867,15 @@ PanelWindow {
                                                 spacing: 14
 
                                                 Rectangle {
-                                                    implicitWidth: 42
-                                                    implicitHeight: 42
+                                                    implicitWidth: 47
+                                                    implicitHeight: 47
                                                     radius: 10
                                                     color: Theme.withAlpha(Theme.primary, 0.2)
                                                     Text {
                                                         anchors.centerIn: parent
                                                         text: Theme.icons.monitor
                                                         font.family: Theme.iconFontFamily
-                                                        font.pixelSize: 20
+                                                        font.pixelSize: 22
                                                         color: Theme.primary
                                                     }
                                                 }
@@ -2847,7 +2889,7 @@ PanelWindow {
                                                         Text {
                                                             text: monCard.modelData.name + " · " + monCard.modelData.width + "x" + monCard.modelData.height
                                                             font.family: Theme.fontFamily
-                                                            font.pixelSize: 13
+                                                            font.pixelSize: 15
                                                             font.weight: Font.Bold
                                                             color: Theme.textColor
                                                         }
@@ -2861,7 +2903,7 @@ PanelWindow {
                                                                 anchors.centerIn: parent
                                                                 text: Math.round(monCard.modelData.refreshRate || 0) + " Hz"
                                                                 font.family: Theme.fontFamily
-                                                                font.pixelSize: 9
+                                                                font.pixelSize: 10
                                                                 font.weight: Font.Bold
                                                                 color: Theme.primary
                                                             }
@@ -2874,7 +2916,7 @@ PanelWindow {
                                                             + "   ·   " + Theme.t("monitor.scale_label", "escala") + " " + monCard.modelData.scale
                                                             + (monCard.modelData.transform ? "   ·   " + (monCard.modelData.transform * 90) + "°" : "")
                                                         font.family: Theme.fontFamily
-                                                        font.pixelSize: 10
+                                                        font.pixelSize: 11
                                                         color: Theme.subtext
                                                         elide: Text.ElideRight
                                                     }
@@ -2912,7 +2954,7 @@ PanelWindow {
                                             readonly property bool isCurrent: win.currentResolution() === resCard.modelData.res
 
                                             Layout.fillWidth: true
-                                            implicitHeight: 58
+                                            implicitHeight: 65
                                             radius: 10
                                             color: resCard.isCurrent ? Theme.withAlpha(Theme.primary, 0.25) : (resArea.containsMouse ? Theme.tileHigh : Theme.tile)
                                             border.width: resCard.isCurrent ? 1.5 : 1
@@ -2925,7 +2967,7 @@ PanelWindow {
                                                     Layout.alignment: Qt.AlignHCenter
                                                     text: resCard.modelData.res
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 13
+                                                    font.pixelSize: 15
                                                     font.weight: Font.Bold
                                                     color: resCard.isCurrent ? Theme.primary : Theme.textColor
                                                 }
@@ -2935,7 +2977,7 @@ PanelWindow {
                                                         ? Theme.t("monitor.res_native", "Nativa (recomendada)")
                                                         : resCard.modelData.maxHz + " Hz " + Theme.t("monitor.res_max", "máx")
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 9
+                                                    font.pixelSize: 10
                                                     color: Theme.subtext
                                                 }
                                             }
@@ -2972,7 +3014,7 @@ PanelWindow {
                                             readonly property bool isCurrent: Math.abs(win.currentRefresh() - modelData.hz) < 1
 
                                             Layout.fillWidth: true
-                                            implicitHeight: 58
+                                            implicitHeight: 65
                                             radius: 10
                                             color: hzCard.isCurrent ? Theme.withAlpha(Theme.primary, 0.25) : (hzArea.containsMouse ? Theme.tileHigh : Theme.tile)
                                             border.width: hzCard.isCurrent ? 1.5 : 1
@@ -2985,7 +3027,7 @@ PanelWindow {
                                                     Layout.alignment: Qt.AlignHCenter
                                                     text: Math.round(modelData.hz) + " Hz"
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 13
+                                                    font.pixelSize: 15
                                                     font.weight: Font.Bold
                                                     color: hzCard.isCurrent ? Theme.primary : Theme.textColor
                                                 }
@@ -2993,7 +3035,7 @@ PanelWindow {
                                                     Layout.alignment: Qt.AlignHCenter
                                                     text: modelData.label
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 9
+                                                    font.pixelSize: 10
                                                     color: Theme.subtext
                                                 }
                                             }
@@ -3036,7 +3078,7 @@ PanelWindow {
                                             readonly property bool isCurrent: Math.abs(win.currentScale() - scaleCard.modelData.val) < 0.05
 
                                             Layout.fillWidth: true
-                                            implicitHeight: 58
+                                            implicitHeight: 65
                                             radius: 10
                                             color: scaleCard.isCurrent ? Theme.withAlpha(Theme.primary, 0.25) : (scaleArea.containsMouse ? Theme.tileHigh : Theme.tile)
                                             border.width: scaleCard.isCurrent ? 1.5 : 1
@@ -3049,7 +3091,7 @@ PanelWindow {
                                                     Layout.alignment: Qt.AlignHCenter
                                                     text: scaleCard.modelData.label
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 13
+                                                    font.pixelSize: 15
                                                     font.weight: Font.Bold
                                                     color: scaleCard.isCurrent ? Theme.primary : Theme.textColor
                                                 }
@@ -3057,7 +3099,7 @@ PanelWindow {
                                                     Layout.alignment: Qt.AlignHCenter
                                                     text: scaleCard.modelData.desc
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 9
+                                                    font.pixelSize: 10
                                                     color: Theme.subtext
                                                 }
                                             }
@@ -3099,7 +3141,7 @@ PanelWindow {
                                             readonly property bool isCurrent: win.currentTransform() === rotCard.modelData.val
 
                                             Layout.fillWidth: true
-                                            implicitHeight: 52
+                                            implicitHeight: 58
                                             radius: 10
                                             color: rotCard.isCurrent ? Theme.withAlpha(Theme.primary, 0.25) : (rotArea.containsMouse ? Theme.tileHigh : Theme.tile)
                                             border.width: rotCard.isCurrent ? 1.5 : 1
@@ -3111,14 +3153,14 @@ PanelWindow {
                                                 Text {
                                                     text: rotCard.modelData.icon
                                                     font.family: Theme.iconFontFamily
-                                                    font.pixelSize: 15
+                                                    font.pixelSize: 17
                                                     rotation: rotCard.modelData.val * 90
                                                     color: rotCard.isCurrent ? Theme.primary : Theme.subtext
                                                 }
                                                 Text {
                                                     text: rotCard.modelData.label
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 11
+                                                    font.pixelSize: 12
                                                     font.weight: rotCard.isCurrent ? Font.Bold : Font.Normal
                                                     color: rotCard.isCurrent ? Theme.primary : Theme.textColor
                                                 }
@@ -3198,6 +3240,7 @@ PanelWindow {
                             contentHeight: audioCol.implicitHeight
                             clip: true
                             boundsBehavior: Flickable.StopAtBounds
+                            ScrollBar.vertical: PanelScroll {}
 
                             ColumnLayout {
                                 id: audioCol
@@ -3218,7 +3261,7 @@ PanelWindow {
                                             id: sinkCard
                                             required property var modelData
                                             Layout.fillWidth: true
-                                            implicitHeight: 56
+                                            implicitHeight: 63
                                             radius: 10
                                             color: sinkCard.modelData.is_default ? Theme.withAlpha(Theme.primary, 0.22) : (sinkArea.containsMouse ? Theme.tileHigh : Theme.tile)
                                             border.width: sinkCard.modelData.is_default ? 1.5 : 0
@@ -3232,7 +3275,7 @@ PanelWindow {
                                                 Text {
                                                     text: sinkCard.modelData.is_default ? Theme.icons.volHigh : Theme.icons.headphones
                                                     font.family: Theme.iconFontFamily
-                                                    font.pixelSize: 20
+                                                    font.pixelSize: 22
                                                     color: sinkCard.modelData.is_default ? Theme.primary : Theme.subtext
                                                 }
 
@@ -3242,14 +3285,14 @@ PanelWindow {
                                                     Text {
                                                         text: sinkCard.modelData.description
                                                         font.family: Theme.fontFamily
-                                                        font.pixelSize: 12
+                                                        font.pixelSize: 13
                                                         font.weight: sinkCard.modelData.is_default ? Font.DemiBold : Font.Normal
                                                         color: Theme.textColor
                                                     }
                                                     Text {
                                                         text: sinkCard.modelData.is_default ? Theme.t("audio.default_active", "Dispositivo Padrão Ativo") + " · " + sinkCard.modelData.volume + "%" : Theme.t("audio.click_select", "Clique para selecionar")
                                                         font.family: Theme.fontFamily
-                                                        font.pixelSize: 10
+                                                        font.pixelSize: 11
                                                         color: sinkCard.modelData.is_default ? Theme.primary : Theme.subtext
                                                     }
                                                 }
@@ -3264,7 +3307,7 @@ PanelWindow {
                                                         anchors.centerIn: parent
                                                         text: Theme.t("common.active", "Ativo")
                                                         font.family: Theme.fontFamily
-                                                        font.pixelSize: 10
+                                                        font.pixelSize: 11
                                                         font.weight: Font.Bold
                                                         color: Theme.background
                                                     }
@@ -3311,7 +3354,7 @@ PanelWindow {
                                             id: sourceCard
                                             required property var modelData
                                             Layout.fillWidth: true
-                                            implicitHeight: 56
+                                            implicitHeight: 63
                                             radius: 10
                                             color: sourceCard.modelData.is_default ? Theme.withAlpha(Theme.primary, 0.22) : (sourceArea.containsMouse ? Theme.tileHigh : Theme.tile)
                                             border.width: sourceCard.modelData.is_default ? 1.5 : 0
@@ -3325,7 +3368,7 @@ PanelWindow {
                                                 Text {
                                                     text: Theme.icons.mic
                                                     font.family: Theme.iconFontFamily
-                                                    font.pixelSize: 20
+                                                    font.pixelSize: 22
                                                     color: sourceCard.modelData.is_default ? Theme.primary : Theme.subtext
                                                 }
 
@@ -3335,14 +3378,14 @@ PanelWindow {
                                                     Text {
                                                         text: sourceCard.modelData.description
                                                         font.family: Theme.fontFamily
-                                                        font.pixelSize: 12
+                                                        font.pixelSize: 13
                                                         font.weight: sourceCard.modelData.is_default ? Font.DemiBold : Font.Normal
                                                         color: Theme.textColor
                                                     }
                                                     Text {
                                                         text: sourceCard.modelData.is_default ? Theme.t("audio.default_in_active", "Microfone Padrão Ativo") + " · " + sourceCard.modelData.volume + "%" : Theme.t("audio.click_select", "Clique para selecionar")
                                                         font.family: Theme.fontFamily
-                                                        font.pixelSize: 10
+                                                        font.pixelSize: 11
                                                         color: sourceCard.modelData.is_default ? Theme.primary : Theme.subtext
                                                     }
                                                 }
@@ -3357,7 +3400,7 @@ PanelWindow {
                                                         anchors.centerIn: parent
                                                         text: Theme.t("common.active", "Ativo")
                                                         font.family: Theme.fontFamily
-                                                        font.pixelSize: 10
+                                                        font.pixelSize: 11
                                                         font.weight: Font.Bold
                                                         color: Theme.background
                                                     }
@@ -3434,6 +3477,7 @@ PanelWindow {
                             contentHeight: inputCol.implicitHeight + 40
                             clip: true
                             boundsBehavior: Flickable.StopAtBounds
+                            ScrollBar.vertical: PanelScroll {}
 
                             WheelHandler {
                                 onWheel: event => {
@@ -3481,7 +3525,7 @@ PanelWindow {
                                                 && (win.kbVariant || "") === kbCard.modelData.variant
 
                                             Layout.fillWidth: true
-                                            implicitHeight: 58
+                                            implicitHeight: 65
                                             radius: 10
                                             color: kbCard.isCurrent ? Theme.withAlpha(Theme.primary, 0.22) : (kbArea.containsMouse ? Theme.tileHigh : Theme.tile)
                                             border.width: kbCard.isCurrent ? 1.5 : 1
@@ -3492,7 +3536,7 @@ PanelWindow {
                                                 anchors.margins: 10
                                                 spacing: 10
 
-                                                Text { text: kbCard.modelData.flag; font.pixelSize: 19 }
+                                                Text { text: kbCard.modelData.flag; font.pixelSize: 21 }
 
                                                 ColumnLayout {
                                                     Layout.fillWidth: true
@@ -3501,7 +3545,7 @@ PanelWindow {
                                                         Layout.fillWidth: true
                                                         text: kbCard.modelData.name
                                                         font.family: Theme.fontFamily
-                                                        font.pixelSize: 11
+                                                        font.pixelSize: 12
                                                         font.weight: Font.DemiBold
                                                         color: kbCard.isCurrent ? Theme.primary : Theme.textColor
                                                         elide: Text.ElideRight
@@ -3511,7 +3555,7 @@ PanelWindow {
                                                         visible: kbCard.modelData.desc !== ""
                                                         text: kbCard.modelData.desc
                                                         font.family: Theme.fontFamily
-                                                        font.pixelSize: 9
+                                                        font.pixelSize: 10
                                                         color: Theme.subtext
                                                         elide: Text.ElideRight
                                                     }
@@ -3657,7 +3701,7 @@ PanelWindow {
                                             Text {
                                                 text: Theme.icons.gamepad
                                                 font.family: Theme.iconFontFamily
-                                                font.pixelSize: 22
+                                                font.pixelSize: 25
                                                 color: win.mouseAccel === "flat" ? Theme.primary : Theme.subtext
                                             }
                                             ColumnLayout {
@@ -3666,14 +3710,14 @@ PanelWindow {
                                                 Text {
                                                     text: Theme.t("input.accel_flat", "Flat (Sem Aceleração - 1:1)")
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 13
+                                                    font.pixelSize: 15
                                                     font.weight: Font.DemiBold
                                                     color: Theme.textColor
                                                 }
                                                 Text {
                                                     text: Theme.t("input.accel_flat_desc", "Movimento previsível e consistente. Essencial para jogos (FPS).")
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 10
+                                                    font.pixelSize: 11
                                                     color: Theme.subtext
                                                 }
                                             }
@@ -3707,7 +3751,7 @@ PanelWindow {
                                             Text {
                                                 text: Theme.icons.cursor
                                                 font.family: Theme.iconFontFamily
-                                                font.pixelSize: 22
+                                                font.pixelSize: 25
                                                 color: win.mouseAccel === "adaptive" ? Theme.primary : Theme.subtext
                                             }
                                             ColumnLayout {
@@ -3716,14 +3760,14 @@ PanelWindow {
                                                 Text {
                                                     text: Theme.t("input.accel_adapt", "Adaptativo (Com Aceleração)")
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 13
+                                                    font.pixelSize: 15
                                                     font.weight: Font.DemiBold
                                                     color: Theme.textColor
                                                 }
                                                 Text {
                                                     text: Theme.t("input.accel_adapt_desc", "Aumenta a velocidade em gestos rápidos. Padrão confortável.")
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 10
+                                                    font.pixelSize: 11
                                                     color: Theme.subtext
                                                 }
                                             }
@@ -3790,7 +3834,7 @@ PanelWindow {
                                                     anchors.centerIn: parent
                                                     text: "󰙯"
                                                     font.family: Theme.iconFontFamily
-                                                    font.pixelSize: 18
+                                                    font.pixelSize: 20
                                                     color: Theme.primary
                                                 }
                                             }
@@ -3803,7 +3847,7 @@ PanelWindow {
                                                     Text {
                                                         text: win.discordClient === "vesktop" ? "Vesktop (Discord Client)" : "Discord Oficial"
                                                         font.family: Theme.fontFamily
-                                                        font.pixelSize: 12
+                                                        font.pixelSize: 13
                                                         font.weight: Font.Bold
                                                         color: Theme.textColor
                                                     }
@@ -3814,20 +3858,20 @@ PanelWindow {
                                                     Text {
                                                         text: win.discordRunning ? "Em execução" : "Não detectado no momento"
                                                         font.family: Theme.fontFamily
-                                                        font.pixelSize: 10
+                                                        font.pixelSize: 11
                                                         color: win.discordRunning ? "#10b981" : Theme.subtext
                                                     }
                                                 }
                                                 Text {
                                                     text: Theme.t("discord.bind_note", "Os atalhos gravam diretamente em ~/.config/hypr/hyprland.lua usando hl.bind")
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 10
+                                                    font.pixelSize: 11
                                                     color: Theme.subtext
                                                 }
                                             }
 
                                             Rectangle {
-                                                implicitWidth: 80; implicitHeight: 28; radius: 14
+                                                implicitWidth: 80; implicitHeight: 31; radius: 14
                                                 color: checkMouse.pressed ? Theme.tileHigh : Theme.surface
                                                 border.width: 1; border.color: Theme.withAlpha(Theme.outline, 0.25)
                                                 RowLayout {
@@ -3836,13 +3880,13 @@ PanelWindow {
                                                     Text {
                                                         text: Theme.icons.refresh
                                                         font.family: Theme.iconFontFamily
-                                                        font.pixelSize: 11
+                                                        font.pixelSize: 12
                                                         color: Theme.textColor
                                                     }
                                                     Text {
                                                         text: Theme.t("discord.verify_btn", "Verificar")
                                                         font.family: Theme.fontFamily
-                                                        font.pixelSize: 10
+                                                        font.pixelSize: 11
                                                         color: Theme.textColor
                                                     }
                                                 }
@@ -3873,14 +3917,14 @@ PanelWindow {
                                                 Text {
                                                     text: Theme.icons.info
                                                     font.family: Theme.iconFontFamily
-                                                    font.pixelSize: 14
+                                                    font.pixelSize: 16
                                                     color: Theme.primary
                                                 }
                                                 Text {
                                                     Layout.fillWidth: true
                                                     text: Theme.t("discord.sim_note", "O atalho gravado intercepta a tecla no Hyprland e simula o atalho nativo do Discord em segundo plano, liberando as teclas modificadoras automaticamente para não travar em jogos.")
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 10
+                                                    font.pixelSize: 11
                                                     wrapMode: Text.Wrap
                                                     color: Theme.subtext
                                                 }
@@ -3902,14 +3946,14 @@ PanelWindow {
                                                     Text {
                                                         text: Theme.t("discord.mute_title", "Mutar / Desmutar Microfone (Mute)")
                                                         font.family: Theme.fontFamily
-                                                        font.pixelSize: 11
+                                                        font.pixelSize: 12
                                                         font.weight: Font.Bold
                                                         color: Theme.textColor
                                                     }
                                                     Text {
                                                         text: Theme.t("discord.mute_desc", "Simula o envio de Ctrl + Shift + M para o Discord/Vesktop")
                                                         font.family: Theme.fontFamily
-                                                        font.pixelSize: 10
+                                                        font.pixelSize: 11
                                                         color: Theme.subtext
                                                     }
                                                 }
@@ -3917,7 +3961,7 @@ PanelWindow {
                                                 // Badge de Atalho Ativo
                                                 Rectangle {
                                                     implicitWidth: mbBadgeRow.implicitWidth + 16
-                                                    implicitHeight: 28; radius: 14
+                                                    implicitHeight: 31; radius: 14
                                                     color: Theme.withAlpha(Theme.primary, 0.15)
                                                     border.width: 1; border.color: Theme.primary
                                                     RowLayout {
@@ -3927,13 +3971,13 @@ PanelWindow {
                                                         Text {
                                                             text: Theme.icons.microphone || ""
                                                             font.family: Theme.iconFontFamily
-                                                            font.pixelSize: 11
+                                                            font.pixelSize: 12
                                                             color: Theme.primary
                                                         }
                                                         Text {
                                                             text: win.discordMuteBind
                                                             font.family: Theme.monoFamily
-                                                            font.pixelSize: 11
+                                                            font.pixelSize: 12
                                                             font.weight: Font.Bold
                                                             color: Theme.primary
                                                         }
@@ -3944,7 +3988,7 @@ PanelWindow {
                                                 Rectangle {
                                                     readonly property bool isRec: win.recordingDiscordTarget === "mute"
                                                     implicitWidth: recMuteRow.implicitWidth + 20
-                                                    implicitHeight: 30; radius: 15
+                                                    implicitHeight: 34; radius: 15
                                                     color: isRec ? Theme.critical : (recMuteMouse.containsMouse ? Theme.primary : Theme.surface)
                                                     border.width: 1
                                                     border.color: isRec ? Theme.critical : (recMuteMouse.containsMouse ? Theme.primary : Theme.withAlpha(Theme.outline, 0.3))
@@ -3957,13 +4001,13 @@ PanelWindow {
                                                         Text {
                                                             text: parent.isRec ? "⏹" : "⏺"
                                                             font.family: Theme.fontFamily
-                                                            font.pixelSize: 11
+                                                            font.pixelSize: 12
                                                             color: parent.isRec || recMuteMouse.containsMouse ? Theme.background : Theme.critical
                                                         }
                                                         Text {
                                                             text: parent.isRec ? Theme.t("discord.recording", "Aperte uma tecla no teclado...") : Theme.t("discord.record_key", "Gravar Tecla")
                                                             font.family: Theme.fontFamily
-                                                            font.pixelSize: 10
+                                                            font.pixelSize: 11
                                                             font.weight: Font.DemiBold
                                                             color: parent.isRec || recMuteMouse.containsMouse ? Theme.background : Theme.textColor
                                                         }
@@ -3990,7 +4034,7 @@ PanelWindow {
                                                 // Botão Digitar Tecla
                                                 Rectangle {
                                                     implicitWidth: editMuteRow.implicitWidth + 16
-                                                    implicitHeight: 30; radius: 15
+                                                    implicitHeight: 34; radius: 15
                                                     color: win.editingManualMute ? Theme.tileHigh : (editMuteMouse.containsMouse ? Theme.surface : "transparent")
                                                     border.width: 1; border.color: win.editingManualMute ? Theme.primary : Theme.withAlpha(Theme.outline, 0.25)
                                                     RowLayout {
@@ -4000,13 +4044,13 @@ PanelWindow {
                                                         Text {
                                                             text: Theme.icons.pencil
                                                             font.family: Theme.iconFontFamily
-                                                            font.pixelSize: 10
+                                                            font.pixelSize: 11
                                                             color: Theme.textColor
                                                         }
                                                         Text {
                                                             text: Theme.t("discord.edit_manual", "Digitar")
                                                             font.family: Theme.fontFamily
-                                                            font.pixelSize: 10
+                                                            font.pixelSize: 11
                                                             color: Theme.textColor
                                                         }
                                                     }
@@ -4039,7 +4083,7 @@ PanelWindow {
                                                         verticalAlignment: TextInput.AlignVCenter
                                                         text: win.discordMuteBind
                                                         font.family: Theme.monoFamily
-                                                        font.pixelSize: 11
+                                                        font.pixelSize: 12
                                                         color: Theme.textColor
                                                         selectByMouse: true
                                                     }
@@ -4052,7 +4096,7 @@ PanelWindow {
                                                         anchors.centerIn: parent
                                                         text: Theme.t("discord.save", "Salvar")
                                                         font.family: Theme.fontFamily
-                                                        font.pixelSize: 10
+                                                        font.pixelSize: 11
                                                         font.weight: Font.Bold
                                                         color: Theme.background
                                                     }
@@ -4079,7 +4123,7 @@ PanelWindow {
                                                 Text {
                                                     text: Theme.t("discord.quick_suggestions", "Sugestões rápidas:")
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 9
+                                                    font.pixelSize: 10
                                                     color: Theme.subtext
                                                 }
                                                 Repeater {
@@ -4087,7 +4131,7 @@ PanelWindow {
                                                     delegate: Rectangle {
                                                         required property string modelData
                                                         implicitWidth: mbTxt.implicitWidth + 14
-                                                        implicitHeight: 24; radius: 12
+                                                        implicitHeight: 27; radius: 12
                                                         readonly property bool isCur: win.discordMuteBind === modelData
                                                         color: isCur ? Theme.primary : Theme.surface
                                                         border.width: 1; border.color: isCur ? Theme.primary : Theme.withAlpha(Theme.outline, 0.2)
@@ -4096,7 +4140,7 @@ PanelWindow {
                                                             anchors.centerIn: parent
                                                             text: parent.modelData
                                                             font.family: Theme.monoFamily
-                                                            font.pixelSize: 9
+                                                            font.pixelSize: 10
                                                             font.weight: Font.Medium
                                                             color: parent.isCur ? Theme.background : Theme.textColor
                                                         }
@@ -4131,14 +4175,14 @@ PanelWindow {
                                                     Text {
                                                         text: Theme.t("discord.deafen_title", "Desativar / Ativar Áudio (Deafen)")
                                                         font.family: Theme.fontFamily
-                                                        font.pixelSize: 11
+                                                        font.pixelSize: 12
                                                         font.weight: Font.Bold
                                                         color: Theme.textColor
                                                     }
                                                     Text {
                                                         text: Theme.t("discord.deafen_desc", "Simula o envio de Ctrl + Shift + D para o Discord/Vesktop")
                                                         font.family: Theme.fontFamily
-                                                        font.pixelSize: 10
+                                                        font.pixelSize: 11
                                                         color: Theme.subtext
                                                     }
                                                 }
@@ -4146,7 +4190,7 @@ PanelWindow {
                                                 // Badge de Atalho Ativo
                                                 Rectangle {
                                                     implicitWidth: dbBadgeRow.implicitWidth + 16
-                                                    implicitHeight: 28; radius: 14
+                                                    implicitHeight: 31; radius: 14
                                                     color: Theme.withAlpha(Theme.primary, 0.15)
                                                     border.width: 1; border.color: Theme.primary
                                                     RowLayout {
@@ -4156,13 +4200,13 @@ PanelWindow {
                                                         Text {
                                                             text: Theme.icons.headphones || "🎧"
                                                             font.family: Theme.iconFontFamily
-                                                            font.pixelSize: 11
+                                                            font.pixelSize: 12
                                                             color: Theme.primary
                                                         }
                                                         Text {
                                                             text: win.discordDeafenBind
                                                             font.family: Theme.monoFamily
-                                                            font.pixelSize: 11
+                                                            font.pixelSize: 12
                                                             font.weight: Font.Bold
                                                             color: Theme.primary
                                                         }
@@ -4173,7 +4217,7 @@ PanelWindow {
                                                 Rectangle {
                                                     readonly property bool isRec: win.recordingDiscordTarget === "deafen"
                                                     implicitWidth: recDeafenRow.implicitWidth + 20
-                                                    implicitHeight: 30; radius: 15
+                                                    implicitHeight: 34; radius: 15
                                                     color: isRec ? Theme.critical : (recDeafenMouse.containsMouse ? Theme.primary : Theme.surface)
                                                     border.width: 1
                                                     border.color: isRec ? Theme.critical : (recDeafenMouse.containsMouse ? Theme.primary : Theme.withAlpha(Theme.outline, 0.3))
@@ -4186,13 +4230,13 @@ PanelWindow {
                                                         Text {
                                                             text: parent.isRec ? "⏹" : "⏺"
                                                             font.family: Theme.fontFamily
-                                                            font.pixelSize: 11
+                                                            font.pixelSize: 12
                                                             color: parent.isRec || recDeafenMouse.containsMouse ? Theme.background : Theme.critical
                                                         }
                                                         Text {
                                                             text: parent.isRec ? Theme.t("discord.recording", "Aperte uma tecla no teclado...") : Theme.t("discord.record_key", "Gravar Tecla")
                                                             font.family: Theme.fontFamily
-                                                            font.pixelSize: 10
+                                                            font.pixelSize: 11
                                                             font.weight: Font.DemiBold
                                                             color: parent.isRec || recDeafenMouse.containsMouse ? Theme.background : Theme.textColor
                                                         }
@@ -4219,7 +4263,7 @@ PanelWindow {
                                                 // Botão Digitar Tecla
                                                 Rectangle {
                                                     implicitWidth: editDeafenRow.implicitWidth + 16
-                                                    implicitHeight: 30; radius: 15
+                                                    implicitHeight: 34; radius: 15
                                                     color: win.editingManualDeafen ? Theme.tileHigh : (editDeafenMouse.containsMouse ? Theme.surface : "transparent")
                                                     border.width: 1; border.color: win.editingManualDeafen ? Theme.primary : Theme.withAlpha(Theme.outline, 0.25)
                                                     RowLayout {
@@ -4229,13 +4273,13 @@ PanelWindow {
                                                         Text {
                                                             text: Theme.icons.pencil
                                                             font.family: Theme.iconFontFamily
-                                                            font.pixelSize: 10
+                                                            font.pixelSize: 11
                                                             color: Theme.textColor
                                                         }
                                                         Text {
                                                             text: Theme.t("discord.edit_manual", "Digitar")
                                                             font.family: Theme.fontFamily
-                                                            font.pixelSize: 10
+                                                            font.pixelSize: 11
                                                             color: Theme.textColor
                                                         }
                                                     }
@@ -4268,7 +4312,7 @@ PanelWindow {
                                                         verticalAlignment: TextInput.AlignVCenter
                                                         text: win.discordDeafenBind
                                                         font.family: Theme.monoFamily
-                                                        font.pixelSize: 11
+                                                        font.pixelSize: 12
                                                         color: Theme.textColor
                                                         selectByMouse: true
                                                     }
@@ -4281,7 +4325,7 @@ PanelWindow {
                                                         anchors.centerIn: parent
                                                         text: Theme.t("discord.save", "Salvar")
                                                         font.family: Theme.fontFamily
-                                                        font.pixelSize: 10
+                                                        font.pixelSize: 11
                                                         font.weight: Font.Bold
                                                         color: Theme.background
                                                     }
@@ -4308,7 +4352,7 @@ PanelWindow {
                                                 Text {
                                                     text: Theme.t("discord.quick_suggestions", "Sugestões rápidas:")
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 9
+                                                    font.pixelSize: 10
                                                     color: Theme.subtext
                                                 }
                                                 Repeater {
@@ -4316,7 +4360,7 @@ PanelWindow {
                                                     delegate: Rectangle {
                                                         required property string modelData
                                                         implicitWidth: dbTxt.implicitWidth + 14
-                                                        implicitHeight: 24; radius: 12
+                                                        implicitHeight: 27; radius: 12
                                                         readonly property bool isCur: win.discordDeafenBind === modelData
                                                         color: isCur ? Theme.primary : Theme.surface
                                                         border.width: 1; border.color: isCur ? Theme.primary : Theme.withAlpha(Theme.outline, 0.2)
@@ -4325,7 +4369,7 @@ PanelWindow {
                                                             anchors.centerIn: parent
                                                             text: parent.modelData
                                                             font.family: Theme.monoFamily
-                                                            font.pixelSize: 9
+                                                            font.pixelSize: 10
                                                             font.weight: Font.Medium
                                                             color: parent.isCur ? Theme.background : Theme.textColor
                                                         }
@@ -4354,6 +4398,7 @@ PanelWindow {
                             contentHeight: powerCol.implicitHeight
                             clip: true
                             boundsBehavior: Flickable.StopAtBounds
+                            ScrollBar.vertical: PanelScroll {}
 
                             ColumnLayout {
                                 id: powerCol
@@ -4394,7 +4439,7 @@ PanelWindow {
                                                 Text {
                                                     text: pCard.modelData.icon
                                                     font.family: Theme.iconFontFamily
-                                                    font.pixelSize: 22
+                                                    font.pixelSize: 25
                                                     color: pCard.active ? Theme.primary : Theme.subtext
                                                 }
 
@@ -4404,14 +4449,14 @@ PanelWindow {
                                                     Text {
                                                         text: pCard.modelData.name
                                                         font.family: Theme.fontFamily
-                                                        font.pixelSize: 13
+                                                        font.pixelSize: 15
                                                         font.weight: pCard.active ? Font.DemiBold : Font.Normal
                                                         color: Theme.textColor
                                                     }
                                                     Text {
                                                         text: pCard.modelData.desc
                                                         font.family: Theme.fontFamily
-                                                        font.pixelSize: 10
+                                                        font.pixelSize: 11
                                                         color: pCard.active ? Theme.primary : Theme.subtext
                                                     }
                                                 }
@@ -4454,12 +4499,12 @@ PanelWindow {
                                             anchors.fill: parent
                                             anchors.margins: 14
                                             spacing: 12
-                                            Text { text: Theme.icons.batHealth; font.family: Theme.iconFontFamily; font.pixelSize: 24; color: Theme.primary }
+                                            Text { text: Theme.icons.batHealth; font.family: Theme.iconFontFamily; font.pixelSize: 27; color: Theme.primary }
                                             ColumnLayout {
                                                 Layout.fillWidth: true
                                                 spacing: 2
-                                                Text { text: Theme.t("power.battery_health", "Saúde da Bateria"); font.family: Theme.fontFamily; font.pixelSize: 11; color: Theme.subtext }
-                                                Text { text: win.powerData.health + "% " + Theme.t("power.capacity", "Capacidade"); font.family: Theme.fontFamily; font.pixelSize: 15; font.weight: Font.Bold; color: Theme.textColor }
+                                                Text { text: Theme.t("power.battery_health", "Saúde da Bateria"); font.family: Theme.fontFamily; font.pixelSize: 12; color: Theme.subtext }
+                                                Text { text: win.powerData.health + "% " + Theme.t("power.capacity", "Capacidade"); font.family: Theme.fontFamily; font.pixelSize: 17; font.weight: Font.Bold; color: Theme.textColor }
                                             }
                                         }
                                     }
@@ -4476,12 +4521,12 @@ PanelWindow {
                                             anchors.fill: parent
                                             anchors.margins: 14
                                             spacing: 12
-                                            Text { text: Theme.icons.history; font.family: Theme.iconFontFamily; font.pixelSize: 24; color: Theme.secondary }
+                                            Text { text: Theme.icons.history; font.family: Theme.iconFontFamily; font.pixelSize: 27; color: Theme.secondary }
                                             ColumnLayout {
                                                 Layout.fillWidth: true
                                                 spacing: 2
-                                                Text { text: Theme.t("power.charge_cycles", "Ciclos de Carga"); font.family: Theme.fontFamily; font.pixelSize: 11; color: Theme.subtext }
-                                                Text { text: win.powerData.cycles + " " + Theme.t("power.cycles_completed", "Ciclos Completos"); font.family: Theme.fontFamily; font.pixelSize: 15; font.weight: Font.Bold; color: Theme.textColor }
+                                                Text { text: Theme.t("power.charge_cycles", "Ciclos de Carga"); font.family: Theme.fontFamily; font.pixelSize: 12; color: Theme.subtext }
+                                                Text { text: win.powerData.cycles + " " + Theme.t("power.cycles_completed", "Ciclos Completos"); font.family: Theme.fontFamily; font.pixelSize: 17; font.weight: Font.Bold; color: Theme.textColor }
                                             }
                                         }
                                     }
@@ -4498,12 +4543,12 @@ PanelWindow {
                                             anchors.fill: parent
                                             anchors.margins: 14
                                             spacing: 12
-                                            Text { text: Theme.icons.lightning; font.family: Theme.iconFontFamily; font.pixelSize: 24; color: Theme.primary }
+                                            Text { text: Theme.icons.lightning; font.family: Theme.iconFontFamily; font.pixelSize: 27; color: Theme.primary }
                                             ColumnLayout {
                                                 Layout.fillWidth: true
                                                 spacing: 2
-                                                Text { text: Theme.t("power.power_status", "Status de Alimentação"); font.family: Theme.fontFamily; font.pixelSize: 11; color: Theme.subtext }
-                                                Text { text: win.powerData.status + " (" + win.powerData.percent + "%)"; font.family: Theme.fontFamily; font.pixelSize: 14; font.weight: Font.Bold; color: Theme.textColor }
+                                                Text { text: Theme.t("power.power_status", "Status de Alimentação"); font.family: Theme.fontFamily; font.pixelSize: 12; color: Theme.subtext }
+                                                Text { text: win.powerData.status + " (" + win.powerData.percent + "%)"; font.family: Theme.fontFamily; font.pixelSize: 16; font.weight: Font.Bold; color: Theme.textColor }
                                             }
                                         }
                                     }
@@ -4532,7 +4577,7 @@ PanelWindow {
                                         Text {
                                             text: idleRow.modelData.title
                                             font.family: Theme.fontFamily
-                                            font.pixelSize: 12
+                                            font.pixelSize: 13
                                             font.weight: Font.DemiBold
                                             color: Theme.textColor
                                         }
@@ -4540,7 +4585,7 @@ PanelWindow {
                                             Layout.fillWidth: true
                                             text: idleRow.modelData.desc
                                             font.family: Theme.fontFamily
-                                            font.pixelSize: 10
+                                            font.pixelSize: 11
                                             color: Theme.subtext
                                             wrapMode: Text.WordWrap
                                         }
@@ -4559,7 +4604,7 @@ PanelWindow {
                                                     readonly property bool isCurrent: (win.idleValues[idleRow.modelData.key] || 0) === idleChip.minutes
 
                                                     Layout.fillWidth: true
-                                                    implicitHeight: 32
+                                                    implicitHeight: 36
                                                     radius: 8
                                                     color: idleChip.isCurrent ? Theme.withAlpha(Theme.primary, 0.25) : (idleChipArea.containsMouse ? Theme.tileHigh : Theme.tile)
                                                     border.width: idleChip.isCurrent ? 1.5 : 1
@@ -4571,7 +4616,7 @@ PanelWindow {
                                                             ? Theme.t("power.idle_never", "Nunca")
                                                             : idleChip.minutes + " min"
                                                         font.family: Theme.fontFamily
-                                                        font.pixelSize: 11
+                                                        font.pixelSize: 12
                                                         font.weight: idleChip.isCurrent ? Font.Bold : Font.Normal
                                                         color: idleChip.isCurrent ? Theme.primary : Theme.textColor
                                                     }
@@ -4612,6 +4657,7 @@ PanelWindow {
                             contentHeight: autoCol.implicitHeight
                             clip: true
                             boundsBehavior: Flickable.StopAtBounds
+                            ScrollBar.vertical: PanelScroll {}
 
                             ColumnLayout {
                                 id: autoCol
@@ -4631,7 +4677,7 @@ PanelWindow {
                                         visible: win.autostartEntries.length === 0
                                         text: Theme.t("boot.empty_autostart", "Nenhum aplicativo configurado para iniciar automaticamente.")
                                         font.family: Theme.fontFamily
-                                        font.pixelSize: 12
+                                        font.pixelSize: 13
                                         color: Theme.subtext
                                     }
 
@@ -4641,7 +4687,7 @@ PanelWindow {
                                             id: autoCard
                                             required property var modelData
                                             Layout.fillWidth: true
-                                            implicitHeight: 56
+                                            implicitHeight: 63
                                             radius: 10
                                             color: Theme.tile
                                             border.width: 1
@@ -4653,15 +4699,15 @@ PanelWindow {
                                                 spacing: 12
 
                                                 Rectangle {
-                                                    implicitWidth: 32
-                                                    implicitHeight: 32
+                                                    implicitWidth: 36
+                                                    implicitHeight: 36
                                                     radius: 8
                                                     color: Theme.withAlpha(Theme.primary, 0.15)
                                                     Text {
                                                         anchors.centerIn: parent
                                                         text: Theme.icons.speed
                                                         font.family: Theme.iconFontFamily
-                                                        font.pixelSize: 16
+                                                        font.pixelSize: 18
                                                         color: Theme.primary
                                                     }
                                                 }
@@ -4672,14 +4718,14 @@ PanelWindow {
                                                     Text {
                                                         text: autoCard.modelData.name
                                                         font.family: Theme.fontFamily
-                                                        font.pixelSize: 12
+                                                        font.pixelSize: 13
                                                         font.weight: Font.DemiBold
                                                         color: Theme.textColor
                                                     }
                                                     Text {
                                                         text: autoCard.modelData.exec || autoCard.modelData.filename
                                                         font.family: Theme.monoFamily
-                                                        font.pixelSize: 10
+                                                        font.pixelSize: 11
                                                         color: Theme.subtext
                                                         elide: Text.ElideMiddle
                                                     }
@@ -4687,15 +4733,15 @@ PanelWindow {
 
                                                 // Botão Lixeira
                                                 Rectangle {
-                                                    implicitWidth: 28
-                                                    implicitHeight: 28
+                                                    implicitWidth: 31
+                                                    implicitHeight: 31
                                                     radius: 14
                                                     color: delArea.containsMouse ? Theme.withAlpha(Theme.critical, 0.2) : "transparent"
                                                     Text {
                                                         anchors.centerIn: parent
                                                         text: Theme.icons.trash
                                                         font.family: Theme.iconFontFamily
-                                                        font.pixelSize: 13
+                                                        font.pixelSize: 15
                                                         color: Theme.critical
                                                     }
                                                     MouseArea {
@@ -4713,7 +4759,7 @@ PanelWindow {
 
                                                 // Toggle Ativado
                                                 Rectangle {
-                                                    implicitWidth: 36
+                                                    implicitWidth: 40
                                                     implicitHeight: 20
                                                     radius: 10
                                                     color: autoCard.modelData.enabled ? Theme.primary : Theme.tileHigh
@@ -4753,7 +4799,7 @@ PanelWindow {
 
                                     Rectangle {
                                         implicitWidth: 240
-                                        implicitHeight: 32
+                                        implicitHeight: 36
                                         radius: 8
                                         color: Theme.background
                                         border.width: 1
@@ -4766,7 +4812,7 @@ PanelWindow {
                                             Text {
                                                 text: Theme.icons.magnify
                                                 font.family: Theme.iconFontFamily
-                                                font.pixelSize: 13
+                                                font.pixelSize: 15
                                                 color: Theme.subtext
                                             }
                                             TextInput {
@@ -4774,7 +4820,7 @@ PanelWindow {
                                                 Layout.fillWidth: true
                                                 verticalAlignment: TextInput.AlignVCenter
                                                 font.family: Theme.fontFamily
-                                                font.pixelSize: 12
+                                                font.pixelSize: 13
                                                 color: Theme.textColor
                                                 selectByMouse: true
                                                 onTextChanged: win.bootAppQuery = text
@@ -4784,7 +4830,7 @@ PanelWindow {
                                                     visible: bootSearchInput.text === ""
                                                     text: Theme.t("boot.search_ph", "Procurar aplicativo...")
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 12
+                                                    font.pixelSize: 13
                                                     color: Theme.subtext
                                                 }
                                             }
@@ -4800,7 +4846,7 @@ PanelWindow {
                                             ? Theme.t("boot.search_none", "Nenhum aplicativo encontrado com esse nome.")
                                             : win.bootAppsFiltered.length + Theme.t("boot.search_found", " aplicativo(s) encontrado(s)."))
                                     font.family: Theme.fontFamily
-                                    font.pixelSize: 11
+                                    font.pixelSize: 12
                                     color: Theme.subtext
                                 }
 
@@ -4813,7 +4859,7 @@ PanelWindow {
                                         delegate: Rectangle {
                                             id: appChip
                                             required property var modelData
-                                            implicitHeight: 32
+                                            implicitHeight: 36
                                             implicitWidth: appChipRow.implicitWidth + 20
                                             radius: 8
                                             color: appChip.modelData.already_added ? Theme.withAlpha(Theme.primary, 0.2) : (appChipArea.containsMouse ? Theme.tileHigh : Theme.tile)
@@ -4827,13 +4873,13 @@ PanelWindow {
                                                 Text {
                                                     text: appChip.modelData.already_added ? Theme.icons.verified : Theme.icons.plus
                                                     font.family: Theme.iconFontFamily
-                                                    font.pixelSize: 12
+                                                    font.pixelSize: 13
                                                     color: appChip.modelData.already_added ? Theme.primary : Theme.textColor
                                                 }
                                                 Text {
                                                     text: appChip.modelData.name
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 11
+                                                    font.pixelSize: 12
                                                     color: Theme.textColor
                                                 }
                                             }
@@ -4872,6 +4918,7 @@ PanelWindow {
                             contentHeight: colorsCol.implicitHeight
                             clip: true
                             boundsBehavior: Flickable.StopAtBounds
+                            ScrollBar.vertical: PanelScroll {}
 
                             ColumnLayout {
                                 id: colorsCol
@@ -4909,8 +4956,8 @@ PanelWindow {
                                                 anchors.margins: 10
                                                 spacing: 10
                                                 Rectangle {
-                                                    implicitWidth: 36
-                                                    implicitHeight: 36
+                                                    implicitWidth: 40
+                                                    implicitHeight: 40
                                                     radius: 18
                                                     color: colorCard.modelData.hex
                                                     border.width: 1
@@ -4922,13 +4969,13 @@ PanelWindow {
                                                     Text {
                                                         text: colorCard.modelData.label
                                                         font.family: Theme.fontFamily
-                                                        font.pixelSize: 11
+                                                        font.pixelSize: 12
                                                         color: Theme.subtext
                                                     }
                                                     Text {
                                                         text: colorCard.modelData.hex
                                                         font.family: Theme.monoFamily
-                                                        font.pixelSize: 12
+                                                        font.pixelSize: 13
                                                         font.weight: Font.DemiBold
                                                         color: Theme.textColor
                                                     }
@@ -4979,7 +5026,7 @@ PanelWindow {
                                             required property int modelData
                                             readonly property string hex: win.wallustColors["color" + modelData] || "#333333"
                                             Layout.fillWidth: true
-                                            implicitHeight: 52
+                                            implicitHeight: 58
                                             radius: 8
                                             color: colorChipArea.containsMouse ? Theme.tileHigh : Theme.tile
                                             border.width: 1
@@ -5003,7 +5050,7 @@ PanelWindow {
                                                     Layout.alignment: Qt.AlignHCenter
                                                     text: "c" + parent.parent.modelData
                                                     font.family: Theme.monoFamily
-                                                    font.pixelSize: 10
+                                                    font.pixelSize: 11
                                                     color: Theme.subtext
                                                 }
                                             }
@@ -5071,7 +5118,7 @@ PanelWindow {
                                             required property var modelData
                                             readonly property bool active: win.wallTransition === modelData.id
                                             Layout.fillWidth: true
-                                            implicitHeight: 52
+                                            implicitHeight: 58
                                             radius: 10
                                             color: active ? Theme.withAlpha(Theme.primary, 0.22) : (trArea.containsMouse ? Theme.tileHigh : Theme.tile)
                                             border.width: active ? 1.5 : 0
@@ -5084,7 +5131,7 @@ PanelWindow {
                                                     Layout.alignment: Qt.AlignHCenter
                                                     text: parent.parent.modelData.name
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 12
+                                                    font.pixelSize: 13
                                                     font.weight: parent.parent.active ? Font.DemiBold : Font.Normal
                                                     color: Theme.textColor
                                                 }
@@ -5092,7 +5139,7 @@ PanelWindow {
                                                     Layout.alignment: Qt.AlignHCenter
                                                     text: parent.parent.modelData.desc
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 10
+                                                    font.pixelSize: 11
                                                     color: parent.parent.active ? Theme.primary : Theme.subtext
                                                 }
                                             }
@@ -5144,7 +5191,7 @@ PanelWindow {
                                              + st.cenas_prontas + "/" + st.cenas;
                                     }
                                     font.family: Theme.fontFamily
-                                    font.pixelSize: 11
+                                    font.pixelSize: 12
                                     color: Theme.subtext
                                 }
 
@@ -5177,7 +5224,7 @@ PanelWindow {
                                     Layout.fillWidth: true
                                     text: Theme.t("wallust.previews_warn", "Os animados (cenas) não têm vídeo de onde tirar um quadro: a única forma é deixar cada um rodar e fotografar a tela. Por isso esse botão troca os wallpapers por alguns segundos, esconde a interface e depois devolve tudo como estava. Uma cena é pulada se sobrar alguma janela na tela.")
                                     font.family: Theme.fontFamily
-                                    font.pixelSize: 10
+                                    font.pixelSize: 11
                                     color: Theme.subtext
                                     wrapMode: Text.WordWrap
                                 }
@@ -5280,6 +5327,7 @@ PanelWindow {
                             contentHeight: effCol.implicitHeight
                             clip: true
                             boundsBehavior: Flickable.StopAtBounds
+                            ScrollBar.vertical: PanelScroll {}
 
                             ColumnLayout {
                                 id: effCol
@@ -5331,7 +5379,7 @@ PanelWindow {
                                             required property var modelData
                                             readonly property bool active: win.nightlightSchedule === modelData.id
                                             Layout.fillWidth: true
-                                            implicitHeight: 52
+                                            implicitHeight: 58
                                             radius: 10
                                             color: active ? Theme.withAlpha(Theme.primary, 0.22) : (nlArea.containsMouse ? Theme.tileHigh : Theme.tile)
                                             border.width: active ? 1.5 : 0
@@ -5344,7 +5392,7 @@ PanelWindow {
                                                     Layout.alignment: Qt.AlignHCenter
                                                     text: parent.parent.modelData.name
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 12
+                                                    font.pixelSize: 13
                                                     font.weight: parent.parent.active ? Font.DemiBold : Font.Normal
                                                     color: Theme.textColor
                                                 }
@@ -5352,7 +5400,7 @@ PanelWindow {
                                                     Layout.alignment: Qt.AlignHCenter
                                                     text: parent.parent.modelData.desc
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 10
+                                                    font.pixelSize: 11
                                                     color: parent.parent.active ? Theme.primary : Theme.subtext
                                                 }
                                             }
@@ -5378,7 +5426,7 @@ PanelWindow {
                                     text: Theme.t("effects.nl_today", "Hoje aqui: o sol se põe às ") + win.nightlightSunset
                                         + Theme.t("effects.nl_today2", " e nasce às ") + win.nightlightSunrise + "."
                                     font.family: Theme.fontFamily
-                                    font.pixelSize: 11
+                                    font.pixelSize: 12
                                     color: Theme.subtext
                                 }
 
@@ -5461,7 +5509,7 @@ PanelWindow {
                                                 Text {
                                                     text: bqCard.modelData.label
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 12
+                                                    font.pixelSize: 13
                                                     font.weight: Font.DemiBold
                                                     color: Theme.textColor
                                                 }
@@ -5470,7 +5518,7 @@ PanelWindow {
                                                     text: bqCard.modelData.desc
                                                     wrapMode: Text.WordWrap
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 10
+                                                    font.pixelSize: 11
                                                     color: Theme.subtext
                                                 }
                                             }
@@ -5484,6 +5532,83 @@ PanelWindow {
                                                     Quickshell.execDetached(["rice-hypr-prefs", "set", "blur_quality", bqCard.modelData.key]);
                                                 }
                                             }
+                                        }
+                                    }
+                                }
+
+                                CfgToggle {
+                                    title: Theme.t("effects.blur_advanced", "Ajustar no detalhe")
+                                    subtitle: Theme.t("effects.blur_advanced_desc", "Mostra os controles finos do desfoque. Mexer neles guarda um ajuste seu, fora dos três níveis.")
+                                    checked: win.blurAdvanced
+                                    onToggled: nv => win.blurAdvanced = nv
+                                }
+
+                                ColumnLayout {
+                                    id: blurAdvCol
+                                    Layout.fillWidth: true
+                                    spacing: 10
+                                    visible: win.blurAdvanced
+
+                                    function saveManual() {
+                                        win.blurQuality = "manual";
+                                        Quickshell.execDetached(["rice-hypr-prefs", "set", "blur_quality", "manual"]);
+                                    }
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 20
+                                        CfgSlider {
+                                            title: Theme.t("effects.blur_size", "Tamanho do borrão")
+                                            minVal: 1; maxVal: 12; value: win.blurSize
+                                            onChanged: newVal => {
+                                                win.blurSize = Math.round(newVal);
+                                                debounceTimer.exec(() => {
+                                                    Quickshell.execDetached(["rice-hypr-prefs", "set", "blur_size", String(win.blurSize)]);
+                                                    blurAdvCol.saveManual();
+                                                });
+                                            }
+                                        }
+                                        CfgSlider {
+                                            title: Theme.t("effects.blur_passes", "Passagens (cada uma custa GPU)")
+                                            minVal: 1; maxVal: 4; value: win.blurPasses
+                                            onChanged: newVal => {
+                                                win.blurPasses = Math.round(newVal);
+                                                debounceTimer.exec(() => {
+                                                    Quickshell.execDetached(["rice-hypr-prefs", "set", "blur_passes", String(win.blurPasses)]);
+                                                    blurAdvCol.saveManual();
+                                                });
+                                            }
+                                        }
+                                    }
+                                    CfgSlider {
+                                        title: Theme.t("effects.blur_vibrancy", "Vivacidade das cores no borrão")
+                                        minVal: 0; maxVal: 1; value: win.blurVibrancy; decimals: 2
+                                        onChanged: newVal => {
+                                            win.blurVibrancy = newVal;
+                                            debounceTimer.exec(() => {
+                                                Quickshell.execDetached(["rice-hypr-prefs", "set", "blur_vibrancy", String(win.blurVibrancy)]);
+                                                blurAdvCol.saveManual();
+                                            });
+                                        }
+                                    }
+                                    CfgToggle {
+                                        title: Theme.t("effects.blur_xray", "Desfocar só o papel de parede (xray)")
+                                        subtitle: Theme.t("effects.blur_xray_desc", "Bem mais leve: as janelas de trás não entram no borrão.")
+                                        checked: win.blurXray
+                                        onToggled: nv => {
+                                            win.blurXray = nv;
+                                            Quickshell.execDetached(["rice-hypr-prefs", "set", "blur_xray", nv ? "true" : "false"]);
+                                            blurAdvCol.saveManual();
+                                        }
+                                    }
+                                    CfgToggle {
+                                        title: Theme.t("effects.blur_ignore_opacity", "Desfocar atrás de janelas opacas")
+                                        subtitle: Theme.t("effects.blur_ignore_opacity_desc", "Desligado economiza GPU: não borra o que ninguém vê.")
+                                        checked: win.blurIgnoreOpacity
+                                        onToggled: nv => {
+                                            win.blurIgnoreOpacity = nv;
+                                            Quickshell.execDetached(["rice-hypr-prefs", "set", "blur_ignore_opacity", nv ? "true" : "false"]);
+                                            blurAdvCol.saveManual();
                                         }
                                     }
                                 }
@@ -5551,8 +5676,16 @@ PanelWindow {
 
                                 // Presets, curva de Bézier por grupo, duração e estilo
                                 // (rice-anim). Ver AnimCurveEditor.qml.
+                                CfgToggle {
+                                    title: Theme.t("effects.anim_advanced", "Ajustar no detalhe")
+                                    subtitle: Theme.t("effects.anim_advanced_desc", "Curvas de Bézier, velocidade e estilo de cada tipo de animação, um por um.")
+                                    checked: win.animAdvanced
+                                    onToggled: nv => win.animAdvanced = nv
+                                }
+
                                 AnimCurveEditor {
                                     Layout.fillWidth: true
+                                    visible: win.animAdvanced
                                     onToast: msg => win.showToast(msg)
                                 }
 
@@ -5648,6 +5781,7 @@ PanelWindow {
                             contentHeight: btCol.implicitHeight
                             clip: true
                             boundsBehavior: Flickable.StopAtBounds
+                            ScrollBar.vertical: PanelScroll {}
 
                             ColumnLayout {
                                 id: btCol
@@ -5687,7 +5821,7 @@ PanelWindow {
                                         Text {
                                             text: win.btData && win.btData.powered ? Theme.icons.bt : Theme.icons.btOff
                                             font.family: Theme.iconFontFamily
-                                            font.pixelSize: 22
+                                            font.pixelSize: 25
                                             color: win.btData && win.btData.powered ? Theme.primary : Theme.subtext
                                         }
 
@@ -5697,14 +5831,14 @@ PanelWindow {
                                             Text {
                                                 text: win.btData && win.btData.powered ? "Bluetooth Ativado" : Theme.t("bt.status_off", "Bluetooth Desativado")
                                                 font.family: Theme.fontFamily
-                                                font.pixelSize: 13
+                                                font.pixelSize: 15
                                                 font.weight: Font.DemiBold
                                                 color: Theme.textColor
                                             }
                                             Text {
                                                 text: win.btData && win.btData.powered ? Theme.t("bt.status_on_desc", "Pronto para conexões e pareamento automático") : "Ligue o adaptador para conectar periféricos"
                                                 font.family: Theme.fontFamily
-                                                font.pixelSize: 11
+                                                font.pixelSize: 12
                                                 color: Theme.subtext
                                             }
                                         }
@@ -5746,8 +5880,8 @@ PanelWindow {
                                                 spacing: 12
 
                                                 Rectangle {
-                                                    implicitWidth: 38
-                                                    implicitHeight: 38
+                                                    implicitWidth: 43
+                                                    implicitHeight: 43
                                                     radius: 10
                                                     color: btDevCard.modelData.connected ? Theme.withAlpha(Theme.primary, 0.25) : Theme.tileHigh
 
@@ -5759,7 +5893,7 @@ PanelWindow {
                                                             : (btDevCard.modelData.icon === "keyboard" ? Theme.icons.tune
                                                             : Theme.icons.bt)))
                                                         font.family: Theme.iconFontFamily
-                                                        font.pixelSize: 18
+                                                        font.pixelSize: 20
                                                         color: btDevCard.modelData.connected ? Theme.primary : Theme.textColor
                                                     }
                                                 }
@@ -5772,7 +5906,7 @@ PanelWindow {
                                                         Text {
                                                             text: btDevCard.modelData.name
                                                             font.family: Theme.fontFamily
-                                                            font.pixelSize: 12
+                                                            font.pixelSize: 13
                                                             font.weight: Font.DemiBold
                                                             color: Theme.textColor
                                                         }
@@ -5788,14 +5922,14 @@ PanelWindow {
                                                                 anchors.centerIn: parent
                                                                 text: Theme.t("bt.connected", "● Conectado")
                                                                 font.family: Theme.fontFamily
-                                                                font.pixelSize: 9
+                                                                font.pixelSize: 10
                                                                 font.weight: Font.Bold
                                                                 color: Theme.primary
                                                             }
                                                         }
                                                         Rectangle {
                                                             visible: btDevCard.modelData.battery !== null
-                                                            implicitWidth: 46
+                                                            implicitWidth: 52
                                                             implicitHeight: 18
                                                             radius: 9
                                                             color: Theme.withAlpha(Theme.foreground, 0.1)
@@ -5803,7 +5937,7 @@ PanelWindow {
                                                                 anchors.centerIn: parent
                                                                 text: "🔋 " + (btDevCard.modelData.battery || 0) + "%"
                                                                 font.family: Theme.fontFamily
-                                                                font.pixelSize: 9
+                                                                font.pixelSize: 10
                                                                 color: Theme.textColor
                                                             }
                                                         }
@@ -5811,7 +5945,7 @@ PanelWindow {
                                                     Text {
                                                         text: btDevCard.modelData.mac
                                                         font.family: Theme.monoFamily
-                                                        font.pixelSize: 10
+                                                        font.pixelSize: 11
                                                         color: Theme.subtext
                                                     }
                                                 }
@@ -5831,15 +5965,15 @@ PanelWindow {
                                                 }
 
                                                 Rectangle {
-                                                    implicitWidth: 32
-                                                    implicitHeight: 32
+                                                    implicitWidth: 36
+                                                    implicitHeight: 36
                                                     radius: 8
                                                     color: rmBtArea.containsMouse ? Theme.withAlpha("#ff5555", 0.2) : "transparent"
                                                     Text {
                                                         anchors.centerIn: parent
                                                         text: Theme.icons.trash
                                                         font.family: Theme.iconFontFamily
-                                                        font.pixelSize: 13
+                                                        font.pixelSize: 15
                                                         color: rmBtArea.containsMouse ? "#ff5555" : Theme.subtext
                                                     }
                                                     MouseArea {
@@ -5861,7 +5995,7 @@ PanelWindow {
                                         visible: !win.btData || !win.btData.devices || win.btData.devices.length === 0
                                         text: Theme.t("bt.empty", "Nenhum dispositivo encontrado. Coloque seu controle ou fone em modo de pareamento e clique em 'Escanear'.")
                                         font.family: Theme.fontFamily
-                                        font.pixelSize: 11
+                                        font.pixelSize: 12
                                         color: Theme.subtext
                                     }
                                 }
@@ -5875,6 +6009,7 @@ PanelWindow {
                             contentHeight: netCol.implicitHeight
                             clip: true
                             boundsBehavior: Flickable.StopAtBounds
+                            ScrollBar.vertical: PanelScroll {}
 
                             ColumnLayout {
                                 id: netCol
@@ -5913,15 +6048,15 @@ PanelWindow {
                                         spacing: 16
 
                                         Rectangle {
-                                            implicitWidth: 46
-                                            implicitHeight: 46
+                                            implicitWidth: 52
+                                            implicitHeight: 52
                                             radius: 12
                                             color: Theme.withAlpha(Theme.primary, 0.25)
                                             Text {
                                                 anchors.centerIn: parent
                                                 text: win.netData && win.netData.wifi_enabled ? Theme.icons.wifi4 : Theme.icons.wifiOff
                                                 font.family: Theme.iconFontFamily
-                                                font.pixelSize: 24
+                                                font.pixelSize: 27
                                                 color: Theme.primary
                                             }
                                         }
@@ -5935,13 +6070,13 @@ PanelWindow {
                                                 Text {
                                                     text: win.netData && win.netData.connected_ssid ? win.netData.connected_ssid : Theme.t("net.no_conn", "Nenhuma rede conectada")
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 15
+                                                    font.pixelSize: 17
                                                     font.weight: Font.Bold
                                                     color: Theme.textColor
                                                 }
                                                 Rectangle {
                                                     visible: win.netData && win.netData.is_5g
-                                                    implicitWidth: 42
+                                                    implicitWidth: 47
                                                     implicitHeight: 18
                                                     radius: 9
                                                     color: Theme.withAlpha(Theme.primary, 0.3)
@@ -5949,14 +6084,14 @@ PanelWindow {
                                                         anchors.centerIn: parent
                                                         text: "5 GHz"
                                                         font.family: Theme.fontFamily
-                                                        font.pixelSize: 9
+                                                        font.pixelSize: 10
                                                         font.weight: Font.Bold
                                                         color: Theme.primary
                                                     }
                                                 }
                                                 Rectangle {
                                                     visible: win.netData && win.netData.signal > 0
-                                                    implicitWidth: 44
+                                                    implicitWidth: 49
                                                     implicitHeight: 18
                                                     radius: 9
                                                     color: Theme.withAlpha(Theme.foreground, 0.1)
@@ -5964,7 +6099,7 @@ PanelWindow {
                                                         anchors.centerIn: parent
                                                         text: (win.netData ? win.netData.signal : 0) + "%"
                                                         font.family: Theme.fontFamily
-                                                        font.pixelSize: 9
+                                                        font.pixelSize: 10
                                                         color: Theme.textColor
                                                     }
                                                 }
@@ -5975,19 +6110,19 @@ PanelWindow {
                                                 Text {
                                                     text: Theme.t("net.ip_label", "IP: ") + (win.netData && win.netData.ip ? win.netData.ip : "---")
                                                     font.family: Theme.monoFamily
-                                                    font.pixelSize: 11
+                                                    font.pixelSize: 12
                                                     color: Theme.subtext
                                                 }
                                                 Text {
                                                     text: Theme.t("net.gateway_label", "Roteador: ") + (win.netData && win.netData.gateway ? win.netData.gateway : "---")
                                                     font.family: Theme.monoFamily
-                                                    font.pixelSize: 11
+                                                    font.pixelSize: 12
                                                     color: Theme.subtext
                                                 }
                                                 Text {
                                                     text: win.pingMs !== null ? ("Ping: " + win.pingMs + " ms") : ""
                                                     font.family: Theme.monoFamily
-                                                    font.pixelSize: 11
+                                                    font.pixelSize: 12
                                                     font.weight: Font.Bold
                                                     color: Theme.primary
                                                 }
@@ -6050,7 +6185,7 @@ PanelWindow {
                                                         text: wifiCard.modelData.signal > 70 ? Theme.icons.wifi4
                                                             : (wifiCard.modelData.signal > 40 ? Theme.icons.wifi3 : Theme.icons.wifi2)
                                                         font.family: Theme.iconFontFamily
-                                                        font.pixelSize: 16
+                                                        font.pixelSize: 18
                                                         color: wifiCard.modelData.active ? Theme.primary : Theme.subtext
                                                     }
 
@@ -6058,7 +6193,7 @@ PanelWindow {
                                                         Layout.fillWidth: true
                                                         text: wifiCard.modelData.ssid
                                                         font.family: Theme.fontFamily
-                                                        font.pixelSize: 12
+                                                        font.pixelSize: 13
                                                         font.weight: wifiCard.modelData.active ? Font.Bold : Font.Normal
                                                         color: Theme.textColor
                                                     }
@@ -6067,13 +6202,13 @@ PanelWindow {
                                                         visible: wifiCard.modelData.protected
                                                         text: Theme.icons.lock
                                                         font.family: Theme.iconFontFamily
-                                                        font.pixelSize: 12
+                                                        font.pixelSize: 13
                                                         color: Theme.subtext
                                                     }
 
                                                     Rectangle {
                                                         visible: wifiCard.modelData.is_5g
-                                                        implicitWidth: 34
+                                                        implicitWidth: 38
                                                         implicitHeight: 18
                                                         radius: 9
                                                         color: Theme.withAlpha(Theme.foreground, 0.08)
@@ -6081,7 +6216,7 @@ PanelWindow {
                                                             anchors.centerIn: parent
                                                             text: "5G"
                                                             font.family: Theme.fontFamily
-                                                            font.pixelSize: 9
+                                                            font.pixelSize: 10
                                                             color: Theme.subtext
                                                         }
                                                     }
@@ -6089,7 +6224,7 @@ PanelWindow {
                                                     Text {
                                                         text: wifiCard.modelData.signal + "%"
                                                         font.family: Theme.fontFamily
-                                                        font.pixelSize: 11
+                                                        font.pixelSize: 12
                                                         color: Theme.subtext
                                                     }
 
@@ -6112,14 +6247,14 @@ PanelWindow {
                                                     Rectangle {
                                                         visible: wifiCard.modelData.active
                                                         implicitWidth: 64
-                                                        implicitHeight: 24
+                                                        implicitHeight: 27
                                                         radius: 12
                                                         color: Theme.withAlpha(Theme.primary, 0.2)
                                                         Text {
                                                             anchors.centerIn: parent
                                                             text: Theme.t("net.active_badge", "Ativa")
                                                             font.family: Theme.fontFamily
-                                                            font.pixelSize: 10
+                                                            font.pixelSize: 11
                                                             font.weight: Font.Bold
                                                             color: Theme.primary
                                                         }
@@ -6133,7 +6268,7 @@ PanelWindow {
 
                                                     Rectangle {
                                                         Layout.fillWidth: true
-                                                        implicitHeight: 32
+                                                        implicitHeight: 36
                                                         radius: 8
                                                         color: Theme.background
                                                         border.width: 1
@@ -6145,7 +6280,7 @@ PanelWindow {
                                                             anchors.margins: 6
                                                             echoMode: TextInput.Password
                                                             font.family: Theme.fontFamily
-                                                            font.pixelSize: 12
+                                                            font.pixelSize: 13
                                                             color: Theme.textColor
                                                             clip: true
                                                             onTextChanged: win.netPassInput = text
@@ -6153,7 +6288,7 @@ PanelWindow {
                                                                 visible: !passInput.text
                                                                 text: Theme.t("net.password_placeholder", "Digite a senha do Wi-Fi...")
                                                                 font.family: Theme.fontFamily
-                                                                font.pixelSize: 11
+                                                                font.pixelSize: 12
                                                                 color: Theme.subtext
                                                             }
                                                         }
@@ -6190,6 +6325,7 @@ PanelWindow {
                             contentHeight: defCol.implicitHeight
                             clip: true
                             boundsBehavior: Flickable.StopAtBounds
+                            ScrollBar.vertical: PanelScroll {}
 
                             ColumnLayout {
                                 id: defCol
@@ -6236,7 +6372,7 @@ PanelWindow {
                                                 Text {
                                                     text: defCatCard.modelData.icon
                                                     font.family: Theme.iconFontFamily
-                                                    font.pixelSize: 18
+                                                    font.pixelSize: 20
                                                     color: Theme.primary
                                                 }
                                                 ColumnLayout {
@@ -6245,14 +6381,14 @@ PanelWindow {
                                                     Text {
                                                         text: defCatCard.modelData.title
                                                         font.family: Theme.fontFamily
-                                                        font.pixelSize: 13
+                                                        font.pixelSize: 15
                                                         font.weight: Font.DemiBold
                                                         color: Theme.textColor
                                                     }
                                                     Text {
                                                         text: defCatCard.modelData.desc
                                                         font.family: Theme.fontFamily
-                                                        font.pixelSize: 10
+                                                        font.pixelSize: 11
                                                         color: Theme.subtext
                                                     }
                                                 }
@@ -6261,7 +6397,7 @@ PanelWindow {
                                             // Banner do App Padrão Atual
                                             Rectangle {
                                                 Layout.fillWidth: true
-                                                implicitHeight: 46
+                                                implicitHeight: 52
                                                 radius: 8
                                                 color: Theme.withAlpha(Theme.background, 0.6)
                                                 border.width: 1
@@ -6286,7 +6422,7 @@ PanelWindow {
                                                         Text {
                                                             text: (defCatCard.catInfo && defCatCard.catInfo.current_name) ? defCatCard.catInfo.current_name : Theme.t("defaults.not_set", "Não definido")
                                                             font.family: Theme.fontFamily
-                                                            font.pixelSize: 12
+                                                            font.pixelSize: 13
                                                             font.weight: Font.DemiBold
                                                             color: Theme.textColor
                                                             elide: Text.ElideRight
@@ -6294,7 +6430,7 @@ PanelWindow {
                                                         Text {
                                                             text: (defCatCard.catInfo && defCatCard.catInfo.current_desktop) ? defCatCard.catInfo.current_desktop : Theme.t("defaults.no_app_assoc", "Nenhum aplicativo associado")
                                                             font.family: Theme.monoFamily
-                                                            font.pixelSize: 9
+                                                            font.pixelSize: 10
                                                             color: Theme.subtext
                                                             elide: Text.ElideRight
                                                         }
@@ -6315,13 +6451,13 @@ PanelWindow {
                                                             Text {
                                                                 text: (defCatCard.catInfo && defCatCard.catInfo.is_set) ? Theme.icons.confirm : Theme.icons.alert
                                                                 font.family: Theme.iconFontFamily
-                                                                font.pixelSize: 11
+                                                                font.pixelSize: 12
                                                                 color: (defCatCard.catInfo && defCatCard.catInfo.is_set) ? Theme.primary : Theme.warning
                                                             }
                                                             Text {
                                                                 text: (defCatCard.catInfo && defCatCard.catInfo.is_set) ? Theme.t("defaults.active_default", "Padrão Ativo") : "Não Definido"
                                                                 font.family: Theme.fontFamily
-                                                                font.pixelSize: 10
+                                                                font.pixelSize: 11
                                                                 font.weight: Font.Bold
                                                                 color: (defCatCard.catInfo && defCatCard.catInfo.is_set) ? Theme.textColor : Theme.warning
                                                             }
@@ -6337,7 +6473,7 @@ PanelWindow {
 
                                                 Rectangle {
                                                     Layout.fillWidth: true
-                                                    implicitHeight: 34
+                                                    implicitHeight: 38
                                                     radius: 8
                                                     color: Theme.background
                                                     border.width: 1
@@ -6352,7 +6488,7 @@ PanelWindow {
                                                         Text {
                                                             text: Theme.icons.pencil
                                                             font.family: Theme.iconFontFamily
-                                                            font.pixelSize: 12
+                                                            font.pixelSize: 13
                                                             color: Theme.subtext
                                                         }
 
@@ -6360,7 +6496,7 @@ PanelWindow {
                                                             id: customInput
                                                             Layout.fillWidth: true
                                                             font.family: Theme.fontFamily
-                                                            font.pixelSize: 11
+                                                            font.pixelSize: 12
                                                             color: Theme.textColor
                                                             selectByMouse: true
                                                             clip: true
@@ -6370,7 +6506,7 @@ PanelWindow {
                                                                 visible: !customInput.text && !customInput.activeFocus
                                                                 text: Theme.t("defaults.input_placeholder", "Digitar app específico (ex: zen, firefox, code, dolphin, mpv)...")
                                                                 font.family: Theme.fontFamily
-                                                                font.pixelSize: 11
+                                                                font.pixelSize: 12
                                                                 color: Theme.withAlpha(Theme.subtext, 0.6)
                                                             }
 
@@ -6381,7 +6517,7 @@ PanelWindow {
                                                             visible: customInput.text.length > 0
                                                             text: Theme.icons.close
                                                             font.family: Theme.iconFontFamily
-                                                            font.pixelSize: 12
+                                                            font.pixelSize: 13
                                                             color: Theme.subtext
                                                             MouseArea {
                                                                 anchors.fill: parent
@@ -6394,7 +6530,7 @@ PanelWindow {
 
                                                 // Botão Salvar App Digitado
                                                 Rectangle {
-                                                    implicitHeight: 34
+                                                    implicitHeight: 38
                                                     implicitWidth: applyRow.implicitWidth + 20
                                                     radius: 8
                                                     color: applyBtnArea.containsMouse ? Theme.mix(Theme.primary, Theme.background, 0.2) : Theme.primary
@@ -6406,13 +6542,13 @@ PanelWindow {
                                                         Text {
                                                             text: Theme.icons.confirm
                                                             font.family: Theme.iconFontFamily
-                                                            font.pixelSize: 12
+                                                            font.pixelSize: 13
                                                             color: Theme.background
                                                         }
                                                         Text {
                                                             text: Theme.t("defaults.save_btn", "Salvar")
                                                             font.family: Theme.fontFamily
-                                                            font.pixelSize: 11
+                                                            font.pixelSize: 12
                                                             font.weight: Font.Bold
                                                             color: Theme.background
                                                         }
@@ -6439,7 +6575,7 @@ PanelWindow {
 
                                                 // Botão Escolher dos Apps Instalados
                                                 Rectangle {
-                                                    implicitHeight: 34
+                                                    implicitHeight: 38
                                                     implicitWidth: pickBtnRow.implicitWidth + 20
                                                     radius: 8
                                                     color: defCatCard.isPicking ? Theme.withAlpha(Theme.primary, 0.25) : (pickBtnArea.containsMouse ? Theme.tileHigh : Theme.background)
@@ -6453,13 +6589,13 @@ PanelWindow {
                                                         Text {
                                                             text: defCatCard.isPicking ? Theme.icons.close : Theme.icons.magnify
                                                             font.family: Theme.iconFontFamily
-                                                            font.pixelSize: 12
+                                                            font.pixelSize: 13
                                                             color: defCatCard.isPicking ? Theme.primary : Theme.textColor
                                                         }
                                                         Text {
                                                             text: defCatCard.isPicking ? "Fechar Lista" : Theme.t("defaults.choose_app", "Escolher App...")
                                                             font.family: Theme.fontFamily
-                                                            font.pixelSize: 11
+                                                            font.pixelSize: 12
                                                             font.weight: Font.Medium
                                                             color: defCatCard.isPicking ? Theme.primary : Theme.textColor
                                                         }
@@ -6501,7 +6637,7 @@ PanelWindow {
                                                     // Campo de busca com filtro dinâmico
                                                     Rectangle {
                                                         Layout.fillWidth: true
-                                                        implicitHeight: 32
+                                                        implicitHeight: 36
                                                         radius: 6
                                                         color: Theme.background
                                                         border.width: 1
@@ -6516,7 +6652,7 @@ PanelWindow {
                                                             Text {
                                                                 text: Theme.icons.magnify
                                                                 font.family: Theme.iconFontFamily
-                                                                font.pixelSize: 12
+                                                                font.pixelSize: 13
                                                                 color: Theme.subtext
                                                             }
 
@@ -6524,7 +6660,7 @@ PanelWindow {
                                                                 id: searchAppInput
                                                                 Layout.fillWidth: true
                                                                 font.family: Theme.fontFamily
-                                                                font.pixelSize: 11
+                                                                font.pixelSize: 12
                                                                 color: Theme.textColor
                                                                 selectByMouse: true
                                                                 clip: true
@@ -6535,7 +6671,7 @@ PanelWindow {
                                                                     visible: !searchAppInput.text
                                                                     text: Theme.t("defaults.search_placeholder", "Pesquisar entre todos os aplicativos do sistema...")
                                                                     font.family: Theme.fontFamily
-                                                                    font.pixelSize: 11
+                                                                    font.pixelSize: 12
                                                                     color: Theme.withAlpha(Theme.subtext, 0.6)
                                                                 }
                                                             }
@@ -6549,6 +6685,7 @@ PanelWindow {
                                                         contentHeight: appListCol.implicitHeight
                                                         clip: true
                                                         boundsBehavior: Flickable.StopAtBounds
+                                                        ScrollBar.vertical: PanelScroll {}
 
                                                         ColumnLayout {
                                                             id: appListCol
@@ -6571,7 +6708,7 @@ PanelWindow {
                                                                     id: appItemRow
                                                                     required property var modelData
                                                                     Layout.fillWidth: true
-                                                                    implicitHeight: 38
+                                                                    implicitHeight: 43
                                                                     radius: 6
                                                                     color: appItemArea.containsMouse ? Theme.tileHigh : Theme.withAlpha(Theme.tile, 0.5)
                                                                     border.width: (defCatCard.catInfo && defCatCard.catInfo.current_desktop === appItemRow.modelData.filename) ? 1 : 0
@@ -6596,7 +6733,7 @@ PanelWindow {
                                                                             Text {
                                                                                 text: appItemRow.modelData.name
                                                                                 font.family: Theme.fontFamily
-                                                                                font.pixelSize: 11
+                                                                                font.pixelSize: 12
                                                                                 font.weight: Font.DemiBold
                                                                                 color: Theme.textColor
                                                                                 elide: Text.ElideRight
@@ -6604,7 +6741,7 @@ PanelWindow {
                                                                             Text {
                                                                                 text: appItemRow.modelData.filename
                                                                                 font.family: Theme.monoFamily
-                                                                                font.pixelSize: 9
+                                                                                font.pixelSize: 10
                                                                                 color: Theme.subtext
                                                                                 elide: Text.ElideRight
                                                                             }
@@ -6614,7 +6751,7 @@ PanelWindow {
                                                                             visible: defCatCard.catInfo && defCatCard.catInfo.current_desktop === appItemRow.modelData.filename
                                                                             text: Theme.icons.confirm + Theme.t("defaults.current_tag", " Atual")
                                                                             font.family: Theme.fontFamily
-                                                                            font.pixelSize: 10
+                                                                            font.pixelSize: 11
                                                                             font.weight: Font.Bold
                                                                             color: Theme.primary
                                                                         }
@@ -6659,6 +6796,7 @@ PanelWindow {
                             contentHeight: gamingCol.implicitHeight
                             clip: true
                             boundsBehavior: Flickable.StopAtBounds
+                            ScrollBar.vertical: PanelScroll {}
 
                             ColumnLayout {
                                 id: gamingCol
@@ -6687,12 +6825,12 @@ PanelWindow {
                                             anchors.margins: 12
                                             spacing: 10
                                             Rectangle {
-                                                implicitWidth: 38; implicitHeight: 38; radius: 10
+                                                implicitWidth: 43; implicitHeight: 43; radius: 10
                                                 color: Theme.withAlpha("#ff7733", 0.2)
                                                 Text {
                                                     anchors.centerIn: parent
                                                     text: "🌡️"
-                                                    font.pixelSize: 16
+                                                    font.pixelSize: 18
                                                 }
                                             }
                                             ColumnLayout {
@@ -6700,13 +6838,13 @@ PanelWindow {
                                                 Text {
                                                     text: Theme.t("gaming.gpu_temp", "Temperatura GPU")
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 10
+                                                    font.pixelSize: 11
                                                     color: Theme.subtext
                                                 }
                                                 Text {
                                                     text: (win.gamingData && win.gamingData.gpu && win.gamingData.gpu.temp ? win.gamingData.gpu.temp : "--") + " °C"
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 16
+                                                    font.pixelSize: 18
                                                     font.weight: Font.Bold
                                                     color: Theme.textColor
                                                 }
@@ -6727,13 +6865,13 @@ PanelWindow {
                                             anchors.margins: 12
                                             spacing: 10
                                             Rectangle {
-                                                implicitWidth: 38; implicitHeight: 38; radius: 10
+                                                implicitWidth: 43; implicitHeight: 43; radius: 10
                                                 color: Theme.withAlpha(Theme.primary, 0.2)
                                                 Text {
                                                     anchors.centerIn: parent
                                                     text: Theme.icons.memory
                                                     font.family: Theme.iconFontFamily
-                                                    font.pixelSize: 16
+                                                    font.pixelSize: 18
                                                     color: Theme.primary
                                                 }
                                             }
@@ -6742,13 +6880,13 @@ PanelWindow {
                                                 Text {
                                                     text: Theme.t("gaming.vram_used", "VRAM Utilizada")
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 10
+                                                    font.pixelSize: 11
                                                     color: Theme.subtext
                                                 }
                                                 Text {
                                                     text: (win.gamingData && win.gamingData.gpu && win.gamingData.gpu.vram_used ? win.gamingData.gpu.vram_used : 0) + " / " + (win.gamingData && win.gamingData.gpu && win.gamingData.gpu.vram_total ? win.gamingData.gpu.vram_total : 4096) + " MB"
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 13
+                                                    font.pixelSize: 15
                                                     font.weight: Font.Bold
                                                     color: Theme.textColor
                                                 }
@@ -6769,13 +6907,13 @@ PanelWindow {
                                             anchors.margins: 12
                                             spacing: 10
                                             Rectangle {
-                                                implicitWidth: 38; implicitHeight: 38; radius: 10
+                                                implicitWidth: 43; implicitHeight: 43; radius: 10
                                                 color: Theme.withAlpha(Theme.primary, 0.2)
                                                 Text {
                                                     anchors.centerIn: parent
                                                     text: Theme.icons.gpu
                                                     font.family: Theme.iconFontFamily
-                                                    font.pixelSize: 16
+                                                    font.pixelSize: 18
                                                     color: Theme.primary
                                                 }
                                             }
@@ -6784,13 +6922,13 @@ PanelWindow {
                                                 Text {
                                                     text: Theme.t("gaming.nvidia_driver", "Driver NVIDIA")
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 10
+                                                    font.pixelSize: 11
                                                     color: Theme.subtext
                                                 }
                                                 Text {
                                                     text: win.gamingData && win.gamingData.gpu && win.gamingData.gpu.driver ? win.gamingData.gpu.driver : "Ativo"
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 13
+                                                    font.pixelSize: 15
                                                     font.weight: Font.Bold
                                                     color: Theme.textColor
                                                 }
@@ -6815,7 +6953,7 @@ PanelWindow {
                                         Text {
                                             text: Theme.icons.speed
                                             font.family: Theme.iconFontFamily
-                                            font.pixelSize: 22
+                                            font.pixelSize: 25
                                             color: win.gamingData && win.gamingData.gamemode_active ? Theme.primary : Theme.subtext
                                         }
 
@@ -6825,14 +6963,14 @@ PanelWindow {
                                             Text {
                                                 text: Theme.t("gaming.gamemode_title", "Feral GameMode")
                                                 font.family: Theme.fontFamily
-                                                font.pixelSize: 13
+                                                font.pixelSize: 15
                                                 font.weight: Font.DemiBold
                                                 color: Theme.textColor
                                             }
                                             Text {
                                                 text: Theme.t("gaming.gamemode_desc", "Otimiza a CPU para priorizar taxas de quadros (FPS) e reduz a latência nos jogos")
                                                 font.family: Theme.fontFamily
-                                                font.pixelSize: 11
+                                                font.pixelSize: 12
                                                 color: Theme.subtext
                                             }
                                         }
@@ -6879,20 +7017,20 @@ PanelWindow {
                                                 Text {
                                                     text: steamCard.modelData.title
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 12
+                                                    font.pixelSize: 13
                                                     font.weight: Font.DemiBold
                                                     color: Theme.textColor
                                                 }
                                                 Text {
                                                     text: steamCard.modelData.desc
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 10
+                                                    font.pixelSize: 11
                                                     color: Theme.subtext
                                                 }
                                                 Text {
                                                     text: steamCard.modelData.param
                                                     font.family: Theme.monoFamily
-                                                    font.pixelSize: 10
+                                                    font.pixelSize: 11
                                                     font.weight: Font.Bold
                                                     color: Theme.primary
                                                 }
@@ -6936,6 +7074,7 @@ PanelWindow {
                             contentHeight: storCol.implicitHeight
                             clip: true
                             boundsBehavior: Flickable.StopAtBounds
+                            ScrollBar.vertical: PanelScroll {}
 
                             ColumnLayout {
                                 id: storCol
@@ -6965,7 +7104,7 @@ PanelWindow {
                                             Text {
                                                 text: Theme.t("storage.ssd_root", "SSD Principal (Partição Btrfs /)")
                                                 font.family: Theme.fontFamily
-                                                font.pixelSize: 13
+                                                font.pixelSize: 15
                                                 font.weight: Font.DemiBold
                                                 color: Theme.textColor
                                             }
@@ -6973,7 +7112,7 @@ PanelWindow {
                                             Text {
                                                 text: (win.storageData ? win.storageData.root_used : "") + " " + Theme.t("storage.used_of", "usado de") + " " + (win.storageData ? win.storageData.root_total : "") + " (" + (win.storageData ? win.storageData.root_avail : "") + " " + Theme.t("storage.free", "livres") + ")"
                                                 font.family: Theme.fontFamily
-                                                font.pixelSize: 11
+                                                font.pixelSize: 12
                                                 color: Theme.subtext
                                             }
                                         }
@@ -6995,7 +7134,7 @@ PanelWindow {
                                         Text {
                                             text: (win.storageData ? win.storageData.root_pct : 0) + "% " + Theme.t("storage.space_occupied", "do espaço ocupado")
                                             font.family: Theme.fontFamily
-                                            font.pixelSize: 10
+                                            font.pixelSize: 11
                                             color: Theme.subtext
                                         }
                                     }
@@ -7024,14 +7163,14 @@ PanelWindow {
                                                 Layout.alignment: Qt.AlignHCenter
                                                 text: Theme.t("storage.pacman_cache", "Cache Pacman")
                                                 font.family: Theme.fontFamily
-                                                font.pixelSize: 11
+                                                font.pixelSize: 12
                                                 color: Theme.subtext
                                             }
                                             Text {
                                                 Layout.alignment: Qt.AlignHCenter
                                                 text: win.storageData ? win.storageData.pacman_cache : "0 B"
                                                 font.family: Theme.fontFamily
-                                                font.pixelSize: 15
+                                                font.pixelSize: 17
                                                 font.weight: Font.Bold
                                                 color: Theme.primary
                                             }
@@ -7052,14 +7191,14 @@ PanelWindow {
                                                 Layout.alignment: Qt.AlignHCenter
                                                 text: Theme.t("storage.thumbnails", "Miniaturas")
                                                 font.family: Theme.fontFamily
-                                                font.pixelSize: 11
+                                                font.pixelSize: 12
                                                 color: Theme.subtext
                                             }
                                             Text {
                                                 Layout.alignment: Qt.AlignHCenter
                                                 text: win.storageData ? win.storageData.thumbnails : "0 B"
                                                 font.family: Theme.fontFamily
-                                                font.pixelSize: 15
+                                                font.pixelSize: 17
                                                 font.weight: Font.Bold
                                                 color: Theme.primary
                                             }
@@ -7080,14 +7219,14 @@ PanelWindow {
                                                 Layout.alignment: Qt.AlignHCenter
                                                 text: Theme.t("storage.trash", "Lixeira")
                                                 font.family: Theme.fontFamily
-                                                font.pixelSize: 11
+                                                font.pixelSize: 12
                                                 color: Theme.subtext
                                             }
                                             Text {
                                                 Layout.alignment: Qt.AlignHCenter
                                                 text: win.storageData ? win.storageData.trash : "0 B"
                                                 font.family: Theme.fontFamily
-                                                font.pixelSize: 15
+                                                font.pixelSize: 17
                                                 font.weight: Font.Bold
                                                 color: Theme.primary
                                             }
@@ -7108,14 +7247,14 @@ PanelWindow {
                                                 Layout.alignment: Qt.AlignHCenter
                                                 text: Theme.t("storage.app_cache", "Caches de Apps")
                                                 font.family: Theme.fontFamily
-                                                font.pixelSize: 11
+                                                font.pixelSize: 12
                                                 color: Theme.subtext
                                             }
                                             Text {
                                                 Layout.alignment: Qt.AlignHCenter
                                                 text: win.storageData ? win.storageData.user_cache : "0 B"
                                                 font.family: Theme.fontFamily
-                                                font.pixelSize: 15
+                                                font.pixelSize: 17
                                                 font.weight: Font.Bold
                                                 color: Theme.primary
                                             }
@@ -7129,7 +7268,7 @@ PanelWindow {
 
                                     Rectangle {
                                         Layout.fillWidth: true
-                                        implicitHeight: 56
+                                        implicitHeight: 63
                                         radius: 10
                                         color: Theme.tile
                                         border.width: 1
@@ -7141,7 +7280,7 @@ PanelWindow {
                                             Text {
                                                 text: Theme.icons.packages
                                                 font.family: Theme.iconFontFamily
-                                                font.pixelSize: 18
+                                                font.pixelSize: 20
                                                 color: Theme.primary
                                             }
                                             ColumnLayout {
@@ -7150,14 +7289,14 @@ PanelWindow {
                                                 Text {
                                                     text: Theme.t("storage.clean_pacman_title", "Limpar Pacotes Antigos do Pacman")
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 12
+                                                    font.pixelSize: 13
                                                     font.weight: Font.DemiBold
                                                     color: Theme.textColor
                                                 }
                                                 Text {
                                                     text: Theme.t("storage.clean_pacman_desc", "Mantém as 2 últimas versões instaladas para rollback seguro e remove o restante.")
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 10
+                                                    font.pixelSize: 11
                                                     color: Theme.subtext
                                                 }
                                             }
@@ -7174,7 +7313,7 @@ PanelWindow {
 
                                     Rectangle {
                                         Layout.fillWidth: true
-                                        implicitHeight: 56
+                                        implicitHeight: 63
                                         radius: 10
                                         color: Theme.tile
                                         border.width: 1
@@ -7186,7 +7325,7 @@ PanelWindow {
                                             Text {
                                                 text: Theme.icons.camera
                                                 font.family: Theme.iconFontFamily
-                                                font.pixelSize: 18
+                                                font.pixelSize: 20
                                                 color: Theme.primary
                                             }
                                             ColumnLayout {
@@ -7195,14 +7334,14 @@ PanelWindow {
                                                 Text {
                                                     text: Theme.t("storage.clean_thumbs_title", "Limpar Miniaturas em Cache")
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 12
+                                                    font.pixelSize: 13
                                                     font.weight: Font.DemiBold
                                                     color: Theme.textColor
                                                 }
                                                 Text {
                                                     text: Theme.t("storage.clean_thumbs_desc", "Remove thumbnails geradas para arquivos e vídeos. Elas serão recriadas se necessário.")
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 10
+                                                    font.pixelSize: 11
                                                     color: Theme.subtext
                                                 }
                                             }
@@ -7219,7 +7358,7 @@ PanelWindow {
 
                                     Rectangle {
                                         Layout.fillWidth: true
-                                        implicitHeight: 56
+                                        implicitHeight: 63
                                         radius: 10
                                         color: Theme.tile
                                         border.width: 1
@@ -7231,7 +7370,7 @@ PanelWindow {
                                             Text {
                                                 text: Theme.icons.trash
                                                 font.family: Theme.iconFontFamily
-                                                font.pixelSize: 18
+                                                font.pixelSize: 20
                                                 color: Theme.primary
                                             }
                                             ColumnLayout {
@@ -7240,14 +7379,14 @@ PanelWindow {
                                                 Text {
                                                     text: Theme.t("storage.empty_trash_title", "Esvaziar Lixeira do Usuário")
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 12
+                                                    font.pixelSize: 13
                                                     font.weight: Font.DemiBold
                                                     color: Theme.textColor
                                                 }
                                                 Text {
                                                     text: Theme.t("storage.empty_trash_desc", "Apaga permanentemente os arquivos descartados em ~/.local/share/Trash.")
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 10
+                                                    font.pixelSize: 11
                                                     color: Theme.subtext
                                                 }
                                             }
@@ -7288,6 +7427,7 @@ PanelWindow {
                             contentHeight: bindsCol.implicitHeight
                             clip: true
                             boundsBehavior: Flickable.StopAtBounds
+                            ScrollBar.vertical: PanelScroll {}
 
                             ColumnLayout {
                                 id: bindsCol
@@ -7388,7 +7528,7 @@ PanelWindow {
 
                                     Rectangle {
                                         implicitWidth: 200
-                                        implicitHeight: 32
+                                        implicitHeight: 36
                                         radius: 8
                                         color: Theme.background
                                         border.width: 1
@@ -7401,14 +7541,14 @@ PanelWindow {
                                             Text {
                                                 text: Theme.icons.magnify
                                                 font.family: Theme.iconFontFamily
-                                                font.pixelSize: 13
+                                                font.pixelSize: 15
                                                 color: Theme.subtext
                                             }
                                             TextInput {
                                                 id: searchInput
                                                 Layout.fillWidth: true
                                                 font.family: Theme.fontFamily
-                                                font.pixelSize: 11
+                                                font.pixelSize: 12
                                                 color: Theme.textColor
                                                 clip: true
                                                 onTextChanged: win.bindsFilter = text.toLowerCase()
@@ -7416,7 +7556,7 @@ PanelWindow {
                                                     visible: !searchInput.text
                                                     text: Theme.t("binds.search_placeholder", "Buscar atalho...")
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 11
+                                                    font.pixelSize: 12
                                                     color: Theme.subtext
                                                 }
                                             }
@@ -7444,15 +7584,15 @@ PanelWindow {
                                             spacing: 10
 
                                             Rectangle {
-                                                implicitWidth: 36
-                                                implicitHeight: 36
+                                                implicitWidth: 40
+                                                implicitHeight: 40
                                                 radius: 10
                                                 color: Theme.withAlpha(Theme.primary, 0.2)
                                                 Text {
                                                     anchors.centerIn: parent
                                                     text: Theme.icons.tune
                                                     font.family: Theme.iconFontFamily
-                                                    font.pixelSize: 18
+                                                    font.pixelSize: 20
                                                     color: Theme.primary
                                                 }
                                             }
@@ -7463,14 +7603,14 @@ PanelWindow {
                                                 Text {
                                                     text: Theme.t("binds.custom_title", "Personalizar Atalhos Próprios (~/.config/hypr/user-binds.lua)")
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 13
+                                                    font.pixelSize: 15
                                                     font.weight: Font.Bold
                                                     color: Theme.textColor
                                                 }
                                                 Text {
                                                     text: Theme.t("binds.custom_desc", "Adicione ou altere qualquer atalho do Hyprland sem perder suas customizações em atualizações futuras.")
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 10
+                                                    font.pixelSize: 11
                                                     color: Theme.subtext
                                                     wrapMode: Text.WordWrap
                                                     Layout.fillWidth: true
@@ -7531,7 +7671,7 @@ PanelWindow {
                                         {
                                             cat: Theme.t("binds.cat_capture", "Captura & Gravação de Tela"),
                                             binds: [
-                                                { key: "Print / Super+Shift+S", action: Theme.t("binds.act_screenshot_region", "Captura de Região (cancelar = tela inteira)") },
+                                                { key: "Print / Super+Shift+S", action: Theme.t("binds.act_screenshot_region", "Captura de Região (Esc cancela)") },
                                                 { key: "Super + Alt + S", action: Theme.t("binds.act_screenshot_swappy", "Captura com Editor de Anotações (Swappy)") },
                                                 { key: "Shift + Print", action: Theme.t("binds.act_screenshot_full", "Captura da Tela Inteira") },
                                                 { key: "Ctrl + Print", action: Theme.t("binds.act_screenshot_window", "Captura da Janela Ativa") },
@@ -7565,7 +7705,7 @@ PanelWindow {
                                         Text {
                                             text: catBindsCol.modelData.cat
                                             font.family: Theme.fontFamily
-                                            font.pixelSize: 12
+                                            font.pixelSize: 13
                                             font.weight: Font.Bold
                                             color: Theme.primary
                                         }
@@ -7586,7 +7726,7 @@ PanelWindow {
                                                     readonly property var info: win.systemBindInfo(guideBind.modelData.key)
                                                     readonly property bool editable: guideBind.info !== null && guideBind.info.customizable
                                                     readonly property bool changed: guideBind.info !== null && guideBind.info.overridden
-                                                    implicitHeight: 34
+                                                    implicitHeight: 38
                                                     implicitWidth: bindRow.implicitWidth + 20
                                                     radius: 8
                                                     color: guideArea.containsMouse && guideBind.editable ? Theme.tileHigh : Theme.tile
@@ -7616,7 +7756,7 @@ PanelWindow {
                                                                 text: guideBind.changed ? guideBind.info.current
                                                                                         : guideBind.modelData.key
                                                                 font.family: Theme.monoFamily
-                                                                font.pixelSize: 10
+                                                                font.pixelSize: 11
                                                                 font.weight: Font.Bold
                                                                 color: Theme.primary
                                                             }
@@ -7625,7 +7765,7 @@ PanelWindow {
                                                         Text {
                                                             text: guideBind.modelData.action
                                                             font.family: Theme.fontFamily
-                                                            font.pixelSize: 11
+                                                            font.pixelSize: 12
                                                             color: Theme.textColor
                                                         }
 
@@ -7633,7 +7773,7 @@ PanelWindow {
                                                             visible: guideBind.editable
                                                             text: guideBind.changed ? Theme.icons.restore : Theme.icons.pencil
                                                             font.family: Theme.iconFontFamily
-                                                            font.pixelSize: 12
+                                                            font.pixelSize: 13
                                                             color: guideArea.containsMouse ? Theme.primary : Theme.subtext
                                                         }
                                                     }
@@ -7675,6 +7815,7 @@ PanelWindow {
                             contentHeight: subBindsCol.implicitHeight
                             clip: true
                             boundsBehavior: Flickable.StopAtBounds
+                            ScrollBar.vertical: PanelScroll {}
 
                             ColumnLayout {
                                 id: subBindsCol
@@ -7716,7 +7857,7 @@ PanelWindow {
                                     wrapMode: Text.WordWrap
                                     text: Theme.t("binds.app_conflict", "Atenção: essa combinação já era usada por outro atalho do sistema.")
                                     font.family: Theme.fontFamily
-                                    font.pixelSize: 11
+                                    font.pixelSize: 12
                                     color: "#ffb347"
                                 }
 
@@ -7726,7 +7867,7 @@ PanelWindow {
                                     visible: win.appBinds.length > 0
                                     text: Theme.t("binds.sub_with", "Programas com atalho")
                                     font.family: Theme.fontFamily
-                                    font.pixelSize: 11
+                                    font.pixelSize: 12
                                     font.weight: Font.DemiBold
                                     color: Theme.subtext
                                 }
@@ -7742,7 +7883,7 @@ PanelWindow {
                                         // saber que existem, mas não são mexidos daqui.
                                         readonly property bool managed: (boundRow.modelData.source || "managed") === "managed"
                                         Layout.fillWidth: true
-                                        implicitHeight: 52
+                                        implicitHeight: 58
                                         radius: 10
                                         color: Theme.tile
                                         border.width: 1
@@ -7760,7 +7901,7 @@ PanelWindow {
                                                 Text {
                                                     text: boundRow.modelData.name
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 12
+                                                    font.pixelSize: 13
                                                     font.weight: Font.DemiBold
                                                     color: Theme.textColor
                                                 }
@@ -7768,7 +7909,7 @@ PanelWindow {
                                                     Layout.fillWidth: true
                                                     text: boundRow.modelData.command
                                                     font.family: Theme.monoFamily
-                                                    font.pixelSize: 10
+                                                    font.pixelSize: 11
                                                     color: Theme.subtext
                                                     elide: Text.ElideMiddle
                                                 }
@@ -7776,7 +7917,7 @@ PanelWindow {
 
                                             Rectangle {
                                                 implicitWidth: Math.max(100, boundCombo.implicitWidth + 20)
-                                                implicitHeight: 28
+                                                implicitHeight: 31
                                                 radius: 7
                                                 color: Theme.withAlpha(Theme.primary, 0.18)
                                                 Text {
@@ -7784,7 +7925,7 @@ PanelWindow {
                                                     anchors.centerIn: parent
                                                     text: boundRow.modelData.combo
                                                     font.family: Theme.monoFamily
-                                                    font.pixelSize: 11
+                                                    font.pixelSize: 12
                                                     font.weight: Font.DemiBold
                                                     color: Theme.primary
                                                 }
@@ -7796,7 +7937,7 @@ PanelWindow {
                                                     ? Theme.t("binds.sub_from_rice", "atalho do rice")
                                                     : Theme.t("binds.sub_from_file", "escrito à mão")
                                                 font.family: Theme.fontFamily
-                                                font.pixelSize: 10
+                                                font.pixelSize: 11
                                                 color: Theme.subtext
                                             }
 
@@ -7809,15 +7950,15 @@ PanelWindow {
 
                                             Rectangle {
                                                 visible: boundRow.managed
-                                                implicitWidth: 28
-                                                implicitHeight: 28
+                                                implicitWidth: 31
+                                                implicitHeight: 31
                                                 radius: 8
                                                 color: rmRowArea.containsMouse ? Theme.critical : "transparent"
                                                 Text {
                                                     anchors.centerIn: parent
                                                     text: Theme.icons.trash
                                                     font.family: Theme.iconFontFamily
-                                                    font.pixelSize: 14
+                                                    font.pixelSize: 16
                                                     color: rmRowArea.containsMouse ? "#ffffff" : Theme.subtext
                                                 }
                                                 MouseArea {
@@ -7845,7 +7986,7 @@ PanelWindow {
                                     Text {
                                         text: Theme.t("binds.sub_add", "Dar atalho a outro programa")
                                         font.family: Theme.fontFamily
-                                        font.pixelSize: 11
+                                        font.pixelSize: 12
                                         font.weight: Font.DemiBold
                                         color: Theme.subtext
                                     }
@@ -7853,7 +7994,7 @@ PanelWindow {
 
                                     Rectangle {
                                         implicitWidth: 260
-                                        implicitHeight: 32
+                                        implicitHeight: 36
                                         radius: 8
                                         color: Theme.background
                                         border.width: 1
@@ -7866,7 +8007,7 @@ PanelWindow {
                                             Text {
                                                 text: Theme.icons.magnify
                                                 font.family: Theme.iconFontFamily
-                                                font.pixelSize: 13
+                                                font.pixelSize: 15
                                                 color: Theme.subtext
                                             }
                                             TextInput {
@@ -7874,7 +8015,7 @@ PanelWindow {
                                                 Layout.fillWidth: true
                                                 verticalAlignment: TextInput.AlignVCenter
                                                 font.family: Theme.fontFamily
-                                                font.pixelSize: 12
+                                                font.pixelSize: 13
                                                 color: Theme.textColor
                                                 selectByMouse: true
                                                 onTextChanged: win.bindAppQuery = text
@@ -7884,7 +8025,7 @@ PanelWindow {
                                                     visible: subBindSearch.text === ""
                                                     text: Theme.t("binds.app_ph2", "Procurar programa...")
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 12
+                                                    font.pixelSize: 13
                                                     color: Theme.subtext
                                                 }
                                             }
@@ -7897,7 +8038,7 @@ PanelWindow {
                                     visible: win.bindAppQuery.trim() === ""
                                     text: Theme.t("binds.sub_search_hint", "Digite o nome de um programa acima para dar um atalho a ele.")
                                     font.family: Theme.fontFamily
-                                    font.pixelSize: 11
+                                    font.pixelSize: 12
                                     color: Theme.subtext
                                 }
 
@@ -7908,7 +8049,7 @@ PanelWindow {
                                         required property var modelData
                                         readonly property string cmd: freeRow.modelData.exec || freeRow.modelData.name
                                         Layout.fillWidth: true
-                                        implicitHeight: 48
+                                        implicitHeight: 54
                                         radius: 10
                                         color: Theme.tile
                                         border.width: 1
@@ -7925,7 +8066,7 @@ PanelWindow {
                                                 Text {
                                                     text: freeRow.modelData.name
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 12
+                                                    font.pixelSize: 13
                                                     font.weight: Font.DemiBold
                                                     color: Theme.textColor
                                                 }
@@ -7933,7 +8074,7 @@ PanelWindow {
                                                     Layout.fillWidth: true
                                                     text: freeRow.cmd
                                                     font.family: Theme.monoFamily
-                                                    font.pixelSize: 10
+                                                    font.pixelSize: 11
                                                     color: Theme.subtext
                                                     elide: Text.ElideMiddle
                                                 }
@@ -7942,7 +8083,7 @@ PanelWindow {
                                             Text {
                                                 text: Theme.t("binds.sub_none", "sem atalho")
                                                 font.family: Theme.fontFamily
-                                                font.pixelSize: 11
+                                                font.pixelSize: 12
                                                 color: Theme.subtext
                                             }
 
@@ -7965,6 +8106,7 @@ PanelWindow {
                             contentHeight: sysCol.implicitHeight
                             clip: true
                             boundsBehavior: Flickable.StopAtBounds
+                            ScrollBar.vertical: PanelScroll {}
 
                             ColumnLayout {
                                 id: sysCol
@@ -8003,7 +8145,7 @@ PanelWindow {
                                             id: snapCard
                                             required property var modelData
                                             Layout.fillWidth: true
-                                            implicitHeight: 46
+                                            implicitHeight: 52
                                             radius: 8
                                             color: Theme.tile
                                             border.width: 1
@@ -8015,15 +8157,15 @@ PanelWindow {
                                                 spacing: 10
 
                                                 Rectangle {
-                                                    implicitWidth: 26
-                                                    implicitHeight: 26
+                                                    implicitWidth: 29
+                                                    implicitHeight: 29
                                                     radius: 6
                                                     color: Theme.withAlpha(Theme.primary, 0.2)
                                                     Text {
                                                         anchors.centerIn: parent
                                                         text: Theme.icons.disk
                                                         font.family: Theme.iconFontFamily
-                                                        font.pixelSize: 13
+                                                        font.pixelSize: 15
                                                         color: Theme.primary
                                                     }
                                                 }
@@ -8034,7 +8176,7 @@ PanelWindow {
                                                     Text {
                                                         text: "#" + snapCard.modelData.id + " · " + snapCard.modelData.description
                                                         font.family: Theme.fontFamily
-                                                        font.pixelSize: 11
+                                                        font.pixelSize: 12
                                                         font.weight: Font.DemiBold
                                                         color: Theme.textColor
                                                         elide: Text.ElideRight
@@ -8042,21 +8184,21 @@ PanelWindow {
                                                     Text {
                                                         text: snapCard.modelData.date + " · Tipo: " + snapCard.modelData.type
                                                         font.family: Theme.fontFamily
-                                                        font.pixelSize: 9
+                                                        font.pixelSize: 10
                                                         color: Theme.subtext
                                                     }
                                                 }
 
                                                 Rectangle {
-                                                    implicitWidth: 24
-                                                    implicitHeight: 24
+                                                    implicitWidth: 27
+                                                    implicitHeight: 27
                                                     radius: 12
                                                     color: snapDelArea.containsMouse ? Theme.withAlpha(Theme.critical, 0.2) : "transparent"
                                                     Text {
                                                         anchors.centerIn: parent
                                                         text: Theme.icons.trash
                                                         font.family: Theme.iconFontFamily
-                                                        font.pixelSize: 12
+                                                        font.pixelSize: 13
                                                         color: Theme.critical
                                                     }
                                                     MouseArea {
@@ -8105,15 +8247,15 @@ PanelWindow {
                                             spacing: 12
 
                                             Rectangle {
-                                                implicitWidth: 38
-                                                implicitHeight: 38
+                                                implicitWidth: 43
+                                                implicitHeight: 43
                                                 radius: 10
                                                 color: Theme.withAlpha(Theme.primary, 0.2)
                                                 Text {
                                                     anchors.centerIn: parent
                                                     text: Theme.icons.volHigh
                                                     font.family: Theme.iconFontFamily
-                                                    font.pixelSize: 18
+                                                    font.pixelSize: 20
                                                     color: Theme.primary
                                                 }
                                             }
@@ -8124,14 +8266,14 @@ PanelWindow {
                                                 Text {
                                                     text: Theme.t("sys.audio_repair_title", "Reiniciar Sistema de Áudio (PipeWire)")
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 12
+                                                    font.pixelSize: 13
                                                     font.weight: Font.DemiBold
                                                     color: Theme.textColor
                                                 }
                                                 Text {
                                                     text: Theme.t("sys.audio_repair_desc", "Se o som parou ou o microfone não responde após conectar um fone/headset.")
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 10
+                                                    font.pixelSize: 11
                                                     color: Theme.subtext
                                                 }
                                             }
@@ -8163,15 +8305,15 @@ PanelWindow {
                                             spacing: 12
 
                                             Rectangle {
-                                                implicitWidth: 38
-                                                implicitHeight: 38
+                                                implicitWidth: 43
+                                                implicitHeight: 43
                                                 radius: 10
                                                 color: Theme.withAlpha(Theme.primary, 0.2)
                                                 Text {
                                                     anchors.centerIn: parent
                                                     text: Theme.icons.lock
                                                     font.family: Theme.iconFontFamily
-                                                    font.pixelSize: 18
+                                                    font.pixelSize: 20
                                                     color: Theme.primary
                                                 }
                                             }
@@ -8182,14 +8324,14 @@ PanelWindow {
                                                 Text {
                                                     text: Theme.t("sys.pacman_unlock_title", "Destravar Pacman (Remover db.lck)")
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 12
+                                                    font.pixelSize: 13
                                                     font.weight: Font.DemiBold
                                                     color: Theme.textColor
                                                 }
                                                 Text {
                                                     text: Theme.t("sys.pacman_unlock_desc", "Resolve o erro 'banco de dados está bloqueado' se o terminal fechou durante um update.")
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 10
+                                                    font.pixelSize: 11
                                                     color: Theme.subtext
                                                 }
                                             }
@@ -8219,15 +8361,15 @@ PanelWindow {
                                             spacing: 12
 
                                             Rectangle {
-                                                implicitWidth: 38
-                                                implicitHeight: 38
+                                                implicitWidth: 43
+                                                implicitHeight: 43
                                                 radius: 10
                                                 color: Theme.withAlpha(Theme.primary, 0.2)
                                                 Text {
                                                     anchors.centerIn: parent
                                                     text: Theme.icons.broom
                                                     font.family: Theme.iconFontFamily
-                                                    font.pixelSize: 18
+                                                    font.pixelSize: 20
                                                     color: Theme.primary
                                                 }
                                             }
@@ -8238,14 +8380,14 @@ PanelWindow {
                                                 Text {
                                                     text: Theme.t("sys.clean_disk_title", "Limpeza de Disco & Caches Antigos")
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 12
+                                                    font.pixelSize: 13
                                                     font.weight: Font.DemiBold
                                                     color: Theme.textColor
                                                 }
                                                 Text {
                                                     text: Theme.t("sys.clean_disk_desc", "Remove versões antigas de pacotes do pacman e miniaturas expiradas com segurança.")
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 10
+                                                    font.pixelSize: 11
                                                     color: Theme.subtext
                                                 }
                                             }
@@ -8276,15 +8418,15 @@ PanelWindow {
                                             spacing: 12
 
                                             Rectangle {
-                                                implicitWidth: 38
-                                                implicitHeight: 38
+                                                implicitWidth: 43
+                                                implicitHeight: 43
                                                 radius: 10
                                                 color: Theme.withAlpha(Theme.primary, 0.2)
                                                 Text {
                                                     anchors.centerIn: parent
                                                     text: Theme.icons.health
                                                     font.family: Theme.iconFontFamily
-                                                    font.pixelSize: 18
+                                                    font.pixelSize: 20
                                                     color: Theme.primary
                                                 }
                                             }
@@ -8295,14 +8437,14 @@ PanelWindow {
                                                 Text {
                                                     text: Theme.t("sys.doctor_title", "Assistente de Diagnóstico (Rice Doctor)")
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 12
+                                                    font.pixelSize: 13
                                                     font.weight: Font.DemiBold
                                                     color: Theme.textColor
                                                 }
                                                 Text {
                                                     text: Theme.t("sys.doctor_desc", "Varredura completa de integridade de áudio, GPU, Waywallen, SDDM e zRAM.")
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 10
+                                                    font.pixelSize: 11
                                                     color: Theme.subtext
                                                 }
                                             }
@@ -8336,6 +8478,7 @@ PanelWindow {
                             contentWidth: width
                             clip: true
                             boundsBehavior: Flickable.StopAtBounds
+                            ScrollBar.vertical: PanelScroll {}
 
                             ColumnLayout {
                                 id: appStoreCol
@@ -8365,7 +8508,7 @@ PanelWindow {
 
                                         Rectangle {
                                             implicitWidth: 56
-                                            implicitHeight: 56
+                                            implicitHeight: 63
                                             radius: 14
                                             color: win.softwareUpdatesData.sys_count > 0
                                                 ? Theme.withAlpha("#f59e0b", 0.18)
@@ -8374,7 +8517,7 @@ PanelWindow {
                                                 anchors.centerIn: parent
                                                 text: win.softwareUpdatesData.sys_count > 0 ? Theme.icons.update : Theme.icons.confirm
                                                 font.family: Theme.iconFontFamily
-                                                font.pixelSize: 26
+                                                font.pixelSize: 29
                                                 color: win.softwareUpdatesData.sys_count > 0 ? "#f59e0b" : "#10b981"
                                             }
                                         }
@@ -8388,7 +8531,7 @@ PanelWindow {
                                                     ? win.softwareUpdatesData.sys_count + " " + Theme.t("store.updates_pending", "atualizações pendentes")
                                                     : Theme.t("store.up_to_date", "Sistema em dia")
                                                 font.family: Theme.fontFamily
-                                                font.pixelSize: 16
+                                                font.pixelSize: 18
                                                 font.weight: Font.Bold
                                                 color: Theme.textColor
                                             }
@@ -8409,7 +8552,7 @@ PanelWindow {
                                                     return parts.join("  ·  ");
                                                 }
                                                 font.family: Theme.fontFamily
-                                                font.pixelSize: 11
+                                                font.pixelSize: 12
                                                 color: Theme.subtext
                                                 elide: Text.ElideRight
                                             }
@@ -8459,15 +8602,15 @@ PanelWindow {
                                         spacing: 14
 
                                         Rectangle {
-                                            implicitWidth: 40
-                                            implicitHeight: 40
+                                            implicitWidth: 45
+                                            implicitHeight: 45
                                             radius: 10
                                             color: Theme.withAlpha(Theme.primary, 0.2)
                                             Text {
                                                 anchors.centerIn: parent
                                                 text: Theme.icons.packages
                                                 font.family: Theme.iconFontFamily
-                                                font.pixelSize: 20
+                                                font.pixelSize: 22
                                                 color: Theme.primary
                                             }
                                         }
@@ -8478,7 +8621,7 @@ PanelWindow {
                                             Text {
                                                 text: Theme.t("store.open_store", "Abrir a loja de programas")
                                                 font.family: Theme.fontFamily
-                                                font.pixelSize: 14
+                                                font.pixelSize: 16
                                                 font.weight: Font.Bold
                                                 color: Theme.textColor
                                             }
@@ -8487,7 +8630,7 @@ PanelWindow {
                                                     ? win.softwareUpdatesData.store
                                                     : Theme.t("store.no_store", "Nenhuma instalada — clique para instalar o Shelly")
                                                 font.family: Theme.monoFamily
-                                                font.pixelSize: 10
+                                                font.pixelSize: 11
                                                 color: Theme.subtext
                                             }
                                         }
@@ -8495,7 +8638,7 @@ PanelWindow {
                                         Text {
                                             text: Theme.icons.chevronRight
                                             font.family: Theme.iconFontFamily
-                                            font.pixelSize: 18
+                                            font.pixelSize: 20
                                             color: Theme.primary
                                         }
                                     }
@@ -8542,7 +8685,7 @@ PanelWindow {
 
                                             Rectangle {
                                                 implicitWidth: 56
-                                                implicitHeight: 56
+                                                implicitHeight: 63
                                                 radius: 14
                                                 color: win.riceHasUpdate
                                                     ? Theme.withAlpha(Theme.primary, 0.18)
@@ -8552,7 +8695,7 @@ PanelWindow {
                                                     text: win.riceHasUpdate ? Theme.icons.update
                                                         : (win.riceCheckFailed ? Theme.icons.alert : Theme.icons.confirm)
                                                     font.family: Theme.iconFontFamily
-                                                    font.pixelSize: 26
+                                                    font.pixelSize: 29
                                                     color: win.riceHasUpdate ? Theme.primary
                                                         : (win.riceCheckFailed ? "#f59e0b" : "#10b981")
                                                 }
@@ -8569,7 +8712,7 @@ PanelWindow {
                                                             ? Theme.t("store.rice_offline", "Não deu para verificar agora")
                                                             : Theme.t("store.rice_latest", "Você está na versão mais recente"))
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 16
+                                                    font.pixelSize: 18
                                                     font.weight: Font.Bold
                                                     color: Theme.textColor
                                                 }
@@ -8587,7 +8730,7 @@ PanelWindow {
                                                         return line;
                                                     }
                                                     font.family: Theme.monoFamily
-                                                    font.pixelSize: 10
+                                                    font.pixelSize: 11
                                                     color: Theme.subtext
                                                     elide: Text.ElideRight
                                                 }
@@ -8642,7 +8785,7 @@ PanelWindow {
                                             Text {
                                                 text: Theme.t("store.rice_changes", "O que vem nesta atualização:")
                                                 font.family: Theme.fontFamily
-                                                font.pixelSize: 11
+                                                font.pixelSize: 12
                                                 font.weight: Font.DemiBold
                                                 color: Theme.subtext
                                             }
@@ -8656,14 +8799,14 @@ PanelWindow {
                                                     Text {
                                                         text: "•"
                                                         font.family: Theme.fontFamily
-                                                        font.pixelSize: 11
+                                                        font.pixelSize: 12
                                                         color: Theme.primary
                                                     }
                                                     Text {
                                                         Layout.fillWidth: true
                                                         text: modelData
                                                         font.family: Theme.fontFamily
-                                                        font.pixelSize: 11
+                                                        font.pixelSize: 12
                                                         color: Theme.textColor
                                                         elide: Text.ElideRight
                                                     }
@@ -8675,7 +8818,7 @@ PanelWindow {
                                             Layout.fillWidth: true
                                             text: Theme.t("store.rice_note", "A atualização faz uma cópia de segurança das suas configurações antes de aplicar, e mantém dock, widgets, atalhos e cores personalizados.")
                                             font.family: Theme.fontFamily
-                                            font.pixelSize: 10
+                                            font.pixelSize: 11
                                             color: Theme.withAlpha(Theme.subtext, 0.8)
                                             wrapMode: Text.WordWrap
                                         }
@@ -8694,6 +8837,7 @@ PanelWindow {
                             contentHeight: modeCol.implicitHeight + 30
                             clip: true
                             boundsBehavior: Flickable.StopAtBounds
+                            ScrollBar.vertical: PanelScroll {}
 
                             ColumnLayout {
                                 id: modeCol
@@ -8748,7 +8892,7 @@ PanelWindow {
                                         Text {
                                             text: Theme.icons.info
                                             font.family: Theme.iconFontFamily
-                                            font.pixelSize: 18
+                                            font.pixelSize: 20
                                             color: Theme.primary
                                         }
                                         Text {
@@ -8756,7 +8900,7 @@ PanelWindow {
                                             wrapMode: Text.WordWrap
                                             text: Theme.t("mode.note", "Os atalhos são os mesmos nos dois estilos. Em qualquer um, Super + Shift + V solta ou prende só a janela atual.")
                                             font.family: Theme.fontFamily
-                                            font.pixelSize: 11
+                                            font.pixelSize: 12
                                             color: Theme.textColor
                                         }
                                     }
@@ -8772,6 +8916,7 @@ PanelWindow {
                             contentWidth: width
                             clip: true
                             boundsBehavior: Flickable.StopAtBounds
+                            ScrollBar.vertical: PanelScroll {}
 
                             property string targetComp: "dock"
 
@@ -8790,7 +8935,7 @@ PanelWindow {
                                         Text {
                                             text: Theme.t("settings.cat_shell_custom", "CUSTOMIZAÇÃO DO SHELL").toUpperCase()
                                             font.family: Theme.fontFamily
-                                            font.pixelSize: 12
+                                            font.pixelSize: 13
                                             font.weight: Font.Bold
                                             color: Theme.primary
                                         }
@@ -8798,7 +8943,7 @@ PanelWindow {
                                         Text {
                                             text: Theme.t("shell_custom.preview_desc", "Configurações sincronizadas em tempo real via ShellCustomization.")
                                             font.family: Theme.fontFamily
-                                            font.pixelSize: 10
+                                            font.pixelSize: 11
                                             color: Theme.subtext
                                         }
                                     }
@@ -8806,7 +8951,7 @@ PanelWindow {
                                     // Seletor de Componentes: Hub, Sidebar, Dock
                                     Rectangle {
                                         Layout.fillWidth: true
-                                        implicitHeight: 48
+                                        implicitHeight: 54
                                         radius: 12
                                         color: Theme.tile
                                         border.width: 1
@@ -8841,13 +8986,13 @@ PanelWindow {
                                                         Text {
                                                             text: modelData.icon
                                                             font.family: Theme.iconFontFamily
-                                                            font.pixelSize: 14
+                                                            font.pixelSize: 16
                                                             color: isSelected ? Theme.background : Theme.textColor
                                                         }
                                                         Text {
                                                             text: modelData.name
                                                             font.family: Theme.fontFamily
-                                                            font.pixelSize: 11
+                                                            font.pixelSize: 12
                                                             font.weight: isSelected ? Font.Bold : Font.Normal
                                                             color: isSelected ? Theme.background : Theme.textColor
                                                         }
@@ -8886,7 +9031,7 @@ PanelWindow {
                                             Text {
                                                 text: Theme.t("shell_custom.preview_title", "Prévia Visual Dinâmica")
                                                 font.family: Theme.fontFamily
-                                                font.pixelSize: 11
+                                                font.pixelSize: 12
                                                 font.weight: Font.Bold
                                                 color: Theme.primary
                                             }
@@ -8897,17 +9042,17 @@ PanelWindow {
                                                 Rectangle {
                                                     implicitWidth: b1.implicitWidth + 10; implicitHeight: 18; radius: 4
                                                     color: Theme.tile
-                                                    Text { id: b1; anchors.centerIn: parent; text: ShellCustomization.getStyle(shellCustomTab.targetComp).toUpperCase(); font.pixelSize: 9; font.weight: Font.Bold; color: Theme.textColor }
+                                                    Text { id: b1; anchors.centerIn: parent; text: ShellCustomization.getStyle(shellCustomTab.targetComp).toUpperCase(); font.pixelSize: 10; font.weight: Font.Bold; color: Theme.textColor }
                                                 }
                                                 Rectangle {
                                                     implicitWidth: b2.implicitWidth + 10; implicitHeight: 18; radius: 4
                                                     color: Theme.tile
-                                                    Text { id: b2; anchors.centerIn: parent; text: Math.round(ShellCustomization.getScale(shellCustomTab.targetComp) * 100) + "%"; font.pixelSize: 9; font.weight: Font.Bold; color: Theme.textColor }
+                                                    Text { id: b2; anchors.centerIn: parent; text: Math.round(ShellCustomization.getScale(shellCustomTab.targetComp) * 100) + "%"; font.pixelSize: 10; font.weight: Font.Bold; color: Theme.textColor }
                                                 }
                                                 Rectangle {
                                                     implicitWidth: b3.implicitWidth + 10; implicitHeight: 18; radius: 4
                                                     color: Theme.tile
-                                                    Text { id: b3; anchors.centerIn: parent; text: Math.round(ShellCustomization.getOpacity(shellCustomTab.targetComp) * 100) + "%"; font.pixelSize: 9; font.weight: Font.Bold; color: Theme.textColor }
+                                                    Text { id: b3; anchors.centerIn: parent; text: Math.round(ShellCustomization.getOpacity(shellCustomTab.targetComp) * 100) + "%"; font.pixelSize: 10; font.weight: Font.Bold; color: Theme.textColor }
                                                 }
                                             }
                                         }
@@ -8952,7 +9097,7 @@ PanelWindow {
                                                             anchors.centerIn: parent
                                                             text: shellCustomTab.targetComp === "hub" ? Theme.icons.dashboard : (shellCustomTab.targetComp === "sidebar" ? Theme.icons.tune : Theme.icons.gamepad)
                                                             font.family: Theme.iconFontFamily
-                                                            font.pixelSize: 14
+                                                            font.pixelSize: 16
                                                             color: ShellCustomization.getAccent(shellCustomTab.targetComp)
                                                         }
                                                     }
@@ -8963,7 +9108,7 @@ PanelWindow {
                                                         Text {
                                                             text: (shellCustomTab.targetComp === "hub" ? "Rice Central Hub" : (shellCustomTab.targetComp === "sidebar" ? "Energy & Quick Sidebar" : "Hollow-Wired Dock"))
                                                             font.family: Theme.fontFamily
-                                                            font.pixelSize: 11
+                                                            font.pixelSize: 12
                                                             font.weight: Font.Bold
                                                             color: Theme.textColor
                                                         }
@@ -8971,7 +9116,7 @@ PanelWindow {
                                                             text: Theme.t("shell_custom.style_label", "Estilo: ") + ShellCustomization.getStyle(shellCustomTab.targetComp)
                                                                 + "  ·  " + Theme.t("shell_custom.scale_label", "escala ") + Math.round(ShellCustomization.getScale(shellCustomTab.targetComp) * 100) + "%"
                                                             font.family: Theme.fontFamily
-                                                            font.pixelSize: 9
+                                                            font.pixelSize: 10
                                                             color: Theme.subtext
                                                         }
                                                     }
@@ -9003,7 +9148,7 @@ PanelWindow {
                                             Text {
                                                 text: Theme.t("shell_custom.style", "Estilo Visual")
                                                 font.family: Theme.fontFamily
-                                                font.pixelSize: 11
+                                                font.pixelSize: 12
                                                 font.weight: Font.Bold
                                                 color: Theme.subtext
                                             }
@@ -9020,7 +9165,7 @@ PanelWindow {
                                                     delegate: Rectangle {
                                                         required property var modelData
                                                         implicitWidth: stText.implicitWidth + 16
-                                                        implicitHeight: 28
+                                                        implicitHeight: 31
                                                         radius: 14
                                                         readonly property bool isCurrent: ShellCustomization.getStyle(shellCustomTab.targetComp) === modelData.val
                                                         color: isCurrent ? Theme.primary : (stMouse.containsMouse ? Theme.tileHigh : Theme.surface)
@@ -9032,7 +9177,7 @@ PanelWindow {
                                                             anchors.centerIn: parent
                                                             text: parent.modelData.label
                                                             font.family: Theme.fontFamily
-                                                            font.pixelSize: 10
+                                                            font.pixelSize: 11
                                                             font.weight: Font.Medium
                                                             color: parent.isCurrent ? Theme.background : Theme.textColor
                                                         }
@@ -9057,7 +9202,7 @@ PanelWindow {
                                             Text {
                                                 text: Theme.t("shell_custom.scale", "Escala de Tamanho")
                                                 font.family: Theme.fontFamily
-                                                font.pixelSize: 11
+                                                font.pixelSize: 12
                                                 font.weight: Font.Bold
                                                 color: Theme.subtext
                                             }
@@ -9073,7 +9218,7 @@ PanelWindow {
                                                     delegate: Rectangle {
                                                         required property var modelData
                                                         implicitWidth: scText.implicitWidth + 18
-                                                        implicitHeight: 28
+                                                        implicitHeight: 31
                                                         radius: 14
                                                         readonly property bool isCurrent: Math.abs(ShellCustomization.getScale(shellCustomTab.targetComp) - modelData.val) < 0.05
                                                         color: isCurrent ? Theme.primary : (scMouse.containsMouse ? Theme.tileHigh : Theme.surface)
@@ -9085,7 +9230,7 @@ PanelWindow {
                                                             anchors.centerIn: parent
                                                             text: parent.modelData.label
                                                             font.family: Theme.fontFamily
-                                                            font.pixelSize: 10
+                                                            font.pixelSize: 11
                                                             font.weight: Font.Medium
                                                             color: parent.isCurrent ? Theme.background : Theme.textColor
                                                         }
@@ -9110,7 +9255,7 @@ PanelWindow {
                                             Text {
                                                 text: Theme.t("shell_custom.opacity", "Opacidade do Fundo")
                                                 font.family: Theme.fontFamily
-                                                font.pixelSize: 11
+                                                font.pixelSize: 12
                                                 font.weight: Font.Bold
                                                 color: Theme.subtext
                                             }
@@ -9127,7 +9272,7 @@ PanelWindow {
                                                     delegate: Rectangle {
                                                         required property var modelData
                                                         implicitWidth: opText.implicitWidth + 16
-                                                        implicitHeight: 28
+                                                        implicitHeight: 31
                                                         radius: 14
                                                         readonly property bool isCurrent: Math.abs(ShellCustomization.getOpacity(shellCustomTab.targetComp) - modelData.val) < 0.03
                                                         color: isCurrent ? Theme.primary : (opMouse.containsMouse ? Theme.tileHigh : Theme.surface)
@@ -9139,7 +9284,7 @@ PanelWindow {
                                                             anchors.centerIn: parent
                                                             text: parent.modelData.label
                                                             font.family: Theme.fontFamily
-                                                            font.pixelSize: 10
+                                                            font.pixelSize: 11
                                                             font.weight: Font.Medium
                                                             color: parent.isCurrent ? Theme.background : Theme.textColor
                                                         }
@@ -9164,7 +9309,7 @@ PanelWindow {
                                             Text {
                                                 text: Theme.t("shell_custom.accent", "Cor de Destaque")
                                                 font.family: Theme.fontFamily
-                                                font.pixelSize: 11
+                                                font.pixelSize: 12
                                                 font.weight: Font.Bold
                                                 color: Theme.subtext
                                             }
@@ -9194,7 +9339,7 @@ PanelWindow {
                                                             visible: parent.isCurrent
                                                             text: "✓"
                                                             font.family: Theme.fontFamily
-                                                            font.pixelSize: 11
+                                                            font.pixelSize: 12
                                                             font.weight: Font.Bold
                                                             color: "#000000"
                                                         }
@@ -9232,7 +9377,7 @@ PanelWindow {
                                             Text {
                                                 text: Theme.t("dock.launcher_icon_title", "Ícone do Launcher da Dock").toUpperCase()
                                                 font.family: Theme.fontFamily
-                                                font.pixelSize: 11
+                                                font.pixelSize: 12
                                                 font.weight: Font.Bold
                                                 color: Theme.primary
                                             }
@@ -9240,7 +9385,7 @@ PanelWindow {
                                             Text {
                                                 text: Theme.t("shell_custom.formats_desc", "PNG, JPG, SVG, WebP ou GIF")
                                                 font.family: Theme.fontFamily
-                                                font.pixelSize: 10
+                                                font.pixelSize: 11
                                                 color: Theme.subtext
                                             }
                                         }
@@ -9278,7 +9423,7 @@ PanelWindow {
                                                     Layout.fillWidth: true
                                                     text: Theme.t("dock.launcher_icon_desc", "Ícone fixo à esquerda da Dock para abrir o Launcher.")
                                                     font.family: Theme.fontFamily
-                                                    font.pixelSize: 11
+                                                    font.pixelSize: 12
                                                     color: Theme.textColor
                                                     wrapMode: Text.WordWrap
                                                 }
@@ -9288,7 +9433,7 @@ PanelWindow {
 
                                                     Rectangle {
                                                         implicitWidth: chooseTxt.implicitWidth + 24
-                                                        implicitHeight: 30
+                                                        implicitHeight: 34
                                                         radius: 15
                                                         color: chooseArea.pressed ? Theme.withAlpha(Theme.primary, 0.7) : Theme.primary
 
@@ -9298,14 +9443,14 @@ PanelWindow {
                                                             Text {
                                                                 text: Theme.icons.palette
                                                                 font.family: Theme.iconFontFamily
-                                                                font.pixelSize: 12
+                                                                font.pixelSize: 13
                                                                 color: Theme.background
                                                             }
                                                             Text {
                                                                 id: chooseTxt
                                                                 text: Theme.t("dock.choose_icon", "Escolher Imagem / GIF...")
                                                                 font.family: Theme.fontFamily
-                                                                font.pixelSize: 10
+                                                                font.pixelSize: 11
                                                                 font.weight: Font.Bold
                                                                 color: Theme.background
                                                             }
@@ -9323,7 +9468,7 @@ PanelWindow {
 
                                                     Rectangle {
                                                         implicitWidth: rstTxt.implicitWidth + 20
-                                                        implicitHeight: 30
+                                                        implicitHeight: 34
                                                         radius: 15
                                                         color: rstArea.pressed ? Theme.tileHigh : Theme.surface
                                                         border.width: 1
@@ -9334,7 +9479,7 @@ PanelWindow {
                                                             anchors.centerIn: parent
                                                             text: Theme.t("dock.reset_icon", "Restaurar Padrão Arch")
                                                             font.family: Theme.fontFamily
-                                                            font.pixelSize: 10
+                                                            font.pixelSize: 11
                                                             font.weight: Font.Medium
                                                             color: Theme.textColor
                                                         }
@@ -9361,7 +9506,7 @@ PanelWindow {
 
                                     Rectangle {
                                         Layout.fillWidth: true
-                                        implicitHeight: 38
+                                        implicitHeight: 43
                                         radius: 10
                                         color: applyMouse.pressed ? Theme.withAlpha(Theme.primary, 0.8) : Theme.primary
                                         border.width: 1
@@ -9373,13 +9518,13 @@ PanelWindow {
                                             Text {
                                                 text: Theme.icons.refresh
                                                 font.family: Theme.iconFontFamily
-                                                font.pixelSize: 14
+                                                font.pixelSize: 16
                                                 color: Theme.background
                                             }
                                             Text {
                                                 text: Theme.t("shell_custom.apply_all", "Aplicar Estilo a Todos")
                                                 font.family: Theme.fontFamily
-                                                font.pixelSize: 11
+                                                font.pixelSize: 12
                                                 font.weight: Font.Bold
                                                 color: Theme.background
                                             }
@@ -9397,7 +9542,7 @@ PanelWindow {
 
                                     Rectangle {
                                         Layout.fillWidth: true
-                                        implicitHeight: 38
+                                        implicitHeight: 43
                                         radius: 10
                                         color: resetMouse.pressed ? Theme.tileHigh : Theme.tile
                                         border.width: 1
@@ -9409,13 +9554,13 @@ PanelWindow {
                                             Text {
                                                 text: Theme.icons.backupRestore
                                                 font.family: Theme.iconFontFamily
-                                                font.pixelSize: 14
+                                                font.pixelSize: 16
                                                 color: Theme.textColor
                                             }
                                             Text {
                                                 text: Theme.t("shell_custom.reset", "Restaurar Padrão")
                                                 font.family: Theme.fontFamily
-                                                font.pixelSize: 11
+                                                font.pixelSize: 12
                                                 font.weight: Font.Medium
                                                 color: Theme.textColor
                                             }
@@ -9603,7 +9748,7 @@ PanelWindow {
                 Text {
                     text: Theme.t("colors.picker_title", "Escolher cor") + ": " + win.pickerLabel
                     font.family: Theme.fontFamily
-                    font.pixelSize: 15
+                    font.pixelSize: 17
                     font.weight: Font.DemiBold
                     color: Theme.textColor
                 }
@@ -9697,7 +9842,7 @@ PanelWindow {
                     Text {
                         text: Theme.t("colors.brightness", "Brilho")
                         font.family: Theme.fontFamily
-                        font.pixelSize: 12
+                        font.pixelSize: 13
                         color: Theme.subtext
                     }
                     Rectangle {
@@ -9735,7 +9880,7 @@ PanelWindow {
 
                     Rectangle {
                         implicitWidth: 56
-                        implicitHeight: 40
+                        implicitHeight: 45
                         radius: 10
                         color: win.pickerColor
                         border.width: 1
@@ -9744,7 +9889,7 @@ PanelWindow {
 
                     Rectangle {
                         Layout.fillWidth: true
-                        implicitHeight: 40
+                        implicitHeight: 45
                         radius: 10
                         color: Theme.tile
                         border.width: 1
@@ -9757,7 +9902,7 @@ PanelWindow {
                             anchors.rightMargin: 12
                             verticalAlignment: TextInput.AlignVCenter
                             font.family: Theme.monoFamily
-                            font.pixelSize: 14
+                            font.pixelSize: 16
                             color: Theme.textColor
                             selectByMouse: true
                             maximumLength: 7

@@ -6,9 +6,10 @@
 # Toda captura é salva no disco, copiada pra área de transferência e notificada
 # com miniatura — e a notificação tem botão pra abrir a imagem.
 #
-# Cancelar a seleção de região (Esc, Ctrl+C ou um clique sem arrastar) NÃO
-# cancela mais a captura: vira uma captura da tela inteira. Era o comportamento
-# esperado por quem vem do Windows, onde PrintScreen sempre captura algo.
+# Esc (ou Ctrl+C, ou um clique sem arrastar) cancela a captura e não salva nada.
+# Antes isso virava uma captura da tela inteira, e quem só queria desistir
+# acabava com um print inteiro salvo e na área de transferência.
+# Para a tela inteira de propósito existe `rice-screenshot full`.
 # ==============================================================================
 set -u
 
@@ -83,9 +84,8 @@ case "$MODE" in
             # Dica (no máximo 2 vezes): existe a versão que já abre o editor.
             command -v rice-tips >/dev/null && (sleep 3; rice-tips show print_edit) >/dev/null 2>&1 &
         else
-            # Cancelou a seleção: captura a tela inteira em vez de não fazer nada.
-            FILE="$(capture_full)"
-            [ -n "$FILE" ] && finish "$FILE" "Tela inteira capturada"
+            # Cancelou (Esc): não salva nada.
+            exit 0
         fi
         ;;
 
@@ -111,8 +111,8 @@ case "$MODE" in
         TEMP_IMG="$(mktemp -t swappy-shot-XXXXXX.png)"
         if [ -n "$GEOM" ]; then
             grim -g "$GEOM" "$TEMP_IMG" 2>/dev/null || rm -f "$TEMP_IMG"
-        else
-            # Cancelou a seleção: edita a tela inteira.
+        elif [ "${RICE_SHOT_CANCEL_FULL:-0}" = 1 ]; then
+            # (não usado por padrão) edita a tela inteira.
             OUT="$(current_output)"
             if [ -n "$OUT" ]; then
                 grim -o "$OUT" "$TEMP_IMG" 2>/dev/null || grim "$TEMP_IMG" 2>/dev/null
@@ -135,7 +135,7 @@ case "$MODE" in
 
     *)
         echo "Uso: rice-screenshot [region|output|full|window|edit]"
-        echo "  region : Seleciona região (cancelar = tela inteira)"
+        echo "  region : Seleciona região (Esc cancela, sem salvar nada)"
         echo "  output : Tela inteira"
         echo "  window : Janela ativa"
         echo "  edit   : Seleciona região e abre no editor de anotações (Swappy)"
