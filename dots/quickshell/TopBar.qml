@@ -27,11 +27,13 @@ PanelWindow {
     property bool recording: false
     signal stopRecording()
 
+    // Com a barra vertical ligada, esta some por completo.
+    visible: ShellLayout.barEnabled && !ShellLayout.barVertical
     anchors { top: true; left: true; right: true }
     implicitHeight: Theme.waybarHeight + 460
     // Barra que some no hover não reserva espaço: as janelas usam a tela toda
     // e ela volta ao encostar o mouse na borda de cima.
-    exclusiveZone: ShellLayout.barAutohide ? 0 : Theme.waybarHeight
+    exclusiveZone: (ShellLayout.barAutohide || ShellLayout.barVertical) ? 0 : Theme.waybarHeight
     color: "transparent"
     focusable: false
 

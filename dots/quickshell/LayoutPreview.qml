@@ -13,6 +13,8 @@ Rectangle {
     property bool dock: true
     property bool dockFull: false
     property bool side: false
+    // Barra vertical: desenha a barra de pé na lateral esquerda.
+    property bool vertical: false
 
     radius: 8
     color: Theme.withAlpha(Theme.background, 0.85)
@@ -36,9 +38,9 @@ Rectangle {
     Rectangle {
         x: prev.pad
         y: prev.pad
-        width: prev.width - prev.pad * 2
-        height: Math.max(4, prev.height * 0.08)
-        radius: height / 2
+        width: prev.vertical ? Math.max(5, prev.width * 0.07) : prev.width - prev.pad * 2
+        height: prev.vertical ? prev.height - prev.pad * 2 : Math.max(4, prev.height * 0.08)
+        radius: Math.min(width, height) / 2
         color: Theme.withAlpha(Theme.primary, prev.bar ? 0.6 : 0.18)
     }
 

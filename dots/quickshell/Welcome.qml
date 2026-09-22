@@ -274,6 +274,7 @@ PanelWindow {
         property bool pvDock: true
         property bool pvDockFull: false
         property bool pvSide: false
+        property bool pvVertical: false
         signal picked()
 
         Layout.fillWidth: true
@@ -297,6 +298,7 @@ PanelWindow {
                 dock: cc.pvDock
                 dockFull: cc.pvDockFull
                 side: cc.pvSide
+                vertical: cc.pvVertical
             }
 
             ColumnLayout {
@@ -391,7 +393,7 @@ PanelWindow {
                         Item {
                             Layout.preferredWidth: 34
                             Layout.preferredHeight: 34
-                            WelcomeMark { anchors.fill: parent; spin: false }
+                            WelcomeMark { anchors.fill: parent; alive: false }
                         }
 
                         ColumnLayout {
@@ -482,7 +484,7 @@ PanelWindow {
                         Layout.alignment: Qt.AlignHCenter
                         Layout.preferredWidth: 190
                         Layout.preferredHeight: 190
-                        WelcomeMark { anchors.fill: parent; spin: welcomeWindow.open && welcomeWindow.page === 0 }
+                        WelcomeMark { anchors.fill: parent; alive: welcomeWindow.open && welcomeWindow.page === 0 }
                     }
 
                     Text {
@@ -495,12 +497,23 @@ PanelWindow {
                         font.letterSpacing: 1
                         color: Theme.textColor
                     }
+                    // A frase do meio é a do símbolo (Lain / the Wired, de onde
+                    // vem o nome do rice); a de baixo é a parte prática.
                     Text {
                         Layout.alignment: Qt.AlignHCenter
-                        Layout.topMargin: 6
-                        Layout.maximumWidth: 460
+                        Layout.topMargin: 8
+                        text: Theme.t("welcome.hero_motto", "Feche o mundo. Abra o próximo.")
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 14
+                        font.letterSpacing: 2
+                        color: Theme.withAlpha(Theme.primary, 0.9)
+                    }
+                    Text {
+                        Layout.alignment: Qt.AlignHCenter
+                        Layout.topMargin: 10
+                        Layout.maximumWidth: 430
                         horizontalAlignment: Text.AlignHCenter
-                        text: Theme.t("welcome.hero_sub", "Seu computador não tem mais barra de tarefas nem Menu Iniciar — tem atalhos. Em dois minutos aqui você já sabe usar tudo.")
+                        text: Theme.t("welcome.hero_sub", "Sem barra de tarefas e sem Menu Iniciar. Em dois minutos aqui você já sabe usar tudo.")
                         wrapMode: Text.WordWrap
                         font.family: Theme.fontFamily
                         font.pixelSize: 13
@@ -556,6 +569,9 @@ PanelWindow {
                             { key: "taskbar", name: Theme.t("layout.preset_taskbar", "Estilo Windows"),
                               desc: Theme.t("welcome.layout_taskbar_desc", "A fileira de aplicativos fica sempre à mostra, de ponta a ponta, e a central de ações fica aberta na direita."),
                               bar: true, dock: true, dockFull: true, side: true },
+                            { key: "sidebar", name: Theme.t("layout.preset_sidebar", "Barra lateral"),
+                              desc: Theme.t("welcome.layout_sidebar_desc", "A barra fica de pé na lateral esquerda, estreita, com as áreas de trabalho e os indicadores — é como a maioria dos rices de Hyprland se organiza."),
+                              bar: true, dock: false, dockFull: false, side: false, vertical: true },
                             { key: "clean", name: Theme.t("layout.preset_clean", "Tela limpa"),
                               desc: Theme.t("welcome.layout_clean_desc", "Só as suas janelas. Tudo do sistema aparece ao encostar o mouse na borda da tela."),
                               bar: false, dock: false, dockFull: false, side: false }
@@ -569,6 +585,7 @@ PanelWindow {
                             pvDock: modelData.dock
                             pvDockFull: modelData.dockFull
                             pvSide: modelData.side
+                            pvVertical: modelData.vertical === true
                             active: ShellLayout.preset === modelData.key
                             onPicked: ShellLayout.applyPreset(modelData.key)
                         }

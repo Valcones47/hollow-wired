@@ -201,6 +201,19 @@ ShellRoot {
         onStopRecording: Quickshell.execDetached(["rice-record", "stop"])
     }
 
+    // Alternativa vertical à barra de cima. As duas nunca aparecem juntas: o
+    // arranjo escolhe uma (ShellLayout.barVertical).
+    VerticalBar {
+        id: vbar
+        launcherOpen: shellRoot.launcherOpen
+        onClockClicked: hub.open = !hub.open
+        onNotifClicked: {
+            card.currentTab = 5;
+            hub.open = true;
+        }
+        onVisualConfigClicked: visualConfig.open = !visualConfig.open
+    }
+
     EnergySidebar {
         id: sidebar
         launcherOpen: shellRoot.launcherOpen

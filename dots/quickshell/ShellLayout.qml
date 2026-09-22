@@ -24,6 +24,7 @@ QtObject {
     property bool ready: false
 
     // "topbar"  — barra em cima, dock embaixo (o arranjo clássico do rice)
+    // "sidebar" — barra vertical na lateral, sem barra em cima
     // "taskbar" — dock em largura total sempre à mostra e central de ações
     //             fixa na direita, para quem vem do Windows
     // "clean"   — nada à mostra: tudo aparece ao encostar o mouse na borda
@@ -102,6 +103,11 @@ QtObject {
             bar: { enabled: true, position: "top", autohide: false, workspaceCount: 9, showTitle: true },
             dock: { enabled: true, position: "bottom", autohide: false, fullWidth: true },
             sidebar: { enabled: true, position: "right", autohide: false }
+        },
+        sidebar: {
+            bar: { enabled: true, position: "left", autohide: false, workspaceCount: 9, showTitle: false },
+            dock: { enabled: true, position: "bottom", autohide: true, fullWidth: false },
+            sidebar: { enabled: true, position: "right", autohide: true }
         },
         clean: {
             bar: { enabled: true, position: "top", autohide: true, workspaceCount: 0, showTitle: true },

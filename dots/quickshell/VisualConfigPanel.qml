@@ -3819,7 +3819,6 @@ PanelWindow {
                                     }
                                 }
 
-                                }
                             }
                         }
 
@@ -8250,6 +8249,7 @@ PanelWindow {
                                             }
                                         }
                                     }
+                                }
                             }
                         }
 
@@ -9026,6 +9026,12 @@ PanelWindow {
                                                 bar: true, dock: true, dockFull: true, side: true
                                             },
                                             {
+                                                key: "sidebar",
+                                                name: Theme.t("layout.preset_sidebar", "Barra lateral"),
+                                                desc: Theme.t("layout.preset_sidebar_desc", "Barra vertical na lateral, como na maioria dos rices"),
+                                                bar: true, dock: false, dockFull: false, side: false, vertical: true
+                                            },
+                                            {
                                                 key: "clean",
                                                 name: Theme.t("layout.preset_clean", "Tela limpa"),
                                                 desc: Theme.t("layout.preset_clean_desc", "Nada à vista: tudo só ao encostar o mouse na borda"),
@@ -9060,6 +9066,7 @@ PanelWindow {
                                                     dock: lpCard.modelData.dock
                                                     dockFull: lpCard.modelData.dockFull
                                                     side: lpCard.modelData.side
+                                                    vertical: lpCard.modelData.vertical === true
                                                 }
 
                                                 Text {
@@ -9097,6 +9104,70 @@ PanelWindow {
                                     subtitle: Theme.t("layout.bar_sub", "Relógio, áreas de trabalho e os indicadores do sistema.")
                                 }
 
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 8
+
+                                    Text {
+                                        text: Theme.t("layout.bar_pos", "Onde fica a barra")
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 13
+                                        color: Theme.textColor
+                                    }
+                                    Text {
+                                        Layout.fillWidth: true
+                                        text: Theme.t("layout.bar_pos_desc", "Na lateral ela fica vertical e estreita; os indicadores abrem a página do assunto em vez de um popup.")
+                                        wrapMode: Text.WordWrap
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 11
+                                        color: Theme.subtext
+                                    }
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 8
+
+                                        Repeater {
+                                            model: [
+                                                { pos: "top", label: Theme.t("layout.pos_top", "Em cima") },
+                                                { pos: "left", label: Theme.t("layout.pos_left", "À esquerda") },
+                                                { pos: "right", label: Theme.t("layout.pos_right", "À direita") }
+                                            ]
+                                            delegate: Rectangle {
+                                                id: posBtn
+                                                required property var modelData
+                                                readonly property bool active: ShellLayout.barPosition === posBtn.modelData.pos
+                                                implicitWidth: posBtnText.implicitWidth + 28
+                                                implicitHeight: 34
+                                                radius: 10
+                                                color: posBtn.active ? Theme.withAlpha(Theme.primary, 0.2) : (posBtnArea.containsMouse ? Theme.tileHigh : Theme.tile)
+                                                border.width: 1
+                                                border.color: posBtn.active ? Theme.primary : Theme.withAlpha(Theme.outline, 0.22)
+
+                                                Text {
+                                                    id: posBtnText
+                                                    anchors.centerIn: parent
+                                                    text: posBtn.modelData.label
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 12
+                                                    font.weight: posBtn.active ? Font.DemiBold : Font.Normal
+                                                    color: posBtn.active ? Theme.primary : Theme.textColor
+                                                }
+
+                                                MouseArea {
+                                                    id: posBtnArea
+                                                    anchors.fill: parent
+                                                    hoverEnabled: true
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    onClicked: ShellLayout.set("bar", "position", posBtn.modelData.pos)
+                                                }
+                                            }
+                                        }
+
+                                        Item { Layout.fillWidth: true }
+                                    }
+                                }
+
                                 CfgToggle {
                                     title: Theme.t("layout.bar_autohide", "Aparecer só com o mouse")
                                     subtitle: Theme.t("layout.bar_autohide_desc", "A barra sai da tela e volta ao encostar o mouse na borda de cima.")
@@ -9105,6 +9176,7 @@ PanelWindow {
                                 }
 
                                 CfgToggle {
+                                    visible: !ShellLayout.barVertical
                                     title: Theme.t("layout.bar_title_win", "Mostrar o nome da janela aberta")
                                     subtitle: Theme.t("layout.bar_title_win_desc", "Ao lado das áreas de trabalho.")
                                     checked: ShellLayout.barShowTitle

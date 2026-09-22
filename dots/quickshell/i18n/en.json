@@ -1204,7 +1204,7 @@
   "welcome.greeter_btn_open": "Open the wizard",
   "welcome.greeter_warn": "Changing the login screen touches what shows up before your session starts. The wizard runs a live test before it applies at boot, and you can undo it at any time.",
   "welcome.hero_btn": "Start setting up",
-  "welcome.hero_sub": "Your computer has no taskbar and no Start menu any more — it has shortcuts. Two minutes here and you know your way around.",
+  "welcome.hero_sub": "No taskbar and no Start menu. Two minutes here and you know your way around.",
   "welcome.hero_title": "hollow-wired",
   "welcome.keys_sub": "The Windows key is called Super here, and almost everything starts with it.",
   "welcome.keys_title": "What replaces what",
@@ -1258,5 +1258,14 @@
   "binds.act_record_desc": "Starts and stops recording the whole screen",
   "binds.act_dropterm": "Drop-down terminal",
   "binds.act_dropterm_desc": "Slides over everything and back up",
-  "binds.act_change": "Change"
+  "binds.act_change": "Change",
+  "welcome.hero_motto": "Close the world. Open the next.",
+  "layout.preset_sidebar": "Side bar",
+  "layout.preset_sidebar_desc": "Vertical bar on the side, like most rices",
+  "welcome.layout_sidebar_desc": "The bar stands on the left edge, narrow, with the workspaces and indicators — the way most Hyprland rices are laid out.",
+  "layout.bar_pos": "Where the bar sits",
+  "layout.bar_pos_desc": "On the side it becomes narrow and vertical; indicators open the matching settings page instead of a popup.",
+  "layout.pos_top": "On top",
+  "layout.pos_left": "On the left",
+  "layout.pos_right": "On the right"
 }

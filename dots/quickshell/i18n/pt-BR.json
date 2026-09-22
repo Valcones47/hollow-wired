@@ -1186,7 +1186,7 @@
   "welcome.brand_sub": "guia de primeiros passos",
   "welcome.nav_footer": "Super + F1 mostra tudo isso de novo, quando quiser.",
   "welcome.hero_title": "hollow-wired",
-  "welcome.hero_sub": "Seu computador não tem mais barra de tarefas nem Menu Iniciar — tem atalhos. Em dois minutos aqui você já sabe usar tudo.",
+  "welcome.hero_sub": "Sem barra de tarefas e sem Menu Iniciar. Em dois minutos aqui você já sabe usar tudo.",
   "welcome.hero_btn": "Começar a configurar",
   "welcome.layout_title": "Como você quer a tela?",
   "welcome.layout_sub": "Dá para trocar quando quiser, e ajustar cada peça depois em Configurações → Personalização.",
@@ -1258,5 +1258,14 @@
   "binds.act_record_desc": "Começa e termina a gravação da tela inteira",
   "binds.act_dropterm": "Terminal suspenso",
   "binds.act_dropterm_desc": "Desce por cima de tudo e volta a subir",
-  "binds.act_change": "Trocar"
+  "binds.act_change": "Trocar",
+  "welcome.hero_motto": "Feche o mundo. Abra o próximo.",
+  "layout.preset_sidebar": "Barra lateral",
+  "layout.preset_sidebar_desc": "Barra vertical na lateral, como na maioria dos rices",
+  "welcome.layout_sidebar_desc": "A barra fica de pé na lateral esquerda, estreita, com as áreas de trabalho e os indicadores — é como a maioria dos rices de Hyprland se organiza.",
+  "layout.bar_pos": "Onde fica a barra",
+  "layout.bar_pos_desc": "Na lateral ela fica vertical e estreita; os indicadores abrem a página do assunto em vez de um popup.",
+  "layout.pos_top": "Em cima",
+  "layout.pos_left": "À esquerda",
+  "layout.pos_right": "À direita"
 }

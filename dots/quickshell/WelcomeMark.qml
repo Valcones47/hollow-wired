@@ -2,81 +2,222 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import "."
 
-// Marca da tela de boas-vindas: três órbitas em ângulos diferentes girando
-// devagar em torno de um núcleo.
+// Marca da tela de boas-vindas: o olho do Wired.
 //
-// Cada órbita é uma elipse desenhada uma única vez num Canvas; quem gira é o
-// item que a contém, então a animação é só transformação na GPU — nada é
-// repintado a cada quadro, o que importa na placa integrada.
+// O rice se chama hollow-wired, e o símbolo vem daí — Serial Experiments Lain.
+// Ele pisca, olha para os lados sozinho e de vez em quando dá um glitch, como
+// uma imagem chegando por um cabo ruim.
+//
+// O contorno é um Canvas (repintado só quando a pálpebra mexe); a íris e os
+// blocos de glitch são itens comuns, que a GPU move sem repintar nada.
 Item {
     id: mark
 
-    // Desligado, a marca fica parada (usada pequena, ao lado do nome).
-    property bool spin: true
+    // Desligado, fica parado e aberto (usado pequeno, ao lado do nome).
+    property bool alive: true
     readonly property real unit: Math.min(width, height)
 
-    Repeater {
-        model: [
-            { tilt: 0,   dur: 16000, w: 0.98, h: 0.44, c: 0 },
-            { tilt: 60,  dur: 21000, w: 0.94, h: 0.40, c: 1 },
-            { tilt: 120, dur: 27000, w: 0.90, h: 0.36, c: 0 }
-        ]
-        delegate: Item {
-            id: orbit
-            required property var modelData
-            anchors.centerIn: parent
-            width: mark.unit
-            height: mark.unit
+    // 0 = olho aberto, 1 = pálpebra fechada
+    property real lid: 0
+    // -1 = olhando para a esquerda, 1 = para a direita
+    property real gaze: 0
+    property bool glitching: false
 
-            property real spinAngle
-            rotation: orbit.modelData.tilt + orbit.spinAngle
+    onLidChanged: eye.requestPaint()
 
-            NumberAnimation on spinAngle {
-                running: mark.spin
-                from: 0
-                to: 360
-                duration: orbit.modelData.dur
-                loops: Animation.Infinite
-            }
+    // ---- piscar de vez em quando ----
+    Timer {
+        running: mark.alive
+        interval: 2600 + Math.random() * 4200
+        repeat: true
+        onTriggered: {
+            blink.restart();
+            interval = 2600 + Math.random() * 4200;
+        }
+    }
+    SequentialAnimation {
+        id: blink
+        NumberAnimation { target: mark; property: "lid"; to: 1; duration: 90; easing.type: Easing.InQuad }
+        NumberAnimation { target: mark; property: "lid"; to: 0; duration: 130; easing.type: Easing.OutQuad }
+    }
 
-            Canvas {
-                id: ringCanvas
+    // ---- olhar para lugares diferentes ----
+    Timer {
+        running: mark.alive
+        interval: 1800 + Math.random() * 2600
+        repeat: true
+        onTriggered: {
+            gazeAnim.to = (Math.random() * 2 - 1) * 0.9;
+            gazeAnim.restart();
+            interval = 1800 + Math.random() * 2600;
+        }
+    }
+    NumberAnimation {
+        id: gazeAnim
+        target: mark
+        property: "gaze"
+        duration: 340
+        easing.type: Easing.OutCubic
+    }
+
+    // ---- glitch ----
+    Timer {
+        running: mark.alive
+        interval: 3200 + Math.random() * 5200
+        repeat: true
+        onTriggered: {
+            mark.glitching = true;
+            glitchOff.restart();
+            interval = 3200 + Math.random() * 5200;
+        }
+    }
+    Timer {
+        id: glitchOff
+        interval: 140 + Math.random() * 160
+        onTriggered: mark.glitching = false
+    }
+    // Sacode o desenho enquanto o glitch dura.
+    Timer {
+        running: mark.glitching
+        interval: 45
+        repeat: true
+        onTriggered: glitchGroup.x = (Math.random() * 2 - 1) * mark.unit * 0.02
+        onRunningChanged: if (!running) glitchGroup.x = 0
+    }
+
+    Item {
+        id: glitchGroup
+        anchors.fill: parent
+
+        // Rastro colorido do glitch: duas cópias deslocadas, como canal de cor
+        // fora de registro numa transmissão ruim.
+        Repeater {
+            model: mark.glitching ? [{ dx: -1, c: "#00e5ff" }, { dx: 1, c: "#39ff14" }] : []
+            delegate: Canvas {
+                id: ghost
+                required property var modelData
                 anchors.fill: parent
-                readonly property color stroke: Theme.withAlpha(
-                    orbit.modelData.c === 0 ? Theme.primary : Theme.secondary, 0.8)
-                onStrokeChanged: requestPaint()
-                onWidthChanged: requestPaint()
-                onPaint: {
-                    const ctx = getContext("2d");
-                    ctx.reset();
-                    const lw = Math.max(1.5, mark.unit * 0.022);
-                    ctx.lineWidth = lw;
-                    ctx.strokeStyle = ringCanvas.stroke;
-                    ctx.beginPath();
-                    ctx.ellipse(
-                        (width - mark.unit * orbit.modelData.w) / 2 + lw / 2,
-                        (height - mark.unit * orbit.modelData.h) / 2 + lw / 2,
-                        mark.unit * orbit.modelData.w - lw,
-                        mark.unit * orbit.modelData.h - lw);
-                    ctx.stroke();
+                x: ghost.modelData.dx * mark.unit * 0.025
+                opacity: 0.55
+                onPaint: mark.paintEye(getContext("2d"), width, height, ghost.modelData.c, true)
+            }
+        }
+
+        Canvas {
+            id: eye
+            anchors.fill: parent
+            onWidthChanged: requestPaint()
+            Connections {
+                target: Theme
+                function onPrimaryChanged() { eye.requestPaint(); }
+            }
+            onPaint: mark.paintEye(getContext("2d"), width, height, Theme.primary, false)
+        }
+
+        // Íris: fica dentro do olho e acompanha o olhar.
+        Item {
+            id: iris
+            anchors.centerIn: parent
+            anchors.verticalCenterOffset: -mark.unit * 0.06
+            anchors.horizontalCenterOffset: mark.gaze * mark.unit * 0.07
+            width: mark.unit * 0.30
+            height: width
+            opacity: 1 - Math.min(1, mark.lid * 1.6)
+
+            // halo claro em volta
+            Rectangle {
+                anchors.fill: parent
+                radius: width / 2
+                color: Theme.mix(Theme.primary, "#ffffff", 0.75)
+            }
+            // pupila escura com as linhas de varredura
+            Rectangle {
+                anchors.centerIn: parent
+                width: parent.width * 0.74
+                height: width
+                radius: width / 2
+                color: "#07070a"
+                clip: true
+
+                Column {
+                    anchors.centerIn: parent
+                    width: parent.width
+                    spacing: Math.max(1, mark.unit * 0.012)
+                    Repeater {
+                        model: 7
+                        delegate: Rectangle {
+                            width: parent.width
+                            height: Math.max(1, mark.unit * 0.011)
+                            color: Theme.withAlpha(Theme.mix(Theme.primary, "#ffffff", 0.6), 0.85)
+                        }
+                    }
                 }
+            }
+        }
+
+        // Blocos que piscam durante o glitch.
+        Repeater {
+            model: mark.glitching ? 6 : 0
+            delegate: Rectangle {
+                required property int index
+                width: mark.unit * (0.06 + Math.random() * 0.16)
+                height: mark.unit * (0.02 + Math.random() * 0.05)
+                x: mark.unit * (0.08 + Math.random() * 0.8) - width / 2
+                y: mark.unit * (0.1 + Math.random() * 0.75)
+                color: index % 3 === 0 ? "#39ff14" : (index % 3 === 1 ? "#00e5ff" : Theme.mix(Theme.primary, "#ffffff", 0.5))
+                opacity: 0.55 + Math.random() * 0.35
             }
         }
     }
 
-    // Núcleo com um halo, para o centro não ficar vazio.
-    Rectangle {
-        anchors.centerIn: parent
-        width: mark.unit * 0.26
-        height: width
-        radius: width / 2
-        color: Theme.withAlpha(Theme.primary, 0.16)
-    }
-    Rectangle {
-        anchors.centerIn: parent
-        width: mark.unit * 0.13
-        height: width
-        radius: width / 2
-        color: Theme.primary
+    // Desenha pálpebras, haste e ganchos. Sai numa função para o contorno
+    // colorido do glitch reaproveitar o mesmo traçado.
+    function paintEye(ctx, w, h, color, thin) {
+        const u = Math.min(w, h);
+        const cx = w / 2;
+        const cy = h / 2 - u * 0.06;      // centro do olho
+        const halfW = u * 0.40;           // meia largura do olho
+        const open = 1 - mark.lid;        // 1 = aberto, 0 = fechado
+
+        ctx.reset();
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.strokeStyle = color;
+        ctx.lineWidth = u * (thin ? 0.035 : 0.055);
+
+        // Pálpebras: duas curvas que se encontram nas pontas, um pouco acima
+        // do centro — é o que dá o bico virado para cima do símbolo.
+        const tipY = cy - u * 0.04;
+        ctx.beginPath();
+        ctx.moveTo(cx - halfW, tipY);
+        ctx.quadraticCurveTo(cx, cy - u * 0.34 * open, cx + halfW, tipY);
+        ctx.quadraticCurveTo(cx, cy + u * 0.34 * open, cx - halfW, tipY);
+        ctx.stroke();
+
+        // haste que desce do olho
+        const stemTop = cy + u * 0.14;
+        const stemBottom = cy + u * 0.34;
+        ctx.beginPath();
+        ctx.moveTo(cx, stemTop);
+        ctx.lineTo(cx, stemBottom);
+        ctx.stroke();
+
+        // os dois ganchos da base, espelhados, virando para fora e para cima
+        for (const side of [-1, 1]) {
+            ctx.beginPath();
+            ctx.moveTo(cx, stemBottom - u * 0.01);
+            ctx.bezierCurveTo(cx + side * u * 0.02, stemBottom + u * 0.07,
+                              cx + side * u * 0.20, stemBottom + u * 0.07,
+                              cx + side * u * 0.19, stemBottom - u * 0.09);
+            ctx.stroke();
+        }
+
+        // pontinhos ao lado do olho
+        ctx.fillStyle = color;
+        for (const side of [-1, 1]) {
+            ctx.beginPath();
+            ctx.ellipse(cx + side * u * 0.28 - u * 0.04, cy + u * 0.16, u * 0.08, u * 0.08);
+            ctx.fill();
+        }
     }
 }

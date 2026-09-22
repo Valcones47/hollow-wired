@@ -13,6 +13,7 @@ PopText 1.0 PopText.qml
 PopAction 1.0 PopAction.qml
 PopSlider 1.0 PopSlider.qml
 TopBar 1.0 TopBar.qml
+VerticalBar 1.0 VerticalBar.qml
 SystemInfo 1.0 SystemInfo.qml
 Snapshots 1.0 Snapshots.qml
 Recording 1.0 Recording.qml
