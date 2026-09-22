@@ -3,6 +3,7 @@
 # rice-greeter — tela de login do sistema (greetd) com a mesma cara da tela de
 # bloqueio do rice.
 #
+#   rice-greeter setup       assistente: instala, testa e pergunta se ativa
 #   rice-greeter test        abre o greeter numa janela, sem instalar nada
 #   rice-greeter sync        copia cores, idioma, foto, wallpaper e nome para o
 #                            greeter (roda sozinho ao bloquear e ao iniciar)
@@ -349,7 +350,77 @@ do_status() {
     return 0
 }
 
+# Estado em uma palavra (para o painel): active | installed | off
+do_state() {
+    if systemctl is-enabled greetd.service >/dev/null 2>&1 && [ -d "$CONFIG_DIR" ]; then
+        echo active
+    elif [ -d "$CONFIG_DIR" ]; then
+        echo installed
+    else
+        echo off
+    fi
+}
+
+# Assistente interativo (roda como o usuário, pede o sudo quando precisa):
+# instala -> oferece o teste ao vivo -> só então pergunta se ativa no boot.
+# É o que o instalador, o painel (Super + I) e o guia de boas-vindas chamam.
+do_setup() {
+    [ "$(id -u)" -ne 0 ] || die "Rode como o seu usuário (o assistente pede o sudo sozinho)."
+    local self; self="$(readlink -f "$0")"
+    local keep="RICE_GREETER_USER=$USER"
+    [ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ] && keep="$keep HYPRLAND_INSTANCE_SIGNATURE=$HYPRLAND_INSTANCE_SIGNATURE"
+    local ans
+
+    echo
+    echo "  Tela de login do rice"
+    echo "  ---------------------"
+    echo "  Troca a tela de login do sistema (SDDM) por uma com a mesma cara da"
+    echo "  tela de bloqueio: relógio, clima, foto, wallpaper e a lista de sessões"
+    echo "  (Hyprland, KDE, Gamescope...) para escolher em qual entrar."
+    echo
+    echo "  Nada muda no boot até você confirmar no fim. Se um dia der problema:"
+    echo "  Ctrl+Alt+F3, entre com o usuário '$USER' e rode:"
+    echo "      sudo ~/.local/bin/rice-greeter uninstall"
+    echo
+    read -rp "  Continuar? [S/n]: " ans || true
+    [[ "${ans:-s}" =~ ^[SsYy]$ ]] || return 0
+
+    # shellcheck disable=SC2086
+    sudo env $keep "$self" install || die "A instalação falhou; nada foi ativado."
+
+    if [ -n "${WAYLAND_DISPLAY:-}" ]; then
+        echo
+        echo "  Teste ao vivo: a tela de login abre num terminal virtual separado,"
+        echo "  com o SDDM intacto. Entrar por ela abre uma SEGUNDA sessão (normal"
+        echo "  no teste). Para voltar para cá: Ctrl+Alt+F1 (ou F2)."
+        read -rp "  Testar agora? [S/n]: " ans || true
+        if [[ "${ans:-s}" =~ ^[SsYy]$ ]]; then
+            sudo "$self" try
+            echo
+            read -rp "  Quando voltar do teste, aperte Enter para encerrá-lo... " _ || true
+            sudo systemctl stop greetd-teste 2>/dev/null || true
+        fi
+    fi
+
+    echo
+    read -rp "  Usar a tela de login do rice a partir do próximo boot? [s/N]: " ans || true
+    if [[ "${ans:-n}" =~ ^[SsYy]$ ]]; then
+        # shellcheck disable=SC2086
+        sudo env $keep "$self" activate
+    else
+        say "Tudo bem: o SDDM continua. Dá para ativar depois pelo painel (Super + I)."
+    fi
+}
+
+do_remove() {
+    [ "$(id -u)" -ne 0 ] || { do_uninstall; return; }
+    sudo "$(readlink -f "$0")" uninstall
+}
+
 case "${1:-}" in
+    setup)     do_setup ;;
+    remove)    do_remove ;;
+    state)     do_state ;;
     sync)      do_sync ;;
     test)      do_test ;;
     install)   do_install ;;
@@ -357,5 +428,5 @@ case "${1:-}" in
     activate)  do_activate ;;
     uninstall) do_uninstall ;;
     status)    do_status ;;
-    *)         sed -n '3,24p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+    *)         sed -n '3,25p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac

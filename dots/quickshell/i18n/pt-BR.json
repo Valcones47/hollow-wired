@@ -1073,5 +1073,20 @@
   "lock.show_more": "Mostrar mais %1",
   "lock.dnd": "Não perturbe",
   "lock.note_hint": "+ adicionar um lembrete",
-  "greeter.session": "Sessão"
+  "greeter.session": "Sessão",
+  "greeter.panel_title": "Tela de login do rice",
+  "greeter.panel_active": "Ativa: o computador já abre nessa tela. Cores, foto e wallpaper se atualizam sozinhos.",
+  "greeter.panel_installed": "Instalada mas ainda não usada no boot. Abra o assistente para testar e ativar.",
+  "greeter.panel_off": "Troca o SDDM por uma tela de login igual à tela de bloqueio, com a lista de sessões (Hyprland, KDE, Gamescope...).",
+  "greeter.panel_reconfigure": "Reconfigurar",
+  "greeter.panel_setup": "Configurar tela de login",
+  "greeter.panel_preview": "Ver como fica",
+  "greeter.panel_sync": "Atualizar aparência",
+  "greeter.panel_synced": "Cores, foto e wallpaper enviados para a tela de login",
+  "greeter.panel_remove": "Voltar ao SDDM",
+  "greeter.no_user": "Tela de login sem usuário configurado. Use Ctrl+Alt+F3 e rode: sudo rice-greeter install",
+  "welcome.greeter_title": "Tela de login com a cara do rice (opcional)",
+  "welcome.greeter_active": "Já ativa: o computador abre na mesma tela da tela de bloqueio.",
+  "welcome.greeter_desc": "Igual à tela de bloqueio, com a lista de sessões. Um assistente explica e pergunta antes de trocar.",
+  "welcome.greeter_btn": "Configurar"
 }

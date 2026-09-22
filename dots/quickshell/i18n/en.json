@@ -1073,5 +1073,20 @@
   "lock.show_more": "Show %1 more",
   "lock.dnd": "Do not disturb",
   "lock.note_hint": "+ add a reminder",
-  "greeter.session": "Session"
+  "greeter.session": "Session",
+  "greeter.panel_title": "Rice login screen",
+  "greeter.panel_active": "Active: the computer already boots into this screen. Colors, photo and wallpaper update on their own.",
+  "greeter.panel_installed": "Installed but not used at boot yet. Open the assistant to test and activate it.",
+  "greeter.panel_off": "Replaces SDDM with a login screen that matches the lock screen, with the session list (Hyprland, KDE, Gamescope...).",
+  "greeter.panel_reconfigure": "Reconfigure",
+  "greeter.panel_setup": "Set up login screen",
+  "greeter.panel_preview": "Preview",
+  "greeter.panel_sync": "Update look",
+  "greeter.panel_synced": "Colors, photo and wallpaper sent to the login screen",
+  "greeter.panel_remove": "Back to SDDM",
+  "greeter.no_user": "Login screen has no user configured. Press Ctrl+Alt+F3 and run: sudo rice-greeter install",
+  "welcome.greeter_title": "Login screen with the rice look (optional)",
+  "welcome.greeter_active": "Already active: the computer boots into the same screen as the lock screen.",
+  "welcome.greeter_desc": "Same as the lock screen, with a session list. An assistant explains and asks before switching.",
+  "welcome.greeter_btn": "Set up"
 }

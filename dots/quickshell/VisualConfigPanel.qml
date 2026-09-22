@@ -995,7 +995,26 @@ PanelWindow {
         }
     }
 
+    // Tela de login do rice (greetd): active | installed | off
+    property string greeterState: "off"
+    Process {
+        id: greeterStateProc
+        command: ["rice-greeter", "state"]
+        stdout: StdioCollector { onStreamFinished: win.greeterState = text.trim() || "off" }
+    }
+    // O assistente roda num terminal (pede a senha); ao fechar, relê o estado.
+    Process {
+        id: greeterSetupProc
+        onExited: greeterStateProc.running = true
+    }
+    function runGreeter(mode, title) {
+        greeterSetupProc.command = ["kitty", "--title", title, "bash", "-c",
+            "rice-greeter " + mode + "; echo; read -n 1 -s -r -p 'Pressione qualquer tecla para fechar...'"];
+        greeterSetupProc.running = true;
+    }
+
     function refreshAll() {
+        greeterStateProc.running = true;
         loadFFProc.running = true;
         listImagesProc.running = true;
         loadKittyProc.running = true;
@@ -5469,6 +5488,51 @@ PanelWindow {
                                 AnimCurveEditor {
                                     Layout.fillWidth: true
                                     onToast: msg => win.showToast(msg)
+                                }
+
+                                SectionHeader {
+                                    title: Theme.t("greeter.panel_title", "Tela de login do rice")
+                                    subtitle: {
+                                        if (win.greeterState === "active")
+                                            return Theme.t("greeter.panel_active", "Ativa: o computador já abre nessa tela. Cores, foto e wallpaper se atualizam sozinhos.");
+                                        if (win.greeterState === "installed")
+                                            return Theme.t("greeter.panel_installed", "Instalada mas ainda não usada no boot. Abra o assistente para testar e ativar.");
+                                        return Theme.t("greeter.panel_off", "Troca o SDDM por uma tela de login igual à tela de bloqueio, com a lista de sessões (Hyprland, KDE, Gamescope...).");
+                                    }
+                                }
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 12
+
+                                    ActionBtn {
+                                        icon: Theme.icons.verified
+                                        text: win.greeterState === "active" ? Theme.t("greeter.panel_reconfigure", "Reconfigurar")
+                                                                            : Theme.t("greeter.panel_setup", "Configurar tela de login")
+                                        primary: win.greeterState !== "active"
+                                        onClicked: win.runGreeter("setup", Theme.t("greeter.panel_title", "Tela de login do rice"))
+                                    }
+                                    ActionBtn {
+                                        icon: Theme.icons.laptop
+                                        text: Theme.t("greeter.panel_preview", "Ver como fica")
+                                        onClicked: Quickshell.execDetached(["rice-greeter", "test"])
+                                    }
+                                    ActionBtn {
+                                        visible: win.greeterState !== "off"
+                                        icon: Theme.icons.refresh
+                                        text: Theme.t("greeter.panel_sync", "Atualizar aparência")
+                                        onClicked: {
+                                            Quickshell.execDetached(["rice-greeter", "sync"]);
+                                            win.showToast(Theme.t("greeter.panel_synced", "Cores, foto e wallpaper enviados para a tela de login"));
+                                        }
+                                    }
+                                    ActionBtn {
+                                        visible: win.greeterState === "active"
+                                        icon: Theme.icons.restore
+                                        text: Theme.t("greeter.panel_remove", "Voltar ao SDDM")
+                                        onClicked: win.runGreeter("remove", Theme.t("greeter.panel_remove", "Voltar ao SDDM"))
+                                    }
+                                    Item { Layout.fillWidth: true }
                                 }
 
                                 SectionHeader {

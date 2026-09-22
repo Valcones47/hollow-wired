@@ -597,6 +597,19 @@ if [[ "$APPLY_BOOT" =~ ^[Ss]$ ]]; then
     ok_msg "SDDM e Limine configurados com sucesso!"
 fi
 
+# Opcional: tela de login do rice (greetd) no lugar do SDDM
+echo -e "\n${CYAN}◈ [OPCIONAL] Usar a tela de login do rice no lugar do SDDM?${NC}"
+echo -e "  ${GRAY}A mesma cara da tela de bloqueio (relógio, clima, foto, wallpaper) com a${NC}"
+echo -e "  ${GRAY}lista de sessões para escolher. Um assistente explica cada passo e só troca${NC}"
+echo -e "  ${GRAY}no boot se você confirmar. Também dá para fazer depois pelo painel (Super + I).${NC}"
+read -rp "  Configurar a tela de login do rice agora? [s/N]: " APPLY_GREETER || true
+APPLY_GREETER=${APPLY_GREETER:-n}
+if [[ "$APPLY_GREETER" =~ ^[Ss]$ ]]; then
+    gear_msg "Abrindo o assistente da tela de login..."
+    "$SCRIPT_DIR/dots/bin/rice-greeter" setup || \
+        echo -e "  ${GRAY}O assistente não terminou — dá para rodar de novo com: rice-greeter setup${NC}"
+fi
+
 # Opcional: Driver Proprietário Legado NVIDIA para Séries 900 / 1000 (Maxwell / Pascal)
 if [ "$IS_LEGACY_NVIDIA" = true ]; then
     echo -e "\n${CYAN}◈ [OPCIONAL] Placa NVIDIA ${WHITE}$LEGACY_NVIDIA_NAME${CYAN} detectada!${NC}"

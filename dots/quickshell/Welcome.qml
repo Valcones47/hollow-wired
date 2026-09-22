@@ -102,6 +102,19 @@ PanelWindow {
     }
 
     property bool tipsOn: true
+    // Tela de login do rice (greetd): active | installed | off
+    property string greeterState: "off"
+    Process {
+        id: greeterStatus
+        command: ["rice-greeter", "state"]
+        stdout: StdioCollector { onStreamFinished: welcomeWindow.greeterState = text.trim() || "off" }
+    }
+    Process {
+        id: greeterSetup
+        command: ["kitty", "--title", "Tela de login do rice", "bash", "-c",
+                  "rice-greeter setup; echo; read -n 1 -s -r -p 'Pressione qualquer tecla para fechar...'"]
+        onExited: greeterStatus.running = true
+    }
     Process {
         id: tipsStatus
         command: ["rice-tips", "status"]
@@ -147,6 +160,7 @@ PanelWindow {
         if (open) {
             tipsStatus.running = true;
             modeStatus.running = true;
+            greeterStatus.running = true;
         }
         if (!open) welcomeWindow.markDone();
     }
@@ -168,7 +182,7 @@ PanelWindow {
         id: card
         anchors.centerIn: parent
         width: 780
-        height: 680
+        height: 740
         radius: Theme.radius
         color: Theme.surface
         border.color: Theme.withAlpha(Theme.outline, 0.35)
@@ -512,6 +526,83 @@ PanelWindow {
                                 Quickshell.execDetached(["rice-tips", welcomeWindow.tipsOn ? "on" : "off"]);
                             }
                         }
+                    }
+                }
+            }
+
+            // ------------------------------------------------- tela de login
+            // Opcional: troca o SDDM pela tela de login do rice (rice-greeter
+            // setup, num terminal; o assistente explica e só ativa no fim).
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 50
+                radius: 14
+                color: Theme.tile
+                border.width: 1
+                border.color: Theme.withAlpha(Theme.outline, 0.22)
+
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 14
+                    anchors.rightMargin: 10
+                    spacing: 12
+
+                    Text {
+                        text: Theme.icons.lock
+                        font.family: Theme.iconFontFamily
+                        font.pixelSize: 18
+                        color: Theme.primary
+                    }
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 0
+                        Text {
+                            text: Theme.t("welcome.greeter_title", "Tela de login com a cara do rice (opcional)")
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 12
+                            font.weight: Font.DemiBold
+                            color: Theme.textColor
+                        }
+                        Text {
+                            Layout.fillWidth: true
+                            elide: Text.ElideRight
+                            text: welcomeWindow.greeterState === "active"
+                                  ? Theme.t("welcome.greeter_active", "Já ativa: o computador abre na mesma tela da tela de bloqueio.")
+                                  : Theme.t("welcome.greeter_desc", "Igual à tela de bloqueio, com a lista de sessões. Um assistente explica e pergunta antes de trocar.")
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 10
+                            color: Theme.subtext
+                        }
+                    }
+                    Rectangle {
+                        visible: welcomeWindow.greeterState !== "active"
+                        implicitWidth: greeterBtnText.implicitWidth + 22
+                        implicitHeight: 30
+                        radius: 9
+                        color: greeterBtnArea.containsMouse ? Theme.withAlpha(Theme.primary, 0.85) : Theme.primary
+                        Text {
+                            id: greeterBtnText
+                            anchors.centerIn: parent
+                            text: Theme.t("welcome.greeter_btn", "Configurar")
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 11
+                            font.weight: Font.DemiBold
+                            color: Theme.background
+                        }
+                        MouseArea {
+                            id: greeterBtnArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: greeterSetup.running = true
+                        }
+                    }
+                    Text {
+                        visible: welcomeWindow.greeterState === "active"
+                        text: Theme.icons.check
+                        font.family: Theme.iconFontFamily
+                        font.pixelSize: 18
+                        color: Theme.primary
                     }
                 }
             }

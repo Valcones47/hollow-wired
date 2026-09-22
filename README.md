@@ -96,6 +96,8 @@ Legacy tools like Waybar, Rofi, SwayOSD, and Wofi are completely omitted. Every 
 - **Full-resolution stills (`rice-wallpaper-frame`)**: Wallpaper Engine ships a square thumbnail with each item — 140×140 to 1024×1024 — which looks terrible stretched to a screen and is a poor source for the palette. For video wallpapers a real frame is extracted with ffmpeg and cached, and it feeds both the transition and the colour generation.
 - **Faithful palettes, never a light background**: the palette is built with `kmeans`, which clusters the image in Lab space and returns the colours the wallpaper actually has — white included. The previous `salience` tuning with `intensity = vibrant` manufactured colour instead: on a near-neutral wallpaper, forcing saturation to the maximum landed on red and turned the whole palette red. `rice-colors palette salience` restores the old, punchier behaviour. Independently of the algorithm, `rice-colors` darkens the background whenever it comes out too bright, preserving hue and saturation, and never touches the accents.
 - **Lock Screen (`hyprlock`)**: frosted-glass card over the blurred desktop with a time-of-day greeting, large clock, localized date, rounded password field and a CPU / RAM / battery / weather row. Weather comes from a background-refreshed cache, because hyprlock runs every label synchronously and a slow command there stalls the whole screen. Its colours track the wallpaper through a dedicated wallust template.
+- **Lock screen (Quickshell)**: Caelestia-style lock screen — a padlock that spins open into a card with weather, system fetch, media (spinning cover, live lyrics, seek bar, cava), quick controls, interactive notifications and a "while you were away" summary. `rice-lock` is used by Super+L, idle and suspend; hyprlock stays as a fallback.
+- **Rice login screen (optional, greetd)**: the same lock screen as the system login, with a session picker (Hyprland, KDE, Gamescope...). `rice-greeter setup` walks through install → live test on a spare VT → enable at boot; also offered by the installer, the settings panel (Super+I) and the welcome guide. `rice-greeter uninstall` goes back to SDDM.
 - **Login Screen (SDDM + SilentSDDM)**: themed lock/login screen whose background is generated from the *actual wallpaper image* (adaptively darkened), never from a screenshot of your desktop. `rice-sddm-install` installs the theme, syncs your avatar and remembers the last session you logged into; `rice-sddm-preview` opens the whole thing in a test window so you can iterate without rebooting.
 
 ### Architecture & GPU Orchestration
@@ -219,6 +221,7 @@ hollow-wired/
 │   ├── xdg-desktop-portal/   # Wayland portal rules (KDE Breeze Dark file picker)
 │   ├── fastfetch/            # System fetch configuration and custom ASCII/GIFs
 │   ├── mako/                 # Notification daemon configuration
+│   ├── greeter/              # greetd greeter (reuses the lock screen)
 │   ├── sddm/                 # Login screen theme (SilentSDDM)
 │   ├── applications/         # Desktop shortcut definitions (.desktop)
 │   └── bin/                  # Helper CLI utilities (rice-update, rice-record, etc.)
