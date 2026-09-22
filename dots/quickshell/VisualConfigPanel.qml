@@ -1975,7 +1975,10 @@ PanelWindow {
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: 13
                                                 font.weight: win.currentTab === navDelegate.targetTab ? Font.Bold : Font.Normal
-                                                color: win.currentTab === navDelegate.targetTab ? Theme.textColor : Theme.subtext
+                                                // O nome da categoria é sempre claro; o que muda na
+                                                // selecionada é o negrito e o fundo. Antes as não
+                                                // selecionadas ficavam da mesma cor da descrição.
+                                                color: Theme.textColor
                                                 elide: Text.ElideRight
                                             }
 
@@ -1983,7 +1986,7 @@ PanelWindow {
                                                 text: navDelegate.modelData.desc || ""
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: 11
-                                                color: Theme.withAlpha(Theme.subtext, 0.6)
+                                                color: Theme.subtextSoft
                                                 elide: Text.ElideRight
                                             }
                                         }
