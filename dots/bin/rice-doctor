@@ -1,263 +1,773 @@
-#!/bin/bash
-# rice-doctor - Diagnóstico e reparação rápida do Rice e Sistema
-# Feito para ser simples, visual e intuitivo para qualquer usuário.
+#!/usr/bin/env python3
+"""rice-doctor — abre, verifica tudo e conserta.
 
-C_RED='\033[1;31m'
-C_GREEN='\033[1;32m'
-C_YELLOW='\033[1;33m'
-C_BLUE='\033[1;34m'
-C_CYAN='\033[1;36m'
-C_RESET='\033[0m'
-C_BOLD='\033[1m'
+Feito para quem não quer entender o problema, só quer que funcione:
 
-clear
-echo -e "${C_CYAN}==============================================================${C_RESET}"
-echo -e "${C_BOLD}          🏥 RICE DOCTOR — DIAGNÓSTICO & REPARADOR           ${C_RESET}"
-echo -e "${C_CYAN}==============================================================${C_RESET}"
-echo ""
+  1. Roda dezenas de verificações (interface, áudio, rede, disco, pacotes,
+     drivers, arquivos do rice).
+  2. O que é problema com certeza é consertado na hora, sem perguntar. Se
+     algum conserto precisa de administrador, a senha é pedida uma vez só.
+  3. O que PODE ser problema, mas também pode ser escolha da pessoa (liberar
+     espaço, remover pacotes órfãos, esvaziar a lixeira...), vira sugestão:
+     pergunta uma por uma, e o padrão é "não".
 
-# 1. Áudio (PipeWire / WirePlumber)
-echo -ne "${C_BOLD}1. Servidor de Áudio (PipeWire)... ${C_RESET}"
-if systemctl --user is-active --quiet pipewire && systemctl --user is-active --quiet wireplumber; then
-  echo -e "${C_GREEN}[✔ ONLINE]${C_RESET}"
-else
-  echo -e "${C_RED}[✖ COM PROBLEMAS]${C_RESET}"
-  BAD_AUDIO=1
-fi
+Uso:
+  rice-doctor            verifica, conserta o certo e pergunta o opcional
+  rice-doctor --auto     só os consertos certos, sem perguntar nada
+  rice-doctor --check    só verifica (não muda nada); --json para máquina
+"""
 
-# 2. Banco do Pacman (db.lck)
-echo -ne "${C_BOLD}2. Trava do Gerenciador de Pacotes (db.lck)... ${C_RESET}"
-if [ -f /var/lib/pacman/db.lck ]; then
-  echo -e "${C_RED}[✖ TRAVA ENCONTRADA]${C_RESET} (Pacman travado ou interrompido)"
-  BAD_PACMAN=1
-else
-  echo -e "${C_GREEN}[✔ LIVRE]${C_RESET}"
-fi
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import time
 
-# 3. Cache do Pacman e Disco
-echo -ne "${C_BOLD}3. Espaço em Disco (/)... ${C_RESET}"
-DISK_USAGE=$(df -h / | awk 'NR==2 {print $5}')
-DISK_FREE=$(df -h / | awk 'NR==2 {print $4}')
-echo -e "${C_GREEN}[✔ $DISK_FREE LIVRE ($DISK_USAGE USADO)]${C_RESET}"
+HOME = os.path.expanduser("~")
+BIN = os.path.join(HOME, ".local/bin")
+TTY = sys.stdout.isatty()
 
-# 4. Display Manager (SDDM vs Plasmalogin)
-echo -ne "${C_BOLD}4. Gerenciador de Login (Display Manager)... ${C_RESET}"
-DM_LINK=$(readlink -f /etc/systemd/system/display-manager.service 2>/dev/null || echo "")
-if [[ "$DM_LINK" =~ sddm ]]; then
-  echo -e "${C_GREEN}[✔ SDDM ATIVO]${C_RESET}"
-else
-  echo -e "${C_YELLOW}[⚠ INCONSISTENTE]${C_RESET} (Atual: $(basename "$DM_LINK"))"
-  BAD_DM=1
-fi
 
-# 5. Memória e zRAM
-echo -ne "${C_BOLD}5. Módulo zRAM / Swap Comprimido... ${C_RESET}"
-if swapon --show | grep -q zram; then
-  ZRAM_SIZE=$(swapon --show --bytes | awk '/zram/ {printf "%.1f GiB", $3/1073741824}')
-  echo -e "${C_GREEN}[✔ ATIVO ($ZRAM_SIZE)]${C_RESET}"
-else
-  echo -e "${C_YELLOW}[⚠ NÃO DETECTADO]${C_RESET}"
-fi
+def c(code, text):
+    return f"\033[{code}m{text}\033[0m" if TTY else text
 
-# 6. Compositor Hyprland & Quickshell
-echo -ne "${C_BOLD}6. Shell Gráfico (Quickshell)... ${C_RESET}"
-if pgrep -x quickshell >/dev/null; then
-  echo -e "${C_GREEN}[✔ RODANDO]${C_RESET}"
-else
-  echo -e "${C_RED}[✖ PARADO]${C_RESET}"
-  BAD_QS=1
-fi
 
-# 7. Placa Gráfica
-# Só cobra driver NVIDIA em quem tem NVIDIA: antes a checagem era fixa e todo
-# PC AMD/Intel via um alarme vermelho de "driver não carregado" sem motivo.
-HAS_NVIDIA=0
-lspci 2>/dev/null | grep -Ei "vga|3d|display" | grep -qi "nvidia" && HAS_NVIDIA=1
+GREEN, RED, YELLOW, CYAN, GRAY, BOLD = "1;32", "1;31", "1;33", "1;36", "2", "1"
 
-if [ "$HAS_NVIDIA" = "1" ]; then
-  GPU_NAME=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -n 1)
-  [ -z "$GPU_NAME" ] && GPU_NAME=$(lspci 2>/dev/null | grep -Ei "vga|3d" | grep -i "nvidia" | sed 's/.*: //g' | head -n 1)
-  echo -ne "${C_BOLD}7. Placa Gráfica (${GPU_NAME:-NVIDIA})... ${C_RESET}"
-  if nvidia-smi &>/dev/null; then
-    echo -e "${C_GREEN}[✔ PRONTA (Driver Ativo)]${C_RESET}"
-    if [ -f /sys/module/nvidia_drm/parameters/modeset ]; then
-      MODESET=$(cat /sys/module/nvidia_drm/parameters/modeset 2>/dev/null)
-      if [ "$MODESET" = "Y" ]; then
-        echo -e "   ${C_CYAN}└─ DRM Kernel Modesetting (nvidia-drm.modeset=1): [✔ ATIVO]${C_RESET}"
-      else
-        echo -e "   ${C_YELLOW}└─ DRM Modeset: [⚠ INATIVO] (Configure nvidia-drm.modeset=1)${C_RESET}"
-      fi
-    fi
-  else
-    echo -e "${C_YELLOW}[⚠ DRIVER NÃO CARREGADO OU GPU SUSPENSA]${C_RESET}"
-  fi
-else
-  GPU_NAME=$(lspci 2>/dev/null | grep -Ei "vga|3d|display" | sed 's/.*: //g' | head -n 1)
-  echo -ne "${C_BOLD}7. Placa Gráfica (${GPU_NAME:-integrada})... ${C_RESET}"
-  if [ -e /dev/dri/renderD128 ]; then
-    echo -e "${C_GREEN}[✔ ACELERAÇÃO ATIVA (Mesa)]${C_RESET}"
-  else
-    echo -e "${C_YELLOW}[⚠ SEM NÓ DE RENDER EM /dev/dri]${C_RESET}"
-  fi
-fi
 
-# 8. Tema de Ícones do Sistema
-echo -ne "${C_BOLD}8. Tema de Ícones (Papirus / GTK)... ${C_RESET}"
-if [ -d /usr/share/icons/Papirus ] || [ -d "$HOME/.local/share/icons/Papirus" ]; then
-  echo -e "${C_GREEN}[✔ PAPIRUS DETECTADO]${C_RESET}"
-else
-  echo -e "${C_YELLOW}[⚠ NÃO INSTALADO]${C_RESET} (Execute: sudo pacman -S --needed papirus-icon-theme)"
-  BAD_ICONS=1
-fi
+def sh(cmd, timeout=20, **kw):
+    """Roda um comando e devolve (código, saída). Nunca levanta exceção."""
+    try:
+        r = subprocess.run(cmd, shell=isinstance(cmd, str), capture_output=True,
+                           text=True, timeout=timeout, **kw)
+        return r.returncode, (r.stdout or "") + (r.stderr or "")
+    except Exception as e:  # comando ausente, timeout...
+        return 127, str(e)
 
-# 9. Portais XDG & Comunicação DBus (Elimina delay de 25s)
-echo -ne "${C_BOLD}9. Portais XDG & Comunicação DBus... ${C_RESET}"
-if systemctl --user is-active --quiet xdg-desktop-portal && systemctl --user is-active --quiet xdg-desktop-portal-hyprland; then
-  echo -e "${C_GREEN}[✔ PORTAIS ATIVOS]${C_RESET}"
-else
-  echo -e "${C_YELLOW}[⚠ INCONSISTENTES / TIMEOUT]${C_RESET}"
-  BAD_PORTALS=1
-fi
 
-# 10. Papel de parede (área de trabalho preta é o problema nº 1 de quem instala
-# o rice sem o Wallpaper Engine)
-echo -ne "${C_BOLD}10. Papel de Parede... ${C_RESET}"
-if pgrep -f waywallen-layer-shell >/dev/null 2>&1; then
-  echo -e "${C_GREEN}[✔ WALLPAPER ENGINE ATIVO]${C_RESET}"
-elif pgrep -x hyprpaper >/dev/null 2>&1; then
-  echo -e "${C_GREEN}[✔ WALLPAPER ESTÁTICO ATIVO]${C_RESET}"
-else
-  echo -e "${C_YELLOW}[⚠ NENHUM WALLPAPER ATIVO]${C_RESET} (área de trabalho preta)"
-  BAD_WALLPAPER=1
-fi
+def have(cmd):
+    return shutil.which(cmd) is not None
 
-# 11. Agente de autenticação (sem ele, nada que pede senha de administrador abre)
-echo -ne "${C_BOLD}11. Janela de Senha (polkit)... ${C_RESET}"
-if pgrep -f "polkit-.*authentication-agent" >/dev/null 2>&1 || pgrep -f polkit-kde >/dev/null 2>&1; then
-  echo -e "${C_GREEN}[✔ ATIVO]${C_RESET}"
-else
-  echo -e "${C_YELLOW}[⚠ NÃO ESTÁ RODANDO]${C_RESET} (pedidos de senha podem falhar em silêncio)"
-  BAD_POLKIT=1
-fi
 
-# 12. Persistência da área de transferência
-echo -ne "${C_BOLD}12. Área de Transferência Persistente... ${C_RESET}"
-if pgrep -x wl-clip-persist >/dev/null 2>&1; then
-  echo -e "${C_GREEN}[✔ ATIVA]${C_RESET}"
-elif command -v wl-clip-persist >/dev/null 2>&1; then
-  echo -e "${C_YELLOW}[⚠ INSTALADA, MAS PARADA]${C_RESET}"
-  BAD_CLIP=1
-else
-  echo -e "${C_YELLOW}[⚠ NÃO INSTALADA]${C_RESET} (o que você copia some ao fechar o programa)"
-  BAD_CLIP=1
-fi
+def running(pattern, exact=True):
+    return sh(["pgrep", "-x" if exact else "-f", pattern])[0] == 0
 
-echo ""
-echo -e "${C_CYAN}--------------------------------------------------------------${C_RESET}"
-echo -e "${C_BOLD}AÇÕES DE REPARAÇÃO RÁPIDA:${C_RESET}"
-echo -e " [1] Reiniciar sistema de áudio (PipeWire & WirePlumber)"
-echo -e " [2] Destravar o Pacman (remover db.lck)"
-echo -e " [3] Limpar cache de pacotes antigos do pacman (liberar espaço)"
-echo -e " [4] Configurar e ativar a tela de login SDDM + Limine"
-echo -e " [5] Reiniciar o Quickshell (recarregar barras e menus)"
-echo -e " [6] Reparar tema de ícones e compatibilidade de pixmaps"
-echo -e " [7] Reparar e reiniciar portais XDG (elimina delay de 25s em apps)"
-echo -e " [8] Definir um papel de parede (resolve área de trabalho preta)"
-echo -e " [9] Instalar/ativar área de transferência persistente e janela de senha"
-echo -e " [A] Executar limpeza e reparos recomendados automaticamente"
-echo -e " [0] Sair"
-echo -e "${C_CYAN}--------------------------------------------------------------${C_RESET}"
-echo -n "Escolha uma opção [0-9 / A]: "
-read -r OPT
 
-case "$OPT" in
-  1)
-    echo -e "\n${C_BLUE}==> Reiniciando áudio PipeWire...${C_RESET}"
-    systemctl --user restart pipewire pipewire-pulse wireplumber
-    echo -e "${C_GREEN}✔ Áudio reiniciado com sucesso!${C_RESET}"
-    ;;
-  2)
-    echo -e "\n${C_BLUE}==> Removendo trava do pacman...${C_RESET}"
-    sudo rm -f /var/lib/pacman/db.lck
-    echo -e "${C_GREEN}✔ Pacman destravado!${C_RESET}"
-    ;;
-  3)
-    echo -e "\n${C_BLUE}==> Limpando cache do pacman...${C_RESET}"
-    sudo paccache -rk2 2>/dev/null || sudo pacman -Sc --noconfirm
-    echo -e "${C_GREEN}✔ Cache limpo!${C_RESET}"
-    ;;
-  4)
-    echo -e "\n${C_BLUE}==> Configurando SDDM e Limine...${C_RESET}"
-    sudo rice-apply-boot-login
-    ;;
-  5)
-    echo -e "\n${C_BLUE}==> Reiniciando o Quickshell...${C_RESET}"
-    rice-restart
-    ;;
-  6)
-    echo -e "\n${C_BLUE}==> Reparando tema de ícones e pixmaps...${C_RESET}"
-    sudo pacman -S --needed --noconfirm papirus-icon-theme breeze-icons 2>/dev/null || true
-    sudo ln -sf /usr/share/icons/*.png /usr/share/pixmaps/ 2>/dev/null || true
-    if command -v gsettings >/dev/null 2>&1; then
-      gsettings set org.gnome.desktop.interface icon-theme "Papirus-Dark" 2>/dev/null || true
-    fi
-    echo -e "${C_GREEN}✔ Tema de ícones configurado!${C_RESET}"
-    ;;
-  7)
-    echo -e "\n${C_BLUE}==> Reparando e reiniciando portais XDG...${C_RESET}"
-    sudo pacman -S --needed --noconfirm xdg-desktop-portal-gtk 2>/dev/null || true
-    rice-portals
-    echo -e "${C_GREEN}✔ Portais XDG reiniciados com sucesso!${C_RESET}"
-    ;;
-  8)
-    echo -e "\n${C_BLUE}==> Abrindo o seletor de papel de parede...${C_RESET}"
-    if command -v rice-wallpaper-set >/dev/null 2>&1; then
-      rice-wallpaper-set || rice-wallpaper-set --generate
-    else
-      echo -e "${C_YELLOW}rice-wallpaper-set não encontrado (rode o install.sh de novo).${C_RESET}"
-    fi
-    ;;
-  9)
-    echo -e "\n${C_BLUE}==> Instalando e ativando serviços de sessão...${C_RESET}"
-    sudo pacman -S --needed --noconfirm wl-clip-persist polkit-kde-agent 2>/dev/null || true
-    pgrep -x wl-clip-persist >/dev/null 2>&1 || (setsid wl-clip-persist --clipboard regular >/dev/null 2>&1 &)
-    pgrep -f "polkit-.*authentication-agent" >/dev/null 2>&1 || (setsid /usr/lib/polkit-kde-authentication-agent-1 >/dev/null 2>&1 &)
-    echo -e "${C_GREEN}✔ Serviços de sessão ativos!${C_RESET}"
-    ;;
-  [aA])
-    echo -e "\n${C_BLUE}==> Executando rotina automática de reparos...${C_RESET}"
-    systemctl --user restart pipewire pipewire-pulse wireplumber 2>/dev/null || true
-    if [ -f /var/lib/pacman/db.lck ]; then
-      sudo rm -f /var/lib/pacman/db.lck 2>/dev/null || true
-    fi
-    sudo paccache -rk2 2>/dev/null || true
-    if [ "$BAD_ICONS" = "1" ]; then
-      sudo pacman -S --needed --noconfirm papirus-icon-theme breeze-icons 2>/dev/null || true
-      sudo ln -sf /usr/share/icons/*.png /usr/share/pixmaps/ 2>/dev/null || true
-      gsettings set org.gnome.desktop.interface icon-theme "Papirus-Dark" 2>/dev/null || true
-    fi
-    if [ "$BAD_PORTALS" = "1" ]; then
-      sudo pacman -S --needed --noconfirm xdg-desktop-portal-gtk 2>/dev/null || true
-      rice-portals
-    fi
-    if [ "$BAD_CLIP" = "1" ]; then
-      sudo pacman -S --needed --noconfirm wl-clip-persist 2>/dev/null || true
-      pgrep -x wl-clip-persist >/dev/null 2>&1 || (setsid wl-clip-persist --clipboard regular >/dev/null 2>&1 &)
-    fi
-    if [ "$BAD_POLKIT" = "1" ]; then
-      sudo pacman -S --needed --noconfirm polkit-kde-agent 2>/dev/null || true
-      pgrep -f "polkit-.*authentication-agent" >/dev/null 2>&1 || (setsid /usr/lib/polkit-kde-authentication-agent-1 >/dev/null 2>&1 &)
-    fi
-    if [ "$BAD_WALLPAPER" = "1" ] && command -v rice-wallpaper-set >/dev/null 2>&1; then
-      rice-wallpaper-set --ensure >/dev/null 2>&1 || true
-    fi
-    echo -e "${C_GREEN}✔ Reparos automáticos concluídos!${C_RESET}"
-    ;;
-  *)
-    echo -e "\nSaindo..."
-    ;;
-esac
+def hypr_exec(command):
+    """Sobe um programa pelo compositor: filho do Hyprland, e não do terminal
+    do doctor (que fecha no fim e levaria o programa junto)."""
+    if os.environ.get("HYPRLAND_INSTANCE_SIGNATURE"):
+        esc = command.replace("\\", "\\\\").replace('"', '\\"')
+        return sh(["hyprctl", "dispatch", f'hl.dsp.exec_cmd("{esc}")'])[0] == 0
+    return subprocess.Popen(["setsid", "sh", "-c", command], stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL) is not None
 
-echo ""
-read -n 1 -s -r -p "Pressione qualquer tecla para finalizar..."
-echo ""
+
+def human(n):
+    for unit in ("B", "KB", "MB", "GB", "TB"):
+        if n < 1024:
+            return f"{n:.0f} {unit}" if unit in ("B", "KB") else f"{n:.1f} {unit}"
+        n /= 1024
+    return f"{n:.1f} PB"
+
+
+def dir_size(path):
+    code, out = sh(["du", "-sb", path], timeout=60)
+    try:
+        return int(out.split()[0]) if code == 0 else 0
+    except (ValueError, IndexError):
+        return 0
+
+
+# ----------------------------------------------------------------- sudo
+
+_sudo_ok = None
+
+
+def sudo_ready():
+    """Pede a senha uma vez (só quando algum conserto precisa)."""
+    global _sudo_ok
+    if _sudo_ok is None:
+        if sh(["sudo", "-n", "true"])[0] == 0:
+            _sudo_ok = True
+        elif sys.stdin.isatty():
+            print(c(CYAN, "\n  Alguns consertos precisam de permissão de administrador."))
+            _sudo_ok = subprocess.run(["sudo", "-v"]).returncode == 0
+        else:
+            _sudo_ok = False
+    return _sudo_ok
+
+
+def sudo(cmd, timeout=600):
+    if not sudo_ready():
+        return 1, "sem permissão de administrador"
+    return sh(["sudo"] + cmd, timeout=timeout)
+
+
+def pacman_install(pkgs):
+    return sudo(["pacman", "-S", "--needed", "--noconfirm"] + pkgs)[0] == 0
+
+
+# --------------------------------------------------------------- checagens
+#
+# Cada checagem devolve None (tudo certo) ou um Problema. `kind`:
+#   "fix"      problema certo → consertado automaticamente
+#   "optional" talvez seja problema → vira pergunta
+#   "info"     só avisa (não há conserto automático sensato)
+
+class Problem:
+    def __init__(self, kind, text, fix=None, detail="", root=False):
+        self.kind, self.text, self.fix, self.detail, self.root = kind, text, fix, detail, root
+
+
+CHECKS = []
+
+
+def check(title, group):
+    def deco(fn):
+        CHECKS.append((group, title, fn))
+        return fn
+    return deco
+
+
+# ---- Interface e sessão -------------------------------------------------
+
+@check("Interface (barra, dock, menus)", "Interface")
+def c_quickshell():
+    if running("quickshell") or running("qs"):
+        return None
+    return Problem("fix", "a interface não está rodando",
+                   lambda: sh([os.path.join(BIN, "rice-restart")])[0] == 0 or hypr_exec("quickshell"))
+
+
+@check("Notificações (mako)", "Interface")
+def c_mako():
+    if not have("mako"):
+        return Problem("fix", "o serviço de notificações não está instalado",
+                       lambda: pacman_install(["mako"]) and hypr_exec("mako"), root=True)
+    if running("mako"):
+        if sh(["makoctl", "reload"])[0] != 0:
+            return Problem("fix", "a configuração das notificações tem erro",
+                           lambda: sh([os.path.join(BIN, "rice-mako-apply"), "reset"])[0] == 0)
+        return None
+    return Problem("fix", "o serviço de notificações está parado", lambda: hypr_exec("mako"))
+
+
+@check("Bloqueio e economia de tela (hypridle)", "Interface")
+def c_hypridle():
+    if running("hypridle") or not have("hypridle"):
+        return None
+    return Problem("fix", "o hypridle está parado (a tela nunca apaga nem bloqueia)",
+                   lambda: hypr_exec("hypridle"))
+
+
+@check("Janela de senha de administrador (polkit)", "Interface")
+def c_polkit():
+    if running("polkit-.*authentication-agent", exact=False) or running("polkit-kde", exact=False):
+        return None
+    agent = "/usr/lib/polkit-kde-authentication-agent-1"
+    if os.path.exists(agent):
+        return Problem("fix", "a janela de senha não está rodando (pedidos de senha falham calados)",
+                       lambda: hypr_exec(agent))
+    return Problem("fix", "a janela de senha não está instalada",
+                   lambda: pacman_install(["polkit-kde-agent"]) and hypr_exec(agent), root=True)
+
+
+@check("Histórico da área de transferência", "Interface")
+def c_clipboard():
+    missing = []
+    code, out = sh(["pgrep", "-af", "wl-paste"])
+    if "cliphist store" not in out:
+        missing.append("histórico")
+    if have("wl-clip-persist") and not running("wl-clip-persist", exact=False):
+        missing.append("persistência")
+    if not missing:
+        return None
+
+    def fix():
+        if "histórico" in missing:
+            hypr_exec("wl-paste --type text --watch cliphist store")
+            hypr_exec("wl-paste --type image --watch cliphist store")
+        if "persistência" in missing:
+            hypr_exec("wl-clip-persist --clipboard regular")
+        return True
+    return Problem("fix", "área de transferência sem " + " e ".join(missing), fix)
+
+
+@check("Portais (abrir arquivos, compartilhar tela)", "Interface")
+def c_portals():
+    ok = all(sh(["systemctl", "--user", "is-active", "--quiet", u])[0] == 0
+             for u in ("xdg-desktop-portal", "xdg-desktop-portal-hyprland"))
+    if ok:
+        return None
+    return Problem("fix", "portais parados (apps demoram 25 s para abrir, compartilhar tela falha)",
+                   lambda: sh([os.path.join(BIN, "rice-portals")], timeout=60)[0] == 0)
+
+
+@check("Papel de parede", "Interface")
+def c_wallpaper():
+    if running("waywallen-layer-shell", exact=False) or running("hyprpaper"):
+        return None
+    if sh(["flatpak", "info", "org.waywallen.waywallen"])[0] == 0:
+        return Problem("fix", "o Waywallen não está desenhando o wallpaper",
+                       lambda: hypr_exec("flatpak run org.waywallen.waywallen --no-ui"))
+    return Problem("fix", "nenhum papel de parede ativo (área de trabalho preta)",
+                   lambda: sh([os.path.join(BIN, "rice-wallpaper-set"), "--ensure"], timeout=60)[0] == 0)
+
+
+@check("Configuração do Hyprland", "Interface")
+def c_hypr_config():
+    if not have("hyprctl") or not os.environ.get("HYPRLAND_INSTANCE_SIGNATURE"):
+        return None
+    code, out = sh(["hyprctl", "configerrors"])
+    out = out.strip()
+    if code != 0 or not out or out.lower().startswith("no errors") or out == "ok":
+        return None
+    return Problem("info", "a configuração do Hyprland tem erros",
+                   detail=out[:400] + "\n  (se editou o user-binds.lua, confira o que mudou por último)")
+
+
+@check("Arquivos e scripts do rice", "Interface")
+def c_rice_files():
+    """Reaproveita o conserto embutido do rice-update (permissões, PATH,
+    cores, notificações, estado quebrado de atualizações)."""
+    updater = os.path.join(BIN, "rice-update")
+    if "--check" in sys.argv or "--json" in sys.argv:
+        return None  # o conserto embutido muda coisas; no modo só-verificar, pula
+    if not os.path.exists(updater):
+        return Problem("info", "o rice-update não está instalado", detail="rode o install.sh de novo")
+    code, out = sh([updater, "fix", "--quiet"], timeout=120)
+    out = re.sub(r"\x1b\[[0-9;]*m", "", out)
+    fixed = [l.split("Consertado:", 1)[1].strip() for l in out.splitlines() if "Consertado:" in l]
+    warn = [l.split("Atenção:", 1)[1].strip() for l in out.splitlines() if "Atenção:" in l]
+    if fixed:
+        return Problem("done", "consertado: " + "; ".join(fixed))
+    if warn:
+        return Problem("info", "; ".join(warn))
+    return None
+
+
+# ---- Áudio --------------------------------------------------------------
+
+@check("Servidor de áudio (PipeWire)", "Áudio")
+def c_pipewire():
+    bad = [u for u in ("pipewire", "pipewire-pulse", "wireplumber")
+           if sh(["systemctl", "--user", "is-active", "--quiet", u])[0] != 0]
+    if not bad:
+        return None
+    return Problem("fix", "áudio parado (" + ", ".join(bad) + ")",
+                   lambda: sh(["systemctl", "--user", "restart", "pipewire", "pipewire-pulse", "wireplumber"])[0] == 0)
+
+
+@check("Saída de som", "Áudio")
+def c_sink():
+    if not have("wpctl"):
+        return None
+    code, out = sh(["wpctl", "get-volume", "@DEFAULT_AUDIO_SINK@"])
+    if code != 0:
+        return Problem("info", "nenhuma saída de som encontrada",
+                       detail="confira se a caixa/fone está ligado; em Configurações > Áudio dá para escolher a saída")
+    m = re.search(r"Volume:\s*([\d.]+)", out)
+    vol = float(m.group(1)) if m else 1.0
+    if "MUTED" in out:
+        return Problem("optional", "o som está mudo",
+                       lambda: sh(["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "0"])[0] == 0)
+    if vol < 0.05:
+        return Problem("optional", f"o volume está em {vol * 100:.0f}%",
+                       lambda: sh(["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", "0.5"])[0] == 0)
+    return None
+
+
+# ---- Rede e dispositivos -------------------------------------------------
+
+def _service_problem(unit, text):
+    if sh(["systemctl", "list-unit-files", unit + ".service"])[1].find(unit + ".service") < 0:
+        return None
+    if sh(["systemctl", "is-active", "--quiet", unit])[0] == 0:
+        return None
+    return Problem("fix", text, lambda: sudo(["systemctl", "enable", "--now", unit + ".service"])[0] == 0,
+                   root=True)
+
+
+@check("Rede (NetworkManager)", "Rede e dispositivos")
+def c_nm():
+    return _service_problem("NetworkManager", "o serviço de rede está desligado (Wi-Fi não aparece)")
+
+
+@check("Bluetooth", "Rede e dispositivos")
+def c_bt():
+    if not os.path.isdir("/sys/class/bluetooth") or not os.listdir("/sys/class/bluetooth"):
+        return None  # sem adaptador: nada a ligar
+    p = _service_problem("bluetooth", "o Bluetooth está desligado no sistema")
+    if p:
+        return p
+    code, out = sh(["rfkill", "list", "bluetooth"])
+    if "Soft blocked: yes" in out:
+        return Problem("optional", "o Bluetooth está bloqueado (modo avião ou desligado)",
+                       lambda: sh(["rfkill", "unblock", "bluetooth"])[0] == 0)
+    return None
+
+
+@check("Internet", "Rede e dispositivos")
+def c_internet():
+    # Algumas redes bloqueiam ping: só conta como "sem internet" se o HTTPS
+    # também falhar.
+    if sh(["ping", "-c", "1", "-W", "3", "1.1.1.1"])[0] != 0 and \
+            sh(["curl", "-sI", "--max-time", "6", "https://1.1.1.1"], timeout=10)[0] != 0:
+        return Problem("info", "sem conexão com a internet",
+                       detail="confira o Wi-Fi/cabo; em Configurações > Rede dá para conectar")
+    if sh(["getent", "hosts", "archlinux.org"], timeout=8)[0] != 0:
+        return Problem("optional", "a internet funciona, mas os nomes de sites não resolvem (DNS)",
+                       lambda: sudo(["systemctl", "restart", "systemd-resolved"])[0] == 0
+                       or sudo(["systemctl", "restart", "NetworkManager"])[0] == 0, root=True)
+    return None
+
+
+@check("Perfis de energia", "Rede e dispositivos")
+def c_ppd():
+    if have("powerprofilesctl") and sh(["powerprofilesctl", "get"])[0] != 0:
+        return _service_problem("power-profiles-daemon", "o serviço de perfis de energia está parado")
+    return None
+
+
+@check("Relógio sincronizado", "Rede e dispositivos")
+def c_ntp():
+    code, out = sh(["timedatectl", "show", "-p", "NTP", "--value"])
+    if code == 0 and out.strip() == "no":
+        return Problem("optional", "o relógio não sincroniza pela internet (hora pode ficar errada)",
+                       lambda: sudo(["timedatectl", "set-ntp", "true"])[0] == 0, root=True)
+    return None
+
+
+# ---- Placa de vídeo ------------------------------------------------------
+
+def _nvidia_present():
+    code, out = sh(["lspci", "-n"])
+    return bool(re.search(r" 03(00|02): 10de:", out))
+
+
+@check("Driver de vídeo", "Placa de vídeo")
+def c_gpu():
+    if _nvidia_present():
+        if sh(["nvidia-smi", "-L"], timeout=15)[0] != 0:
+            return Problem("info", "há uma NVIDIA, mas o driver dela não está carregado",
+                           detail="se instalou o driver agora, reinicie; senão instale pelo "
+                                  "gerenciador de hardware (no CachyOS: sudo chwd -a)")
+        if os.path.exists("/sys/module/nvidia_drm/parameters/modeset"):
+            with open("/sys/module/nvidia_drm/parameters/modeset") as f:
+                if f.read().strip() != "Y":
+                    return Problem("info", "nvidia-drm.modeset está desligado (tela pode piscar ou travar)",
+                                   detail="adicione nvidia-drm.modeset=1 à linha do kernel no bootloader")
+    if not any(n.startswith("renderD") for n in os.listdir("/dev/dri")) if os.path.isdir("/dev/dri") else True:
+        return Problem("info", "sem aceleração de vídeo (/dev/dri vazio)",
+                       detail="o driver da placa não carregou; reinicie ou instale o driver")
+    return None
+
+
+@check("Driver NVIDIA dos apps Flatpak", "Placa de vídeo")
+def c_flatpak_gl():
+    """Flatpak precisa de org.freedesktop.Platform.GL.nvidia-<versão exata do
+    driver>. Depois de atualizar o driver, os apps Flatpak (Waywallen,
+    jogos) caem para a Intel e travam até instalar a versão nova."""
+    if not _nvidia_present() or not have("flatpak"):
+        return None
+    code, ver = sh(["nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"])
+    ver = ver.strip().splitlines()[0] if code == 0 and ver.strip() else ""
+    if not ver:
+        return None
+    if not sh(["flatpak", "list", "--app", "--columns=application"])[1].strip():
+        return None
+    want = "org.freedesktop.Platform.GL.nvidia-" + ver.replace(".", "-")
+    installed = sh(["flatpak", "list", "--runtime", "--columns=application"])[1]
+    if want in installed:
+        return None
+    def fix():
+        # Instalação do sistema (vale para todos os apps); se não der, a do usuário.
+        return (sh(["flatpak", "install", "-y", "--noninteractive", "flathub", want], timeout=900)[0] == 0
+                or sh(["flatpak", "install", "--user", "-y", "--noninteractive", "flathub", want], timeout=900)[0] == 0)
+    return Problem("fix", f"falta o driver NVIDIA {ver} para apps Flatpak (eles caem para a placa integrada)", fix)
+
+
+@check("Variáveis globais da NVIDIA", "Placa de vídeo")
+def c_env_prime():
+    try:
+        with open("/etc/environment") as f:
+            txt = f.read()
+    except OSError:
+        return None
+    bad = [v for v in ("__NV_PRIME_RENDER_OFFLOAD", "__GLX_VENDOR_LIBRARY_NAME")
+           if re.search(rf"^\s*{v}\s*=", txt, re.M)]
+    if not bad:
+        return None
+    return Problem("info", "o /etc/environment força tudo na NVIDIA (" + ", ".join(bad) + ")",
+                   detail="o rice já desfaz isso na sessão; mas outros ambientes (KDE) e alguns apps\n"
+                          "  ficam mais lentos. Remover as linhas é seguro se você não depende delas.")
+
+
+# ---- Sistema e pacotes ---------------------------------------------------
+
+@check("Gerenciador de pacotes destravado", "Sistema")
+def c_pacman_lock():
+    if not os.path.exists("/var/lib/pacman/db.lck"):
+        return None
+    if running("pacman") or running("yay") or running("paru") or running("pamac", exact=False) \
+            or running("shelly", exact=False):
+        return Problem("info", "o pacman está travado porque uma instalação/atualização está rodando",
+                       detail="espere terminar; não apague a trava com algo rodando")
+    return Problem("fix", "a trava do pacman ficou para trás (instalações falham com 'db.lck')",
+                   lambda: sudo(["rm", "-f", "/var/lib/pacman/db.lck"])[0] == 0, root=True)
+
+
+@check("Reinício pendente", "Sistema")
+def c_reboot():
+    tool = os.path.join(BIN, "rice-reboot-needed")
+    if not os.path.exists(tool):
+        return None
+    out = sh([tool])[1].strip()
+    if out:
+        return Problem("info", "o computador precisa reiniciar", detail=out.replace(";", "\n  "))
+    return None
+
+
+@check("Serviços com falha", "Sistema")
+def c_failed_units():
+    sysf = [l.split()[0] for l in sh(["systemctl", "--failed", "--plain", "--no-legend"])[1].splitlines() if l.strip()]
+    usrf = [l.split()[0] for l in sh(["systemctl", "--user", "--failed", "--plain", "--no-legend"])[1].splitlines() if l.strip()]
+    if not sysf and not usrf:
+        return None
+
+    def fix():
+        if usrf:
+            sh(["systemctl", "--user", "reset-failed"])
+            for u in usrf:
+                sh(["systemctl", "--user", "restart", u], timeout=30)
+        if sysf:
+            sudo(["systemctl", "reset-failed"])
+        return True
+    return Problem("optional", "serviços falharam: " + ", ".join((usrf + sysf)[:6]),
+                   fix, detail="tentar reiniciar os seus e limpar o estado de falha", root=bool(sysf))
+
+
+@check("Memória comprimida (zRAM)", "Sistema")
+def c_zram():
+    if "zram" in sh(["swapon", "--show"])[1] or sh(["swapon", "--show"])[1].strip():
+        return None
+    return Problem("info", "sem memória virtual (zRAM ou swap)",
+                   detail="com a RAM cheia os apps fecham sozinhos; o install.sh configura o zRAM")
+
+
+@check("Uso de memória", "Sistema")
+def c_mem():
+    try:
+        info = {l.split(":")[0]: int(l.split()[1]) for l in open("/proc/meminfo")}
+        avail = info["MemAvailable"] / info["MemTotal"]
+    except (OSError, KeyError, ValueError, ZeroDivisionError):
+        return None
+    if avail > 0.08:
+        return None
+    top = sh("ps -eo rss,comm --sort=-rss | sed -n 2,4p")[1].strip().splitlines()
+    top = ", ".join(f"{l.split()[1]} ({human(int(l.split()[0]) * 1024)})" for l in top if len(l.split()) >= 2)
+    return Problem("info", f"a memória está quase cheia ({avail * 100:.0f}% livre)",
+                   detail="quem mais usa: " + top)
+
+
+@check("Pacotes que o rice usa", "Sistema")
+def c_missing_pkgs():
+    repo = ""
+    try:
+        repo = open(os.path.join(HOME, ".config/hollow-wired-repo")).read().strip()
+    except OSError:
+        pass
+    cands = [repo, os.path.join(os.environ.get("XDG_DATA_HOME", HOME + "/.local/share"), "hollow-wired")]
+    lst = next((os.path.join(d, "packages.txt") for d in cands if d and os.path.isfile(os.path.join(d, "packages.txt"))), None)
+    if not lst:
+        return None
+    pkgs = []
+    for line in open(lst, encoding="utf-8"):
+        p = line.split("#", 1)[0].strip()
+        if p and not (p == "wallust-git" and have("wallust")):
+            pkgs.append(p)
+    # `pacman -T` imprime só os que faltam, numa chamada.
+    missing = sh(["pacman", "-T"] + pkgs, timeout=60)[1].split() if pkgs else []
+    if not missing:
+        return None
+    repo_pkgs = [p for p in missing if sh(["pacman", "-Si", p])[0] == 0]
+    if not repo_pkgs:
+        return Problem("info", "faltam pacotes do AUR: " + ", ".join(missing),
+                       detail="instale com: yay -S " + " ".join(missing))
+
+    def fix():
+        if pacman_install(repo_pkgs):
+            return True
+        return all(pacman_install([p]) for p in repo_pkgs)
+    return Problem("fix", "faltam programas que o rice usa: " + ", ".join(missing[:8])
+                   + ("…" if len(missing) > 8 else ""), fix, root=True)
+
+
+@check("Fontes e ícones", "Sistema")
+def c_fonts_icons():
+    need = []
+    if "JetBrainsMono Nerd" not in sh(["fc-list", ":", "family"])[1]:
+        need.append("ttf-jetbrains-mono-nerd")
+    if not os.path.isdir("/usr/share/icons/Papirus") and not os.path.isdir(HOME + "/.local/share/icons/Papirus"):
+        need.append("papirus-icon-theme")
+    if not need:
+        return None
+    return Problem("fix", "faltam fontes/ícones (aparecem quadradinhos no lugar dos ícones)",
+                   lambda: pacman_install(need), root=True)
+
+
+@check("Arquivos seus que viraram do administrador", "Sistema")
+def c_root_owned():
+    """Rodar algo com sudo dentro da pasta pessoal deixa arquivos do root lá,
+    e depois o próprio usuário não consegue salvar configurações.
+
+    Só arquivos do root (uid 0), e fora de pastas de contêiner: o Waydroid,
+    Docker e Podman guardam dados de outros usuários de propósito, e um
+    chown neles quebra o contêiner. Por isso é sugestão, não conserto
+    automático, e mostra o que vai mudar."""
+    skip = ("waydroid", "docker", "containers", "distrobox", "podman", "lxc", "flatpak/repo")
+    found = []
+    for base in (".config", ".local/share", ".cache"):
+        code, out = sh(["find", os.path.join(HOME, base), "-maxdepth", "4", "-uid", "0",
+                        "-not", "-path", "*/proc/*"], timeout=30)
+        for line in out.splitlines():
+            if line.startswith("/") and not any(k in line.lower() for k in skip):
+                found.append(line)
+    if not found:
+        return None
+    # Agrupa pela pasta de primeiro nível dentro da base (o que será corrigido).
+    tops = []
+    for f in found:
+        rel = os.path.relpath(f, HOME).split(os.sep)
+        top = os.path.join(HOME, *rel[:3 if rel[0] == ".local" else 2])
+        if top not in tops:
+            tops.append(top)
+    user = os.environ.get("USER") or sh(["id", "-un"])[1].strip()
+    return Problem("optional", f"{len(found)} arquivo(s) do administrador na sua pasta",
+                   lambda: all(sudo(["chown", "-R", f"{user}:", t], timeout=300)[0] == 0 for t in tops),
+                   detail="passa a ser seus: " + ", ".join(t.replace(HOME, "~") for t in tops[:6])
+                   + ("…" if len(tops) > 6 else ""), root=True)
+
+
+@check("Tela de login", "Sistema")
+def c_dm():
+    link = os.path.realpath("/etc/systemd/system/display-manager.service")
+    if "sddm" in link or not os.path.exists(os.path.join(BIN, "rice-apply-boot-login")):
+        return None
+    name = os.path.basename(link) if os.path.exists(link) else "nenhuma"
+    return Problem("optional", f"a tela de login não é a do rice (atual: {name})",
+                   lambda: subprocess.run(["sudo", os.path.join(BIN, "rice-apply-boot-login")]).returncode == 0,
+                   detail="troca para o SDDM com o tema do rice", root=True)
+
+
+# ---- Espaço em disco (tudo opcional) ------------------------------------
+
+@check("Espaço em disco", "Espaço")
+def c_disk():
+    st = os.statvfs("/")
+    free, total = st.f_bavail * st.f_frsize, st.f_blocks * st.f_frsize
+    if free / total > 0.10 and free > 15 * 1024 ** 3:
+        return None
+    return Problem("info", f"pouco espaço livre: {human(free)} de {human(total)}",
+                   detail="veja as sugestões de limpeza abaixo")
+
+
+@check("Cache de pacotes antigos", "Espaço")
+def c_pkg_cache():
+    size = dir_size("/var/cache/pacman/pkg")
+    if size < 3 * 1024 ** 3 or not have("paccache"):
+        return None
+    return Problem("optional", f"versões antigas de pacotes ocupam {human(size)}",
+                   lambda: sudo(["paccache", "-rk1"])[0] == 0 and sudo(["paccache", "-ruk0"])[0] == 0,
+                   detail="mantém só a última versão de cada (dá para voltar uma versão se algo quebrar)", root=True)
+
+
+@check("Registros do sistema (journal)", "Espaço")
+def c_journal():
+    out = sh(["journalctl", "--disk-usage"])[1]
+    m = re.search(r"([\d.]+)([KMGT])", out)
+    if not m:
+        return None
+    size = float(m.group(1)) * {"K": 1024, "M": 1024 ** 2, "G": 1024 ** 3, "T": 1024 ** 4}[m.group(2)]
+    if size < 1024 ** 3:
+        return None
+    return Problem("optional", f"registros do sistema ocupam {human(size)}",
+                   lambda: sudo(["journalctl", "--vacuum-size=300M"])[0] == 0,
+                   detail="reduz para 300 MB (mantém os mais recentes)", root=True)
+
+
+@check("Pacotes órfãos", "Espaço")
+def c_orphans():
+    out = sh(["pacman", "-Qtdq"])[1].split()
+    if len(out) < 5:
+        return None
+    return Problem("optional", f"{len(out)} pacotes órfãos (instalados como dependência e não usados mais)",
+                   lambda: sudo(["pacman", "-Rns", "--noconfirm"] + out, timeout=900)[0] == 0,
+                   detail=", ".join(out[:12]) + ("…" if len(out) > 12 else "")
+                   + "\n  Confira a lista: às vezes algo que você usa aparece aqui.", root=True)
+
+
+@check("Flatpak sem uso", "Espaço")
+def c_flatpak_unused():
+    if not have("flatpak"):
+        return None
+    code, out = sh(["flatpak", "uninstall", "--unused", "--assumeno"], timeout=60)
+    n = len(re.findall(r"^\s*\d+\.\s", out, re.M))
+    if n == 0:
+        return None
+    return Problem("optional", f"{n} componentes Flatpak que nenhum app usa",
+                   lambda: sh(["flatpak", "uninstall", "--unused", "-y", "--noninteractive"], timeout=900)[0] == 0)
+
+
+@check("Miniaturas e cache de apps", "Espaço")
+def c_user_cache():
+    thumbs = os.path.join(HOME, ".cache/thumbnails")
+    size = dir_size(thumbs) if os.path.isdir(thumbs) else 0
+    if size < 1024 ** 3:
+        return None
+    return Problem("optional", f"miniaturas guardadas ocupam {human(size)}",
+                   lambda: sh(["rm", "-rf", thumbs])[0] == 0, detail="são refeitas quando precisar")
+
+
+@check("Lixeira", "Espaço")
+def c_trash():
+    trash = os.path.join(HOME, ".local/share/Trash")
+    size = dir_size(trash) if os.path.isdir(trash) else 0
+    if size < 2 * 1024 ** 3:
+        return None
+
+    def fix():
+        for sub in ("files", "info", "expunged"):
+            p = os.path.join(trash, sub)
+            if os.path.isdir(p):
+                sh(["rm", "-rf", p])
+        return True
+    return Problem("optional", f"a lixeira tem {human(size)}", fix,
+                   detail="ATENÇÃO: apaga de vez o que está na lixeira")
+
+
+@check("Tamanho do histórico copiado", "Espaço")
+def c_cliphist_db():
+    db = os.path.join(os.environ.get("XDG_CACHE_HOME", HOME + "/.cache"), "cliphist/db")
+    if not os.path.isfile(db) or os.path.getsize(db) < 200 * 1024 ** 2:
+        return None
+    return Problem("optional", f"o histórico do que você copiou ocupa {human(os.path.getsize(db))}",
+                   lambda: sh(["cliphist", "wipe"])[0] == 0, detail="apaga o histórico (os favoritos do rice ficam)")
+
+
+# ------------------------------------------------------------------- main
+
+def main(argv):
+    mode = "check" if "--check" in argv else ("auto" if "--auto" in argv else "full")
+    as_json = "--json" in argv
+    results = []
+
+    if not as_json:
+        print(c(CYAN, "═" * 62))
+        print(c(BOLD, "   RICE DOCTOR — verificando e consertando o seu sistema"))
+        print(c(CYAN, "═" * 62))
+
+    group_now = None
+    for group, title, fn in CHECKS:
+        if not as_json and group != group_now:
+            group_now = group
+            print("\n" + c(CYAN, group))
+        if not as_json:
+            print(f"  {c(GRAY, '…')} {title}", end="\r", flush=True)
+        try:
+            p = fn()
+        except Exception as e:
+            p = Problem("info", f"a verificação falhou ({e.__class__.__name__})")
+        results.append((title, p))
+        if as_json:
+            continue
+        if p is None:
+            print(f"  {c(GREEN, '✔')} {title}\033[K")
+        elif p.kind == "done":
+            print(f"  {c(GREEN, '✔')} {title} — {c(GREEN, p.text)}\033[K")
+        elif p.kind == "fix":
+            print(f"  {c(RED, '✖')} {title} — {p.text}\033[K")
+        elif p.kind == "optional":
+            print(f"  {c(YELLOW, '?')} {title} — {p.text}\033[K")
+        else:
+            print(f"  {c(YELLOW, '!')} {title} — {p.text}\033[K")
+            if p.detail:
+                print(c(GRAY, "    " + p.detail.replace("\n", "\n    ")))
+
+    if as_json:
+        print(json.dumps([{"check": t, "kind": (p.kind if p else "ok"), "text": (p.text if p else ""),
+                           "detail": (p.detail if p else "")} for t, p in results], ensure_ascii=False))
+        return 0
+
+    fixes = [(t, p) for t, p in results if p and p.kind == "fix"]
+    optional = [(t, p) for t, p in results if p and p.kind == "optional"]
+
+    if mode == "check":
+        print(f"\n{len(fixes)} problema(s), {len(optional)} sugestão(ões). Nada foi alterado (--check).")
+        return 0
+
+    fixed, failed = [], []
+    if fixes:
+        print("\n" + c(BOLD, "Consertando…"))
+        for t, p in fixes:
+            print(f"  → {p.text}", end="", flush=True)
+            try:
+                ok = bool(p.fix())
+            except Exception:
+                ok = False
+            print("  " + (c(GREEN, "✔ resolvido") if ok else c(RED, "✖ não consegui")))
+            (fixed if ok else failed).append(p.text)
+
+    if optional and mode == "full" and sys.stdin.isatty():
+        print("\n" + c(BOLD, "Sugestões (opcionais — pode ser escolha sua, não um problema):"))
+        for t, p in optional:
+            print(f"\n  {c(YELLOW, '?')} {p.text}")
+            if p.detail:
+                print(c(GRAY, "    " + p.detail.replace("\n", "\n    ")))
+            try:
+                ans = input("    Fazer isso? [s/N] ").strip().lower()
+            except EOFError:
+                ans = ""
+            if ans in ("s", "sim", "y", "yes"):
+                try:
+                    ok = bool(p.fix())
+                except Exception:
+                    ok = False
+                print("    " + (c(GREEN, "✔ feito") if ok else c(RED, "✖ não consegui")))
+                (fixed if ok else failed).append(p.text)
+
+    print("\n" + c(CYAN, "─" * 62))
+    if not fixes and not failed and not fixed:
+        print(c(GREEN, "  Tudo certo! Nenhum problema encontrado."))
+    else:
+        if fixed:
+            print(c(GREEN, f"  {len(fixed)} coisa(s) resolvida(s)."))
+        if failed:
+            print(c(RED, f"  {len(failed)} não deu para resolver sozinho:"))
+            for f in failed:
+                print(c(RED, "    • " + f))
+            print(c(GRAY, "  Rode de novo depois de reiniciar; se continuar, peça ajuda com essa lista."))
+    infos = [p for _, p in results if p and p.kind == "info"]
+    if infos:
+        print(c(YELLOW, f"  {len(infos)} aviso(s) acima pedem atenção sua (marcados com !)."))
+    if fixed:
+        sh(["notify-send", "-a", "Rice Doctor", "-i", "emblem-ok-symbolic",
+            "Rice Doctor", f"{len(fixed)} problema(s) resolvido(s)."])
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        rc = main(sys.argv[1:])
+    except KeyboardInterrupt:
+        print("\nInterrompido.")
+        rc = 130
+    if sys.stdin.isatty() and "--check" not in sys.argv and "--json" not in sys.argv and "--auto" not in sys.argv:
+        try:
+            input("\nPressione Enter para fechar…")
+        except (EOFError, KeyboardInterrupt):
+            pass
+    sys.exit(rc)

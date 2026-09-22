@@ -79,7 +79,9 @@ PanelWindow {
         { icon: Theme.icons.workspaces, label: Theme.t("dmenu.overview", "Visão geral"), keys: "Super + Tab", enabled: true,
           action: () => Quickshell.execDetached(["quickshell", "ipc", "call", "overview", "open"]) },
         { icon: Theme.icons.magnify, label: Theme.t("dmenu.shortcuts", "Atalhos do teclado"), keys: "Super + F1", enabled: true,
-          action: () => Quickshell.execDetached(["quickshell", "ipc", "call", "cheatsheet", "toggle"]) }
+          action: () => Quickshell.execDetached(["quickshell", "ipc", "call", "cheatsheet", "toggle"]) },
+        { icon: Theme.icons.health, label: Theme.t("dmenu.doctor", "Consertar problemas"), keys: "", enabled: true,
+          action: () => Quickshell.execDetached(["rice-update", "fix-gui"]) }
     ]
 
     MouseArea {

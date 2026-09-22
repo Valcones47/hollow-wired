@@ -1,6 +1,9 @@
 [Desktop Entry]
-Name=Reparador do Sistema (Rice Doctor)
-Comment=Diagnosticar e consertar áudio, pacotes, zRAM e shell
+Name=Consertar Problemas (Rice Doctor)
+Name[en]=Fix Problems (Rice Doctor)
+Comment=Verifica o sistema e conserta sozinho: som, rede, interface, pacotes, espaço em disco
+Comment[en]=Checks the system and fixes it: sound, network, interface, packages, disk space
+Keywords=consertar;reparar;problema;erro;doctor;fix;repair;som;internet;
 Exec=kitty --title "Rice Doctor" rice-doctor
 Icon=system-software-update
 Terminal=false

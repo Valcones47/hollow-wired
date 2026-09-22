@@ -1038,5 +1038,6 @@
   "welcome.mode_windows_desc": "Floating in the middle of the screen, like Windows.",
   "welcome.mode_hyprland_desc": "Side by side, splitting the screen by themselves.",
   "welcome.mode_windows": "Windows style",
-  "welcome.mode_hyprland": "Hyprland style"
+  "welcome.mode_hyprland": "Hyprland style",
+  "dmenu.doctor": "Fix problems"
 }

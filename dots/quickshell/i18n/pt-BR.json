@@ -1038,5 +1038,6 @@
   "welcome.mode_windows_desc": "Soltas no meio da tela, como no Windows.",
   "welcome.mode_hyprland_desc": "Lado a lado, dividindo a tela sozinhas.",
   "welcome.mode_windows": "Estilo Windows",
-  "welcome.mode_hyprland": "Estilo Hyprland"
+  "welcome.mode_hyprland": "Estilo Hyprland",
+  "dmenu.doctor": "Consertar problemas"
 }

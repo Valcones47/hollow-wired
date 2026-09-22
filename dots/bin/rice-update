@@ -665,7 +665,13 @@ case "$cmd" in
         fi
         ;;
     fix-gui)
-        kitty --title "Consertando o rice" -e "$HOME/.local/bin/rice-update" fix &
+        # O botão "Procurar e consertar problemas" abre o rice-doctor, que
+        # inclui este conserto e dezenas de outras verificações.
+        if [ -x "$HOME/.local/bin/rice-doctor" ]; then
+            kitty --title "Rice Doctor" -e "$HOME/.local/bin/rice-doctor" &
+        else
+            kitty --title "Consertando o rice" -e "$HOME/.local/bin/rice-update" fix &
+        fi
         ;;
     gui)
         # Abre em janela dedicada do Kitty
