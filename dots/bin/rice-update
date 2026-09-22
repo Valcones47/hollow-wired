@@ -481,6 +481,8 @@ fix_broken_state() {
     for f in "$HOME/.config/quickshell/dock.json" \
              "$HOME/.config/quickshell/desktop-widgets.json" \
              "$HOME/.config/quickshell/shell-customization.json" \
+             "$HOME/.config/quickshell/shell-layout.json" \
+             "$HOME/.config/quickshell/clipboard-prefs.json" \
              "$HOME/.config/quickshell/locale.json" \
              "$HOME/.config/hypr/user-prefs.json" \
              "$HOME/.config/hypr/color-overrides.json"; do
