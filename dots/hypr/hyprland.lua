@@ -129,6 +129,26 @@ local function prefBool(key, default)
     return default
 end
 
+-- Qualidade do desfoque: "leve" (integradas fracas), "padrao" ou "forte".
+local function prefStr(key, default)
+    local f = io.open(home .. "/.config/hypr/user-prefs.json", "r")
+    if not f then return default end
+    local txt = f:read("*a")
+    f:close()
+    return txt:match('"' .. key .. '"%s*:%s*"([^"]*)"') or default
+end
+local blurQuality = prefStr("blur_quality", "padrao")
+-- size/passes custam GPU; xray = desfocar só o fundo (não reprocessa por
+-- janela) e ignore_opacity = false evita desfocar atrás do que é opaco.
+local blurCfg = ({
+    leve   = { size = 2, passes = 1, xray = true,  ignore_opacity = false, vibrancy = 0.10 },
+    padrao = { size = 3, passes = 1, xray = false, ignore_opacity = true,  vibrancy = 0.20 },
+    forte  = { size = 6, passes = 3, xray = false, ignore_opacity = true,  vibrancy = 0.25 },
+})[blurQuality] or { size = 3, passes = 1, xray = false, ignore_opacity = true, vibrancy = 0.20 }
+-- No modo leve os painéis que cobrem a tela inteira ficam sem desfoque: são
+-- eles que derrubam o desempenho em iGPU (desfocar 1920x1080 a cada quadro).
+local blurBigPanels = blurQuality ~= "leve"
+
 local function systemKbLayout()
     local f = io.open("/etc/vconsole.conf", "r")
     if f then
@@ -360,11 +380,13 @@ hl.config({
             -- Respeita o que ficou salvo no painel; desativado automaticamente
             -- em tela cheia pelo blur-fullscreen-toggle.sh (ver AUTOSTART).
             enabled           = prefBool("blur", true),
-            size              = 3,      -- mínimo visual viável pra Intel UHD
-            passes            = 1,      -- 1 pass = custo mínimo de blur
-            vibrancy          = 0.20,
-            xray              = false,
-            ignore_opacity    = true,
+            -- Valores por qualidade (ver blurCfg, acima): o painel e o
+            -- rice-hypr-prefs trocam isso ao vivo.
+            size              = blurCfg.size,
+            passes            = blurCfg.passes,
+            vibrancy          = blurCfg.vibrancy,
+            xray              = blurCfg.xray,
+            ignore_opacity    = blurCfg.ignore_opacity,
             new_optimizations = true,
         },
     },
@@ -387,11 +409,11 @@ hl.layer_rule({ match = { namespace = "quickshell-sidebar" }, blur = true, ignor
 hl.layer_rule({ match = { namespace = "quickshell-bar" }, blur = true, ignore_alpha = 0.3 })
 hl.layer_rule({ match = { namespace = "quickshell-sysinfo" }, blur = true, ignore_alpha = 0.3 })
 hl.layer_rule({ match = { namespace = "quickshell-dock" }, blur = true, ignore_alpha = 0.3 })
-hl.layer_rule({ match = { namespace = "quickshell-launcher" }, blur = true, ignore_alpha = 0.3 })
-hl.layer_rule({ match = { namespace = "quickshell-visualconfig" }, blur = true, ignore_alpha = 0.3 })
-hl.layer_rule({ match = { namespace = "quickshell-clipboard" }, blur = true, ignore_alpha = 0.3 })
-hl.layer_rule({ match = { namespace = "quickshell-cheatsheet" }, blur = true, ignore_alpha = 0.3 })
-hl.layer_rule({ match = { namespace = "quickshell-overview" }, blur = true, ignore_alpha = 0.3 })
+hl.layer_rule({ match = { namespace = "quickshell-launcher" }, blur = blurBigPanels, ignore_alpha = 0.3 })
+hl.layer_rule({ match = { namespace = "quickshell-visualconfig" }, blur = blurBigPanels, ignore_alpha = 0.3 })
+hl.layer_rule({ match = { namespace = "quickshell-clipboard" }, blur = blurBigPanels, ignore_alpha = 0.3 })
+hl.layer_rule({ match = { namespace = "quickshell-cheatsheet" }, blur = blurBigPanels, ignore_alpha = 0.3 })
+hl.layer_rule({ match = { namespace = "quickshell-overview" }, blur = blurBigPanels, ignore_alpha = 0.3 })
 hl.layer_rule({ match = { namespace = "quickshell-desktop-widgets" }, blur = false })
 
 -- Beziers customizados (não usa só os presets padrão)

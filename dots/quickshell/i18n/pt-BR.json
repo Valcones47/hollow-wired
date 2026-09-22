@@ -1095,5 +1095,13 @@
   "overview.keys_vertical": "↑ ↓ navegar  ·  Enter abrir  ·  clique numa janela para ir até ela  ·  Esc fechar",
   "cheatsheet.desc_ws_switch": "Área de trabalho anterior / próxima",
   "cheatsheet.desc_ws_move": "Levar a janela para a área vizinha",
-  "cheatsheet.desc_focus": "Trocar o foco entre janelas"
+  "cheatsheet.desc_focus": "Trocar o foco entre janelas",
+  "effects.blur_title": "Desfoque (Blur)",
+  "effects.blur_sub": "Quanto mais forte, mais bonito e mais pesado. Em placas de vídeo integradas, o leve evita travadas. Super + B liga e desliga.",
+  "effects.blur_light": "Leve",
+  "effects.blur_light_desc": "Para integradas: sem desfoque nos painéis grandes",
+  "effects.blur_normal": "Padrão",
+  "effects.blur_normal_desc": "Equilíbrio entre visual e desempenho",
+  "effects.blur_strong": "Forte",
+  "effects.blur_strong_desc": "Vidro mais fosco; pede uma placa dedicada"
 }

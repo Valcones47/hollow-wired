@@ -42,6 +42,7 @@ ensure_prefs_file() {
   "numlock": true,
   "vrr": 0,
   "blur": true,
+  "blur_quality": "padrao",
   "monitor_hz": 0,
   "monitor_scale": 1
 }
@@ -93,6 +94,13 @@ apply_all() {
     touchpad_dwt=$(jq -r '.touchpad_dwt // false' "$PREFS_FILE")
     vrr=$(jq -r '.vrr // 0' "$PREFS_FILE")
     blur=$(jq -r 'if .blur == false then false else true end' "$PREFS_FILE")
+    # Qualidade do desfoque: leve (integradas fracas), padrao, forte.
+    blur_quality=$(jq -r '.blur_quality // "padrao"' "$PREFS_FILE")
+    case "$blur_quality" in
+        leve)  blur_size=2; blur_passes=1; blur_xray=true;  blur_ign=false; blur_vib=0.10 ;;
+        forte) blur_size=6; blur_passes=3; blur_xray=false; blur_ign=true;  blur_vib=0.25 ;;
+        *)     blur_size=3; blur_passes=1; blur_xray=false; blur_ign=true;  blur_vib=0.20 ;;
+    esac
     local run="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
     if [ "$blur" = "false" ]; then
         touch "$run/rice-blur-disabled" 2>/dev/null || true
@@ -120,7 +128,12 @@ hl.config({
         dim_inactive = $dim_inactive,
         dim_strength = $dim_strength,
         blur = {
-            enabled = $blur
+            enabled = $blur,
+            size = $blur_size,
+            passes = $blur_passes,
+            xray = $blur_xray,
+            ignore_opacity = $blur_ign,
+            vibrancy = $blur_vib
         }
     },
     animations = {
@@ -241,6 +254,13 @@ case "$cmd" in
         fi
         echo "$tmp" > "$PREFS_FILE"
         apply_all
+        # As regras de camada (quais painéis têm desfoque) só saem do arquivo de
+        # configuração: o eval do apply_all não as alcança.
+        if [ "$key" = "blur_quality" ]; then
+            hyprctl reload >/dev/null 2>&1 || true
+            notify-send -a "Hyprland" -i preferences-desktop-theme -r 91197 -t 2500 \
+                "Desfoque: $val" "$([ "$val" = leve ] && echo 'Mais leve para placas integradas' || echo 'Aparência atualizada')" 2>/dev/null || true
+        fi
         if [ "$key" = "monitor_scale" ]; then
             command -v rice-wallpaper-reload >/dev/null 2>&1 && rice-wallpaper-reload >/dev/null 2>&1 &
         fi

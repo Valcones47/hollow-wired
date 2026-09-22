@@ -388,6 +388,7 @@ PanelWindow {
     property string nightlightSunset: ""
     property bool dimInactive: false
     property real dimStrength: 0.2
+    property string blurQuality: "padrao"
     property int rounding: 8
     property int gapsIn: 6
     property string animPreset: "smooth"
@@ -655,6 +656,7 @@ PanelWindow {
                     const d = JSON.parse(text);
                     if (d.dim_inactive !== undefined) win.dimInactive = !!d.dim_inactive;
                     if (d.dim_strength !== undefined) win.dimStrength = d.dim_strength;
+                    if (d.blur_quality !== undefined) win.blurQuality = d.blur_quality;
                     if (d.rounding !== undefined) win.rounding = d.rounding;
                     if (d.gaps_in !== undefined) win.gapsIn = d.gaps_in;
                     if (d.anim_preset !== undefined) win.animPreset = d.anim_preset;
@@ -5420,6 +5422,70 @@ PanelWindow {
                                     id: nlRecheck
                                     interval: 1200
                                     onTriggered: loadNightlightProc.running = true
+                                }
+
+                                SectionHeader {
+                                    title: Theme.t("effects.blur_title", "Desfoque (Blur)")
+                                    subtitle: Theme.t("effects.blur_sub", "Quanto mais forte, mais bonito e mais pesado. Em placas de vídeo integradas, o leve evita travadas. Super + B liga e desliga.")
+                                }
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 12
+
+                                    Repeater {
+                                        model: [
+                                            { key: "leve", label: Theme.t("effects.blur_light", "Leve"), desc: Theme.t("effects.blur_light_desc", "Para integradas: sem desfoque nos painéis grandes") },
+                                            { key: "padrao", label: Theme.t("effects.blur_normal", "Padrão"), desc: Theme.t("effects.blur_normal_desc", "Equilíbrio entre visual e desempenho") },
+                                            { key: "forte", label: Theme.t("effects.blur_strong", "Forte"), desc: Theme.t("effects.blur_strong_desc", "Vidro mais fosco; pede uma placa dedicada") }
+                                        ]
+                                        delegate: Rectangle {
+                                            id: bqCard
+                                            required property var modelData
+                                            readonly property bool active: win.blurQuality === modelData.key
+                                            Layout.fillWidth: true
+                                            implicitHeight: bqCol.implicitHeight + 20
+                                            radius: 12
+                                            color: bqCard.active ? Theme.withAlpha(Theme.primary, 0.18) : (bqArea.containsMouse ? Theme.tileHigh : Theme.tile)
+                                            border.width: 1
+                                            border.color: bqCard.active ? Theme.primary : Theme.withAlpha(Theme.outline, 0.2)
+                                            Behavior on color { ColorAnimation { duration: 140 } }
+
+                                            ColumnLayout {
+                                                id: bqCol
+                                                anchors.left: parent.left
+                                                anchors.right: parent.right
+                                                anchors.verticalCenter: parent.verticalCenter
+                                                anchors.margins: 12
+                                                spacing: 2
+                                                Text {
+                                                    text: bqCard.modelData.label
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 12
+                                                    font.weight: Font.DemiBold
+                                                    color: Theme.textColor
+                                                }
+                                                Text {
+                                                    Layout.fillWidth: true
+                                                    text: bqCard.modelData.desc
+                                                    wrapMode: Text.WordWrap
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 10
+                                                    color: Theme.subtext
+                                                }
+                                            }
+                                            MouseArea {
+                                                id: bqArea
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: {
+                                                    win.blurQuality = bqCard.modelData.key;
+                                                    Quickshell.execDetached(["rice-hypr-prefs", "set", "blur_quality", bqCard.modelData.key]);
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
 
                                 SectionHeader {
