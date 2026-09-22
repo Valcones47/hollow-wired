@@ -472,19 +472,73 @@ PanelWindow {
                 }
 
                 // ---------------- página 0: início ----------------
+                Item {
+                    id: heroPage
+                    anchors.fill: parent
+                    visible: welcomeWindow.page === 0
+                    clip: true
+
+                    readonly property bool live: welcomeWindow.open && welcomeWindow.page === 0
+
+                    // Onde o olho está dentro desta página — é para cá que a
+                    // chuva da frente puxa o cabo.
+                    readonly property real eyeX: markHolder.x + markHolder.width / 2
+                    readonly property real eyeY: markHolder.y + markHolder.height / 2
+                        - markHolder.height * 0.06
+
+                    // Planos de trás: passam por baixo do olho.
+                    WiredRain {
+                        anchors.fill: parent
+                        z: 0
+                        planes: [0, 1]
+                        perPlane: 7
+                        running: heroPage.live
+                    }
+
+                    // Fiação exposta do cenário, em três tamanhos.
+                    CutCable {
+                        x: 26
+                        y: -8
+                        z: 0
+                        drop: 96
+                        sway: 22
+                        alive: heroPage.live
+                    }
+                    CutCable {
+                        x: parent.width - 96
+                        y: -6
+                        z: 0
+                        drop: 150
+                        sway: -34
+                        alive: heroPage.live
+                    }
+                    CutCable {
+                        x: parent.width * 0.62
+                        y: -4
+                        z: 3
+                        drop: 62
+                        sway: 18
+                        alive: heroPage.live
+                    }
+
                 ColumnLayout {
                     anchors.fill: parent
                     anchors.margins: 34
-                    visible: welcomeWindow.page === 0
+                    z: 1
                     spacing: 0
 
                     Item { Layout.fillHeight: true }
 
                     Item {
+                        id: markHolder
                         Layout.alignment: Qt.AlignHCenter
                         Layout.preferredWidth: 190
                         Layout.preferredHeight: 190
-                        WelcomeMark { anchors.fill: parent; alive: welcomeWindow.open && welcomeWindow.page === 0 }
+                        WelcomeMark {
+                            id: eyeMark
+                            anchors.fill: parent
+                            alive: heroPage.live
+                        }
                     }
 
                     Text {
@@ -558,6 +612,21 @@ PanelWindow {
                     }
 
                     Item { Layout.fillHeight: true }
+                }
+
+                    // Plano da frente: passa por cima do olho e é o que
+                    // encosta o cabo elétrico nele.
+                    WiredRain {
+                        anchors.fill: parent
+                        z: 2
+                        planes: [2]
+                        perPlane: 6
+                        running: heroPage.live
+                        connects: true
+                        eyeX: heroPage.eyeX
+                        eyeY: heroPage.eyeY
+                        linkColor: eyeMark.stateColor
+                    }
                 }
 
                 // ---------------- página 1: interface ----------------

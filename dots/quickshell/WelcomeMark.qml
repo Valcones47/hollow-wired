@@ -17,6 +17,20 @@ Item {
     property bool alive: true
     readonly property real unit: Math.min(width, height)
 
+    // Paleta de estado: muda a cada ciclo de 30 s e vale para a pupila e para
+    // as conexões elétricas da chuva ao mesmo tempo — é o que amarra os dois
+    // efeitos como se fossem o mesmo sinal.
+    readonly property var statePalette: ["#00e5ff", "#39ff14", "#ffb300", "#ff2fd0", "#ff3b3b"]
+    property int stateIndex: 0
+    readonly property color stateColor: mark.statePalette[mark.stateIndex % mark.statePalette.length]
+
+    // Onde o olho está, para a chuva saber onde encostar o cabo.
+    readonly property real eyeX: width / 2
+    readonly property real eyeY: height / 2 - unit * 0.06
+
+    // Deslocamento vertical da pupila no evento de 30 s.
+    property real irisOffsetY: 0
+
     // 0 = olho aberto, 1 = pálpebra fechada
     property real lid: 0
     // -1 = olhando para a esquerda, 1 = para a direita
@@ -63,12 +77,14 @@ Item {
     // ---- glitch ----
     Timer {
         running: mark.alive
-        interval: 3200 + Math.random() * 5200
+        interval: 3000 + Math.random() * 2000
         repeat: true
         onTriggered: {
             mark.glitching = true;
             glitchOff.restart();
-            interval = 3200 + Math.random() * 5200;
+            // Sorteado de novo a cada vez: em intervalo fixo o glitch vira
+            // relógio e some da vista.
+            interval = 3000 + Math.random() * 2000;
         }
     }
     Timer {
@@ -83,6 +99,37 @@ Item {
         repeat: true
         onTriggered: glitchGroup.x = (Math.random() * 2 - 1) * mark.unit * 0.02
         onRunningChanged: if (!running) glitchGroup.x = 0
+    }
+
+    // A cada 30 s a pupila sobe, atravessa a pálpebra e volta pela parte de
+    // baixo noutra cor. O "errado" é de propósito: ela passa por onde não
+    // caberia, e o corte da volta é seco em vez de suave.
+    Timer {
+        running: mark.alive
+        interval: 30000
+        repeat: true
+        onTriggered: surge.restart()
+    }
+
+    SequentialAnimation {
+        id: surge
+        ScriptAction { script: mark.glitching = true }
+        NumberAnimation {
+            target: mark; property: "irisOffsetY"
+            to: -mark.unit * 0.58; duration: 420; easing.type: Easing.InBack
+        }
+        ScriptAction {
+            script: {
+                mark.stateIndex = (mark.stateIndex + 1) % mark.statePalette.length;
+                mark.irisOffsetY = mark.unit * 0.58;   // reaparece embaixo, sem transição
+            }
+        }
+        PauseAnimation { duration: 90 }
+        NumberAnimation {
+            target: mark; property: "irisOffsetY"
+            to: 0; duration: 520; easing.type: Easing.OutBack
+        }
+        ScriptAction { script: mark.glitching = false }
     }
 
     Item {
@@ -106,6 +153,9 @@ Item {
         Canvas {
             id: eye
             anchors.fill: parent
+            // Acima da íris: a pálpebra tem que passar por cima da pupila
+            // quando ela desce, e não o contrário.
+            z: 2
             onWidthChanged: requestPaint()
             Connections {
                 target: Theme
@@ -118,17 +168,20 @@ Item {
         Item {
             id: iris
             anchors.centerIn: parent
-            anchors.verticalCenterOffset: -mark.unit * 0.06
+            anchors.verticalCenterOffset: -mark.unit * 0.06 + mark.irisOffsetY
             anchors.horizontalCenterOffset: mark.gaze * mark.unit * 0.07
             width: mark.unit * 0.30
             height: width
             opacity: 1 - Math.min(1, mark.lid * 1.6)
 
-            // halo claro em volta
+            // halo claro em volta; ganha a cor do estado depois do primeiro ciclo
             Rectangle {
                 anchors.fill: parent
                 radius: width / 2
-                color: Theme.mix(Theme.primary, "#ffffff", 0.75)
+                color: mark.stateIndex === 0
+                    ? Theme.mix(Theme.primary, "#ffffff", 0.75)
+                    : Theme.mix(mark.stateColor, "#ffffff", 0.55)
+                Behavior on color { ColorAnimation { duration: 180 } }
             }
             // pupila escura com as linhas de varredura
             Rectangle {
@@ -148,7 +201,9 @@ Item {
                         delegate: Rectangle {
                             width: parent.width
                             height: Math.max(1, mark.unit * 0.011)
-                            color: Theme.withAlpha(Theme.mix(Theme.primary, "#ffffff", 0.6), 0.85)
+                            color: Theme.withAlpha(mark.stateIndex === 0
+                                ? Theme.mix(Theme.primary, "#ffffff", 0.6)
+                                : mark.stateColor, 0.85)
                         }
                     }
                 }
@@ -160,6 +215,7 @@ Item {
             model: mark.glitching ? 6 : 0
             delegate: Rectangle {
                 required property int index
+                z: 3
                 width: mark.unit * (0.06 + Math.random() * 0.16)
                 height: mark.unit * (0.02 + Math.random() * 0.05)
                 x: mark.unit * (0.08 + Math.random() * 0.8) - width / 2

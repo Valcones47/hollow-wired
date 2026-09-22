@@ -35,6 +35,9 @@ singleton ShellLayout 1.0 ShellLayout.qml
 Welcome 1.0 Welcome.qml
 WelcomeMark 1.0 WelcomeMark.qml
 GlitchText 1.0 GlitchText.qml
+WiredRain 1.0 WiredRain.qml
+CutCable 1.0 CutCable.qml
+GlyphCable 1.0 GlyphCable.qml
 LayoutPreview 1.0 LayoutPreview.qml
 WallpaperFade 1.0 WallpaperFade.qml
 singleton EqService 1.0 EqService.qml
