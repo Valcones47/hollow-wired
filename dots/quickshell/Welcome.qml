@@ -9,16 +9,21 @@ import "."
 // Tela de boas-vindas do primeiro login.
 //
 // Pensada para quem está vindo do Windows e abre o computador pela primeira vez
-// sem barra de tarefas, sem botão Iniciar e sem ícones na área de trabalho: em
-// vez de descobrir sozinho, a pessoa vê de cara o que substitui cada coisa.
+// sem barra de tarefas, sem botão Iniciar e sem ícones na área de trabalho.
+//
+// Ela tem cara própria de propósito: fundo mais escuro que o resto do shell,
+// marca desenhada e navegação lateral por assuntos, em vez de uma lista só que
+// rolava sem fim. As cores continuam saindo do wallust, então ela acompanha o
+// papel de parede como todo o resto.
 //
 // Aparece uma única vez (marca ~/.config/quickshell/.welcome-done) e pode ser
-// reaberta a qualquer momento com `qs ipc call welcome open` ou pelo Painel Rice.
+// reaberta com `qs ipc call welcome open` ou pelo Painel Rice.
 PanelWindow {
     id: welcomeWindow
 
     property bool open: false
     property bool checked: false
+    property int page: 0
 
     // Cada passo é um "e no Windows era assim" → "aqui é assim".
     readonly property var steps: [
@@ -90,6 +95,15 @@ PanelWindow {
         }
     ]
 
+    readonly property var pages: [
+        { icon: Theme.icons.arch, name: Theme.t("welcome.nav_start", "Início") },
+        { icon: Theme.icons.dashboard, name: Theme.t("welcome.nav_layout", "Interface") },
+        { icon: Theme.icons.laptop, name: Theme.t("welcome.nav_windows", "Janelas") },
+        { icon: Theme.icons.magnify, name: Theme.t("welcome.nav_keys", "Atalhos") },
+        { icon: Theme.icons.lock, name: Theme.t("welcome.nav_login", "Tela de login") },
+        { icon: Theme.icons.palette, name: Theme.t("welcome.nav_extras", "Aparência") }
+    ]
+
     property string windowMode: "hyprland"
     Process {
         id: modeStatus
@@ -158,6 +172,7 @@ PanelWindow {
 
     onOpenChanged: {
         if (open) {
+            welcomeWindow.page = 0;
             tipsStatus.running = true;
             modeStatus.running = true;
             greeterStatus.running = true;
@@ -165,9 +180,162 @@ PanelWindow {
         if (!open) welcomeWindow.markDone();
     }
 
+    // ---------------------------------------------------------- componentes
+    component NavItem: Rectangle {
+        id: nav
+        property int pageIndex: 0
+        property string icon: ""
+        property string label: ""
+        readonly property bool active: welcomeWindow.page === nav.pageIndex
+
+        Layout.fillWidth: true
+        implicitHeight: 40
+        radius: 12
+        color: nav.active ? Theme.withAlpha(Theme.primary, 0.20)
+             : (navArea.containsMouse ? Theme.withAlpha(Theme.outline, 0.18) : "transparent")
+        Behavior on color { ColorAnimation { duration: 130 } }
+
+        // Marca da página atual, como um marcador de livro na borda.
+        Rectangle {
+            visible: nav.active
+            anchors.left: parent.left
+            anchors.leftMargin: 3
+            anchors.verticalCenter: parent.verticalCenter
+            width: 3
+            height: 18
+            radius: 1.5
+            color: Theme.primary
+        }
+
+        Row {
+            anchors.left: parent.left
+            anchors.leftMargin: 14
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 10
+
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: nav.icon
+                font.family: Theme.iconFontFamily
+                font.pixelSize: 15
+                color: nav.active ? Theme.primary : Theme.subtext
+            }
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: nav.label
+                font.family: Theme.fontFamily
+                font.pixelSize: 13
+                font.weight: nav.active ? Font.DemiBold : Font.Normal
+                color: nav.active ? Theme.textColor : Theme.subtext
+            }
+        }
+
+        MouseArea {
+            id: navArea
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: welcomeWindow.page = nav.pageIndex
+        }
+    }
+
+    component PageTitle: ColumnLayout {
+        property string title: ""
+        property string subtitle: ""
+        Layout.fillWidth: true
+        spacing: 4
+
+        Text {
+            text: parent.title
+            font.family: Theme.fontFamily
+            font.pixelSize: 21
+            font.weight: Font.Bold
+            color: Theme.textColor
+        }
+        Text {
+            Layout.fillWidth: true
+            visible: parent.subtitle !== ""
+            text: parent.subtitle
+            wrapMode: Text.WordWrap
+            font.family: Theme.fontFamily
+            font.pixelSize: 13
+            color: Theme.subtext
+        }
+    }
+
+    component ChoiceCard: Rectangle {
+        id: cc
+        property string title: ""
+        property string desc: ""
+        property bool active: false
+        // Sem preview, o cartão vira só texto (é o caso do estilo das janelas).
+        property bool showPreview: false
+        property bool pvBar: true
+        property bool pvDock: true
+        property bool pvDockFull: false
+        property bool pvSide: false
+        signal picked()
+
+        Layout.fillWidth: true
+        Layout.preferredHeight: Math.max(ccCol.implicitHeight + 26, cc.showPreview ? 96 : 0)
+        radius: 14
+        color: cc.active ? Theme.withAlpha(Theme.primary, 0.14) : (ccArea.containsMouse ? Theme.tileHigh : Theme.tile)
+        border.width: cc.active ? 2 : 1
+        border.color: cc.active ? Theme.primary : Theme.withAlpha(Theme.outline, 0.25)
+        Behavior on color { ColorAnimation { duration: 140 } }
+
+        RowLayout {
+            anchors.fill: parent
+            anchors.margins: 14
+            spacing: 14
+
+            LayoutPreview {
+                visible: cc.showPreview
+                Layout.preferredWidth: 118
+                Layout.preferredHeight: 68
+                bar: cc.pvBar
+                dock: cc.pvDock
+                dockFull: cc.pvDockFull
+                side: cc.pvSide
+            }
+
+            ColumnLayout {
+                id: ccCol
+                Layout.fillWidth: true
+                spacing: 3
+
+                Text {
+                    Layout.fillWidth: true
+                    text: cc.title
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 14
+                    font.weight: Font.DemiBold
+                    color: Theme.textColor
+                }
+                Text {
+                    Layout.fillWidth: true
+                    visible: cc.desc !== ""
+                    text: cc.desc
+                    wrapMode: Text.WordWrap
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 12
+                    color: Theme.subtext
+                }
+            }
+        }
+
+        MouseArea {
+            id: ccArea
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: cc.picked()
+        }
+    }
+
     Rectangle {
         anchors.fill: parent
-        color: Qt.rgba(0, 0, 0, 0.65)
+        color: Qt.rgba(0, 0, 0, 0.72)
         opacity: welcomeWindow.open ? 1 : 0
         visible: opacity > 0
         Behavior on opacity { NumberAnimation { duration: 220 } }
@@ -181,12 +349,15 @@ PanelWindow {
     Rectangle {
         id: card
         anchors.centerIn: parent
-        width: 780
-        height: 740
-        radius: Theme.radius
-        color: Theme.surface
-        border.color: Theme.withAlpha(Theme.outline, 0.35)
+        width: Math.min(1040, welcomeWindow.width - 80)
+        height: Math.min(660, welcomeWindow.height - 80)
+        radius: 24
+        // Mais escuro que o resto do shell: é o que dá a ela um ar de
+        // "primeira tela", separada do desktop que está por baixo.
+        color: Theme.mix(Theme.background, "#000000", 0.35)
+        border.color: Theme.withAlpha(Theme.primary, 0.30)
         border.width: 1
+        clip: true
 
         scale: welcomeWindow.open ? 1 : 0.94
         opacity: welcomeWindow.open ? 1 : 0
@@ -197,64 +368,97 @@ PanelWindow {
 
         MouseArea { anchors.fill: parent }
 
-        ColumnLayout {
+        RowLayout {
             anchors.fill: parent
-            anchors.margins: 26
-            spacing: 16
+            spacing: 0
 
-            // ------------------------------------------------- cabeçalho
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 14
-
-                Rectangle {
-                    Layout.preferredWidth: 46
-                    Layout.preferredHeight: 46
-                    radius: 23
-                    color: Theme.withAlpha(Theme.primary, 0.18)
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: Theme.icons.arch
-                        font.family: Theme.iconFontFamily
-                        font.pixelSize: 24
-                        color: Theme.primary
-                    }
-                }
+            // ------------------------------------------------ navegação
+            Rectangle {
+                Layout.preferredWidth: 228
+                Layout.fillHeight: true
+                color: Theme.withAlpha("#000000", 0.25)
 
                 ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: 2
+                    anchors.fill: parent
+                    anchors.margins: 16
+                    spacing: 6
 
-                    Text {
-                        text: Theme.t("welcome.title", "Bem-vindo ao seu novo desktop")
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 20
-                        font.weight: Font.Bold
-                        color: Theme.textColor
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Layout.bottomMargin: 10
+                        spacing: 10
+
+                        Item {
+                            Layout.preferredWidth: 34
+                            Layout.preferredHeight: 34
+                            WelcomeMark { anchors.fill: parent; spin: false }
+                        }
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 0
+                            Text {
+                                text: "hollow-wired"
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 14
+                                font.weight: Font.Bold
+                                color: Theme.textColor
+                            }
+                            Text {
+                                text: Theme.t("welcome.brand_sub", "guia de primeiros passos")
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 10
+                                color: Theme.subtext
+                            }
+                        }
                     }
+
+                    Repeater {
+                        model: welcomeWindow.pages
+                        delegate: NavItem {
+                            required property var modelData
+                            required property int index
+                            icon: modelData.icon
+                            label: modelData.name
+                            pageIndex: index
+                        }
+                    }
+
+                    Item { Layout.fillHeight: true }
+
                     Text {
                         Layout.fillWidth: true
-                        text: Theme.t("welcome.subtitle", "Alguns atalhos e você já está em casa. Dá pra rever tudo isso quando quiser com Super + F1.")
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 12
-                        color: Theme.subtext
+                        text: Theme.t("welcome.nav_footer", "Super + F1 mostra tudo isso de novo, quando quiser.")
                         wrapMode: Text.WordWrap
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 11
+                        color: Theme.withAlpha(Theme.subtext, 0.85)
                     }
                 }
+            }
 
+            // ------------------------------------------------ conteúdo
+            Item {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+
+                // Botão fechar, sempre no canto de cima.
                 Rectangle {
-                    Layout.preferredWidth: 32
-                    Layout.preferredHeight: 32
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: 14
+                    z: 5
+                    width: 32
+                    height: 32
                     radius: 16
-                    color: closeArea.containsMouse ? Theme.tileHigh : "transparent"
+                    color: closeArea.containsMouse ? Theme.withAlpha(Theme.critical, 0.22) : "transparent"
 
                     Text {
                         anchors.centerIn: parent
                         text: Theme.icons.close
                         font.family: Theme.iconFontFamily
                         font.pixelSize: 15
-                        color: closeArea.containsMouse ? Theme.primary : Theme.subtext
+                        color: closeArea.containsMouse ? Theme.critical : Theme.subtext
                     }
                     MouseArea {
                         id: closeArea
@@ -264,434 +468,555 @@ PanelWindow {
                         onClicked: welcomeWindow.open = false
                     }
                 }
-            }
 
-            // ------------------------------------------------- passos
-            ListView {
-                id: stepList
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                clip: true
-                spacing: 8
-                model: welcomeWindow.steps
-                boundsBehavior: Flickable.StopAtBounds
+                // ---------------- página 0: início ----------------
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: 34
+                    visible: welcomeWindow.page === 0
+                    spacing: 0
 
-                ScrollBar.vertical: ScrollBar {
-                    id: stepScroll
-                    policy: stepList.contentHeight > stepList.height ? ScrollBar.AlwaysOn : ScrollBar.AlwaysOff
-                    width: 8
-                    contentItem: Rectangle {
-                        implicitWidth: 6
-                        radius: 3
-                        color: stepScroll.pressed ? Theme.primary : Theme.withAlpha(Theme.outline, 0.55)
-                    }
-                }
+                    Item { Layout.fillHeight: true }
 
-                delegate: Rectangle {
-                    id: stepCard
-                    required property var modelData
-                    required property int index
-
-                    width: stepList.width - (stepScroll.visible ? 16 : 4)
-                    height: 74
-                    radius: 12
-                    color: Theme.tile
-                    border.width: 1
-                    border.color: Theme.withAlpha(Theme.outline, 0.18)
-
-                    // Entrada escalonada: os cards vão aparecendo um a um, de cima
-                    // pra baixo, em vez de a lista inteira piscar de uma vez.
-                    opacity: 0
-                    x: 18
-                    SequentialAnimation {
-                        running: welcomeWindow.open
-                        PauseAnimation { duration: 60 + stepCard.index * 55 }
-                        ParallelAnimation {
-                            NumberAnimation { target: stepCard; property: "opacity"; to: 1; duration: 260; easing.type: Easing.OutCubic }
-                            NumberAnimation { target: stepCard; property: "x"; to: 0; duration: 320; easing.type: Easing.OutCubic }
-                        }
+                    Item {
+                        Layout.alignment: Qt.AlignHCenter
+                        Layout.preferredWidth: 190
+                        Layout.preferredHeight: 190
+                        WelcomeMark { anchors.fill: parent; spin: welcomeWindow.open && welcomeWindow.page === 0 }
                     }
 
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.leftMargin: 16
-                        anchors.rightMargin: 16
-                        spacing: 14
+                    Text {
+                        Layout.alignment: Qt.AlignHCenter
+                        Layout.topMargin: 18
+                        text: Theme.t("welcome.hero_title", "hollow-wired")
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 34
+                        font.weight: Font.Bold
+                        font.letterSpacing: 1
+                        color: Theme.textColor
+                    }
+                    Text {
+                        Layout.alignment: Qt.AlignHCenter
+                        Layout.topMargin: 6
+                        Layout.maximumWidth: 460
+                        horizontalAlignment: Text.AlignHCenter
+                        text: Theme.t("welcome.hero_sub", "Seu computador não tem mais barra de tarefas nem Menu Iniciar — tem atalhos. Em dois minutos aqui você já sabe usar tudo.")
+                        wrapMode: Text.WordWrap
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 13
+                        color: Theme.subtext
+                    }
+
+                    Rectangle {
+                        Layout.alignment: Qt.AlignHCenter
+                        Layout.topMargin: 26
+                        width: 210
+                        height: 44
+                        radius: 22
+                        color: heroArea.containsMouse ? Theme.primary : Theme.withAlpha(Theme.primary, 0.88)
+                        Behavior on color { ColorAnimation { duration: 130 } }
 
                         Text {
-                            text: modelData.icon
-                            font.family: Theme.iconFontFamily
-                            font.pixelSize: 22
-                            color: Theme.primary
-                            Layout.preferredWidth: 26
+                            anchors.centerIn: parent
+                            text: Theme.t("welcome.hero_btn", "Começar a configurar")
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 13
+                            font.weight: Font.Bold
+                            color: Theme.background
+                        }
+                        MouseArea {
+                            id: heroArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: welcomeWindow.page = 1
+                        }
+                    }
+
+                    Item { Layout.fillHeight: true }
+                }
+
+                // ---------------- página 1: interface ----------------
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: 34
+                    visible: welcomeWindow.page === 1
+                    spacing: 14
+
+                    PageTitle {
+                        title: Theme.t("welcome.layout_title", "Como você quer a tela?")
+                        subtitle: Theme.t("welcome.layout_sub", "Dá para trocar quando quiser, e ajustar cada peça depois em Configurações → Personalização.")
+                    }
+
+                    Repeater {
+                        model: [
+                            { key: "topbar", name: Theme.t("layout.preset_topbar", "Clássico"),
+                              desc: Theme.t("welcome.layout_topbar_desc", "Barra fina em cima com relógio e status; a fileira de aplicativos aparece quando o mouse chega na borda de baixo."),
+                              bar: true, dock: false, dockFull: false, side: false },
+                            { key: "taskbar", name: Theme.t("layout.preset_taskbar", "Estilo Windows"),
+                              desc: Theme.t("welcome.layout_taskbar_desc", "A fileira de aplicativos fica sempre à mostra, de ponta a ponta, e a central de ações fica aberta na direita."),
+                              bar: true, dock: true, dockFull: true, side: true },
+                            { key: "clean", name: Theme.t("layout.preset_clean", "Tela limpa"),
+                              desc: Theme.t("welcome.layout_clean_desc", "Só as suas janelas. Tudo do sistema aparece ao encostar o mouse na borda da tela."),
+                              bar: false, dock: false, dockFull: false, side: false }
+                        ]
+                        delegate: ChoiceCard {
+                            required property var modelData
+                            title: modelData.name
+                            desc: modelData.desc
+                            showPreview: true
+                            pvBar: modelData.bar
+                            pvDock: modelData.dock
+                            pvDockFull: modelData.dockFull
+                            pvSide: modelData.side
+                            active: ShellLayout.preset === modelData.key
+                            onPicked: ShellLayout.applyPreset(modelData.key)
+                        }
+                    }
+
+                    Item { Layout.fillHeight: true }
+                }
+
+                // ---------------- página 2: janelas ----------------
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: 34
+                    visible: welcomeWindow.page === 2
+                    spacing: 14
+
+                    PageTitle {
+                        title: Theme.t("welcome.mode_title", "Como as janelas devem abrir?")
+                        subtitle: Theme.t("welcome.mode_sub", "O jeito do Hyprland é dividir a tela sozinho. Se isso for estranho no começo, comece pelo estilo Windows.")
+                    }
+
+                    Repeater {
+                        model: [
+                            { mode: "windows", label: Theme.t("welcome.mode_windows", "Estilo Windows"),
+                              desc: Theme.t("welcome.mode_windows_desc", "Soltas no meio da tela, como no Windows.") },
+                            { mode: "hyprland", label: Theme.t("welcome.mode_hyprland", "Estilo Hyprland"),
+                              desc: Theme.t("welcome.mode_hyprland_desc", "Lado a lado, dividindo a tela sozinhas.") }
+                        ]
+                        delegate: ChoiceCard {
+                            required property var modelData
+                            title: modelData.label
+                            desc: modelData.desc
+                            active: welcomeWindow.windowMode === modelData.mode
+                            onPicked: {
+                                welcomeWindow.windowMode = modelData.mode;
+                                Quickshell.execDetached(["rice-window-mode", modelData.mode]);
+                            }
+                        }
+                    }
+
+                    Item { Layout.fillHeight: true }
+                }
+
+                // ---------------- página 3: atalhos ----------------
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: 34
+                    visible: welcomeWindow.page === 3
+                    spacing: 12
+
+                    PageTitle {
+                        title: Theme.t("welcome.keys_title", "O que substitui cada coisa")
+                        subtitle: Theme.t("welcome.keys_sub", "A tecla Windows aqui se chama Super e é o centro de quase tudo.")
+                    }
+
+                    ListView {
+                        id: stepList
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        clip: true
+                        spacing: 8
+                        model: welcomeWindow.steps
+                        boundsBehavior: Flickable.StopAtBounds
+
+                        ScrollBar.vertical: ScrollBar {
+                            id: stepScroll
+                            policy: stepList.contentHeight > stepList.height ? ScrollBar.AlwaysOn : ScrollBar.AlwaysOff
+                            width: 8
+                            contentItem: Rectangle {
+                                implicitWidth: 6
+                                radius: 3
+                                color: stepScroll.pressed ? Theme.primary : Theme.withAlpha(Theme.outline, 0.55)
+                            }
                         }
 
-                        ColumnLayout {
-                            Layout.fillWidth: true
-                            spacing: 3
+                        delegate: Rectangle {
+                            id: stepCard
+                            required property var modelData
+                            required property int index
 
-                            Text {
-                                text: modelData.title
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 13
-                                font.weight: Font.Bold
-                                color: Theme.textColor
-                            }
-                            Text {
-                                Layout.fillWidth: true
-                                text: modelData.desc
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 11
-                                color: Theme.subtext
-                                wrapMode: Text.WordWrap
-                            }
-                        }
+                            width: stepList.width - (stepScroll.visible ? 16 : 4)
+                            height: 70
+                            radius: 12
+                            color: Theme.tile
+                            border.width: 1
+                            border.color: Theme.withAlpha(Theme.outline, 0.18)
 
-                        // Teclas do atalho
-                        Row {
-                            spacing: 4
-                            Layout.alignment: Qt.AlignVCenter
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: 16
+                                anchors.rightMargin: 16
+                                spacing: 14
 
-                            Repeater {
-                                model: modelData.keys
-                                delegate: Rectangle {
-                                    required property var modelData
-                                    height: 24
-                                    width: keyLabel.implicitWidth + 16
-                                    radius: 6
-                                    color: Theme.withAlpha(Theme.primary, 0.16)
-                                    border.width: 1
-                                    border.color: Theme.withAlpha(Theme.primary, 0.35)
+                                Text {
+                                    text: stepCard.modelData.icon
+                                    font.family: Theme.iconFontFamily
+                                    font.pixelSize: 22
+                                    color: Theme.primary
+                                    Layout.preferredWidth: 26
+                                }
+
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 2
 
                                     Text {
-                                        id: keyLabel
-                                        anchors.centerIn: parent
-                                        text: modelData
-                                        font.family: Theme.monoFamily
-                                        font.pixelSize: 11
-                                        font.weight: Font.Bold
-                                        color: Theme.primary
+                                        Layout.fillWidth: true
+                                        text: stepCard.modelData.title
+                                        elide: Text.ElideRight
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 13
+                                        font.weight: Font.DemiBold
+                                        color: Theme.textColor
+                                    }
+                                    Text {
+                                        Layout.fillWidth: true
+                                        text: stepCard.modelData.desc
+                                        wrapMode: Text.WordWrap
+                                        maximumLineCount: 2
+                                        elide: Text.ElideRight
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 12
+                                        color: Theme.subtext
+                                    }
+                                }
+
+                                Row {
+                                    spacing: 5
+                                    Repeater {
+                                        model: stepCard.modelData.keys
+                                        delegate: Rectangle {
+                                            required property var modelData
+                                            height: 24
+                                            width: keyText.implicitWidth + 16
+                                            radius: 7
+                                            color: Theme.withAlpha(Theme.primary, 0.16)
+                                            border.width: 1
+                                            border.color: Theme.withAlpha(Theme.primary, 0.35)
+
+                                            Text {
+                                                id: keyText
+                                                anchors.centerIn: parent
+                                                text: modelData
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: 11
+                                                font.weight: Font.DemiBold
+                                                color: Theme.primary
+                                            }
+                                        }
                                     }
                                 }
                             }
                         }
                     }
                 }
-            }
 
-            // ------------------------------------------------- estilo das janelas
-            // Mesma escolha do painel Rice > Jeito de Usar (rice-window-mode).
-            // Escondido até o estilo Windows ficar estável.
-            Rectangle {
-                visible: false
-                Layout.fillWidth: true
-                Layout.preferredHeight: 54
-                radius: 14
-                color: Theme.tile
-                border.width: 1
-                border.color: Theme.withAlpha(Theme.outline, 0.22)
-
-                RowLayout {
+                // ---------------- página 4: tela de login ----------------
+                ColumnLayout {
                     anchors.fill: parent
-                    anchors.leftMargin: 14
-                    anchors.rightMargin: 8
-                    spacing: 12
+                    anchors.margins: 34
+                    visible: welcomeWindow.page === 4
+                    spacing: 14
 
-                    Text {
-                        text: Theme.icons.laptop
-                        font.family: Theme.iconFontFamily
-                        font.pixelSize: 18
-                        color: Theme.primary
+                    PageTitle {
+                        title: Theme.t("welcome.greeter_title", "Tela de login com a cara do rice (opcional)")
+                        subtitle: welcomeWindow.greeterState === "active"
+                            ? Theme.t("welcome.greeter_active", "Já ativa: o computador abre na mesma tela da tela de bloqueio.")
+                            : Theme.t("welcome.greeter_desc", "Igual à tela de bloqueio, com a lista de sessões. Um assistente explica e pergunta antes de trocar.")
                     }
-                    ColumnLayout {
+
+                    Rectangle {
                         Layout.fillWidth: true
-                        spacing: 0
-                        Text {
-                            text: Theme.t("welcome.mode_title", "Como as janelas devem abrir?")
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 12
-                            font.weight: Font.DemiBold
-                            color: Theme.textColor
-                        }
-                        Text {
-                            Layout.fillWidth: true
-                            elide: Text.ElideRight
-                            text: welcomeWindow.windowMode === "windows"
-                                ? Theme.t("welcome.mode_windows_desc", "Soltas no meio da tela, como no Windows.")
-                                : Theme.t("welcome.mode_hyprland_desc", "Lado a lado, dividindo a tela sozinhas.")
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 10
-                            color: Theme.subtext
-                        }
-                    }
-                    Repeater {
-                        model: [
-                            { mode: "windows", label: Theme.t("welcome.mode_windows", "Estilo Windows") },
-                            { mode: "hyprland", label: Theme.t("welcome.mode_hyprland", "Estilo Hyprland") }
-                        ]
-                        delegate: Rectangle {
-                            required property var modelData
-                            readonly property bool on: welcomeWindow.windowMode === modelData.mode
-                            implicitWidth: modeLbl.implicitWidth + 26
-                            implicitHeight: 34
-                            radius: 17
-                            color: on ? Theme.primary : (modeArea.containsMouse ? Theme.tileHigh : "transparent")
-                            border.width: on ? 0 : 1
-                            border.color: Theme.withAlpha(Theme.outline, 0.35)
-                            Behavior on color { ColorAnimation { duration: 140 } }
+                        Layout.preferredHeight: greeterCol.implicitHeight + 28
+                        radius: 14
+                        color: Theme.tile
+                        border.width: 1
+                        border.color: Theme.withAlpha(Theme.outline, 0.22)
+
+                        ColumnLayout {
+                            id: greeterCol
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            anchors.margins: 16
+                            spacing: 10
+
                             Text {
-                                id: modeLbl
-                                anchors.centerIn: parent
-                                text: modelData.label
+                                Layout.fillWidth: true
+                                text: Theme.t("welcome.greeter_warn", "Trocar a tela de login mexe no que aparece antes da sessão abrir. O assistente faz um teste ao vivo antes de valer no boot, e dá para voltar atrás a qualquer momento.")
+                                wrapMode: Text.WordWrap
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 12
-                                font.weight: Font.DemiBold
-                                color: parent.on ? Theme.background : Theme.textColor
+                                color: Theme.subtext
                             }
-                            MouseArea {
-                                id: modeArea
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: {
-                                    welcomeWindow.windowMode = modelData.mode;
-                                    Quickshell.execDetached(["rice-window-mode", modelData.mode]);
+
+                            Rectangle {
+                                Layout.preferredWidth: 190
+                                Layout.preferredHeight: 38
+                                radius: 19
+                                color: greeterArea.containsMouse ? Theme.withAlpha(Theme.primary, 0.3) : Theme.withAlpha(Theme.primary, 0.18)
+                                border.width: 1
+                                border.color: Theme.withAlpha(Theme.primary, 0.45)
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: welcomeWindow.greeterState === "active"
+                                        ? Theme.t("welcome.greeter_btn_open", "Abrir o assistente")
+                                        : Theme.t("welcome.greeter_btn", "Configurar")
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 12
+                                    font.weight: Font.DemiBold
+                                    color: Theme.primary
+                                }
+                                MouseArea {
+                                    id: greeterArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: greeterSetup.running = true
                                 }
                             }
                         }
                     }
+
+                    Item { Layout.fillHeight: true }
                 }
-            }
 
-            // ------------------------------------------------- dicas
-            // Liga/desliga as dicas em notificação (rice-tips). Mesma chave do
-            // painel Rice > Guia de Atalhos.
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 50
-                radius: 14
-                color: Theme.tile
-                border.width: 1
-                border.color: Theme.withAlpha(Theme.outline, 0.22)
-
-                RowLayout {
+                // ---------------- página 5: aparência e extras ----------------
+                ColumnLayout {
                     anchors.fill: parent
-                    anchors.leftMargin: 14
-                    anchors.rightMargin: 14
-                    spacing: 12
+                    anchors.margins: 34
+                    visible: welcomeWindow.page === 5
+                    spacing: 14
 
-                    Text {
-                        text: Theme.icons.info
-                        font.family: Theme.iconFontFamily
-                        font.pixelSize: 18
-                        color: Theme.primary
+                    PageTitle {
+                        title: Theme.t("welcome.extras_title", "A cara do sistema é a do seu papel de parede")
+                        subtitle: Theme.t("welcome.extras_sub", "As cores de tudo saem da imagem de fundo. Troque o papel de parede e o resto acompanha.")
                     }
-                    ColumnLayout {
+
+                    RowLayout {
                         Layout.fillWidth: true
-                        spacing: 0
-                        Text {
-                            text: Theme.t("welcome.tips_title", "Dicas enquanto você usa")
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 12
-                            font.weight: Font.DemiBold
-                            color: Theme.textColor
-                        }
-                        Text {
-                            Layout.fillWidth: true
-                            elide: Text.ElideRight
-                            text: Theme.t("welcome.tips_desc", "De vez em quando uma notificação ensina um atalho. Cada dica aparece no máximo 2 vezes.")
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 10
-                            color: Theme.subtext
-                        }
-                    }
-                    Rectangle {
-                        implicitWidth: 42
-                        implicitHeight: 22
-                        radius: 11
-                        color: welcomeWindow.tipsOn ? Theme.primary : Theme.tileHigh
-                        Behavior on color { ColorAnimation { duration: 140 } }
-                        Rectangle {
-                            width: 16; height: 16; radius: 8
-                            anchors.verticalCenter: parent.verticalCenter
-                            x: welcomeWindow.tipsOn ? parent.width - width - 3 : 3
-                            color: Theme.textColor
-                            Behavior on x { NumberAnimation { duration: 140 } }
-                        }
-                        MouseArea {
-                            anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                welcomeWindow.tipsOn = !welcomeWindow.tipsOn;
-                                Quickshell.execDetached(["rice-tips", welcomeWindow.tipsOn ? "on" : "off"]);
+                        spacing: 10
+
+                        Repeater {
+                            model: [
+                                { label: Theme.t("welcome.btn_wallpaper", "Papel de parede"), icon: Theme.icons.palette, action: "wallpaper" },
+                                { label: Theme.t("welcome.btn_settings", "Configurações"), icon: Theme.icons.tune, action: "settings" },
+                                { label: Theme.t("welcome.btn_shortcuts", "Ver todos os atalhos"), icon: Theme.icons.info, action: "cheatsheet" }
+                            ]
+
+                            delegate: Rectangle {
+                                id: actBtn
+                                required property var modelData
+
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 40
+                                radius: 20
+                                color: actArea.containsMouse ? Theme.tileHigh : Theme.tile
+                                border.width: 1
+                                border.color: Theme.withAlpha(Theme.outline, 0.22)
+                                Behavior on color { ColorAnimation { duration: 130 } }
+
+                                Row {
+                                    anchors.centerIn: parent
+                                    spacing: 8
+
+                                    Text {
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: actBtn.modelData.icon
+                                        font.family: Theme.iconFontFamily
+                                        font.pixelSize: 14
+                                        color: Theme.primary
+                                    }
+                                    Text {
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: actBtn.modelData.label
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 12
+                                        color: Theme.textColor
+                                    }
+                                }
+
+                                MouseArea {
+                                    id: actArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        welcomeWindow.open = false;
+                                        if (actBtn.modelData.action === "cheatsheet")
+                                            Quickshell.execDetached(["quickshell", "ipc", "call", "cheatsheet", "toggle"]);
+                                        else if (actBtn.modelData.action === "settings")
+                                            Quickshell.execDetached(["quickshell", "ipc", "call", "visualconfig", "toggle"]);
+                                        else if (actBtn.modelData.action === "wallpaper")
+                                            Quickshell.execDetached(["sh", "-c", "if flatpak info org.waywallen.waywallen >/dev/null 2>&1; then exec waywallen-switcher; else exec rice-wallpaper-set; fi"]);
+                                    }
+                                }
                             }
                         }
                     }
-                }
-            }
 
-            // ------------------------------------------------- tela de login
-            // Opcional: troca o SDDM pela tela de login do rice (rice-greeter
-            // setup, num terminal; o assistente explica e só ativa no fim).
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 50
-                radius: 14
-                color: Theme.tile
-                border.width: 1
-                border.color: Theme.withAlpha(Theme.outline, 0.22)
-
-                RowLayout {
-                    anchors.fill: parent
-                    anchors.leftMargin: 14
-                    anchors.rightMargin: 10
-                    spacing: 12
-
-                    Text {
-                        text: Theme.icons.lock
-                        font.family: Theme.iconFontFamily
-                        font.pixelSize: 18
-                        color: Theme.primary
-                    }
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        spacing: 0
-                        Text {
-                            text: Theme.t("welcome.greeter_title", "Tela de login com a cara do rice (opcional)")
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 12
-                            font.weight: Font.DemiBold
-                            color: Theme.textColor
-                        }
-                        Text {
-                            Layout.fillWidth: true
-                            elide: Text.ElideRight
-                            text: welcomeWindow.greeterState === "active"
-                                  ? Theme.t("welcome.greeter_active", "Já ativa: o computador abre na mesma tela da tela de bloqueio.")
-                                  : Theme.t("welcome.greeter_desc", "Igual à tela de bloqueio, com a lista de sessões. Um assistente explica e pergunta antes de trocar.")
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 10
-                            color: Theme.subtext
-                        }
-                    }
                     Rectangle {
-                        visible: welcomeWindow.greeterState !== "active"
-                        implicitWidth: greeterBtnText.implicitWidth + 22
-                        implicitHeight: 30
-                        radius: 9
-                        color: greeterBtnArea.containsMouse ? Theme.withAlpha(Theme.primary, 0.85) : Theme.primary
-                        Text {
-                            id: greeterBtnText
-                            anchors.centerIn: parent
-                            text: Theme.t("welcome.greeter_btn", "Configurar")
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 11
-                            font.weight: Font.DemiBold
-                            color: Theme.background
-                        }
-                        MouseArea {
-                            id: greeterBtnArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: greeterSetup.running = true
-                        }
-                    }
-                    Text {
-                        visible: welcomeWindow.greeterState === "active"
-                        text: Theme.icons.check
-                        font.family: Theme.iconFontFamily
-                        font.pixelSize: 18
-                        color: Theme.primary
-                    }
-                }
-            }
-
-            // ------------------------------------------------- ações
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 10
-
-                Repeater {
-                    model: [
-                        { label: Theme.t("welcome.btn_shortcuts", "Ver todos os atalhos"), icon: Theme.icons.info, action: "cheatsheet" },
-                        { label: Theme.t("welcome.btn_settings", "Configurações"), icon: Theme.icons.tune, action: "settings" },
-                        { label: Theme.t("welcome.btn_wallpaper", "Papel de parede"), icon: Theme.icons.palette, action: "wallpaper" }
-                    ]
-
-                    delegate: Rectangle {
-                        required property var modelData
-
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 38
-                        radius: 19
-                        color: actArea.containsMouse ? Theme.tileHigh : Theme.tile
+                        Layout.preferredHeight: tipsRow.implicitHeight + 26
+                        radius: 14
+                        color: Theme.tile
                         border.width: 1
                         border.color: Theme.withAlpha(Theme.outline, 0.22)
 
-                        Behavior on color { ColorAnimation { duration: 130 } }
+                        RowLayout {
+                            id: tipsRow
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            anchors.margins: 16
+                            spacing: 12
 
-                        Row {
-                            anchors.centerIn: parent
-                            spacing: 8
-
-                            Text {
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: modelData.icon
-                                font.family: Theme.iconFontFamily
-                                font.pixelSize: 14
-                                color: Theme.primary
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 2
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: Theme.t("welcome.tips_title", "Dicas enquanto você usa")
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 13
+                                    font.weight: Font.DemiBold
+                                    color: Theme.textColor
+                                }
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: Theme.t("welcome.tips_desc", "De vez em quando uma notificação ensina um atalho. Cada dica aparece no máximo 2 vezes.")
+                                    wrapMode: Text.WordWrap
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 12
+                                    color: Theme.subtext
+                                }
                             }
-                            Text {
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: modelData.label
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 12
-                                color: Theme.textColor
+
+                            Rectangle {
+                                implicitWidth: 43
+                                implicitHeight: 20
+                                radius: 10
+                                color: welcomeWindow.tipsOn ? Theme.primary : Theme.tileHigh
+
+                                Rectangle {
+                                    width: 14; height: 14; radius: 7
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    x: welcomeWindow.tipsOn ? parent.width - width - 3 : 3
+                                    color: Theme.textColor
+                                    Behavior on x { NumberAnimation { duration: 140 } }
+                                }
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        welcomeWindow.tipsOn = !welcomeWindow.tipsOn;
+                                        Quickshell.execDetached(["rice-tips", welcomeWindow.tipsOn ? "on" : "off"]);
+                                    }
+                                }
                             }
                         }
+                    }
 
+                    Item { Layout.fillHeight: true }
+                }
+
+                // ---------------- rodapé de navegação ----------------
+                RowLayout {
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    anchors.margins: 34
+                    visible: welcomeWindow.page > 0
+                    spacing: 10
+
+                    Rectangle {
+                        Layout.preferredWidth: 110
+                        Layout.preferredHeight: 38
+                        radius: 19
+                        color: prevArea.containsMouse ? Theme.tileHigh : "transparent"
+                        border.width: 1
+                        border.color: Theme.withAlpha(Theme.outline, 0.3)
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: Theme.t("welcome.prev", "Voltar")
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 12
+                            color: Theme.subtext
+                        }
                         MouseArea {
-                            id: actArea
+                            id: prevArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: welcomeWindow.page = Math.max(0, welcomeWindow.page - 1)
+                        }
+                    }
+
+                    Item { Layout.fillWidth: true }
+
+                    // Bolinhas de progresso, para saber quanto falta.
+                    Row {
+                        Layout.alignment: Qt.AlignVCenter
+                        spacing: 6
+                        Repeater {
+                            model: welcomeWindow.pages.length
+                            delegate: Rectangle {
+                                required property int index
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: welcomeWindow.page === index ? 18 : 7
+                                height: 7
+                                radius: 3.5
+                                color: welcomeWindow.page === index ? Theme.primary : Theme.withAlpha(Theme.subtext, 0.35)
+                                Behavior on width { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+                            }
+                        }
+                    }
+
+                    Item { Layout.fillWidth: true }
+
+                    Rectangle {
+                        Layout.preferredWidth: 150
+                        Layout.preferredHeight: 38
+                        radius: 19
+                        color: nextArea.containsMouse ? Theme.primary : Theme.withAlpha(Theme.primary, 0.85)
+                        Behavior on color { ColorAnimation { duration: 130 } }
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: welcomeWindow.page >= welcomeWindow.pages.length - 1
+                                ? Theme.t("welcome.btn_start", "Começar a usar")
+                                : Theme.t("welcome.next", "Continuar")
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 12
+                            font.weight: Font.Bold
+                            color: Theme.background
+                        }
+                        MouseArea {
+                            id: nextArea
                             anchors.fill: parent
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
-                                welcomeWindow.open = false;
-                                if (modelData.action === "cheatsheet")
-                                    Quickshell.execDetached(["quickshell", "ipc", "call", "cheatsheet", "toggle"]);
-                                else if (modelData.action === "settings")
-                                    Quickshell.execDetached(["quickshell", "ipc", "call", "visualconfig", "toggle"]);
-                                else if (modelData.action === "wallpaper")
-                                    Quickshell.execDetached(["sh", "-c", "if flatpak info org.waywallen.waywallen >/dev/null 2>&1; then exec waywallen-switcher; else exec rice-wallpaper-set; fi"]);
+                                if (welcomeWindow.page >= welcomeWindow.pages.length - 1) welcomeWindow.open = false;
+                                else welcomeWindow.page++;
                             }
                         }
-                    }
-                }
-
-                Rectangle {
-                    Layout.preferredWidth: 150
-                    Layout.preferredHeight: 38
-                    radius: 19
-                    color: startArea.containsMouse ? Theme.primary : Theme.withAlpha(Theme.primary, 0.85)
-
-                    Behavior on color { ColorAnimation { duration: 130 } }
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: Theme.t("welcome.btn_start", "Começar a usar")
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 12
-                        font.weight: Font.Bold
-                        color: Theme.background
-                    }
-
-                    MouseArea {
-                        id: startArea
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: welcomeWindow.open = false
                     }
                 }
             }

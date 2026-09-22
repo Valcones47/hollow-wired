@@ -32,6 +32,8 @@ VisualConfigPanel 1.0 VisualConfigPanel.qml
 singleton ShellCustomization 1.0 ShellCustomization.qml
 singleton ShellLayout 1.0 ShellLayout.qml
 Welcome 1.0 Welcome.qml
+WelcomeMark 1.0 WelcomeMark.qml
+LayoutPreview 1.0 LayoutPreview.qml
 WallpaperFade 1.0 WallpaperFade.qml
 singleton EqService 1.0 EqService.qml
 Equalizer 1.0 Equalizer.qml
@@ -42,3 +44,4 @@ LockScreen 1.0 LockScreen.qml
 LockView 1.0 LockView.qml
 LockShape 1.0 LockShape.qml
 LockWave 1.0 LockWave.qml
+

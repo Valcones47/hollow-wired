@@ -8890,19 +8890,19 @@ PanelWindow {
                                                 key: "topbar",
                                                 name: Theme.t("layout.preset_topbar", "Clássico"),
                                                 desc: Theme.t("layout.preset_topbar_desc", "Barra em cima, dock que aparece no mouse"),
-                                                bar: true, barFull: true, dock: true, dockFull: false, side: false
+                                                bar: true, dock: false, dockFull: false, side: false
                                             },
                                             {
                                                 key: "taskbar",
                                                 name: Theme.t("layout.preset_taskbar", "Estilo Windows"),
                                                 desc: Theme.t("layout.preset_taskbar_desc", "Dock larga sempre à mostra e central de ações fixa"),
-                                                bar: true, barFull: true, dock: true, dockFull: true, side: true
+                                                bar: true, dock: true, dockFull: true, side: true
                                             },
                                             {
                                                 key: "clean",
                                                 name: Theme.t("layout.preset_clean", "Tela limpa"),
                                                 desc: Theme.t("layout.preset_clean_desc", "Nada à vista: tudo só ao encostar o mouse na borda"),
-                                                bar: false, barFull: false, dock: false, dockFull: false, side: false
+                                                bar: false, dock: false, dockFull: false, side: false
                                             }
                                         ]
                                         delegate: Rectangle {
@@ -8926,51 +8926,13 @@ PanelWindow {
                                                 spacing: 10
 
                                                 // Miniatura da tela com as peças no lugar
-                                                Rectangle {
-                                                    id: lpMini
+                                                LayoutPreview {
                                                     Layout.fillWidth: true
                                                     Layout.preferredHeight: width * 0.52
-                                                    radius: 8
-                                                    color: Theme.withAlpha(Theme.background, 0.8)
-                                                    border.width: 1
-                                                    border.color: Theme.withAlpha(Theme.outline, 0.3)
-                                                    clip: true
-
-                                                    // barra de cima
-                                                    Rectangle {
-                                                        x: 5; y: 5
-                                                        width: parent.width - 10
-                                                        height: 6
-                                                        radius: 3
-                                                        color: Theme.withAlpha(Theme.primary, lpCard.modelData.bar ? 0.55 : 0.18)
-                                                    }
-                                                    // dock embaixo
-                                                    Rectangle {
-                                                        height: 7
-                                                        radius: 3.5
-                                                        y: parent.height - height - 5
-                                                        width: lpCard.modelData.dockFull ? parent.width - 10 : parent.width * 0.42
-                                                        x: lpCard.modelData.dockFull ? 5 : (parent.width - width) / 2
-                                                        color: Theme.withAlpha(Theme.secondary, lpCard.modelData.dock ? 0.55 : 0.18)
-                                                    }
-                                                    // central de ações na direita
-                                                    Rectangle {
-                                                        width: 12
-                                                        radius: 4
-                                                        x: parent.width - width - 5
-                                                        y: 15
-                                                        height: parent.height - 28
-                                                        color: Theme.withAlpha(Theme.primary, lpCard.modelData.side ? 0.4 : 0.14)
-                                                    }
-                                                    // janela de exemplo
-                                                    Rectangle {
-                                                        x: parent.width * 0.12
-                                                        y: parent.height * 0.3
-                                                        width: parent.width * 0.5
-                                                        height: parent.height * 0.42
-                                                        radius: 4
-                                                        color: Theme.withAlpha(Theme.outline, 0.35)
-                                                    }
+                                                    bar: lpCard.modelData.bar
+                                                    dock: lpCard.modelData.dock
+                                                    dockFull: lpCard.modelData.dockFull
+                                                    side: lpCard.modelData.side
                                                 }
 
                                                 Text {
