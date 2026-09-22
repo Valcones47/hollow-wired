@@ -678,7 +678,17 @@ class SwitcherWindow(Gtk.ApplicationWindow):
         big = cached_still(wallpaper)
         if big:
             return big
-        return preview if preview and os.path.isfile(preview) else ""
+        if preview and os.path.isfile(preview):
+            return preview
+        # Vídeo de pasta comum sem quadro ainda (acabou de ser adicionado e a
+        # extração em segundo plano não chegou nele): não há preview de reserva,
+        # e sem imagem a transição era pulada. Extrair agora custa ~0,5 s.
+        if wallpaper.get("kind") in ("video", "image"):
+            still = extract_still(wallpaper)
+            if still:
+                self._stills[wallpaper.get("id")] = still
+            return still
+        return ""
 
     def _apply_now(self, wallpaper):
         self.applying = False

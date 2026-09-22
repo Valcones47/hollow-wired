@@ -56,14 +56,25 @@ try:
     conn = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
     conn.row_factory = sqlite3.Row
     rows = conn.execute(
-        "SELECT item.id, item.display_name, item.preview_path, library.path AS lib "
-        "FROM item JOIN library ON library.id = item.library_id"
+        "SELECT item.id, item.display_name, item.preview_path, item.path, "
+        "source_plugin.name AS plugin, library.path AS lib "
+        "FROM item JOIN library ON library.id = item.library_id "
+        "JOIN source_plugin ON source_plugin.id = item.plugin_id"
     ).fetchall()
 except Exception:
     sys.exit(0)
 
 VIDEO = (".mp4", ".webm", ".mkv")
 for r in rows:
+    # Vídeo de pasta comum do Waywallen (plugin "video"): não tem preview e a
+    # pasta pode ter vários vídeos, então o "diretório" é o próprio arquivo
+    # (o rice-wallpaper-frame aceita arquivo). Antes esses itens eram pulados
+    # e ficavam sem quadro — e sem quadro a transição não roda.
+    if r["plugin"] == "video" and r["path"]:
+        f = os.path.join(r["lib"].rstrip("/"), r["path"])
+        if os.path.isfile(f):
+            print("\t".join([str(r["id"]), f, "video", r["display_name"] or ""]))
+        continue
     if not r["preview_path"]:
         continue
     d = os.path.dirname(os.path.join(r["lib"].rstrip("/"), r["preview_path"]))
@@ -166,7 +177,9 @@ cmd_status() {
         case "$kind" in
             video)
                 videos=$((videos + 1))
-                out=$(rice-wallpaper-frame "$dir" 2>/dev/null)
+                # Só consulta o cache: o painel chama o status toda vez que abre,
+                # e sem --cached-only isto extraía os quadros ali mesmo.
+                out=$(rice-wallpaper-frame --cached-only "$dir" 2>/dev/null)
                 case "$out" in "$CACHE"/*) v_ok=$((v_ok + 1)) ;; esac
                 ;;
             cena)
