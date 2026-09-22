@@ -1,0 +1,361 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# rice-greeter — tela de login do sistema (greetd) com a mesma cara da tela de
+# bloqueio do rice.
+#
+#   rice-greeter test        abre o greeter numa janela, sem instalar nada
+#   rice-greeter sync        copia cores, idioma, foto, wallpaper e nome para o
+#                            greeter (roda sozinho ao bloquear e ao iniciar)
+#   sudo rice-greeter install    instala o greetd e os arquivos (NÃO troca o SDDM)
+#   sudo rice-greeter try        testa ao vivo num terminal virtual livre
+#   sudo rice-greeter activate   troca o SDDM pelo greetd no boot
+#   sudo rice-greeter uninstall  volta para o SDDM
+#   rice-greeter status
+#
+# Como funciona: o greetd abre um Hyprland mínimo como o usuário `greeter`
+# (/etc/greetd/hyprland-greeter.lua), que roda o Quickshell com
+# /etc/greetd/quickshell (LockView.qml + dots/greeter/shell.qml). O greeter não
+# lê a home de ninguém: HOME dele é /var/lib/hollow-wired-greeter, e a pasta
+# shared/ lá dentro pertence ao usuário, que a mantém atualizada pelo `sync`.
+#
+# Se algo der errado no boot: Ctrl+Alt+F3, entrar com o SEU usuário e rodar
+#   sudo rice-greeter uninstall      (ou: sudo systemctl disable greetd; sudo systemctl enable sddm)
+# ==============================================================================
+set -uo pipefail
+
+GREETER_HOME="/var/lib/hollow-wired-greeter"
+SHARED="$GREETER_HOME/shared"
+CONFIG_DIR="/etc/greetd/quickshell"
+HYPR_CONF="/etc/greetd/hyprland-greeter.lua"
+SESSION_BIN="/usr/local/bin/rice-greeter-session"
+SESSION_WRAP="/usr/local/bin/rice-session-start"
+GREETD_CONF="/etc/greetd/config.toml"
+
+# Quem é o usuário de verdade. RICE_GREETER_USER vem primeiro: dentro do
+# `install` (root) o sync é chamado via `sudo -u <usuário>`, e esse sudo
+# interno põe SUDO_USER=root — o greeter chegou a ser montado para o root
+# ("Bom dia, root", senha que não entrava).
+REAL_USER="${RICE_GREETER_USER:-${SUDO_USER:-$USER}}"
+USER_HOME="$(getent passwd "$REAL_USER" | cut -d: -f6)"
+[ -n "$USER_HOME" ] || USER_HOME="$HOME"
+
+say()  { printf '\033[1;36m==>\033[0m %s\n' "$*"; }
+warn() { printf '\033[1;33m[aviso]\033[0m %s\n' "$*" >&2; }
+die()  { printf '\033[1;31m[erro]\033[0m %s\n' "$*" >&2; exit 1; }
+
+find_dots() {
+    local c
+    for c in \
+        "$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/../.." 2>/dev/null && pwd)/dots" \
+        "$(cat "$USER_HOME/.config/hollow-wired-repo" 2>/dev/null)/dots" \
+        "$USER_HOME/.local/share/hollow-wired/dots" \
+        "$USER_HOME/projetos/hyprland-setup/dots" \
+        "$USER_HOME/projetos/hollow-wired/dots" \
+        "$USER_HOME/.hollow-wired/dots"; do
+        if [ -f "$c/greeter/shell.qml" ] && [ -f "$c/quickshell/LockView.qml" ]; then
+            echo "$c"
+            return 0
+        fi
+    done
+    return 1
+}
+
+# Monta a config do Quickshell do greeter em $1.
+build_config() {
+    local dest="$1" dots
+    dots="$(find_dots)" || die "Não achei a pasta dots/ do rice (com dots/greeter)."
+    mkdir -p "$dest/i18n"
+    cp "$dots/greeter/shell.qml" "$dots/greeter/NotifService.qml" "$dots/greeter/qmldir" "$dest/"
+    local f
+    for f in Theme.qml SysStats.qml LockView.qml LockShape.qml LockWave.qml; do
+        cp "$dots/quickshell/$f" "$dest/"
+    done
+    cp "$dots/quickshell/i18n/"*.json "$dest/i18n/"
+}
+
+# Mantém a home do greeter no formato que o Theme.qml espera ($1 = home).
+link_home() {
+    local home="$1" cfg="$2"
+    mkdir -p "$home/.cache/wallust" "$home/.config/quickshell"
+    ln -sfn "$home/shared/colors-quickshell.json" "$home/.cache/wallust/colors-quickshell.json"
+    ln -sfn "$home/shared/locale.json" "$home/.config/quickshell/locale.json"
+    ln -sfn "$cfg/i18n" "$home/.config/quickshell/i18n"
+}
+
+# ------------------------------------------------------------------ sync
+# Copia para $1 (padrão: a pasta shared do greeter) o que a tela precisa.
+do_sync() {
+    local dest="${1:-$SHARED}"
+    [ -d "$dest" ] && [ -w "$dest" ] || return 0
+    local h="$USER_HOME"
+
+    cp -f "$h/.cache/wallust/colors-quickshell.json" "$dest/colors-quickshell.json" 2>/dev/null || true
+    cp -f "$h/.config/quickshell/locale.json" "$dest/locale.json" 2>/dev/null || true
+    echo "$REAL_USER" > "$dest/user"
+    local first
+    first="$(getent passwd "$REAL_USER" | cut -d: -f5 | cut -d, -f1 | cut -d' ' -f1)"
+    echo "${first:-$REAL_USER}" > "$dest/firstname"
+
+    local f
+    rm -f "$dest/face"
+    for f in "$h/.face.gif" "$h/.face" "$h/.face.icon"; do
+        [ -s "$f" ] && { cp -f "$f" "$dest/face"; break; }
+    done
+    if [ -s "$h/.config/hollow-wired/lock-note.txt" ]; then
+        cp -f "$h/.config/hollow-wired/lock-note.txt" "$dest/note.txt"
+    else
+        rm -f "$dest/note.txt"
+    fi
+
+    # Wallpaper: imagem sempre; vídeo quando o wallpaper ativo é um vídeo
+    # (copia só se mudou, e até 300 MB).
+    local img vid
+    img="$(rice-wallpaper-current 2>/dev/null)"
+    if [ -s "$img" ]; then
+        if command -v magick >/dev/null 2>&1; then
+            magick "$img" -resize '1920x1080^' -quality 88 "$dest/wallpaper.jpg" 2>/dev/null || cp -f "$img" "$dest/wallpaper.jpg"
+        else
+            cp -f "$img" "$dest/wallpaper.jpg"
+        fi
+    fi
+    vid="$(rice-wallpaper-current --media 2>/dev/null)"
+    if [ -s "$vid" ] && [ "$(stat -c %s "$vid")" -lt 314572800 ]; then
+        if [ "$(cat "$dest/.video-src" 2>/dev/null)" != "$vid" ] || [ ! -s "$dest/wallpaper.mp4" ]; then
+            cp -f "$vid" "$dest/wallpaper.mp4.tmp" && mv -f "$dest/wallpaper.mp4.tmp" "$dest/wallpaper.mp4"
+            echo "$vid" > "$dest/.video-src"
+        fi
+    else
+        rm -f "$dest/wallpaper.mp4" "$dest/.video-src"
+    fi
+    chmod -R a+rX "$dest" 2>/dev/null || true
+}
+
+# ------------------------------------------------------------------ test
+do_test() {
+    local base="${XDG_CACHE_HOME:-$HOME/.cache}/hollow-wired/greeter-test"
+    rm -rf "$base/config"
+    mkdir -p "$base/home/shared"
+    build_config "$base/config"
+    link_home "$base/home" "$base/config"
+    do_sync "$base/home/shared"
+    say "Abrindo o greeter em modo de demonstração (Enter com qualquer texto fecha)."
+    env -u GREETD_SOCK HOME="$base/home" qs -p "$base/config"
+}
+
+# ------------------------------------------------------------------ install
+do_install() {
+    [ "$(id -u)" -eq 0 ] || die "Rode com sudo: sudo rice-greeter install"
+    [ -n "$REAL_USER" ] && [ "$REAL_USER" != "root" ] && id "$REAL_USER" >/dev/null 2>&1 \
+        || die "Rode com sudo a partir do seu usuário (não como root direto)."
+    command -v qs >/dev/null 2>&1 || die "Quickshell (qs) não está instalado."
+    command -v Hyprland >/dev/null 2>&1 || die "Hyprland não está instalado."
+
+    say "Instalando o greetd..."
+    pacman -S --needed --noconfirm greetd || die "Falha ao instalar o greetd."
+    id greeter >/dev/null 2>&1 || die "O pacote greetd não criou o usuário 'greeter'."
+
+    # O PAM do greetd não desbloqueia o chaveiro (gnome-keyring/kwallet) como o
+    # do SDDM: sem isso, apps como o Claude e navegadores pedem a senha do
+    # chaveiro depois do login e "perdem" as contas salvas se cancelar.
+    local pamf=/etc/pam.d/greetd
+    if [ -f "$pamf" ] && ! grep -q pam_gnome_keyring "$pamf"; then
+        say "Liberando o chaveiro no login ($pamf)..."
+        cp -n "$pamf" "$pamf.antes-do-rice"
+        cat >> "$pamf" <<'EOF'
+
+# Adicionado pelo rice-greeter: desbloqueia o chaveiro com a senha do login.
+-auth       optional    pam_gnome_keyring.so
+-auth       optional    pam_kwallet5.so
+-password   optional    pam_gnome_keyring.so    use_authtok
+-session    optional    pam_gnome_keyring.so    auto_start
+-session    optional    pam_kwallet5.so         auto_start
+EOF
+    fi
+
+    say "Montando a config do greeter em $CONFIG_DIR..."
+    rm -rf "$CONFIG_DIR.new"
+    build_config "$CONFIG_DIR.new"
+    rm -rf "$CONFIG_DIR"
+    mv "$CONFIG_DIR.new" "$CONFIG_DIR"
+    chown -R root:root "$CONFIG_DIR"
+    chmod -R a+rX "$CONFIG_DIR"
+
+    say "Preparando $GREETER_HOME..."
+    mkdir -p "$SHARED"
+    chown greeter:greeter "$GREETER_HOME"
+    chmod 755 "$GREETER_HOME"
+    chown "$REAL_USER:$REAL_USER" "$SHARED"
+    chmod 755 "$SHARED"
+    link_home "$GREETER_HOME" "$CONFIG_DIR"
+    chown -h greeter:greeter "$GREETER_HOME/.cache" "$GREETER_HOME/.config" 2>/dev/null || true
+    chown -R greeter:greeter "$GREETER_HOME/.cache" "$GREETER_HOME/.config"
+    sudo -u "$REAL_USER" env RICE_GREETER_USER="$REAL_USER" HOME="$USER_HOME" PATH="$USER_HOME/.local/bin:$PATH" "$0" sync \
+        || die "sync falhou."
+    [ "$(head -1 "$SHARED/user" 2>/dev/null)" = "$REAL_USER" ] || die "O greeter não ficou com o usuário $REAL_USER. Nada foi ativado."
+
+    # Teclado do greeter igual ao da sessão.
+    local kb_layout kb_variant uid
+    uid="$(id -u "$REAL_USER")"
+    hypr_opt() {
+        sudo -u "$REAL_USER" env XDG_RUNTIME_DIR="/run/user/$uid" \
+            HYPRLAND_INSTANCE_SIGNATURE="${HYPRLAND_INSTANCE_SIGNATURE:-}" \
+            hyprctl getoption "$1" -j 2>/dev/null | sed -n 's/.*"str": *"\([^"]*\)".*/\1/p'
+    }
+    kb_layout="$(hypr_opt input:kb_layout)"
+    kb_variant="$(hypr_opt input:kb_variant)"
+    # Mouse igual ao da sessão: sensibilidade/perfil globais e os blocos
+    # hl.device({...}) do hyprland.lua do usuário (sem isso a velocidade do
+    # ponteiro no greeter saía diferente).
+    local sens accel devices
+    sens="$(sudo -u "$REAL_USER" env XDG_RUNTIME_DIR="/run/user/$uid" \
+        HYPRLAND_INSTANCE_SIGNATURE="${HYPRLAND_INSTANCE_SIGNATURE:-}" \
+        hyprctl getoption input:sensitivity -j 2>/dev/null | sed -n 's/.*"float": *\([-0-9.]*\).*/\1/p')"
+    accel="$(hypr_opt input:accel_profile)"
+    [ -n "$sens" ] || sens=0
+    local accel_line=""
+    [ -n "$accel" ] && [ "$accel" != "[[EMPTY]]" ] && accel_line=" accel_profile = \"$accel\","
+    devices="$(python3 -c 'import re,sys; print("\n".join(re.findall(r"(?ms)^hl\.device\(\{.*?^\}\)", open(sys.argv[1]).read())))' \
+        "$USER_HOME/.config/hypr/hyprland.lua" 2>/dev/null)"
+    # Sem Hyprland rodando: o layout do sistema (localectl).
+    [ -n "$kb_layout" ] || kb_layout="$(localectl status 2>/dev/null | sed -n 's/.*X11 Layout: *//p' | head -1)"
+    [ "$kb_variant" = "[[EMPTY]]" ] && kb_variant=""
+    [ -n "$kb_layout" ] || kb_layout="us"
+
+    say "Escrevendo $HYPR_CONF..."
+    cat > "$HYPR_CONF" <<EOF
+-- Hyprland mínimo que só existe para mostrar o greeter do rice.
+-- Gerado pelo rice-greeter install.
+hl.config({
+    input = {
+        kb_layout = "$kb_layout", kb_variant = "$kb_variant", numlock_by_default = true,
+        sensitivity = $sens,$accel_line
+    },
+    misc = {
+        disable_hyprland_logo = true,
+        disable_splash_rendering = true,
+        disable_hyprland_guiutils_check = true,
+    },
+    animations = { enabled = false },
+    decoration = { blur = { enabled = false } },
+    cursor = { inactive_timeout = 0 },
+})
+hl.monitor({ output = "", mode = "preferred", position = "auto", scale = "1" })
+$devices
+hl.on("hyprland.start", function()
+    hl.exec_cmd("qs -p $CONFIG_DIR; hyprctl dispatch 'hl.dsp.exit()'")
+end)
+EOF
+    chmod 644 "$HYPR_CONF"
+
+    cat > "$SESSION_BIN" <<EOF
+#!/bin/sh
+# Sessão do greeter (greetd -> Hyprland mínimo -> Quickshell). rice-greeter.
+export HOME="$GREETER_HOME"
+export XDG_SESSION_TYPE=wayland
+export QT_QPA_PLATFORM=wayland
+# start-hyprland é o jeito suportado de subir o Hyprland (watchdog); chamar o
+# binário direto mostra o aviso "started without start-hyprland".
+if command -v start-hyprland >/dev/null 2>&1; then
+    exec start-hyprland -- -c "$HYPR_CONF" > "$GREETER_HOME/greeter.log" 2>&1
+fi
+exec Hyprland -c "$HYPR_CONF" > "$GREETER_HOME/greeter.log" 2>&1
+EOF
+    chmod 755 "$SESSION_BIN"
+
+    # Quem o greeter manda o greetd executar (como o usuário que entrou). O
+    # greetd junta o comando num texto só e o reinterpreta no shell, então
+    # nada de `sh -c '...'` do lado do greeter: só palavras simples.
+    cat > "$SESSION_WRAP" <<'EOF'
+#!/bin/sh
+# Inicia a sessão escolhida no greeter do rice, guardando a saída em
+# ~/.cache/hollow-wired/session.log (se a sessão fechar na hora, o motivo está lá).
+mkdir -p "$HOME/.cache/hollow-wired"
+exec "$@" > "$HOME/.cache/hollow-wired/session.log" 2>&1
+EOF
+    chmod 755 "$SESSION_WRAP"
+
+    say "Configurando o greetd..."
+    [ -f "$GREETD_CONF" ] && [ ! -f "$GREETD_CONF.antes-do-rice" ] && cp "$GREETD_CONF" "$GREETD_CONF.antes-do-rice"
+    cat > "$GREETD_CONF" <<EOF
+# Gerado pelo rice-greeter install. Original em config.toml.antes-do-rice.
+[terminal]
+vt = 1
+
+[default_session]
+command = "$SESSION_BIN"
+user = "greeter"
+EOF
+
+    # Config de teste: mesmo greeter num terminal virtual livre, sem mexer no SDDM.
+    sed 's/^vt = 1$/vt = "next"/' "$GREETD_CONF" > /etc/greetd/config-teste.toml
+
+    echo
+    say "Arquivos instalados. O SDDM continua sendo a tela de login por enquanto."
+    echo "    1) Teste ao vivo (não mexe no boot):  sudo rice-greeter try"
+    echo "    2) Se funcionar, ative no boot:       sudo rice-greeter activate"
+}
+
+# Sobe o greetd num terminal virtual livre, com o SDDM intacto. Entrar por ele
+# abre uma segunda sessão; para voltar, Ctrl+Alt+F1/F2 (onde está a atual).
+do_try() {
+    [ "$(id -u)" -eq 0 ] || die "Rode com sudo: sudo rice-greeter try"
+    [ -f /etc/greetd/config-teste.toml ] || die "Rode antes: sudo rice-greeter install"
+    systemctl stop greetd-teste.service 2>/dev/null || true
+    systemd-run --unit=greetd-teste --collect /usr/bin/greetd --config /etc/greetd/config-teste.toml \
+        || die "Não consegui iniciar o teste."
+    sleep 2
+    local vt
+    vt="$(fgconsole 2>/dev/null)"
+    say "Greeter de teste rodando${vt:+ no VT $vt}."
+    echo "    Se a tela não trocou sozinha, aperte Ctrl+Alt+F3 … F7 até achar."
+    echo "    Para voltar à sessão atual: Ctrl+Alt+F1 (ou F2)."
+    echo "    Para encerrar o teste:      sudo systemctl stop greetd-teste"
+}
+
+do_activate() {
+    [ "$(id -u)" -eq 0 ] || die "Rode com sudo: sudo rice-greeter activate"
+    [ -f "$GREETD_CONF" ] && [ -x "$SESSION_BIN" ] || die "Rode antes: sudo rice-greeter install"
+    [ "$(head -1 "$SHARED/user" 2>/dev/null)" = "$REAL_USER" ] || die "Greeter montado para outro usuário; rode o install de novo."
+    say "Trocando o gerenciador de login (SDDM -> greetd)..."
+    local dm
+    for dm in sddm plasmalogin lightdm gdm ly; do
+        systemctl is-enabled "$dm.service" >/dev/null 2>&1 && systemctl disable "$dm.service" 2>/dev/null
+    done
+    systemctl enable greetd.service || die "Não consegui ativar o greetd."
+    echo
+    say "Pronto. A nova tela de login aparece a partir do próximo boot."
+    echo "    Se algo der errado: Ctrl+Alt+F3, login com o usuário $REAL_USER e"
+    echo "        sudo rice-greeter uninstall"
+}
+
+do_uninstall() {
+    [ "$(id -u)" -eq 0 ] || die "Rode com sudo: sudo rice-greeter uninstall"
+    systemctl disable greetd.service 2>/dev/null || true
+    if [ -f /usr/lib/systemd/system/sddm.service ]; then
+        systemctl enable sddm.service && say "SDDM reativado. Vale a partir do próximo boot."
+    else
+        warn "SDDM não está instalado; instale e ative um gerenciador de login."
+    fi
+}
+
+do_status() {
+    local active="nenhum"
+    for dm in greetd sddm plasmalogin lightdm gdm ly; do
+        systemctl is-enabled "$dm.service" >/dev/null 2>&1 && { active="$dm"; break; }
+    done
+    echo "gerenciador de login: $active"
+    [ -d "$CONFIG_DIR" ] && echo "config do greeter: $CONFIG_DIR" || echo "greeter do rice: não instalado"
+    [ -d "$SHARED" ] && echo "pasta compartilhada: $SHARED ($(du -sh "$SHARED" 2>/dev/null | cut -f1))"
+    return 0
+}
+
+case "${1:-}" in
+    sync)      do_sync ;;
+    test)      do_test ;;
+    install)   do_install ;;
+    try)       do_try ;;
+    activate)  do_activate ;;
+    uninstall) do_uninstall ;;
+    status)    do_status ;;
+    *)         sed -n '3,24p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+esac

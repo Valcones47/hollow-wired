@@ -10,6 +10,11 @@
 WAIT=0
 [ "${1:-}" = "--wait" ] && WAIT=1
 
+# Deixa a tela de login (greetd) com as mesmas cores/foto/wallpaper. Só faz
+# algo se o greeter do rice estiver instalado.
+[ -w /var/lib/hollow-wired-greeter/shared ] && command -v rice-greeter >/dev/null 2>&1 && \
+    (nice -n 10 rice-greeter sync >/dev/null 2>&1 &)
+
 if command -v qs >/dev/null 2>&1 && timeout 3 qs ipc call lock lock >/dev/null 2>&1; then
     if [ "$WAIT" = 1 ]; then
         for _ in $(seq 20); do

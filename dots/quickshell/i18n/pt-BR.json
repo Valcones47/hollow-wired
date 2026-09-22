@@ -1072,5 +1072,6 @@
   "lock.show_less": "Mostrar menos",
   "lock.show_more": "Mostrar mais %1",
   "lock.dnd": "Não perturbe",
-  "lock.note_hint": "+ adicionar um lembrete"
+  "lock.note_hint": "+ adicionar um lembrete",
+  "greeter.session": "Sessão"
 }

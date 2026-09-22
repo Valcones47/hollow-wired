@@ -20,6 +20,9 @@ Item {
 
     required property var ctl
     property real screenH: 1080
+    // No greeter (greetd) não há sessão aberta: sem mídia, notificações nem
+    // controles do usuário; no lugar entra o seletor de WM.
+    readonly property bool greeter: ctl.isGreeter === true
 
     readonly property real s: Math.max(0.6, screenH / 1080)
     readonly property real fullH: screenH * 0.7
@@ -270,8 +273,8 @@ Item {
                 spacing: 12 * view.s
 
                 WeatherTile { Layout.fillWidth: true }
-                FetchTile { Layout.fillWidth: true }
-                MediaTile { Layout.fillWidth: true; Layout.fillHeight: true }
+                FetchTile { Layout.fillWidth: true; Layout.fillHeight: view.greeter }
+                MediaTile { Layout.fillWidth: true; Layout.fillHeight: true; visible: !view.greeter }
             }
 
             // ===== centro =====
@@ -308,7 +311,7 @@ Item {
                     Layout.alignment: Qt.AlignHCenter
                 }
                 StateMessage { Layout.fillWidth: true }
-                NoteLabel { Layout.fillWidth: true; Layout.topMargin: 6 * view.s }
+                NoteLabel { Layout.fillWidth: true; Layout.topMargin: 6 * view.s; visible: !view.greeter || view.ctl.note !== "" }
                 Item { Layout.fillHeight: true }
             }
 
@@ -320,8 +323,9 @@ Item {
                 spacing: 12 * view.s
 
                 ResourcesTile { Layout.fillWidth: true }
-                QuickTile { Layout.fillWidth: true }
-                NotifTile { Layout.fillWidth: true; Layout.fillHeight: true }
+                QuickTile { Layout.fillWidth: true; visible: !view.greeter }
+                NotifTile { Layout.fillWidth: true; Layout.fillHeight: true; visible: !view.greeter }
+                SessionTile { Layout.fillWidth: true; Layout.fillHeight: true; visible: view.greeter }
             }
         }
     }
@@ -839,7 +843,9 @@ Item {
 
         ColumnLayout {
             id: fcol
-            anchors.fill: parent
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
             anchors.margins: 22 * view.s
             spacing: 8 * view.s
 
@@ -1269,7 +1275,7 @@ Item {
             }
             Behavior on opacity { DefEffects {} }
 
-            SessionButton { icon: Theme.icons.logout; label: Theme.t("lock.switch_wm", "Trocar de WM"); action: "switch-wm" }
+            SessionButton { icon: Theme.icons.logout; label: Theme.t("lock.switch_wm", "Trocar de WM"); action: "switch-wm"; visible: !view.greeter }
             SessionButton { icon: Theme.icons.sleep; label: Theme.t("lock.suspend", "Suspender"); action: "suspend" }
             SessionButton { icon: Theme.icons.restart; label: Theme.t("lock.reboot", "Reiniciar"); action: "reboot" }
             SessionButton { icon: Theme.icons.power; label: Theme.t("lock.poweroff", "Desligar"); action: "poweroff" }
@@ -1926,6 +1932,7 @@ Item {
                 anchors.fill: parent
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
+                enabled: !view.greeter
                 onClicked: {
                     nl.editing = true;
                     noteInput.text = view.ctl.note;
@@ -1968,4 +1975,89 @@ Item {
         }
     }
 
+    // ======================================================================
+    // Seletor de sessão (só no greeter)
+    // ======================================================================
+    component SessionTile: Rectangle {
+        id: st
+        color: view.tileColor
+        radius: 14 * view.s
+        bottomRightRadius: 28 * view.s
+        clip: true
+
+        function iconFor(name) {
+            const n = (name || "").toLowerCase();
+            if (n.includes("plasma") || n.includes("kde")) return "\u{F0C9E}";
+            if (n.includes("gamescope") || n.includes("steam")) return Theme.icons.gamepad;
+            if (n.includes("gnome")) return "\u{F02A0}";
+            return Theme.icons.monitor;
+        }
+
+        ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: 16 * view.s
+            spacing: 8 * view.s
+
+            Text {
+                text: Theme.t("greeter.session", "Sessão")
+                color: view.onSurfVar
+                font.family: Theme.monoFamily
+                font.pixelSize: 13 * view.s
+            }
+
+            ListView {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
+                spacing: 6 * view.s
+                boundsBehavior: Flickable.StopAtBounds
+                model: view.ctl.sessions
+
+                delegate: Rectangle {
+                    id: sess
+                    required property var modelData
+                    required property int index
+                    readonly property bool selected: view.ctl.sessionIndex === index
+                    width: ListView.view.width
+                    implicitHeight: 48 * view.s
+                    radius: sessMouse.pressed ? 12 * view.s : height / 2
+                    color: selected ? Theme.withAlpha(view.pri, 0.9) : sessMouse.containsMouse ? view.tileHigh : Theme.withAlpha(view.tileHigh, 0.5)
+                    Behavior on radius { FastSpatial {} }
+                    Behavior on color { ColorAnimation { duration: 150 } }
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 16 * view.s
+                        anchors.rightMargin: 16 * view.s
+                        spacing: 12 * view.s
+                        Glyph {
+                            text: st.iconFor(sess.modelData.name + " " + sess.modelData.key)
+                            px: 20 * view.s
+                            color: sess.selected ? Theme.background : view.onSurf
+                        }
+                        Label {
+                            Layout.fillWidth: true
+                            text: sess.modelData.name
+                            px: 14 * view.s
+                            font.weight: sess.selected ? Font.DemiBold : Font.Normal
+                            color: sess.selected ? Theme.background : view.onSurf
+                        }
+                        Glyph {
+                            visible: sess.selected
+                            text: Theme.icons.check
+                            px: 18 * view.s
+                            color: Theme.background
+                        }
+                    }
+                    MouseArea {
+                        id: sessMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: view.ctl.selectSession(sess.index)
+                    }
+                }
+            }
+        }
+    }
 }

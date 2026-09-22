@@ -23,6 +23,11 @@ import "."
 Scope {
     id: root
 
+    readonly property bool isGreeter: false
+    readonly property var sessions: []
+    readonly property int sessionIndex: -1
+    function selectSession(i) {}
+
     readonly property bool locked: sessionLock.locked
     property bool previewing: false
     readonly property bool active: locked || previewing

@@ -1072,5 +1072,6 @@
   "lock.show_less": "Show less",
   "lock.show_more": "Show %1 more",
   "lock.dnd": "Do not disturb",
-  "lock.note_hint": "+ add a reminder"
+  "lock.note_hint": "+ add a reminder",
+  "greeter.session": "Session"
 }

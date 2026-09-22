@@ -266,6 +266,10 @@ hl.on("hyprland.start", function()
     -- Remove modificador Mod2 do Num_Lock no XWayland (evita que Discord/jogos detectem NumLock indevidamente)
     hl.exec_cmd(home .. "/.local/bin/rice-fix-xwayland-numlock")
 
+    -- Tela de login (greetd): atualiza cores, foto e wallpaper que ela mostra.
+    -- Espera o wallpaper subir; sem o greeter instalado não faz nada.
+    hl.exec_cmd("sh -c 'sleep 20; command -v rice-greeter >/dev/null && rice-greeter sync'")
+
     -- Autostarts genéricos (só o que existe na máquina: o arch-update é opcional)
     hl.exec_cmd("sh -c 'command -v arch-update >/dev/null 2>&1 && arch-update --tray'")
     if io.open("/usr/local/bin/limitar_cpu.sh", "r") then
