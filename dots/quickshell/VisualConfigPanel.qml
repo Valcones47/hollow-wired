@@ -4940,8 +4940,12 @@ PanelWindow {
                                         model: [
                                             { key: "background", label: Theme.t("wallust.bg", "Fundo"), hex: win.wallustColors.background || "#170D0C" },
                                             { key: "foreground", label: Theme.t("wallust.fg", "Texto"), hex: win.wallustColors.foreground || "#C2A6A5" },
-                                            { key: "color4", label: Theme.t("wallust.accent1", "Destaque 1"), hex: win.wallustColors.color4 || "#5D1D1D" },
-                                            { key: "color10", label: Theme.t("wallust.accent2", "Destaque 2"), hex: win.wallustColors.color10 || "#A62727" }
+                                            // As duas que a interface está realmente usando como
+                                            // destaque (o tema escolhe as mais vivas da paleta).
+                                            { key: Theme.primaryKey, label: Theme.t("wallust.accent1", "Destaque 1 (em uso)"), hex: String(Theme.primary) },
+                                            { key: Theme.secondaryKey, label: Theme.secondaryKey === ""
+                                                    ? Theme.t("wallust.accent2_auto", "Destaque 2 (criado pelo tema)")
+                                                    : Theme.t("wallust.accent2", "Destaque 2 (em uso)"), hex: String(Theme.secondary) }
                                         ]
                                         delegate: Rectangle {
                                             id: colorCard
@@ -5002,6 +5006,10 @@ PanelWindow {
                                                     if (mouse.button === Qt.RightButton) {
                                                         Quickshell.execDetached(["wl-copy", colorCard.modelData.hex]);
                                                         win.showToast(Theme.t("toast.copied", "Copiado: ") + colorCard.modelData.hex);
+                                                    } else if (colorCard.modelData.key === "") {
+                                                        // Destaque criado pelo tema: não existe cor da
+                                                        // paleta por trás dele para editar.
+                                                        win.showToast(Theme.t("wallust.accent2_auto_toast", "Esse destaque é criado a partir do outro. Mude o Destaque 1 ou o papel de parede."));
                                                     } else {
                                                         win.openColorPicker(colorCard.modelData.key, colorCard.modelData.label, colorCard.modelData.hex);
                                                     }

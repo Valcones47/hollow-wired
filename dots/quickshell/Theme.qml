@@ -72,30 +72,40 @@ QtObject {
         const d = Math.abs(a.hslHue - b.hslHue);
         return Math.min(d, 1 - d);
     }
+    readonly property var _accentKeys: ["color10", "color13", "color12", "color9", "color14", "color11", "color5", "color4", "color6", "color2", "color3", "color1"]
     readonly property var _accentPool: [color10, color13, color12, color9, color14, color11, color5, color4, color6, color2, color3, color1]
-    readonly property color _pick1: {
-        let best = color10, bestScore = -1;
-        for (const c of _accentPool) {
-            const sc = root._score(c);
-            if (sc > bestScore) { best = c; bestScore = sc; }
+    // Índices escolhidos: o painel de cores mostra e deixa editar justamente as
+    // cores que viraram destaque (antes ele mostrava color4/color10 fixos, que
+    // podiam não ter nada a ver com o destaque em uso).
+    readonly property int _idx1: {
+        let bi = 0, bestScore = -1;
+        for (let i = 0; i < _accentPool.length; i++) {
+            const sc = root._score(_accentPool[i]);
+            if (sc > bestScore) { bi = i; bestScore = sc; }
         }
-        return best;
+        return bi;
     }
-    readonly property color _pick2: {
-        // Segunda cor: a mais viva entre as de matiz bem diferente da primeira.
-        let best = null, bestScore = -1;
-        for (const c of _accentPool) {
-            if (root._hueGap(c, root._pick1) < 0.12) continue;
-            const sc = root._score(c);
-            if (sc > bestScore) { best = c; bestScore = sc; }
+    readonly property int _idx2: {
+        let bi = -1, bestScore = -1;
+        for (let i = 0; i < _accentPool.length; i++) {
+            if (root._hueGap(_accentPool[i], root._pick1) < 0.12) continue;
+            const sc = root._score(_accentPool[i]);
+            if (sc > bestScore) { bi = i; bestScore = sc; }
         }
+        return bestScore < 0.12 ? -1 : bi;
+    }
+    readonly property string primaryKey: _accentKeys[_idx1]
+    // -1 = o segundo destaque foi criado girando o matiz, não veio da paleta.
+    readonly property string secondaryKey: _idx2 >= 0 ? _accentKeys[_idx2] : ""
+    readonly property color _pick1: _accentPool[_idx1]
+    readonly property color _pick2: {
         // Paleta de matiz único (papel de parede monocromático): em vez de
         // repetir a mesma cor, gira o matiz para ter um segundo destaque.
-        if (!best || bestScore < 0.12) {
+        if (root._idx2 < 0) {
             const h = root._pick1.hslHue < 0 ? 0.55 : root._pick1.hslHue;
             return Qt.hsla((h + 0.42) % 1, 0.42, 0.60, 1);
         }
-        return best;
+        return _accentPool[root._idx2];
     }
     readonly property color primary: _vivid(_pick1, 0.38, 0.46, 0.62)
     readonly property color tertiary: _vivid(_pick2, 0.34, 0.52, 0.68)

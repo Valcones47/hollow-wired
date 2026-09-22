@@ -461,8 +461,8 @@
   "wallust.section_palette_sub": "Todas as cores da interface e terminal são geradas pelo Wallust a partir do papel de parede ativo",
   "wallust.bg": "Fundo",
   "wallust.fg": "Texto",
-  "wallust.accent1": "Destaque 1",
-  "wallust.accent2": "Destaque 2",
+  "wallust.accent1": "Destaque 1 (em uso)",
+  "wallust.accent2": "Destaque 2 (em uso)",
   "wallust.section_ansi": "Paleta Completa de 16 Cores ANSI",
   "wallust.section_ansi_sub": "Clique numa cor para escolher outra na roda de cores. Clique com o botão direito para copiar o código HEX.",
   "wallust.section_actions": "Ações de Wallpaper & Sincronização",
@@ -1114,5 +1114,7 @@
   "effects.blur_ignore_opacity": "Desfocar atrás de janelas opacas",
   "effects.blur_ignore_opacity_desc": "Desligado economiza GPU: não borra o que ninguém vê.",
   "effects.anim_advanced": "Ajustar no detalhe",
-  "effects.anim_advanced_desc": "Curvas de Bézier, velocidade e estilo de cada tipo de animação, um por um."
+  "effects.anim_advanced_desc": "Curvas de Bézier, velocidade e estilo de cada tipo de animação, um por um.",
+  "wallust.accent2_auto": "Destaque 2 (criado pelo tema)",
+  "wallust.accent2_auto_toast": "Esse destaque é criado a partir do outro. Mude o Destaque 1 ou o papel de parede."
 }
