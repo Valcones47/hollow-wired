@@ -93,12 +93,12 @@ QtObject {
         // repetir a mesma cor, gira o matiz para ter um segundo destaque.
         if (!best || bestScore < 0.12) {
             const h = root._pick1.hslHue < 0 ? 0.55 : root._pick1.hslHue;
-            return Qt.hsla((h + 0.42) % 1, 0.5, 0.66, 1);
+            return Qt.hsla((h + 0.42) % 1, 0.42, 0.60, 1);
         }
         return best;
     }
-    readonly property color primary: _vivid(_pick1, 0.45, 0.52, 0.74)
-    readonly property color tertiary: _vivid(_pick2, 0.40, 0.58, 0.78)
+    readonly property color primary: _vivid(_pick1, 0.38, 0.46, 0.62)
+    readonly property color tertiary: _vivid(_pick2, 0.34, 0.52, 0.68)
     readonly property color primaryOld: color10
     // Usado em vários lugares mas nunca tinha sido definido: virava
     // `undefined` e o QML desenhava preto (o medidor da GPU nos widgets).

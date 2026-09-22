@@ -1930,11 +1930,13 @@ PanelWindow {
                                         anchors.verticalCenter: parent.verticalCenter
                                         text: navDelegate.modelData.name
                                         font.family: Theme.fontFamily
-                                        font.pixelSize: 10
+                                        font.pixelSize: 11
                                         font.weight: Font.Bold
                                         font.capitalization: Font.AllUppercase
                                         font.letterSpacing: 0.8
-                                        color: Theme.withAlpha(Theme.subtext, 0.75)
+                                        // Cor de destaque nos títulos de grupo: separa "Ajuda",
+                                        // "Aparência" e "Hardware" das categorias em si.
+                                        color: Theme.secondary
                                     }
 
                                     Behavior on color { ColorAnimation { duration: 120 } }
