@@ -1437,8 +1437,15 @@ PanelWindow {
         property bool primary: false
         signal clicked()
 
+        // Largura mínima para os botões de ação formarem uma coluna alinhada
+        // quando aparecem um embaixo do outro, em vez de cada card terminar
+        // num ponto diferente. Botão só de ícone continua quadrado.
+        property real minWidth: 148
+
         implicitHeight: 38
-        implicitWidth: btnRow.implicitWidth + 24
+        implicitWidth: abtn.text === ""
+            ? implicitHeight
+            : Math.max(abtn.minWidth, btnRow.implicitWidth + 24)
         radius: 8
         color: abtn.primary ? (abtnArea.pressed ? Theme.withAlpha(Theme.primary, 0.7) : Theme.primary)
                             : (abtnArea.pressed ? Theme.tileHigh : (abtnArea.containsMouse ? Theme.tileHigh : Theme.tile))
@@ -1567,6 +1574,7 @@ PanelWindow {
                     Layout.fillWidth: true
                     spacing: 1
                     Text {
+                        Layout.alignment: Qt.AlignLeft
                         text: Theme.t("binds.sub_capturing", "Aperte a combinação de teclas agora...")
                         font.family: Theme.fontFamily
                         font.pixelSize: 15
@@ -1574,6 +1582,7 @@ PanelWindow {
                         color: Theme.textColor
                     }
                     Text {
+                        Layout.alignment: Qt.AlignLeft
                         text: win.bindRecordingName + " · " + Theme.t("binds.sub_capturing_hint", "qualquer tecla vale, inclusive o Esc")
                         font.family: Theme.fontFamily
                         font.pixelSize: 12
@@ -1738,6 +1747,7 @@ PanelWindow {
                             Layout.fillWidth: true
                             spacing: 1
                             Text {
+                                Layout.alignment: Qt.AlignLeft
                                 text: Theme.t("settings.panel_title", "Painel Rice")
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 17
@@ -1745,6 +1755,7 @@ PanelWindow {
                                 color: Theme.textColor
                             }
                             Text {
+                                Layout.alignment: Qt.AlignLeft
                                 text: Theme.t("settings.panel_subtitle", "Central de Controle Gráfica")
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 11
@@ -1982,6 +1993,7 @@ PanelWindow {
                                             spacing: 1
 
                                             Text {
+                                                Layout.alignment: Qt.AlignLeft
                                                 text: navDelegate.modelData.name
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: 13
@@ -1994,6 +2006,7 @@ PanelWindow {
                                             }
 
                                             Text {
+                                                Layout.alignment: Qt.AlignLeft
                                                 text: navDelegate.modelData.desc || ""
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: 11
@@ -2145,6 +2158,7 @@ PanelWindow {
                             spacing: 1
 
                             Text {
+                                Layout.alignment: Qt.AlignLeft
                                 text: [
                                     Theme.t("header.title_0", "Fastfetch & Terminal Fetch"),
                                     Theme.t("header.title_1", "Kitty Terminal & Tipografia"),
@@ -2174,6 +2188,7 @@ PanelWindow {
                             }
 
                             Text {
+                                Layout.alignment: Qt.AlignLeft
                                 text: [
                                     Theme.t("header.sub_0", "Personalize o logo, dimensões e informações mostradas no terminal."),
                                     Theme.t("header.sub_1", "Ajuste opacidade, tamanho de texto, espaçamento interno e cursor."),
@@ -2676,6 +2691,7 @@ PanelWindow {
                                             Layout.fillWidth: true
                                             spacing: 4
                                             Text {
+                                                Layout.alignment: Qt.AlignLeft
                                                 text: Theme.t("mako.problem_title", "As notificações estão com problema")
                                                 color: "#ffb347"
                                                 font.pixelSize: 16
@@ -3299,6 +3315,7 @@ PanelWindow {
                                                     Layout.fillWidth: true
                                                     spacing: 1
                                                     Text {
+                                                        Layout.alignment: Qt.AlignLeft
                                                         text: sinkCard.modelData.description
                                                         font.family: Theme.fontFamily
                                                         font.pixelSize: 13
@@ -3306,6 +3323,7 @@ PanelWindow {
                                                         color: Theme.textColor
                                                     }
                                                     Text {
+                                                        Layout.alignment: Qt.AlignLeft
                                                         text: sinkCard.modelData.is_default ? Theme.t("audio.default_active", "Dispositivo Padrão Ativo") + " · " + sinkCard.modelData.volume + "%" : Theme.t("audio.click_select", "Clique para selecionar")
                                                         font.family: Theme.fontFamily
                                                         font.pixelSize: 11
@@ -3392,6 +3410,7 @@ PanelWindow {
                                                     Layout.fillWidth: true
                                                     spacing: 1
                                                     Text {
+                                                        Layout.alignment: Qt.AlignLeft
                                                         text: sourceCard.modelData.description
                                                         font.family: Theme.fontFamily
                                                         font.pixelSize: 13
@@ -3399,6 +3418,7 @@ PanelWindow {
                                                         color: Theme.textColor
                                                     }
                                                     Text {
+                                                        Layout.alignment: Qt.AlignLeft
                                                         text: sourceCard.modelData.is_default ? Theme.t("audio.default_in_active", "Microfone Padrão Ativo") + " · " + sourceCard.modelData.volume + "%" : Theme.t("audio.click_select", "Clique para selecionar")
                                                         font.family: Theme.fontFamily
                                                         font.pixelSize: 11
@@ -3724,6 +3744,7 @@ PanelWindow {
                                                 Layout.fillWidth: true
                                                 spacing: 1
                                                 Text {
+                                                    Layout.alignment: Qt.AlignLeft
                                                     text: Theme.t("input.accel_flat", "Flat (Sem Aceleração - 1:1)")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 15
@@ -3731,6 +3752,7 @@ PanelWindow {
                                                     color: Theme.textColor
                                                 }
                                                 Text {
+                                                    Layout.alignment: Qt.AlignLeft
                                                     text: Theme.t("input.accel_flat_desc", "Movimento previsível e consistente. Essencial para jogos (FPS).")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 11
@@ -3774,6 +3796,7 @@ PanelWindow {
                                                 Layout.fillWidth: true
                                                 spacing: 1
                                                 Text {
+                                                    Layout.alignment: Qt.AlignLeft
                                                     text: Theme.t("input.accel_adapt", "Adaptativo (Com Aceleração)")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 15
@@ -3781,6 +3804,7 @@ PanelWindow {
                                                     color: Theme.textColor
                                                 }
                                                 Text {
+                                                    Layout.alignment: Qt.AlignLeft
                                                     text: Theme.t("input.accel_adapt_desc", "Aumenta a velocidade em gestos rápidos. Padrão confortável.")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 11
@@ -3878,6 +3902,7 @@ PanelWindow {
                                                     Layout.fillWidth: true
                                                     spacing: 2
                                                     Text {
+                                                        Layout.alignment: Qt.AlignLeft
                                                         text: pCard.modelData.name
                                                         font.family: Theme.fontFamily
                                                         font.pixelSize: 15
@@ -3885,6 +3910,7 @@ PanelWindow {
                                                         color: Theme.textColor
                                                     }
                                                     Text {
+                                                        Layout.alignment: Qt.AlignLeft
                                                         text: pCard.modelData.desc
                                                         font.family: Theme.fontFamily
                                                         font.pixelSize: 11
@@ -4105,6 +4131,7 @@ PanelWindow {
                                     spacing: 8
 
                                     Text {
+                                        Layout.alignment: Qt.AlignLeft
                                         visible: win.autostartEntries.length === 0
                                         text: Theme.t("boot.empty_autostart", "Nenhum aplicativo configurado para iniciar automaticamente.")
                                         font.family: Theme.fontFamily
@@ -4147,6 +4174,7 @@ PanelWindow {
                                                     Layout.fillWidth: true
                                                     spacing: 1
                                                     Text {
+                                                        Layout.alignment: Qt.AlignLeft
                                                         text: autoCard.modelData.name
                                                         font.family: Theme.fontFamily
                                                         font.pixelSize: 13
@@ -4154,6 +4182,7 @@ PanelWindow {
                                                         color: Theme.textColor
                                                     }
                                                     Text {
+                                                        Layout.alignment: Qt.AlignLeft
                                                         text: autoCard.modelData.exec || autoCard.modelData.filename
                                                         font.family: Theme.monoFamily
                                                         font.pixelSize: 11
@@ -4402,12 +4431,14 @@ PanelWindow {
                                                     Layout.fillWidth: true
                                                     spacing: 1
                                                     Text {
+                                                        Layout.alignment: Qt.AlignLeft
                                                         text: colorCard.modelData.label
                                                         font.family: Theme.fontFamily
                                                         font.pixelSize: 12
                                                         color: Theme.subtext
                                                     }
                                                     Text {
+                                                        Layout.alignment: Qt.AlignLeft
                                                         text: colorCard.modelData.hex
                                                         font.family: Theme.monoFamily
                                                         font.pixelSize: 13
@@ -5272,6 +5303,7 @@ PanelWindow {
                                             Layout.fillWidth: true
                                             spacing: 2
                                             Text {
+                                                Layout.alignment: Qt.AlignLeft
                                                 text: win.btData && win.btData.powered ? "Bluetooth Ativado" : Theme.t("bt.status_off", "Bluetooth Desativado")
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: 15
@@ -5279,6 +5311,7 @@ PanelWindow {
                                                 color: Theme.textColor
                                             }
                                             Text {
+                                                Layout.alignment: Qt.AlignLeft
                                                 text: win.btData && win.btData.powered ? Theme.t("bt.status_on_desc", "Pronto para conexões e pareamento automático") : "Ligue o adaptador para conectar periféricos"
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: 12
@@ -5386,6 +5419,7 @@ PanelWindow {
                                                         }
                                                     }
                                                     Text {
+                                                        Layout.alignment: Qt.AlignLeft
                                                         text: btDevCard.modelData.mac
                                                         font.family: Theme.monoFamily
                                                         font.pixelSize: 11
@@ -5435,6 +5469,7 @@ PanelWindow {
                                     }
 
                                     Text {
+                                        Layout.alignment: Qt.AlignLeft
                                         visible: !win.btData || !win.btData.devices || win.btData.devices.length === 0
                                         text: Theme.t("bt.empty", "Nenhum dispositivo encontrado. Coloque seu controle ou fone em modo de pareamento e clique em 'Escanear'.")
                                         font.family: Theme.fontFamily
@@ -5822,6 +5857,7 @@ PanelWindow {
                                                     Layout.fillWidth: true
                                                     spacing: 1
                                                     Text {
+                                                        Layout.alignment: Qt.AlignLeft
                                                         text: defCatCard.modelData.title
                                                         font.family: Theme.fontFamily
                                                         font.pixelSize: 15
@@ -5829,6 +5865,7 @@ PanelWindow {
                                                         color: Theme.textColor
                                                     }
                                                     Text {
+                                                        Layout.alignment: Qt.AlignLeft
                                                         text: defCatCard.modelData.desc
                                                         font.family: Theme.fontFamily
                                                         font.pixelSize: 11
@@ -5863,6 +5900,7 @@ PanelWindow {
                                                         Layout.fillWidth: true
                                                         spacing: 0
                                                         Text {
+                                                            Layout.alignment: Qt.AlignLeft
                                                             text: (defCatCard.catInfo && defCatCard.catInfo.current_name) ? defCatCard.catInfo.current_name : Theme.t("defaults.not_set", "Não definido")
                                                             font.family: Theme.fontFamily
                                                             font.pixelSize: 13
@@ -5871,6 +5909,7 @@ PanelWindow {
                                                             elide: Text.ElideRight
                                                         }
                                                         Text {
+                                                            Layout.alignment: Qt.AlignLeft
                                                             text: (defCatCard.catInfo && defCatCard.catInfo.current_desktop) ? defCatCard.catInfo.current_desktop : Theme.t("defaults.no_app_assoc", "Nenhum aplicativo associado")
                                                             font.family: Theme.monoFamily
                                                             font.pixelSize: 10
@@ -6174,6 +6213,7 @@ PanelWindow {
                                                                             Layout.fillWidth: true
                                                                             spacing: 0
                                                                             Text {
+                                                                                Layout.alignment: Qt.AlignLeft
                                                                                 text: appItemRow.modelData.name
                                                                                 font.family: Theme.fontFamily
                                                                                 font.pixelSize: 12
@@ -6182,6 +6222,7 @@ PanelWindow {
                                                                                 elide: Text.ElideRight
                                                                             }
                                                                             Text {
+                                                                                Layout.alignment: Qt.AlignLeft
                                                                                 text: appItemRow.modelData.filename
                                                                                 font.family: Theme.monoFamily
                                                                                 font.pixelSize: 10
@@ -6404,6 +6445,7 @@ PanelWindow {
                                             Layout.fillWidth: true
                                             spacing: 2
                                             Text {
+                                                Layout.alignment: Qt.AlignLeft
                                                 text: Theme.t("gaming.gamemode_title", "Feral GameMode")
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: 15
@@ -6411,6 +6453,7 @@ PanelWindow {
                                                 color: Theme.textColor
                                             }
                                             Text {
+                                                Layout.alignment: Qt.AlignLeft
                                                 text: Theme.t("gaming.gamemode_desc", "Otimiza a CPU para priorizar taxas de quadros (FPS) e reduz a latência nos jogos")
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: 12
@@ -6458,6 +6501,7 @@ PanelWindow {
                                                 Layout.fillWidth: true
                                                 spacing: 2
                                                 Text {
+                                                    Layout.alignment: Qt.AlignLeft
                                                     text: steamCard.modelData.title
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 13
@@ -6465,12 +6509,14 @@ PanelWindow {
                                                     color: Theme.textColor
                                                 }
                                                 Text {
+                                                    Layout.alignment: Qt.AlignLeft
                                                     text: steamCard.modelData.desc
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 11
                                                     color: Theme.subtext
                                                 }
                                                 Text {
+                                                    Layout.alignment: Qt.AlignLeft
                                                     text: steamCard.modelData.param
                                                     font.family: Theme.monoFamily
                                                     font.pixelSize: 11
@@ -6730,6 +6776,7 @@ PanelWindow {
                                                 Layout.fillWidth: true
                                                 spacing: 1
                                                 Text {
+                                                    Layout.alignment: Qt.AlignLeft
                                                     text: Theme.t("storage.clean_pacman_title", "Limpar Pacotes Antigos do Pacman")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 13
@@ -6737,6 +6784,7 @@ PanelWindow {
                                                     color: Theme.textColor
                                                 }
                                                 Text {
+                                                    Layout.alignment: Qt.AlignLeft
                                                     text: Theme.t("storage.clean_pacman_desc", "Mantém as 2 últimas versões instaladas para rollback seguro e remove o restante.")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 11
@@ -6775,6 +6823,7 @@ PanelWindow {
                                                 Layout.fillWidth: true
                                                 spacing: 1
                                                 Text {
+                                                    Layout.alignment: Qt.AlignLeft
                                                     text: Theme.t("storage.clean_thumbs_title", "Limpar Miniaturas em Cache")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 13
@@ -6782,6 +6831,7 @@ PanelWindow {
                                                     color: Theme.textColor
                                                 }
                                                 Text {
+                                                    Layout.alignment: Qt.AlignLeft
                                                     text: Theme.t("storage.clean_thumbs_desc", "Remove thumbnails geradas para arquivos e vídeos. Elas serão recriadas se necessário.")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 11
@@ -6820,6 +6870,7 @@ PanelWindow {
                                                 Layout.fillWidth: true
                                                 spacing: 1
                                                 Text {
+                                                    Layout.alignment: Qt.AlignLeft
                                                     text: Theme.t("storage.empty_trash_title", "Esvaziar Lixeira do Usuário")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 13
@@ -6827,6 +6878,7 @@ PanelWindow {
                                                     color: Theme.textColor
                                                 }
                                                 Text {
+                                                    Layout.alignment: Qt.AlignLeft
                                                     text: Theme.t("storage.empty_trash_desc", "Apaga permanentemente os arquivos descartados em ~/.local/share/Trash.")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 11
@@ -7044,6 +7096,7 @@ PanelWindow {
                                                 Layout.fillWidth: true
                                                 spacing: 2
                                                 Text {
+                                                    Layout.alignment: Qt.AlignLeft
                                                     text: Theme.t("binds.custom_title", "Personalizar Atalhos Próprios (~/.config/hypr/user-binds.lua)")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 15
@@ -7467,6 +7520,7 @@ PanelWindow {
                                                 Layout.fillWidth: true
                                                 spacing: 1
                                                 Text {
+                                                    Layout.alignment: Qt.AlignLeft
                                                     text: boundRow.modelData.name
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 13
@@ -7632,6 +7686,7 @@ PanelWindow {
                                                 Layout.fillWidth: true
                                                 spacing: 1
                                                 Text {
+                                                    Layout.alignment: Qt.AlignLeft
                                                     text: freeRow.modelData.name
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 13
@@ -7725,6 +7780,7 @@ PanelWindow {
                                                     }
                                                 }
                                                 Text {
+                                                    Layout.alignment: Qt.AlignLeft
                                                     text: Theme.t("discord.bind_note", "Os atalhos gravam diretamente em ~/.config/hypr/hyprland.lua usando hl.bind")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 11
@@ -7806,6 +7862,7 @@ PanelWindow {
                                                     Layout.fillWidth: true
                                                     spacing: 2
                                                     Text {
+                                                        Layout.alignment: Qt.AlignLeft
                                                         text: Theme.t("discord.mute_title", "Mutar / Desmutar Microfone (Mute)")
                                                         font.family: Theme.fontFamily
                                                         font.pixelSize: 12
@@ -7813,6 +7870,7 @@ PanelWindow {
                                                         color: Theme.textColor
                                                     }
                                                     Text {
+                                                        Layout.alignment: Qt.AlignLeft
                                                         text: Theme.t("discord.mute_desc", "Simula o envio de Ctrl + Shift + M para o Discord/Vesktop")
                                                         font.family: Theme.fontFamily
                                                         font.pixelSize: 11
@@ -8035,6 +8093,7 @@ PanelWindow {
                                                     Layout.fillWidth: true
                                                     spacing: 2
                                                     Text {
+                                                        Layout.alignment: Qt.AlignLeft
                                                         text: Theme.t("discord.deafen_title", "Desativar / Ativar Áudio (Deafen)")
                                                         font.family: Theme.fontFamily
                                                         font.pixelSize: 12
@@ -8042,6 +8101,7 @@ PanelWindow {
                                                         color: Theme.textColor
                                                     }
                                                     Text {
+                                                        Layout.alignment: Qt.AlignLeft
                                                         text: Theme.t("discord.deafen_desc", "Simula o envio de Ctrl + Shift + D para o Discord/Vesktop")
                                                         font.family: Theme.fontFamily
                                                         font.pixelSize: 11
@@ -8328,6 +8388,7 @@ PanelWindow {
                                                     Layout.fillWidth: true
                                                     spacing: 1
                                                     Text {
+                                                        Layout.alignment: Qt.AlignLeft
                                                         text: "#" + snapCard.modelData.id + " · " + snapCard.modelData.description
                                                         font.family: Theme.fontFamily
                                                         font.pixelSize: 12
@@ -8336,6 +8397,7 @@ PanelWindow {
                                                         elide: Text.ElideRight
                                                     }
                                                     Text {
+                                                        Layout.alignment: Qt.AlignLeft
                                                         text: snapCard.modelData.date + " · Tipo: " + snapCard.modelData.type
                                                         font.family: Theme.fontFamily
                                                         font.pixelSize: 10
@@ -8418,6 +8480,7 @@ PanelWindow {
                                                 Layout.fillWidth: true
                                                 spacing: 2
                                                 Text {
+                                                    Layout.alignment: Qt.AlignLeft
                                                     text: Theme.t("sys.audio_repair_title", "Reiniciar Sistema de Áudio (PipeWire)")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 13
@@ -8425,6 +8488,7 @@ PanelWindow {
                                                     color: Theme.textColor
                                                 }
                                                 Text {
+                                                    Layout.alignment: Qt.AlignLeft
                                                     text: Theme.t("sys.audio_repair_desc", "Se o som parou ou o microfone não responde após conectar um fone/headset.")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 11
@@ -8476,6 +8540,7 @@ PanelWindow {
                                                 Layout.fillWidth: true
                                                 spacing: 2
                                                 Text {
+                                                    Layout.alignment: Qt.AlignLeft
                                                     text: Theme.t("sys.pacman_unlock_title", "Destravar Pacman (Remover db.lck)")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 13
@@ -8483,6 +8548,7 @@ PanelWindow {
                                                     color: Theme.textColor
                                                 }
                                                 Text {
+                                                    Layout.alignment: Qt.AlignLeft
                                                     text: Theme.t("sys.pacman_unlock_desc", "Resolve o erro 'banco de dados está bloqueado' se o terminal fechou durante um update.")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 11
@@ -8532,6 +8598,7 @@ PanelWindow {
                                                 Layout.fillWidth: true
                                                 spacing: 2
                                                 Text {
+                                                    Layout.alignment: Qt.AlignLeft
                                                     text: Theme.t("sys.clean_disk_title", "Limpeza de Disco & Caches Antigos")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 13
@@ -8539,6 +8606,7 @@ PanelWindow {
                                                     color: Theme.textColor
                                                 }
                                                 Text {
+                                                    Layout.alignment: Qt.AlignLeft
                                                     text: Theme.t("sys.clean_disk_desc", "Remove versões antigas de pacotes do pacman e miniaturas expiradas com segurança.")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 11
@@ -8589,6 +8657,7 @@ PanelWindow {
                                                 Layout.fillWidth: true
                                                 spacing: 2
                                                 Text {
+                                                    Layout.alignment: Qt.AlignLeft
                                                     text: Theme.t("sys.doctor_title", "Assistente de Diagnóstico (Rice Doctor)")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 13
@@ -8596,6 +8665,7 @@ PanelWindow {
                                                     color: Theme.textColor
                                                 }
                                                 Text {
+                                                    Layout.alignment: Qt.AlignLeft
                                                     text: Theme.t("sys.doctor_desc", "Varredura completa de integridade de áudio, GPU, Waywallen, SDDM e zRAM.")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 11
@@ -8681,6 +8751,7 @@ PanelWindow {
                                             spacing: 3
 
                                             Text {
+                                                Layout.alignment: Qt.AlignLeft
                                                 text: win.softwareUpdatesData.sys_count > 0
                                                     ? win.softwareUpdatesData.sys_count + " " + Theme.t("store.updates_pending", "atualizações pendentes")
                                                     : Theme.t("store.up_to_date", "Sistema em dia")
@@ -8773,6 +8844,7 @@ PanelWindow {
                                             Layout.fillWidth: true
                                             spacing: 2
                                             Text {
+                                                Layout.alignment: Qt.AlignLeft
                                                 text: Theme.t("store.open_store", "Abrir a loja de programas")
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: 16
@@ -8780,6 +8852,7 @@ PanelWindow {
                                                 color: Theme.textColor
                                             }
                                             Text {
+                                                Layout.alignment: Qt.AlignLeft
                                                 text: win.softwareUpdatesData.store && win.softwareUpdatesData.store !== ""
                                                     ? win.softwareUpdatesData.store
                                                     : Theme.t("store.no_store", "Nenhuma instalada — clique para instalar o Shelly")
@@ -8860,6 +8933,7 @@ PanelWindow {
                                                 spacing: 3
 
                                                 Text {
+                                                    Layout.alignment: Qt.AlignLeft
                                                     text: win.riceHasUpdate
                                                         ? (win.riceInfo.count || 0) + " " + Theme.t("store.rice_available", "atualizações do rice disponíveis")
                                                         : (win.riceCheckFailed
@@ -8937,6 +9011,7 @@ PanelWindow {
                                             }
 
                                             Text {
+                                                Layout.alignment: Qt.AlignLeft
                                                 text: Theme.t("store.rice_changes", "O que vem nesta atualização:")
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: 12
@@ -9109,6 +9184,7 @@ PanelWindow {
                                     spacing: 8
 
                                     Text {
+                                        Layout.alignment: Qt.AlignLeft
                                         text: Theme.t("layout.bar_pos", "Onde fica a barra")
                                         font.family: Theme.fontFamily
                                         font.pixelSize: 13
@@ -9188,6 +9264,7 @@ PanelWindow {
                                     spacing: 8
 
                                     Text {
+                                        Layout.alignment: Qt.AlignLeft
                                         text: Theme.t("layout.ws_count", "Botões de área de trabalho")
                                         font.family: Theme.fontFamily
                                         font.pixelSize: 13
@@ -9575,6 +9652,7 @@ PanelWindow {
                                                         Layout.fillWidth: true
                                                         spacing: 2
                                                         Text {
+                                                            Layout.alignment: Qt.AlignLeft
                                                             text: (shellCustomTab.targetComp === "hub" ? "Rice Central Hub" : (shellCustomTab.targetComp === "sidebar" ? "Energy & Quick Sidebar" : "Hollow-Wired Dock"))
                                                             font.family: Theme.fontFamily
                                                             font.pixelSize: 12
@@ -9582,6 +9660,7 @@ PanelWindow {
                                                             color: Theme.textColor
                                                         }
                                                         Text {
+                                                            Layout.alignment: Qt.AlignLeft
                                                             text: Theme.t("shell_custom.style_label", "Estilo: ") + ShellCustomization.getStyle(shellCustomTab.targetComp)
                                                                 + "  ·  " + Theme.t("shell_custom.scale_label", "escala ") + Math.round(ShellCustomization.getScale(shellCustomTab.targetComp) * 100) + "%"
                                                             font.family: Theme.fontFamily
@@ -9615,6 +9694,7 @@ PanelWindow {
                                             Layout.fillWidth: true
                                             spacing: 8
                                             Text {
+                                                Layout.alignment: Qt.AlignLeft
                                                 text: Theme.t("shell_custom.style", "Estilo Visual")
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: 12
@@ -9669,6 +9749,7 @@ PanelWindow {
                                             Layout.fillWidth: true
                                             spacing: 8
                                             Text {
+                                                Layout.alignment: Qt.AlignLeft
                                                 text: Theme.t("shell_custom.scale", "Escala de Tamanho")
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: 12
@@ -9722,6 +9803,7 @@ PanelWindow {
                                             Layout.fillWidth: true
                                             spacing: 8
                                             Text {
+                                                Layout.alignment: Qt.AlignLeft
                                                 text: Theme.t("shell_custom.opacity", "Opacidade do Fundo")
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: 12
@@ -9776,6 +9858,7 @@ PanelWindow {
                                             Layout.fillWidth: true
                                             spacing: 8
                                             Text {
+                                                Layout.alignment: Qt.AlignLeft
                                                 text: Theme.t("shell_custom.accent", "Cor de Destaque")
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: 12
