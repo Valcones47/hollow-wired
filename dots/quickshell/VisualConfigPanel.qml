@@ -1862,6 +1862,7 @@ PanelWindow {
                                 { group: "look", tabIndex: 8, name: Theme.t("settings.cat_wallust", "Cores & Papel de Parede"), icon: Theme.icons.palette, desc: Theme.t("settings.desc_wallust", "Cores da tela toda"), keywords: "cores color colors wallust tema theme wallpaper papel de parede paleta palette dinamica accent visual fundo transicao transição transition onda wave varredura circulo fade" },
                                 { group: "look", tabIndex: 9, name: Theme.t("settings.cat_effects", "Efeitos & Janelas"), icon: Theme.icons.laptop, desc: Theme.t("settings.desc_effects", "Bordas & Animações"), keywords: "efeitos effects janelas windows blur desfoque bordas borders sombras shadows sddm animacoes animations transparência luz noturna curvas bezier curves velocidade" },
                                 { group: "custom", tabIndex: 20, name: Theme.t("settings.cat_layout", "Organização da Interface"), icon: Theme.icons.dashboard, desc: Theme.t("settings.desc_layout", "Onde fica cada barra"), keywords: "organizacao layout arranjo interface barra topbar dock sidebar lateral taskbar windows areas de trabalho workspaces hover esconder largura total posicao preset estilo" },
+                                { group: "custom", tabIndex: 21, name: Theme.t("settings.cat_binds", "Atalhos do Teclado"), icon: Theme.icons.cursor, desc: Theme.t("settings.desc_binds", "Criar e trocar atalhos"), keywords: "atalhos shortcuts teclas binds keybinds combinacao gravar programa abrir steam heroic jogos discord mute deafen microfone push to talk user-binds" },
                                 { group: "custom", tabIndex: 18, name: Theme.t("settings.cat_shell_custom", "Customização do Shell"), icon: Theme.icons.tune, desc: Theme.t("settings.desc_shell_custom", "Hub, Sidebar & Dock"), keywords: "shell quickshell customizacao dock topbar barra sidebar hub aparencia widgets glass solid glow borderless escala" },
                                 { group: "look", tabIndex: 2, name: Theme.t("settings.cat_mako", "Notificações"), icon: Theme.icons.bell, desc: Theme.t("settings.desc_mako", "Posição & Estilo"), keywords: "mako notificacoes notifications som posicao borda alert toast banner avisos" },
                                 { group: "look", tabIndex: 1, name: Theme.t("settings.cat_kitty", "Kitty Terminal"), icon: Theme.icons.console, desc: Theme.t("settings.desc_kitty", "Fonte & Opacidade"), keywords: "kitty terminal console fonte font opacidade padding cursor audio blur som transparencia" },
@@ -3818,590 +3819,6 @@ PanelWindow {
                                     }
                                 }
 
-                                SectionHeader {
-                                    title: Theme.t("settings.discord_binds", "Atalhos Globais do Discord")
-                                    subtitle: Theme.t("input.discord_sub", "Mute e Deafen globais que funcionam mesmo com Discord ou Vesktop minimizado em segundo plano")
-                                }
-
-                                Rectangle {
-                                    Layout.fillWidth: true
-                                    implicitHeight: discordCol.implicitHeight + 28
-                                    radius: 12
-                                    color: Theme.tile
-                                    border.width: 1
-                                    border.color: Theme.withAlpha(Theme.outline, 0.2)
-
-                                    ColumnLayout {
-                                        id: discordCol
-                                        anchors.fill: parent
-                                        anchors.margins: 16
-                                        spacing: 14
-
-                                        // Status do cliente Discord / Vesktop
-                                        RowLayout {
-                                            Layout.fillWidth: true
-                                            spacing: 12
-
-                                            Rectangle {
-                                                width: 36; height: 36; radius: 18
-                                                color: Theme.withAlpha(Theme.primary, 0.2)
-                                                Text {
-                                                    anchors.centerIn: parent
-                                                    text: "󰙯"
-                                                    font.family: Theme.iconFontFamily
-                                                    font.pixelSize: 20
-                                                    color: Theme.primary
-                                                }
-                                            }
-
-                                            ColumnLayout {
-                                                Layout.fillWidth: true
-                                                spacing: 2
-                                                RowLayout {
-                                                    spacing: 6
-                                                    Text {
-                                                        text: win.discordClient === "vesktop" ? "Vesktop (Discord Client)" : "Discord Oficial"
-                                                        font.family: Theme.fontFamily
-                                                        font.pixelSize: 13
-                                                        font.weight: Font.Bold
-                                                        color: Theme.textColor
-                                                    }
-                                                    Rectangle {
-                                                        width: 8; height: 8; radius: 4
-                                                        color: win.discordRunning ? "#10b981" : Theme.withAlpha(Theme.subtext, 0.75)
-                                                    }
-                                                    Text {
-                                                        text: win.discordRunning ? "Em execução" : "Não detectado no momento"
-                                                        font.family: Theme.fontFamily
-                                                        font.pixelSize: 11
-                                                        color: win.discordRunning ? "#10b981" : Theme.subtext
-                                                    }
-                                                }
-                                                Text {
-                                                    text: Theme.t("discord.bind_note", "Os atalhos gravam diretamente em ~/.config/hypr/hyprland.lua usando hl.bind")
-                                                    font.family: Theme.fontFamily
-                                                    font.pixelSize: 11
-                                                    color: Theme.subtext
-                                                }
-                                            }
-
-                                            Rectangle {
-                                                implicitWidth: 80; implicitHeight: 31; radius: 14
-                                                color: checkMouse.pressed ? Theme.tileHigh : Theme.surface
-                                                border.width: 1; border.color: Theme.withAlpha(Theme.outline, 0.25)
-                                                RowLayout {
-                                                    anchors.centerIn: parent
-                                                    spacing: 4
-                                                    Text {
-                                                        text: Theme.icons.refresh
-                                                        font.family: Theme.iconFontFamily
-                                                        font.pixelSize: 12
-                                                        color: Theme.textColor
-                                                    }
-                                                    Text {
-                                                        text: Theme.t("discord.verify_btn", "Verificar")
-                                                        font.family: Theme.fontFamily
-                                                        font.pixelSize: 11
-                                                        color: Theme.textColor
-                                                    }
-                                                }
-                                                MouseArea {
-                                                    id: checkMouse
-                                                    anchors.fill: parent
-                                                    cursorShape: Qt.PointingHandCursor
-                                                    onClicked: loadDiscordProc.running = true
-                                                }
-                                            }
-                                        }
-
-                                        Rectangle { Layout.fillWidth: true; height: 1; color: Theme.withAlpha(Theme.outline, 0.15) }
-
-                                        // Nota explicativa da simulação
-                                        Rectangle {
-                                            Layout.fillWidth: true
-                                            implicitHeight: simNoteRow.implicitHeight + 16
-                                            radius: 8
-                                            color: Theme.withAlpha(Theme.primary, 0.08)
-                                            border.width: 1
-                                            border.color: Theme.withAlpha(Theme.primary, 0.25)
-                                            RowLayout {
-                                                id: simNoteRow
-                                                anchors.fill: parent
-                                                anchors.margins: 10
-                                                spacing: 8
-                                                Text {
-                                                    text: Theme.icons.info
-                                                    font.family: Theme.iconFontFamily
-                                                    font.pixelSize: 16
-                                                    color: Theme.primary
-                                                }
-                                                Text {
-                                                    Layout.fillWidth: true
-                                                    text: Theme.t("discord.sim_note", "O atalho gravado intercepta a tecla no Hyprland e simula o atalho nativo do Discord em segundo plano, liberando as teclas modificadoras automaticamente para não travar em jogos.")
-                                                    font.family: Theme.fontFamily
-                                                    font.pixelSize: 11
-                                                    wrapMode: Text.Wrap
-                                                    color: Theme.subtext
-                                                }
-                                            }
-                                        }
-
-                                        // 1. Mute Bind Card
-                                        ColumnLayout {
-                                            Layout.fillWidth: true
-                                            spacing: 8
-
-                                            RowLayout {
-                                                Layout.fillWidth: true
-                                                spacing: 12
-
-                                                ColumnLayout {
-                                                    Layout.fillWidth: true
-                                                    spacing: 2
-                                                    Text {
-                                                        text: Theme.t("discord.mute_title", "Mutar / Desmutar Microfone (Mute)")
-                                                        font.family: Theme.fontFamily
-                                                        font.pixelSize: 12
-                                                        font.weight: Font.Bold
-                                                        color: Theme.textColor
-                                                    }
-                                                    Text {
-                                                        text: Theme.t("discord.mute_desc", "Simula o envio de Ctrl + Shift + M para o Discord/Vesktop")
-                                                        font.family: Theme.fontFamily
-                                                        font.pixelSize: 11
-                                                        color: Theme.subtext
-                                                    }
-                                                }
-
-                                                // Badge de Atalho Ativo
-                                                Rectangle {
-                                                    implicitWidth: mbBadgeRow.implicitWidth + 16
-                                                    implicitHeight: 31; radius: 14
-                                                    color: Theme.withAlpha(Theme.primary, 0.15)
-                                                    border.width: 1; border.color: Theme.primary
-                                                    RowLayout {
-                                                        id: mbBadgeRow
-                                                        anchors.centerIn: parent
-                                                        spacing: 6
-                                                        Text {
-                                                            text: Theme.icons.microphone || ""
-                                                            font.family: Theme.iconFontFamily
-                                                            font.pixelSize: 12
-                                                            color: Theme.primary
-                                                        }
-                                                        Text {
-                                                            text: win.discordMuteBind
-                                                            font.family: Theme.monoFamily
-                                                            font.pixelSize: 12
-                                                            font.weight: Font.Bold
-                                                            color: Theme.primary
-                                                        }
-                                                    }
-                                                }
-
-                                                // Botão Gravar Tecla
-                                                Rectangle {
-                                                    readonly property bool isRec: win.recordingDiscordTarget === "mute"
-                                                    implicitWidth: recMuteRow.implicitWidth + 20
-                                                    implicitHeight: 34; radius: 15
-                                                    color: isRec ? Theme.critical : (recMuteMouse.containsMouse ? Theme.primary : Theme.surface)
-                                                    border.width: 1
-                                                    border.color: isRec ? Theme.critical : (recMuteMouse.containsMouse ? Theme.primary : Theme.withAlpha(Theme.outline, 0.3))
-                                                    Behavior on color { ColorAnimation { duration: 150 } }
-
-                                                    RowLayout {
-                                                        id: recMuteRow
-                                                        anchors.centerIn: parent
-                                                        spacing: 6
-                                                        Text {
-                                                            text: parent.isRec ? "⏹" : "⏺"
-                                                            font.family: Theme.fontFamily
-                                                            font.pixelSize: 12
-                                                            color: parent.isRec || recMuteMouse.containsMouse ? Theme.background : Theme.critical
-                                                        }
-                                                        Text {
-                                                            text: parent.isRec ? Theme.t("discord.recording", "Aperte uma tecla no teclado...") : Theme.t("discord.record_key", "Gravar Tecla")
-                                                            font.family: Theme.fontFamily
-                                                            font.pixelSize: 11
-                                                            font.weight: Font.DemiBold
-                                                            color: parent.isRec || recMuteMouse.containsMouse ? Theme.background : Theme.textColor
-                                                        }
-                                                    }
-                                                    MouseArea {
-                                                        id: recMuteMouse
-                                                        anchors.fill: parent
-                                                        hoverEnabled: true
-                                                        cursorShape: Qt.PointingHandCursor
-                                                        onClicked: {
-                                                            if (parent.isRec) {
-                                                                recordDiscordProc.running = false;
-                                                                win.recordingDiscordTarget = "";
-                                                            } else {
-                                                                win.recordingDiscordTarget = "mute";
-                                                                win.editingManualMute = false;
-                                                                recordDiscordProc.command = ["rice-discord-binds", "record", "--target", "mute", "--timeout", "15"];
-                                                                recordDiscordProc.running = true;
-                                                            }
-                                                        }
-                                                    }
-                                                }
-
-                                                // Botão Digitar Tecla
-                                                Rectangle {
-                                                    implicitWidth: editMuteRow.implicitWidth + 16
-                                                    implicitHeight: 34; radius: 15
-                                                    color: win.editingManualMute ? Theme.tileHigh : (editMuteMouse.containsMouse ? Theme.surface : "transparent")
-                                                    border.width: 1; border.color: win.editingManualMute ? Theme.primary : Theme.withAlpha(Theme.outline, 0.25)
-                                                    RowLayout {
-                                                        id: editMuteRow
-                                                        anchors.centerIn: parent
-                                                        spacing: 4
-                                                        Text {
-                                                            text: Theme.icons.pencil
-                                                            font.family: Theme.iconFontFamily
-                                                            font.pixelSize: 11
-                                                            color: Theme.textColor
-                                                        }
-                                                        Text {
-                                                            text: Theme.t("discord.edit_manual", "Digitar")
-                                                            font.family: Theme.fontFamily
-                                                            font.pixelSize: 11
-                                                            color: Theme.textColor
-                                                        }
-                                                    }
-                                                    MouseArea {
-                                                        id: editMuteMouse
-                                                        anchors.fill: parent
-                                                        hoverEnabled: true
-                                                        cursorShape: Qt.PointingHandCursor
-                                                        onClicked: win.editingManualMute = !win.editingManualMute
-                                                    }
-                                                }
-                                            }
-
-                                            // Campo de Digitação Manual (se aberto)
-                                            RowLayout {
-                                                Layout.fillWidth: true
-                                                visible: win.editingManualMute
-                                                spacing: 8
-
-                                                Rectangle {
-                                                    Layout.fillWidth: true
-                                                    height: 32; radius: 8
-                                                    color: Theme.surface
-                                                    border.width: 1; border.color: Theme.withAlpha(Theme.outline, 0.3)
-                                                    TextInput {
-                                                        id: manualMuteInput
-                                                        anchors.fill: parent
-                                                        anchors.leftMargin: 10
-                                                        anchors.rightMargin: 10
-                                                        verticalAlignment: TextInput.AlignVCenter
-                                                        text: win.discordMuteBind
-                                                        font.family: Theme.monoFamily
-                                                        font.pixelSize: 12
-                                                        color: Theme.textColor
-                                                        selectByMouse: true
-                                                    }
-                                                }
-
-                                                Rectangle {
-                                                    implicitWidth: 70; height: 32; radius: 8
-                                                    color: Theme.primary
-                                                    Text {
-                                                        anchors.centerIn: parent
-                                                        text: Theme.t("discord.save", "Salvar")
-                                                        font.family: Theme.fontFamily
-                                                        font.pixelSize: 11
-                                                        font.weight: Font.Bold
-                                                        color: Theme.background
-                                                    }
-                                                    MouseArea {
-                                                        anchors.fill: parent
-                                                        cursorShape: Qt.PointingHandCursor
-                                                        onClicked: {
-                                                            const keyVal = manualMuteInput.text.trim();
-                                                            if (keyVal.length > 0) {
-                                                                win.discordMuteBind = keyVal;
-                                                                Quickshell.execDetached(["rice-discord-binds", "set", "--mute", keyVal]);
-                                                                win.showToast(Theme.t("discord.recorded_mute", "Tecla de Mute salva: ") + keyVal);
-                                                                win.editingManualMute = false;
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-
-                                            // Presets rápidos de teclas de Mute
-                                            RowLayout {
-                                                Layout.fillWidth: true
-                                                spacing: 6
-                                                Text {
-                                                    text: Theme.t("discord.quick_suggestions", "Sugestões rápidas:")
-                                                    font.family: Theme.fontFamily
-                                                    font.pixelSize: 10
-                                                    color: Theme.subtext
-                                                }
-                                                Repeater {
-                                                    model: ["Num_Lock", "F8", "Pause", "Scroll_Lock", "CTRL + SHIFT + M"]
-                                                    delegate: Rectangle {
-                                                        required property string modelData
-                                                        implicitWidth: mbTxt.implicitWidth + 14
-                                                        implicitHeight: 27; radius: 12
-                                                        readonly property bool isCur: win.discordMuteBind === modelData
-                                                        color: isCur ? Theme.primary : Theme.surface
-                                                        border.width: 1; border.color: isCur ? Theme.primary : Theme.withAlpha(Theme.outline, 0.2)
-                                                        Text {
-                                                            id: mbTxt
-                                                            anchors.centerIn: parent
-                                                            text: parent.modelData
-                                                            font.family: Theme.monoFamily
-                                                            font.pixelSize: 10
-                                                            font.weight: Font.Medium
-                                                            color: parent.isCur ? Theme.background : Theme.textColor
-                                                        }
-                                                        MouseArea {
-                                                            anchors.fill: parent
-                                                            cursorShape: Qt.PointingHandCursor
-                                                            onClicked: {
-                                                                win.discordMuteBind = parent.modelData;
-                                                                Quickshell.execDetached(["rice-discord-binds", "set", "--mute", parent.modelData]);
-                                                                win.showToast(Theme.t("discord.recorded_mute", "Tecla de Mute configurada: ") + parent.modelData);
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-
-                                        Rectangle { Layout.fillWidth: true; height: 1; color: Theme.withAlpha(Theme.outline, 0.15) }
-
-                                        // 2. Deafen Bind Card
-                                        ColumnLayout {
-                                            Layout.fillWidth: true
-                                            spacing: 8
-
-                                            RowLayout {
-                                                Layout.fillWidth: true
-                                                spacing: 12
-
-                                                ColumnLayout {
-                                                    Layout.fillWidth: true
-                                                    spacing: 2
-                                                    Text {
-                                                        text: Theme.t("discord.deafen_title", "Desativar / Ativar Áudio (Deafen)")
-                                                        font.family: Theme.fontFamily
-                                                        font.pixelSize: 12
-                                                        font.weight: Font.Bold
-                                                        color: Theme.textColor
-                                                    }
-                                                    Text {
-                                                        text: Theme.t("discord.deafen_desc", "Simula o envio de Ctrl + Shift + D para o Discord/Vesktop")
-                                                        font.family: Theme.fontFamily
-                                                        font.pixelSize: 11
-                                                        color: Theme.subtext
-                                                    }
-                                                }
-
-                                                // Badge de Atalho Ativo
-                                                Rectangle {
-                                                    implicitWidth: dbBadgeRow.implicitWidth + 16
-                                                    implicitHeight: 31; radius: 14
-                                                    color: Theme.withAlpha(Theme.primary, 0.15)
-                                                    border.width: 1; border.color: Theme.primary
-                                                    RowLayout {
-                                                        id: dbBadgeRow
-                                                        anchors.centerIn: parent
-                                                        spacing: 6
-                                                        Text {
-                                                            text: Theme.icons.headphones || "🎧"
-                                                            font.family: Theme.iconFontFamily
-                                                            font.pixelSize: 12
-                                                            color: Theme.primary
-                                                        }
-                                                        Text {
-                                                            text: win.discordDeafenBind
-                                                            font.family: Theme.monoFamily
-                                                            font.pixelSize: 12
-                                                            font.weight: Font.Bold
-                                                            color: Theme.primary
-                                                        }
-                                                    }
-                                                }
-
-                                                // Botão Gravar Tecla
-                                                Rectangle {
-                                                    readonly property bool isRec: win.recordingDiscordTarget === "deafen"
-                                                    implicitWidth: recDeafenRow.implicitWidth + 20
-                                                    implicitHeight: 34; radius: 15
-                                                    color: isRec ? Theme.critical : (recDeafenMouse.containsMouse ? Theme.primary : Theme.surface)
-                                                    border.width: 1
-                                                    border.color: isRec ? Theme.critical : (recDeafenMouse.containsMouse ? Theme.primary : Theme.withAlpha(Theme.outline, 0.3))
-                                                    Behavior on color { ColorAnimation { duration: 150 } }
-
-                                                    RowLayout {
-                                                        id: recDeafenRow
-                                                        anchors.centerIn: parent
-                                                        spacing: 6
-                                                        Text {
-                                                            text: parent.isRec ? "⏹" : "⏺"
-                                                            font.family: Theme.fontFamily
-                                                            font.pixelSize: 12
-                                                            color: parent.isRec || recDeafenMouse.containsMouse ? Theme.background : Theme.critical
-                                                        }
-                                                        Text {
-                                                            text: parent.isRec ? Theme.t("discord.recording", "Aperte uma tecla no teclado...") : Theme.t("discord.record_key", "Gravar Tecla")
-                                                            font.family: Theme.fontFamily
-                                                            font.pixelSize: 11
-                                                            font.weight: Font.DemiBold
-                                                            color: parent.isRec || recDeafenMouse.containsMouse ? Theme.background : Theme.textColor
-                                                        }
-                                                    }
-                                                    MouseArea {
-                                                        id: recDeafenMouse
-                                                        anchors.fill: parent
-                                                        hoverEnabled: true
-                                                        cursorShape: Qt.PointingHandCursor
-                                                        onClicked: {
-                                                            if (parent.isRec) {
-                                                                recordDiscordProc.running = false;
-                                                                win.recordingDiscordTarget = "";
-                                                            } else {
-                                                                win.recordingDiscordTarget = "deafen";
-                                                                win.editingManualDeafen = false;
-                                                                recordDiscordProc.command = ["rice-discord-binds", "record", "--target", "deafen", "--timeout", "15"];
-                                                                recordDiscordProc.running = true;
-                                                            }
-                                                        }
-                                                    }
-                                                }
-
-                                                // Botão Digitar Tecla
-                                                Rectangle {
-                                                    implicitWidth: editDeafenRow.implicitWidth + 16
-                                                    implicitHeight: 34; radius: 15
-                                                    color: win.editingManualDeafen ? Theme.tileHigh : (editDeafenMouse.containsMouse ? Theme.surface : "transparent")
-                                                    border.width: 1; border.color: win.editingManualDeafen ? Theme.primary : Theme.withAlpha(Theme.outline, 0.25)
-                                                    RowLayout {
-                                                        id: editDeafenRow
-                                                        anchors.centerIn: parent
-                                                        spacing: 4
-                                                        Text {
-                                                            text: Theme.icons.pencil
-                                                            font.family: Theme.iconFontFamily
-                                                            font.pixelSize: 11
-                                                            color: Theme.textColor
-                                                        }
-                                                        Text {
-                                                            text: Theme.t("discord.edit_manual", "Digitar")
-                                                            font.family: Theme.fontFamily
-                                                            font.pixelSize: 11
-                                                            color: Theme.textColor
-                                                        }
-                                                    }
-                                                    MouseArea {
-                                                        id: editDeafenMouse
-                                                        anchors.fill: parent
-                                                        hoverEnabled: true
-                                                        cursorShape: Qt.PointingHandCursor
-                                                        onClicked: win.editingManualDeafen = !win.editingManualDeafen
-                                                    }
-                                                }
-                                            }
-
-                                            // Campo de Digitação Manual (se aberto)
-                                            RowLayout {
-                                                Layout.fillWidth: true
-                                                visible: win.editingManualDeafen
-                                                spacing: 8
-
-                                                Rectangle {
-                                                    Layout.fillWidth: true
-                                                    height: 32; radius: 8
-                                                    color: Theme.surface
-                                                    border.width: 1; border.color: Theme.withAlpha(Theme.outline, 0.3)
-                                                    TextInput {
-                                                        id: manualDeafenInput
-                                                        anchors.fill: parent
-                                                        anchors.leftMargin: 10
-                                                        anchors.rightMargin: 10
-                                                        verticalAlignment: TextInput.AlignVCenter
-                                                        text: win.discordDeafenBind
-                                                        font.family: Theme.monoFamily
-                                                        font.pixelSize: 12
-                                                        color: Theme.textColor
-                                                        selectByMouse: true
-                                                    }
-                                                }
-
-                                                Rectangle {
-                                                    implicitWidth: 70; height: 32; radius: 8
-                                                    color: Theme.primary
-                                                    Text {
-                                                        anchors.centerIn: parent
-                                                        text: Theme.t("discord.save", "Salvar")
-                                                        font.family: Theme.fontFamily
-                                                        font.pixelSize: 11
-                                                        font.weight: Font.Bold
-                                                        color: Theme.background
-                                                    }
-                                                    MouseArea {
-                                                        anchors.fill: parent
-                                                        cursorShape: Qt.PointingHandCursor
-                                                        onClicked: {
-                                                            const keyVal = manualDeafenInput.text.trim();
-                                                            if (keyVal.length > 0) {
-                                                                win.discordDeafenBind = keyVal;
-                                                                Quickshell.execDetached(["rice-discord-binds", "set", "--deafen", keyVal]);
-                                                                win.showToast(Theme.t("discord.recorded_deafen", "Tecla de Deafen salva: ") + keyVal);
-                                                                win.editingManualDeafen = false;
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-
-                                            // Presets rápidos de teclas de Deafen
-                                            RowLayout {
-                                                Layout.fillWidth: true
-                                                spacing: 6
-                                                Text {
-                                                    text: Theme.t("discord.quick_suggestions", "Sugestões rápidas:")
-                                                    font.family: Theme.fontFamily
-                                                    font.pixelSize: 10
-                                                    color: Theme.subtext
-                                                }
-                                                Repeater {
-                                                    model: ["Num_Lock", "F9", "Pause", "Scroll_Lock", "CTRL + SHIFT + D"]
-                                                    delegate: Rectangle {
-                                                        required property string modelData
-                                                        implicitWidth: dbTxt.implicitWidth + 14
-                                                        implicitHeight: 27; radius: 12
-                                                        readonly property bool isCur: win.discordDeafenBind === modelData
-                                                        color: isCur ? Theme.primary : Theme.surface
-                                                        border.width: 1; border.color: isCur ? Theme.primary : Theme.withAlpha(Theme.outline, 0.2)
-                                                        Text {
-                                                            id: dbTxt
-                                                            anchors.centerIn: parent
-                                                            text: parent.modelData
-                                                            font.family: Theme.monoFamily
-                                                            font.pixelSize: 10
-                                                            font.weight: Font.Medium
-                                                            color: parent.isCur ? Theme.background : Theme.textColor
-                                                        }
-                                                        MouseArea {
-                                                            anchors.fill: parent
-                                                            cursorShape: Qt.PointingHandCursor
-                                                            onClicked: {
-                                                                win.discordDeafenBind = parent.modelData;
-                                                                Quickshell.execDetached(["rice-discord-binds", "set", "--deafen", parent.modelData]);
-                                                                win.showToast(Theme.t("discord.recorded_deafen", "Tecla de Deafen configurada: ") + parent.modelData);
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
                                 }
                             }
                         }
@@ -7838,7 +7255,9 @@ PanelWindow {
                         // que não tem) e deixa gravar, trocar ou apagar na hora.
                         Flickable {
                             anchors.fill: parent
-                            visible: win.currentTab === 15 && win.bindsSubPage
+                            // Mesma página em dois lugares: pelo botão do guia
+                            // (aba 15) e como categoria própria em Personalização.
+                            visible: (win.currentTab === 15 && win.bindsSubPage) || win.currentTab === 21
                             contentHeight: subBindsCol.implicitHeight
                             clip: true
                             boundsBehavior: Flickable.StopAtBounds
@@ -7851,9 +7270,13 @@ PanelWindow {
 
                                 RowLayout {
                                     Layout.fillWidth: true
+                                    // Sem essa folga o botão da direita passava
+                                    // por baixo do X do painel.
+                                    Layout.rightMargin: 44
                                     spacing: 12
 
                                     ActionBtn {
+                                        visible: win.currentTab === 15
                                         icon: Theme.icons.chevronRight
                                         text: Theme.t("binds.sub_back", "Voltar ao guia")
                                         onClicked: {
@@ -7886,6 +7309,125 @@ PanelWindow {
                                     font.family: Theme.fontFamily
                                     font.pixelSize: 12
                                     color: "#ffb347"
+                                }
+
+                                // ---- ações do próprio rice ----
+                                // Não são programas: são comandos do rice que
+                                // ficavam espalhados por outras abas (jogos,
+                                // notificações, gravação) e que muita gente quer
+                                // numa tecla.
+                                SectionHeader {
+                                    title: Theme.t("binds.actions_title", "Ações do rice")
+                                    subtitle: Theme.t("binds.actions_sub", "Ligar e desligar coisas do sistema sem abrir menu nenhum.")
+                                }
+
+                                Repeater {
+                                    model: [
+                                        { cmd: "rice-gaming toggle-gamemode", name: Theme.t("binds.act_gamemode", "Feral GameMode"),
+                                          desc: Theme.t("binds.act_gamemode_desc", "Prioriza o processador para o jogo em foco") },
+                                        { cmd: "steam", name: Theme.t("binds.act_steam", "Abrir a Steam"),
+                                          desc: Theme.t("binds.act_steam_desc", "Também serve para trazer a janela de volta") },
+                                        { cmd: "heroic", name: Theme.t("binds.act_heroic", "Abrir o Heroic"),
+                                          desc: Theme.t("binds.act_heroic_desc", "Launcher da Epic, GOG e Amazon") },
+                                        { cmd: "rice-dnd", name: Theme.t("binds.act_dnd", "Não perturbe"),
+                                          desc: Theme.t("binds.act_dnd_desc", "Segura as notificações até você desligar") },
+                                        { cmd: "rice-caffeine", name: Theme.t("binds.act_caffeine", "Não deixar a tela apagar"),
+                                          desc: Theme.t("binds.act_caffeine_desc", "Para assistir algo sem o bloqueio automático") },
+                                        { cmd: "rice-blur-toggle", name: Theme.t("binds.act_blur", "Ligar e desligar o desfoque"),
+                                          desc: Theme.t("binds.act_blur_desc", "O jeito rápido de ganhar quadros por segundo") },
+                                        { cmd: "rice-record full", name: Theme.t("binds.act_record", "Gravar a tela"),
+                                          desc: Theme.t("binds.act_record_desc", "Começa e termina a gravação da tela inteira") },
+                                        { cmd: "rice-dropterm", name: Theme.t("binds.act_dropterm", "Terminal suspenso"),
+                                          desc: Theme.t("binds.act_dropterm_desc", "Desce por cima de tudo e volta a subir") }
+                                    ]
+                                    delegate: Rectangle {
+                                        id: actRow
+                                        required property var modelData
+                                        // Se já existe um atalho apontando para o mesmo comando,
+                                        // mostra ele em vez de oferecer criar outro.
+                                        readonly property var existing: {
+                                            const list = win.appBinds || [];
+                                            for (let i = 0; i < list.length; i++) {
+                                                if ((list[i].cmd || "") === actRow.modelData.cmd) return list[i];
+                                            }
+                                            return null;
+                                        }
+
+                                        Layout.fillWidth: true
+                                        implicitHeight: 58
+                                        radius: 12
+                                        color: Theme.tile
+                                        border.width: 1
+                                        border.color: Theme.withAlpha(Theme.outline, 0.18)
+
+                                        RowLayout {
+                                            anchors.fill: parent
+                                            anchors.leftMargin: 16
+                                            anchors.rightMargin: 16
+                                            spacing: 12
+
+                                            ColumnLayout {
+                                                Layout.fillWidth: true
+                                                spacing: 1
+                                                Text {
+                                                    Layout.fillWidth: true
+                                                    text: actRow.modelData.name
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 13
+                                                    font.weight: Font.DemiBold
+                                                    color: Theme.textColor
+                                                }
+                                                Text {
+                                                    Layout.fillWidth: true
+                                                    text: actRow.modelData.desc
+                                                    elide: Text.ElideRight
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 11
+                                                    color: Theme.subtext
+                                                }
+                                            }
+
+                                            Rectangle {
+                                                visible: actRow.existing !== null
+                                                implicitWidth: actComboText.implicitWidth + 20
+                                                implicitHeight: 26
+                                                radius: 8
+                                                color: Theme.withAlpha(Theme.primary, 0.16)
+                                                border.width: 1
+                                                border.color: Theme.withAlpha(Theme.primary, 0.35)
+
+                                                Text {
+                                                    id: actComboText
+                                                    anchors.centerIn: parent
+                                                    text: actRow.existing ? actRow.existing.combo : ""
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 11
+                                                    font.weight: Font.DemiBold
+                                                    color: Theme.primary
+                                                }
+                                            }
+
+                                            ActionBtn {
+                                                icon: Theme.icons.plus
+                                                primary: actRow.existing === null
+                                                text: actRow.existing === null
+                                                    ? Theme.t("binds.sub_set", "Definir atalho")
+                                                    : Theme.t("binds.act_change", "Trocar")
+                                                onClicked: win.startBindCapture(actRow.modelData.cmd, actRow.modelData.name)
+                                            }
+
+                                            ActionBtn {
+                                                visible: actRow.existing !== null
+                                                icon: Theme.icons.trash
+                                                text: ""
+                                                onClicked: {
+                                                    if (!actRow.existing) return;
+                                                    saveAppBindProc.command = ["rice-app-binds", "remove", actRow.existing.combo];
+                                                    saveAppBindProc.running = true;
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
 
                                 // ---- programas que já têm atalho ----
@@ -8123,6 +7665,591 @@ PanelWindow {
                                         }
                                     }
                                 }
+
+                                SectionHeader {
+                                    title: Theme.t("settings.discord_binds", "Atalhos Globais do Discord")
+                                    subtitle: Theme.t("input.discord_sub", "Mute e Deafen globais que funcionam mesmo com Discord ou Vesktop minimizado em segundo plano")
+                                }
+
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    implicitHeight: discordCol.implicitHeight + 28
+                                    radius: 12
+                                    color: Theme.tile
+                                    border.width: 1
+                                    border.color: Theme.withAlpha(Theme.outline, 0.2)
+
+                                    ColumnLayout {
+                                        id: discordCol
+                                        anchors.fill: parent
+                                        anchors.margins: 16
+                                        spacing: 14
+
+                                        // Status do cliente Discord / Vesktop
+                                        RowLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 12
+
+                                            Rectangle {
+                                                width: 36; height: 36; radius: 18
+                                                color: Theme.withAlpha(Theme.primary, 0.2)
+                                                Text {
+                                                    anchors.centerIn: parent
+                                                    text: "󰙯"
+                                                    font.family: Theme.iconFontFamily
+                                                    font.pixelSize: 20
+                                                    color: Theme.primary
+                                                }
+                                            }
+
+                                            ColumnLayout {
+                                                Layout.fillWidth: true
+                                                spacing: 2
+                                                RowLayout {
+                                                    spacing: 6
+                                                    Text {
+                                                        text: win.discordClient === "vesktop" ? "Vesktop (Discord Client)" : "Discord Oficial"
+                                                        font.family: Theme.fontFamily
+                                                        font.pixelSize: 13
+                                                        font.weight: Font.Bold
+                                                        color: Theme.textColor
+                                                    }
+                                                    Rectangle {
+                                                        width: 8; height: 8; radius: 4
+                                                        color: win.discordRunning ? "#10b981" : Theme.withAlpha(Theme.subtext, 0.75)
+                                                    }
+                                                    Text {
+                                                        text: win.discordRunning ? "Em execução" : "Não detectado no momento"
+                                                        font.family: Theme.fontFamily
+                                                        font.pixelSize: 11
+                                                        color: win.discordRunning ? "#10b981" : Theme.subtext
+                                                    }
+                                                }
+                                                Text {
+                                                    text: Theme.t("discord.bind_note", "Os atalhos gravam diretamente em ~/.config/hypr/hyprland.lua usando hl.bind")
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 11
+                                                    color: Theme.subtext
+                                                }
+                                            }
+
+                                            Rectangle {
+                                                implicitWidth: 80; implicitHeight: 31; radius: 14
+                                                color: checkMouse.pressed ? Theme.tileHigh : Theme.surface
+                                                border.width: 1; border.color: Theme.withAlpha(Theme.outline, 0.25)
+                                                RowLayout {
+                                                    anchors.centerIn: parent
+                                                    spacing: 4
+                                                    Text {
+                                                        text: Theme.icons.refresh
+                                                        font.family: Theme.iconFontFamily
+                                                        font.pixelSize: 12
+                                                        color: Theme.textColor
+                                                    }
+                                                    Text {
+                                                        text: Theme.t("discord.verify_btn", "Verificar")
+                                                        font.family: Theme.fontFamily
+                                                        font.pixelSize: 11
+                                                        color: Theme.textColor
+                                                    }
+                                                }
+                                                MouseArea {
+                                                    id: checkMouse
+                                                    anchors.fill: parent
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    onClicked: loadDiscordProc.running = true
+                                                }
+                                            }
+                                        }
+
+                                        Rectangle { Layout.fillWidth: true; height: 1; color: Theme.withAlpha(Theme.outline, 0.15) }
+
+                                        // Nota explicativa da simulação
+                                        Rectangle {
+                                            Layout.fillWidth: true
+                                            implicitHeight: simNoteRow.implicitHeight + 16
+                                            radius: 8
+                                            color: Theme.withAlpha(Theme.primary, 0.08)
+                                            border.width: 1
+                                            border.color: Theme.withAlpha(Theme.primary, 0.25)
+                                            RowLayout {
+                                                id: simNoteRow
+                                                anchors.fill: parent
+                                                anchors.margins: 10
+                                                spacing: 8
+                                                Text {
+                                                    text: Theme.icons.info
+                                                    font.family: Theme.iconFontFamily
+                                                    font.pixelSize: 16
+                                                    color: Theme.primary
+                                                }
+                                                Text {
+                                                    Layout.fillWidth: true
+                                                    text: Theme.t("discord.sim_note", "O atalho gravado intercepta a tecla no Hyprland e simula o atalho nativo do Discord em segundo plano, liberando as teclas modificadoras automaticamente para não travar em jogos.")
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 11
+                                                    wrapMode: Text.Wrap
+                                                    color: Theme.subtext
+                                                }
+                                            }
+                                        }
+
+                                        // 1. Mute Bind Card
+                                        ColumnLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 8
+
+                                            RowLayout {
+                                                Layout.fillWidth: true
+                                                spacing: 12
+
+                                                ColumnLayout {
+                                                    Layout.fillWidth: true
+                                                    spacing: 2
+                                                    Text {
+                                                        text: Theme.t("discord.mute_title", "Mutar / Desmutar Microfone (Mute)")
+                                                        font.family: Theme.fontFamily
+                                                        font.pixelSize: 12
+                                                        font.weight: Font.Bold
+                                                        color: Theme.textColor
+                                                    }
+                                                    Text {
+                                                        text: Theme.t("discord.mute_desc", "Simula o envio de Ctrl + Shift + M para o Discord/Vesktop")
+                                                        font.family: Theme.fontFamily
+                                                        font.pixelSize: 11
+                                                        color: Theme.subtext
+                                                    }
+                                                }
+
+                                                // Badge de Atalho Ativo
+                                                Rectangle {
+                                                    implicitWidth: mbBadgeRow.implicitWidth + 16
+                                                    implicitHeight: 31; radius: 14
+                                                    color: Theme.withAlpha(Theme.primary, 0.15)
+                                                    border.width: 1; border.color: Theme.primary
+                                                    RowLayout {
+                                                        id: mbBadgeRow
+                                                        anchors.centerIn: parent
+                                                        spacing: 6
+                                                        Text {
+                                                            text: Theme.icons.microphone || ""
+                                                            font.family: Theme.iconFontFamily
+                                                            font.pixelSize: 12
+                                                            color: Theme.primary
+                                                        }
+                                                        Text {
+                                                            text: win.discordMuteBind
+                                                            font.family: Theme.monoFamily
+                                                            font.pixelSize: 12
+                                                            font.weight: Font.Bold
+                                                            color: Theme.primary
+                                                        }
+                                                    }
+                                                }
+
+                                                // Botão Gravar Tecla
+                                                Rectangle {
+                                                    readonly property bool isRec: win.recordingDiscordTarget === "mute"
+                                                    implicitWidth: recMuteRow.implicitWidth + 20
+                                                    implicitHeight: 34; radius: 15
+                                                    color: isRec ? Theme.critical : (recMuteMouse.containsMouse ? Theme.primary : Theme.surface)
+                                                    border.width: 1
+                                                    border.color: isRec ? Theme.critical : (recMuteMouse.containsMouse ? Theme.primary : Theme.withAlpha(Theme.outline, 0.3))
+                                                    Behavior on color { ColorAnimation { duration: 150 } }
+
+                                                    RowLayout {
+                                                        id: recMuteRow
+                                                        anchors.centerIn: parent
+                                                        spacing: 6
+                                                        Text {
+                                                            text: parent.isRec ? "⏹" : "⏺"
+                                                            font.family: Theme.fontFamily
+                                                            font.pixelSize: 12
+                                                            color: parent.isRec || recMuteMouse.containsMouse ? Theme.background : Theme.critical
+                                                        }
+                                                        Text {
+                                                            text: parent.isRec ? Theme.t("discord.recording", "Aperte uma tecla no teclado...") : Theme.t("discord.record_key", "Gravar Tecla")
+                                                            font.family: Theme.fontFamily
+                                                            font.pixelSize: 11
+                                                            font.weight: Font.DemiBold
+                                                            color: parent.isRec || recMuteMouse.containsMouse ? Theme.background : Theme.textColor
+                                                        }
+                                                    }
+                                                    MouseArea {
+                                                        id: recMuteMouse
+                                                        anchors.fill: parent
+                                                        hoverEnabled: true
+                                                        cursorShape: Qt.PointingHandCursor
+                                                        onClicked: {
+                                                            if (parent.isRec) {
+                                                                recordDiscordProc.running = false;
+                                                                win.recordingDiscordTarget = "";
+                                                            } else {
+                                                                win.recordingDiscordTarget = "mute";
+                                                                win.editingManualMute = false;
+                                                                recordDiscordProc.command = ["rice-discord-binds", "record", "--target", "mute", "--timeout", "15"];
+                                                                recordDiscordProc.running = true;
+                                                            }
+                                                        }
+                                                    }
+                                                }
+
+                                                // Botão Digitar Tecla
+                                                Rectangle {
+                                                    implicitWidth: editMuteRow.implicitWidth + 16
+                                                    implicitHeight: 34; radius: 15
+                                                    color: win.editingManualMute ? Theme.tileHigh : (editMuteMouse.containsMouse ? Theme.surface : "transparent")
+                                                    border.width: 1; border.color: win.editingManualMute ? Theme.primary : Theme.withAlpha(Theme.outline, 0.25)
+                                                    RowLayout {
+                                                        id: editMuteRow
+                                                        anchors.centerIn: parent
+                                                        spacing: 4
+                                                        Text {
+                                                            text: Theme.icons.pencil
+                                                            font.family: Theme.iconFontFamily
+                                                            font.pixelSize: 11
+                                                            color: Theme.textColor
+                                                        }
+                                                        Text {
+                                                            text: Theme.t("discord.edit_manual", "Digitar")
+                                                            font.family: Theme.fontFamily
+                                                            font.pixelSize: 11
+                                                            color: Theme.textColor
+                                                        }
+                                                    }
+                                                    MouseArea {
+                                                        id: editMuteMouse
+                                                        anchors.fill: parent
+                                                        hoverEnabled: true
+                                                        cursorShape: Qt.PointingHandCursor
+                                                        onClicked: win.editingManualMute = !win.editingManualMute
+                                                    }
+                                                }
+                                            }
+
+                                            // Campo de Digitação Manual (se aberto)
+                                            RowLayout {
+                                                Layout.fillWidth: true
+                                                visible: win.editingManualMute
+                                                spacing: 8
+
+                                                Rectangle {
+                                                    Layout.fillWidth: true
+                                                    height: 32; radius: 8
+                                                    color: Theme.surface
+                                                    border.width: 1; border.color: Theme.withAlpha(Theme.outline, 0.3)
+                                                    TextInput {
+                                                        id: manualMuteInput
+                                                        anchors.fill: parent
+                                                        anchors.leftMargin: 10
+                                                        anchors.rightMargin: 10
+                                                        verticalAlignment: TextInput.AlignVCenter
+                                                        text: win.discordMuteBind
+                                                        font.family: Theme.monoFamily
+                                                        font.pixelSize: 12
+                                                        color: Theme.textColor
+                                                        selectByMouse: true
+                                                    }
+                                                }
+
+                                                Rectangle {
+                                                    implicitWidth: 70; height: 32; radius: 8
+                                                    color: Theme.primary
+                                                    Text {
+                                                        anchors.centerIn: parent
+                                                        text: Theme.t("discord.save", "Salvar")
+                                                        font.family: Theme.fontFamily
+                                                        font.pixelSize: 11
+                                                        font.weight: Font.Bold
+                                                        color: Theme.background
+                                                    }
+                                                    MouseArea {
+                                                        anchors.fill: parent
+                                                        cursorShape: Qt.PointingHandCursor
+                                                        onClicked: {
+                                                            const keyVal = manualMuteInput.text.trim();
+                                                            if (keyVal.length > 0) {
+                                                                win.discordMuteBind = keyVal;
+                                                                Quickshell.execDetached(["rice-discord-binds", "set", "--mute", keyVal]);
+                                                                win.showToast(Theme.t("discord.recorded_mute", "Tecla de Mute salva: ") + keyVal);
+                                                                win.editingManualMute = false;
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            // Presets rápidos de teclas de Mute
+                                            RowLayout {
+                                                Layout.fillWidth: true
+                                                spacing: 6
+                                                Text {
+                                                    text: Theme.t("discord.quick_suggestions", "Sugestões rápidas:")
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 10
+                                                    color: Theme.subtext
+                                                }
+                                                Repeater {
+                                                    model: ["Num_Lock", "F8", "Pause", "Scroll_Lock", "CTRL + SHIFT + M"]
+                                                    delegate: Rectangle {
+                                                        required property string modelData
+                                                        implicitWidth: mbTxt.implicitWidth + 14
+                                                        implicitHeight: 27; radius: 12
+                                                        readonly property bool isCur: win.discordMuteBind === modelData
+                                                        color: isCur ? Theme.primary : Theme.surface
+                                                        border.width: 1; border.color: isCur ? Theme.primary : Theme.withAlpha(Theme.outline, 0.2)
+                                                        Text {
+                                                            id: mbTxt
+                                                            anchors.centerIn: parent
+                                                            text: parent.modelData
+                                                            font.family: Theme.monoFamily
+                                                            font.pixelSize: 10
+                                                            font.weight: Font.Medium
+                                                            color: parent.isCur ? Theme.background : Theme.textColor
+                                                        }
+                                                        MouseArea {
+                                                            anchors.fill: parent
+                                                            cursorShape: Qt.PointingHandCursor
+                                                            onClicked: {
+                                                                win.discordMuteBind = parent.modelData;
+                                                                Quickshell.execDetached(["rice-discord-binds", "set", "--mute", parent.modelData]);
+                                                                win.showToast(Theme.t("discord.recorded_mute", "Tecla de Mute configurada: ") + parent.modelData);
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        Rectangle { Layout.fillWidth: true; height: 1; color: Theme.withAlpha(Theme.outline, 0.15) }
+
+                                        // 2. Deafen Bind Card
+                                        ColumnLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 8
+
+                                            RowLayout {
+                                                Layout.fillWidth: true
+                                                spacing: 12
+
+                                                ColumnLayout {
+                                                    Layout.fillWidth: true
+                                                    spacing: 2
+                                                    Text {
+                                                        text: Theme.t("discord.deafen_title", "Desativar / Ativar Áudio (Deafen)")
+                                                        font.family: Theme.fontFamily
+                                                        font.pixelSize: 12
+                                                        font.weight: Font.Bold
+                                                        color: Theme.textColor
+                                                    }
+                                                    Text {
+                                                        text: Theme.t("discord.deafen_desc", "Simula o envio de Ctrl + Shift + D para o Discord/Vesktop")
+                                                        font.family: Theme.fontFamily
+                                                        font.pixelSize: 11
+                                                        color: Theme.subtext
+                                                    }
+                                                }
+
+                                                // Badge de Atalho Ativo
+                                                Rectangle {
+                                                    implicitWidth: dbBadgeRow.implicitWidth + 16
+                                                    implicitHeight: 31; radius: 14
+                                                    color: Theme.withAlpha(Theme.primary, 0.15)
+                                                    border.width: 1; border.color: Theme.primary
+                                                    RowLayout {
+                                                        id: dbBadgeRow
+                                                        anchors.centerIn: parent
+                                                        spacing: 6
+                                                        Text {
+                                                            text: Theme.icons.headphones || "🎧"
+                                                            font.family: Theme.iconFontFamily
+                                                            font.pixelSize: 12
+                                                            color: Theme.primary
+                                                        }
+                                                        Text {
+                                                            text: win.discordDeafenBind
+                                                            font.family: Theme.monoFamily
+                                                            font.pixelSize: 12
+                                                            font.weight: Font.Bold
+                                                            color: Theme.primary
+                                                        }
+                                                    }
+                                                }
+
+                                                // Botão Gravar Tecla
+                                                Rectangle {
+                                                    readonly property bool isRec: win.recordingDiscordTarget === "deafen"
+                                                    implicitWidth: recDeafenRow.implicitWidth + 20
+                                                    implicitHeight: 34; radius: 15
+                                                    color: isRec ? Theme.critical : (recDeafenMouse.containsMouse ? Theme.primary : Theme.surface)
+                                                    border.width: 1
+                                                    border.color: isRec ? Theme.critical : (recDeafenMouse.containsMouse ? Theme.primary : Theme.withAlpha(Theme.outline, 0.3))
+                                                    Behavior on color { ColorAnimation { duration: 150 } }
+
+                                                    RowLayout {
+                                                        id: recDeafenRow
+                                                        anchors.centerIn: parent
+                                                        spacing: 6
+                                                        Text {
+                                                            text: parent.isRec ? "⏹" : "⏺"
+                                                            font.family: Theme.fontFamily
+                                                            font.pixelSize: 12
+                                                            color: parent.isRec || recDeafenMouse.containsMouse ? Theme.background : Theme.critical
+                                                        }
+                                                        Text {
+                                                            text: parent.isRec ? Theme.t("discord.recording", "Aperte uma tecla no teclado...") : Theme.t("discord.record_key", "Gravar Tecla")
+                                                            font.family: Theme.fontFamily
+                                                            font.pixelSize: 11
+                                                            font.weight: Font.DemiBold
+                                                            color: parent.isRec || recDeafenMouse.containsMouse ? Theme.background : Theme.textColor
+                                                        }
+                                                    }
+                                                    MouseArea {
+                                                        id: recDeafenMouse
+                                                        anchors.fill: parent
+                                                        hoverEnabled: true
+                                                        cursorShape: Qt.PointingHandCursor
+                                                        onClicked: {
+                                                            if (parent.isRec) {
+                                                                recordDiscordProc.running = false;
+                                                                win.recordingDiscordTarget = "";
+                                                            } else {
+                                                                win.recordingDiscordTarget = "deafen";
+                                                                win.editingManualDeafen = false;
+                                                                recordDiscordProc.command = ["rice-discord-binds", "record", "--target", "deafen", "--timeout", "15"];
+                                                                recordDiscordProc.running = true;
+                                                            }
+                                                        }
+                                                    }
+                                                }
+
+                                                // Botão Digitar Tecla
+                                                Rectangle {
+                                                    implicitWidth: editDeafenRow.implicitWidth + 16
+                                                    implicitHeight: 34; radius: 15
+                                                    color: win.editingManualDeafen ? Theme.tileHigh : (editDeafenMouse.containsMouse ? Theme.surface : "transparent")
+                                                    border.width: 1; border.color: win.editingManualDeafen ? Theme.primary : Theme.withAlpha(Theme.outline, 0.25)
+                                                    RowLayout {
+                                                        id: editDeafenRow
+                                                        anchors.centerIn: parent
+                                                        spacing: 4
+                                                        Text {
+                                                            text: Theme.icons.pencil
+                                                            font.family: Theme.iconFontFamily
+                                                            font.pixelSize: 11
+                                                            color: Theme.textColor
+                                                        }
+                                                        Text {
+                                                            text: Theme.t("discord.edit_manual", "Digitar")
+                                                            font.family: Theme.fontFamily
+                                                            font.pixelSize: 11
+                                                            color: Theme.textColor
+                                                        }
+                                                    }
+                                                    MouseArea {
+                                                        id: editDeafenMouse
+                                                        anchors.fill: parent
+                                                        hoverEnabled: true
+                                                        cursorShape: Qt.PointingHandCursor
+                                                        onClicked: win.editingManualDeafen = !win.editingManualDeafen
+                                                    }
+                                                }
+                                            }
+
+                                            // Campo de Digitação Manual (se aberto)
+                                            RowLayout {
+                                                Layout.fillWidth: true
+                                                visible: win.editingManualDeafen
+                                                spacing: 8
+
+                                                Rectangle {
+                                                    Layout.fillWidth: true
+                                                    height: 32; radius: 8
+                                                    color: Theme.surface
+                                                    border.width: 1; border.color: Theme.withAlpha(Theme.outline, 0.3)
+                                                    TextInput {
+                                                        id: manualDeafenInput
+                                                        anchors.fill: parent
+                                                        anchors.leftMargin: 10
+                                                        anchors.rightMargin: 10
+                                                        verticalAlignment: TextInput.AlignVCenter
+                                                        text: win.discordDeafenBind
+                                                        font.family: Theme.monoFamily
+                                                        font.pixelSize: 12
+                                                        color: Theme.textColor
+                                                        selectByMouse: true
+                                                    }
+                                                }
+
+                                                Rectangle {
+                                                    implicitWidth: 70; height: 32; radius: 8
+                                                    color: Theme.primary
+                                                    Text {
+                                                        anchors.centerIn: parent
+                                                        text: Theme.t("discord.save", "Salvar")
+                                                        font.family: Theme.fontFamily
+                                                        font.pixelSize: 11
+                                                        font.weight: Font.Bold
+                                                        color: Theme.background
+                                                    }
+                                                    MouseArea {
+                                                        anchors.fill: parent
+                                                        cursorShape: Qt.PointingHandCursor
+                                                        onClicked: {
+                                                            const keyVal = manualDeafenInput.text.trim();
+                                                            if (keyVal.length > 0) {
+                                                                win.discordDeafenBind = keyVal;
+                                                                Quickshell.execDetached(["rice-discord-binds", "set", "--deafen", keyVal]);
+                                                                win.showToast(Theme.t("discord.recorded_deafen", "Tecla de Deafen salva: ") + keyVal);
+                                                                win.editingManualDeafen = false;
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            // Presets rápidos de teclas de Deafen
+                                            RowLayout {
+                                                Layout.fillWidth: true
+                                                spacing: 6
+                                                Text {
+                                                    text: Theme.t("discord.quick_suggestions", "Sugestões rápidas:")
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 10
+                                                    color: Theme.subtext
+                                                }
+                                                Repeater {
+                                                    model: ["Num_Lock", "F9", "Pause", "Scroll_Lock", "CTRL + SHIFT + D"]
+                                                    delegate: Rectangle {
+                                                        required property string modelData
+                                                        implicitWidth: dbTxt.implicitWidth + 14
+                                                        implicitHeight: 27; radius: 12
+                                                        readonly property bool isCur: win.discordDeafenBind === modelData
+                                                        color: isCur ? Theme.primary : Theme.surface
+                                                        border.width: 1; border.color: isCur ? Theme.primary : Theme.withAlpha(Theme.outline, 0.2)
+                                                        Text {
+                                                            id: dbTxt
+                                                            anchors.centerIn: parent
+                                                            text: parent.modelData
+                                                            font.family: Theme.monoFamily
+                                                            font.pixelSize: 10
+                                                            font.weight: Font.Medium
+                                                            color: parent.isCur ? Theme.background : Theme.textColor
+                                                        }
+                                                        MouseArea {
+                                                            anchors.fill: parent
+                                                            cursorShape: Qt.PointingHandCursor
+                                                            onClicked: {
+                                                                win.discordDeafenBind = parent.modelData;
+                                                                Quickshell.execDetached(["rice-discord-binds", "set", "--deafen", parent.modelData]);
+                                                                win.showToast(Theme.t("discord.recorded_deafen", "Tecla de Deafen configurada: ") + parent.modelData);
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
                             }
                         }
 
