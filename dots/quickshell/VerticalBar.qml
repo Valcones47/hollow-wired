@@ -272,6 +272,7 @@ PanelWindow {
 
                 // ---- relógio ----
                 Rectangle {
+                    visible: ShellLayout.barModule("clock")
                     Layout.alignment: Qt.AlignHCenter
                     implicitWidth: 40
                     implicitHeight: clockCol.implicitHeight + 12
@@ -328,6 +329,7 @@ PanelWindow {
 
                 // ---- indicadores ----
                 BarButton {
+                    visible: ShellLayout.barModule("notifications")
                     icon: NotifService.dnd ? Theme.icons.bellOff : Theme.icons.bell
                     iconColor: NotifService.dnd ? Theme.secondary
                         : (NotifService.unreadCount > 0 ? Theme.primary : Theme.textColor)
@@ -338,6 +340,7 @@ PanelWindow {
                 }
 
                 BarButton {
+                    visible: ShellLayout.barModule("audio")
                     icon: vbar.volIcon()
                     iconColor: (vbar.sink && vbar.sink.audio && vbar.sink.audio.muted) ? Theme.subtext : Theme.textColor
                     onActivated: {
@@ -352,13 +355,14 @@ PanelWindow {
                 }
 
                 BarButton {
+                    visible: ShellLayout.barModule("network")
                     icon: vbar.wifiIcon()
                     iconColor: vbar.activeNetwork ? Theme.textColor : Theme.subtext
                     onActivated: Quickshell.execDetached(["quickshell", "ipc", "call", "visualconfig", "tab", "11"])
                 }
 
                 BarButton {
-                    visible: vbar.btAdapter !== null
+                    visible: vbar.btAdapter !== null && ShellLayout.barModule("bluetooth")
                     icon: !vbar.btAdapter || !vbar.btAdapter.enabled ? Theme.icons.btOff
                         : (vbar.btConnected > 0 ? Theme.icons.btConnected : Theme.icons.bt)
                     iconColor: vbar.btConnected > 0 ? Theme.primary : Theme.textColor
@@ -366,7 +370,7 @@ PanelWindow {
                 }
 
                 BarButton {
-                    visible: vbar.battery !== null && vbar.battery.isLaptopBattery
+                    visible: vbar.battery !== null && vbar.battery.isLaptopBattery && ShellLayout.barModule("battery")
                     icon: vbar.batIcon()
                     iconColor: vbar.battery && vbar.battery.percentage < 0.15 ? Theme.critical : Theme.textColor
                     onActivated: Quickshell.execDetached(["quickshell", "ipc", "call", "visualconfig", "tab", "6"])
@@ -380,6 +384,7 @@ PanelWindow {
                 }
 
                 BarButton {
+                    visible: ShellLayout.barModule("settings")
                     icon: Theme.icons.tune
                     onActivated: vbar.visualConfigClicked()
                 }

@@ -1267,5 +1267,14 @@
   "layout.bar_pos_desc": "Na lateral ela fica vertical e estreita; os indicadores abrem a página do assunto em vez de um popup.",
   "layout.pos_top": "Em cima",
   "layout.pos_left": "À esquerda",
-  "layout.pos_right": "À direita"
+  "layout.pos_right": "À direita",
+  "layout.bar_modules": "O que a barra mostra",
+  "layout.bar_modules_desc": "Desligue o que você não usa. O que o computador não tem (Wi-Fi, Bluetooth, bateria) já some sozinho.",
+  "layout.mod_clock": "Relógio",
+  "layout.mod_notif": "Notificações",
+  "layout.mod_audio": "Volume",
+  "layout.mod_bright": "Brilho",
+  "layout.mod_net": "Wi-Fi",
+  "layout.mod_bat": "Bateria",
+  "layout.mod_settings": "Configurações"
 }

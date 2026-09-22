@@ -581,6 +581,7 @@ PanelWindow {
             Module {
                 id: clockMod
                 kind: ""
+                visible: ShellLayout.barModule("clock")
                 anchors.centerIn: parent
                 onClicked: bar.clockClicked()
 
@@ -652,6 +653,7 @@ PanelWindow {
                 Module {
                     id: notifMod
                     kind: ""
+                    visible: ShellLayout.barModule("notifications")
                     onClicked: bar.notifClicked()
                     onRightClicked: NotifService.toggleDnd()
 
@@ -683,6 +685,7 @@ PanelWindow {
                 Module {
                     id: visualConfigMod
                     kind: ""
+                    visible: ShellLayout.barModule("settings")
                     onClicked: bar.visualConfigClicked()
 
                     BarIcon {
@@ -697,7 +700,7 @@ PanelWindow {
                     kind: "wifi"
                     // Desktop ligado só no cabo não tem placa Wi-Fi: mostrar um
                     // ícone de "Wi-Fi desligado" pra sempre só confundia.
-                    visible: bar.wifiDevice !== null
+                    visible: bar.wifiDevice !== null && ShellLayout.barModule("network")
                     BarIcon { text: bar.wifiIcon() }
                 }
 
@@ -705,7 +708,7 @@ PanelWindow {
                     id: btMod
                     kind: "bt"
                     // Idem para máquinas sem adaptador Bluetooth.
-                    visible: bar.btAdapter !== null
+                    visible: bar.btAdapter !== null && ShellLayout.barModule("bluetooth")
                     BarIcon {
                         text: !bar.btAdapter || !bar.btAdapter.enabled ? Theme.icons.btOff
                             : bar.btConnected > 0 ? Theme.icons.btConnected : Theme.icons.bt
@@ -716,6 +719,7 @@ PanelWindow {
                 Module {
                     id: audioMod
                     kind: "audio"
+                    visible: ShellLayout.barModule("audio")
                     onClicked: if (bar.sink) bar.sink.audio.muted = !bar.sink.audio.muted
                     onWheel: d => bar.wheelVolume(d)
                     BarIcon { text: bar.volIcon(bar.sink) }
@@ -725,6 +729,7 @@ PanelWindow {
                 Module {
                     id: brMod
                     kind: "brightness"
+                    visible: ShellLayout.barModule("brightness")
                     onWheel: d => bar.wheelBrightness(d)
                     BarIcon { text: Theme.icons.brightness }
                     BarText { text: Math.round(bar.brightness * 100) + "%" }
@@ -733,7 +738,7 @@ PanelWindow {
                 Module {
                     id: batMod
                     kind: "battery"
-                    visible: bar.battery && bar.battery.isLaptopBattery
+                    visible: bar.battery && bar.battery.isLaptopBattery && ShellLayout.barModule("battery")
                     BarIcon {
                         text: bar.batIcon()
                         color: bar.battery && bar.battery.percentage <= 0.15 && bar.battery.state !== UPowerDeviceState.Charging

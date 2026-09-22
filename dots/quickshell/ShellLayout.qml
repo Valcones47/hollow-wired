@@ -70,6 +70,19 @@ QtObject {
     readonly property int workspaceCount: get("bar", "workspaceCount", 0)
     readonly property bool barShowTitle: get("bar", "showTitle", true)
 
+    // Quais indicadores a barra mostra. Tudo ligado por padrão: a pessoa
+    // desliga o que não usa em vez de precisar montar a barra do zero.
+    readonly property var barModules: get("bar", "modules", ({}))
+    function barModule(name) {
+        const m = root.barModules;
+        return !m || m[name] === undefined ? true : m[name] === true;
+    }
+    function setBarModule(name, on) {
+        const next = Object.assign({}, root.barModules);
+        next[name] = on === true;
+        root.set("bar", "modules", next);
+    }
+
     readonly property bool dockEnabled: get("dock", "enabled", true)
     readonly property string dockPosition: get("dock", "position", "bottom")
     readonly property bool dockAutohide: get("dock", "autohide", true)

@@ -9326,6 +9326,86 @@ PanelWindow {
                                     }
                                 }
 
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 8
+
+                                    Text {
+                                        Layout.alignment: Qt.AlignLeft
+                                        text: Theme.t("layout.bar_modules", "O que a barra mostra")
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 13
+                                        color: Theme.textColor
+                                    }
+                                    Text {
+                                        Layout.fillWidth: true
+                                        text: Theme.t("layout.bar_modules_desc", "Desligue o que você não usa. O que o computador não tem (Wi-Fi, Bluetooth, bateria) já some sozinho.")
+                                        wrapMode: Text.WordWrap
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 11
+                                        color: Theme.subtext
+                                    }
+
+                                    Flow {
+                                        Layout.fillWidth: true
+                                        spacing: 8
+
+                                        Repeater {
+                                            model: [
+                                                { key: "clock", icon: Theme.icons.clock, label: Theme.t("layout.mod_clock", "Relógio") },
+                                                { key: "notifications", icon: Theme.icons.bell, label: Theme.t("layout.mod_notif", "Notificações") },
+                                                { key: "audio", icon: Theme.icons.volHigh, label: Theme.t("layout.mod_audio", "Volume") },
+                                                { key: "brightness", icon: Theme.icons.brightness, label: Theme.t("layout.mod_bright", "Brilho") },
+                                                { key: "network", icon: Theme.icons.wifi4, label: Theme.t("layout.mod_net", "Wi-Fi") },
+                                                { key: "bluetooth", icon: Theme.icons.bt, label: "Bluetooth" },
+                                                { key: "battery", icon: Theme.icons.bat, label: Theme.t("layout.mod_bat", "Bateria") },
+                                                { key: "settings", icon: Theme.icons.tune, label: Theme.t("layout.mod_settings", "Configurações") }
+                                            ]
+                                            delegate: Rectangle {
+                                                id: modChip
+                                                required property var modelData
+                                                readonly property bool on: ShellLayout.barModule(modChip.modelData.key)
+                                                width: modChipRow.implicitWidth + 24
+                                                height: 34
+                                                radius: 10
+                                                color: modChip.on ? Theme.withAlpha(Theme.primary, 0.18)
+                                                     : (modChipArea.containsMouse ? Theme.tileHigh : Theme.tile)
+                                                border.width: 1
+                                                border.color: modChip.on ? Theme.withAlpha(Theme.primary, 0.5) : Theme.withAlpha(Theme.outline, 0.22)
+
+                                                Row {
+                                                    id: modChipRow
+                                                    anchors.centerIn: parent
+                                                    spacing: 7
+
+                                                    Text {
+                                                        anchors.verticalCenter: parent.verticalCenter
+                                                        text: modChip.modelData.icon
+                                                        font.family: Theme.iconFontFamily
+                                                        font.pixelSize: 14
+                                                        color: modChip.on ? Theme.primary : Theme.subtext
+                                                    }
+                                                    Text {
+                                                        anchors.verticalCenter: parent.verticalCenter
+                                                        text: modChip.modelData.label
+                                                        font.family: Theme.fontFamily
+                                                        font.pixelSize: 12
+                                                        color: modChip.on ? Theme.textColor : Theme.subtext
+                                                    }
+                                                }
+
+                                                MouseArea {
+                                                    id: modChipArea
+                                                    anchors.fill: parent
+                                                    hoverEnabled: true
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    onClicked: ShellLayout.setBarModule(modChip.modelData.key, !modChip.on)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
                                 Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: Theme.withAlpha(Theme.outline, 0.45) }
 
                                 SectionHeader {

@@ -1267,5 +1267,14 @@
   "layout.bar_pos_desc": "On the side it becomes narrow and vertical; indicators open the matching settings page instead of a popup.",
   "layout.pos_top": "On top",
   "layout.pos_left": "On the left",
-  "layout.pos_right": "On the right"
+  "layout.pos_right": "On the right",
+  "layout.bar_modules": "What the bar shows",
+  "layout.bar_modules_desc": "Turn off what you don't use. Anything the computer doesn't have (Wi-Fi, Bluetooth, battery) hides itself already.",
+  "layout.mod_clock": "Clock",
+  "layout.mod_notif": "Notifications",
+  "layout.mod_audio": "Volume",
+  "layout.mod_bright": "Brightness",
+  "layout.mod_net": "Wi-Fi",
+  "layout.mod_bat": "Battery",
+  "layout.mod_settings": "Settings"
 }
