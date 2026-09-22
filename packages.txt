@@ -28,6 +28,7 @@ swappy
 cliphist
 wl-clipboard
 wl-clip-persist   # Mantém o que foi copiado mesmo depois de fechar o app de origem
+wtype             # Teclado virtual: usado para colar direto no campo em foco (Super+V)
 hyprpicker        # Conta-gotas de cor (Super + Shift + C)
 
 # Bloqueio, Ociosidade & Feedback

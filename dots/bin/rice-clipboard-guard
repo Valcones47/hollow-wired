@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# Rede de segurança da área de transferência.
+#
+# No Wayland quem copiou é o dono do conteúdo: ao fechar o programa de origem,
+# a seleção fica órfã e o Ctrl+V cola nada (ou o item anterior, que ainda tinha
+# dono). O wl-clip-persist resolve a maior parte dos casos, mas falha quando o
+# app oferece um tipo MIME que ele não consegue ler — o caso clássico é o
+# navegador, que oferece text/html junto com o texto puro.
+#
+# Este guarda cobre o que sobra: quando percebe que a seleção ficou sem dono,
+# devolve o último item do cliphist para o clipboard. O histórico já é a fonte
+# da verdade, então não precisa guardar uma segunda cópia.
+set -u
+
+INTERVAL="${RICE_CLIPBOARD_GUARD_INTERVAL:-1}"
+
+restore() {
+    local line
+    line=$(cliphist list 2>/dev/null | head -n 1) || return 0
+    [ -z "$line" ] && return 0
+
+    # O cliphist descreve imagem como "[[ binary data 12 KiB png 1920x1080 ]]";
+    # sem o --type certo o wl-copy devolveria os bytes como texto.
+    local mime="text/plain"
+    case "$line" in
+        *"binary data"*png*)  mime="image/png" ;;
+        *"binary data"*jpeg*) mime="image/jpeg" ;;
+        *"binary data"*jpg*)  mime="image/jpeg" ;;
+        *"binary data"*gif*)  mime="image/gif" ;;
+        *"binary data"*webp*) mime="image/webp" ;;
+        *"binary data"*)      mime="application/octet-stream" ;;
+    esac
+
+    printf '%s' "$line" | cliphist decode 2>/dev/null | wl-copy --type "$mime" 2>/dev/null
+}
+
+while :; do
+    # --list-types sai com erro quando não há dono da seleção.
+    if ! wl-paste --list-types >/dev/null 2>&1; then
+        restore
+    fi
+    sleep "$INTERVAL"
+done

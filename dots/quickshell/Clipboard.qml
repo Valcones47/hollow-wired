@@ -34,6 +34,12 @@ PanelWindow {
     // reiniciar gravaria uma lista vazia por cima dos favoritos reais.
     property bool favReady: false
 
+    // Escolher um item cola direto no campo em foco (como no Windows) em vez de
+    // só devolver o conteúdo pro clipboard. Ctrl+clique / Ctrl+Enter continua
+    // fazendo só a cópia, para quem quer colar depois no lugar que decidir.
+    property bool pasteOnPick: true
+    property bool prefsReady: false
+
     function currentList() {
         return clipWindow.tab === 0 ? clipWindow.filteredItems : clipWindow.filteredFavorites;
     }
@@ -103,11 +109,14 @@ PanelWindow {
         }
     }
 
-    function copyFavorite(fav) {
+    function copyFavorite(fav, alsoPaste) {
+        const paste = alsoPaste === undefined ? clipWindow.pasteOnPick : alsoPaste;
         if (fav.kind === "image") {
+            copyFavImageProc.paste = paste;
             copyFavImageProc.path = fav.file;
             copyFavImageProc.running = true;
         } else {
+            copyFavTextProc.paste = paste;
             copyFavTextProc.payload = fav.text;
             copyFavTextProc.running = true;
         }
@@ -137,6 +146,41 @@ PanelWindow {
             // Primeira execução: arquivo ainda não existe.
             clipWindow.favReady = true;
         }
+    }
+
+    FileView {
+        id: clipPrefsFile
+        path: Quickshell.env("HOME") + "/.config/quickshell/clipboard-prefs.json"
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: {
+            try {
+                const t = text().trim();
+                if (t) {
+                    const parsed = JSON.parse(t);
+                    if (typeof parsed.pasteOnPick === "boolean") clipWindow.pasteOnPick = parsed.pasteOnPick;
+                }
+            } catch (e) {
+                console.log("Clipboard: clipboard-prefs.json inválido:", e);
+            } finally {
+                clipWindow.prefsReady = true;
+            }
+        }
+        onLoadFailed: clipWindow.prefsReady = true
+    }
+
+    // Mesma guarda dos favoritos: sem ela, alternar a opção logo após o
+    // Quickshell reiniciar gravaria o valor padrão por cima do escolhido.
+    function saveClipPrefs() {
+        if (!clipWindow.prefsReady) return;
+        clipPrefsFile.setText(JSON.stringify({ pasteOnPick: clipWindow.pasteOnPick }, null, 2));
+    }
+
+    // O Ctrl+V sintético sai do rice-paste, que espera o compositor devolver o
+    // foco à janela antes de enviar (o modal fica com foco exclusivo).
+    Process {
+        id: pasteProc
+        command: [Quickshell.env("HOME") + "/.local/bin/rice-paste"]
     }
 
     visible: true
@@ -199,9 +243,15 @@ PanelWindow {
     Process {
         id: copyProc
         property string rawLine: ""
+        property bool paste: false
         command: ["bash", "-c", "printf '%s' \"$RAW\" | cliphist decode | wl-copy"]
         environment: ({ RAW: rawLine })
-        onExited: clipWindow.open = false
+        // Só manda colar depois que o wl-copy terminou: o contrário colaria o
+        // conteúdo antigo, que ainda era o dono da seleção.
+        onExited: {
+            clipWindow.open = false;
+            if (copyProc.paste) pasteProc.running = true;
+        }
     }
 
     Process {
@@ -267,15 +317,19 @@ PanelWindow {
     Process {
         id: copyFavTextProc
         property string payload: ""
+        property bool paste: false
         command: ["bash", "-c", "printf '%s' \"$PAYLOAD\" | wl-copy"]
         environment: ({ PAYLOAD: payload })
+        onExited: if (copyFavTextProc.paste) pasteProc.running = true
     }
 
     Process {
         id: copyFavImageProc
         property string path: ""
+        property bool paste: false
         command: ["bash", "-c", "wl-copy --type image/png < \"$F\""]
         environment: ({ F: path })
+        onExited: if (copyFavImageProc.paste) pasteProc.running = true
     }
 
     Process {
@@ -285,7 +339,8 @@ PanelWindow {
         environment: ({ F: path })
     }
 
-    function copyItem(raw) {
+    function copyItem(raw, alsoPaste) {
+        copyProc.paste = alsoPaste === undefined ? clipWindow.pasteOnPick : alsoPaste;
         copyProc.rawLine = raw;
         copyProc.running = true;
     }
@@ -364,6 +419,52 @@ PanelWindow {
                 }
 
                 Item { Layout.fillWidth: true }
+
+                // Liga/desliga o colar direto. Quando está ligado, escolher um
+                // item já digita o Ctrl+V na janela de trás.
+                Rectangle {
+                    Layout.preferredHeight: 32
+                    Layout.preferredWidth: pasteToggleRow.implicitWidth + 20
+                    radius: 16
+                    color: clipWindow.pasteOnPick
+                        ? Theme.withAlpha(Theme.primary, pasteToggleArea.containsMouse ? 0.30 : 0.18)
+                        : (pasteToggleArea.containsMouse ? Theme.tileHigh : "transparent")
+                    border.width: 1
+                    border.color: clipWindow.pasteOnPick ? Theme.withAlpha(Theme.primary, 0.45) : Theme.withAlpha(Theme.subtext, 0.25)
+
+                    Row {
+                        id: pasteToggleRow
+                        anchors.centerIn: parent
+                        spacing: 6
+
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: Theme.icons.paste
+                            font.family: Theme.iconFontFamily
+                            font.pixelSize: 14
+                            color: clipWindow.pasteOnPick ? Theme.primary : Theme.subtext
+                        }
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: Theme.t("clipboard.paste_direct", "Colar direto")
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 11
+                            font.weight: Font.DemiBold
+                            color: clipWindow.pasteOnPick ? Theme.primary : Theme.subtext
+                        }
+                    }
+
+                    MouseArea {
+                        id: pasteToggleArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            clipWindow.pasteOnPick = !clipWindow.pasteOnPick;
+                            clipWindow.saveClipPrefs();
+                        }
+                    }
+                }
 
                 // Botão Limpar Tudo (só faz sentido no histórico)
                 Rectangle {
@@ -551,8 +652,9 @@ PanelWindow {
                             } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                                 if (list.length > 0 && clipWindow.selectedIndex < list.length) {
                                     const item = list[clipWindow.selectedIndex];
-                                    if (clipWindow.tab === 0) clipWindow.copyItem(item.raw);
-                                    else clipWindow.copyFavorite(item);
+                                    const paste = !(event.modifiers & Qt.ControlModifier) && clipWindow.pasteOnPick;
+                                    if (clipWindow.tab === 0) clipWindow.copyItem(item.raw, paste);
+                                    else clipWindow.copyFavorite(item, paste);
                                 }
                                 event.accepted = true;
                             }
@@ -735,9 +837,11 @@ PanelWindow {
                         anchors.rightMargin: 64
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            if (rowRect.isFav) clipWindow.copyFavorite(rowRect.modelData);
-                            else clipWindow.copyItem(rowRect.modelData.raw);
+                        onClicked: mouse => {
+                            // Ctrl segurado: só copia, não cola.
+                            const paste = !(mouse.modifiers & Qt.ControlModifier) && clipWindow.pasteOnPick;
+                            if (rowRect.isFav) clipWindow.copyFavorite(rowRect.modelData, paste);
+                            else clipWindow.copyItem(rowRect.modelData.raw, paste);
                         }
                     }
                 }

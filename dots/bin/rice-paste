@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Cola o que está na área de transferência direto no campo em foco.
+#
+# O histórico (Super+V) até agora só devolvia o item para o clipboard: quem
+# quisesse ver o texto no campo ainda tinha que dar Ctrl+V. Aqui o Ctrl+V é
+# enviado por teclado virtual (wtype), que é o que o Windows faz ao escolher
+# um item do histórico.
+#
+# O atraso existe porque o modal do clipboard fica com foco de teclado
+# exclusivo: sem esperar o compositor devolver o foco para a janela, o atalho
+# chegaria na camada errada.
+set -u
+
+DELAY="${RICE_PASTE_DELAY:-0.18}"
+sleep "$DELAY"
+
+if command -v wtype >/dev/null 2>&1; then
+    exec wtype -M ctrl -k v -m ctrl
+elif command -v ydotool >/dev/null 2>&1; then
+    exec ydotool key 29:1 47:1 47:0 29:0
+fi
+
+echo "rice-paste: instale wtype (ou ydotool) para colar direto no campo" >&2
+exit 1

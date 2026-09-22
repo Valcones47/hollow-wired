@@ -1116,5 +1116,6 @@
   "effects.anim_advanced": "Fine tuning",
   "effects.anim_advanced_desc": "Curves, speed and style for each animation.",
   "wallust.accent2_auto": "Accent 2 (made by the theme)",
-  "wallust.accent2_auto_toast": "This accent is derived from the other one. Change Accent 1 or the wallpaper."
+  "wallust.accent2_auto_toast": "This accent is derived from the other one. Change Accent 1 or the wallpaper.",
+  "clipboard.paste_direct": "Paste directly"
 }

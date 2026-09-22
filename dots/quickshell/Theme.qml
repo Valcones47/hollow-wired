@@ -243,7 +243,7 @@ QtObject {
         network: "\u{F0C9D}", batHealth: "\u{F120F}", restore: "\u{F099B}", alert: "\u{F002A}",
         fileCompare: "\u{F08AA}", close: "\u{F0156}", verified: "\u{F0791}", camera: "\u{F0D5D}",
         gamepad: "\u{F0297}", pin: "\u{F0403}", pencil: "\u{F0CB6}",
-        star: "\u{F04CE}", starOutline: "\u{F04D2}", content: "\u{F018F}",
+        star: "\u{F04CE}", starOutline: "\u{F04D2}", content: "\u{F018F}", paste: "\u{F0192}",
         sleep: "\u{F0904}",
         tune: "\u{F062E}", palette: "\u{F03D8}", settings: "\u{F08B8}",
         check: "\u{F012C}",

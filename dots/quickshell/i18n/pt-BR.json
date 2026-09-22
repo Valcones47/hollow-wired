@@ -1116,5 +1116,6 @@
   "effects.anim_advanced": "Ajustar no detalhe",
   "effects.anim_advanced_desc": "Curvas, velocidade e estilo de cada animação.",
   "wallust.accent2_auto": "Destaque 2 (criado pelo tema)",
-  "wallust.accent2_auto_toast": "Esse destaque é criado a partir do outro. Mude o Destaque 1 ou o papel de parede."
+  "wallust.accent2_auto_toast": "Esse destaque é criado a partir do outro. Mude o Destaque 1 ou o papel de parede.",
+  "clipboard.paste_direct": "Colar direto"
 }

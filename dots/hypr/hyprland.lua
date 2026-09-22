@@ -313,7 +313,15 @@ hl.on("hyprland.start", function()
     -- No Wayland quem copiou é "dono" do conteúdo: ao fechar o programa de
     -- origem, o que estava copiado some e o Ctrl+V não cola mais nada. O
     -- wl-clip-persist segura o conteúdo na sessão mesmo depois do app fechar.
-    hl.exec_cmd("wl-clip-persist --clipboard regular")
+    -- O -e (ignore-event-on-error) é o que faz ele NÃO assumir uma seleção que
+    -- leu pela metade: sem isso, copiar do navegador (que oferece text/html
+    -- junto do texto) deixava o clipboard com conteúdo vazio e o Ctrl+V colava
+    -- nada depois de fechar a janela.
+    hl.exec_cmd("wl-clip-persist --clipboard regular -e")
+
+    -- Rede de segurança pro caso acima: se mesmo assim a seleção ficar órfã,
+    -- devolve o último item do cliphist pro clipboard (ver rice-clipboard-guard).
+    hl.exec_cmd(home .. "/.local/bin/rice-clipboard-guard")
 
     -- Luz noturna: controlada pela sidebar/painel do Quickshell via rice-nightlight
     -- (hyprsunset). O autostart do wlsunset foi removido: ele vinha com as
