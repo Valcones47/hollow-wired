@@ -30,6 +30,7 @@ DesktopWidgets 1.0 DesktopWidgets.qml
 singleton NotifService 1.0 NotifService.qml
 VisualConfigPanel 1.0 VisualConfigPanel.qml
 singleton ShellCustomization 1.0 ShellCustomization.qml
+singleton ShellLayout 1.0 ShellLayout.qml
 Welcome 1.0 Welcome.qml
 WallpaperFade 1.0 WallpaperFade.qml
 singleton EqService 1.0 EqService.qml

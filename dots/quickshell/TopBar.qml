@@ -42,6 +42,35 @@ PanelWindow {
 
     readonly property int barH: Theme.waybarHeight
 
+    // Áreas de trabalho mostradas na barra. Com workspaceCount = 0 continua só
+    // o que existe (comportamento antigo); com 1..10 os botões ficam sempre
+    // lá, mesmo sem nenhuma janela aberta — é assim que dá para pular para uma
+    // área vazia sem decorar o atalho.
+    readonly property var wsModel: {
+        const existing = Hyprland.workspaces.values.filter(w => w.id > 0).sort((a, b) => a.id - b.id);
+        const n = ShellLayout.workspaceCount;
+        if (n <= 0)
+            return existing.map(w => ({ id: w.id, ws: w, urgent: w.urgent, occupied: true }));
+
+        const byId = {};
+        for (const w of existing) byId[w.id] = w;
+        const out = [];
+        for (let i = 1; i <= n; i++) {
+            const w = byId[i] || null;
+            out.push({
+                id: i,
+                ws: w,
+                urgent: w ? w.urgent : false,
+                occupied: w ? w.toplevels.values.length > 0 : false
+            });
+        }
+        // Áreas acima do limite só aparecem se realmente existirem.
+        for (const w of existing) {
+            if (w.id > n) out.push({ id: w.id, ws: w, urgent: w.urgent, occupied: true });
+        }
+        return out;
+    }
+
     mask: Region {
         x: 0
         y: 0
@@ -403,19 +432,24 @@ PanelWindow {
                         anchors.centerIn: parent
                         spacing: 6
                         Repeater {
-                            model: Hyprland.workspaces.values.filter(w => w.id > 0).sort((a, b) => a.id - b.id)
+                            model: bar.wsModel
                             delegate: Rectangle {
                                 id: wsDot
                                 required property var modelData
-                                readonly property bool active: Hyprland.focusedWorkspace === modelData
+                                readonly property bool active: Hyprland.focusedWorkspace
+                                    && Hyprland.focusedWorkspace.id === modelData.id
                                 anchors.verticalCenter: parent.verticalCenter
-                                width: active ? 26 : 10
-                                height: 10
-                                radius: 5
+                                // Área vazia fica menor e mais apagada: dá para
+                                // ver que existe sem competir com as ocupadas.
+                                width: active ? 26 : (modelData.occupied ? 10 : 7)
+                                height: modelData.occupied || active ? 10 : 7
+                                radius: height / 2
                                 color: active ? Theme.primary
                                     : modelData.urgent ? Theme.critical
-                                    : wsArea.containsMouse ? Theme.textColor : Theme.withAlpha(Theme.subtext, 0.55)
+                                    : wsArea.containsMouse ? Theme.textColor
+                                    : Theme.withAlpha(Theme.subtext, modelData.occupied ? 0.55 : 0.28)
                                 Behavior on width { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+                                Behavior on height { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
                                 Behavior on color { ColorAnimation { duration: 160 } }
                                 MouseArea {
                                     id: wsArea

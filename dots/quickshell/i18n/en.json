@@ -1104,8 +1104,8 @@
   "effects.blur_normal_desc": "Balance between looks and performance",
   "effects.blur_strong": "Strong",
   "effects.blur_strong_desc": "Frostier glass; wants a dedicated GPU",
-  "effects.blur_advanced": "Fine tuning",
-  "effects.blur_advanced_desc": "Fine controls. Touching them saves a custom setting.",
+  "effects.blur_advanced": "Advanced blur",
+  "effects.blur_advanced_desc": "Shows the size, passes and vibrancy controls.",
   "effects.blur_size": "Blur size",
   "effects.blur_passes": "Passes (each one costs GPU)",
   "effects.blur_vibrancy": "Color vibrancy in the blur",
@@ -1113,9 +1113,11 @@
   "effects.blur_xray_desc": "Much lighter: windows behind don't enter the blur.",
   "effects.blur_ignore_opacity": "Blur behind opaque windows",
   "effects.blur_ignore_opacity_desc": "Off saves GPU: doesn't blur what nobody sees.",
-  "effects.anim_advanced": "Fine tuning",
-  "effects.anim_advanced_desc": "Curves, speed and style for each animation.",
+  "effects.anim_advanced": "Advanced animations",
+  "effects.anim_advanced_desc": "Curve, speed and style for each animation type.",
   "wallust.accent2_auto": "Accent 2 (made by the theme)",
   "wallust.accent2_auto_toast": "This accent is derived from the other one. Change Accent 1 or the wallpaper.",
-  "clipboard.paste_direct": "Paste directly"
+  "clipboard.paste_direct": "Paste directly",
+  "effects.blur_custom": "Custom",
+  "effects.blur_custom_desc": "Your own values, in the controls below"
 }

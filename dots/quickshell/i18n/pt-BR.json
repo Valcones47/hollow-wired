@@ -1104,8 +1104,8 @@
   "effects.blur_normal_desc": "Equilíbrio entre visual e desempenho",
   "effects.blur_strong": "Forte",
   "effects.blur_strong_desc": "Vidro mais fosco; pede uma placa dedicada",
-  "effects.blur_advanced": "Ajustar no detalhe",
-  "effects.blur_advanced_desc": "Controles finos. Mexer neles guarda um ajuste seu.",
+  "effects.blur_advanced": "Desfoque avançado",
+  "effects.blur_advanced_desc": "Mostra os controles de tamanho, passadas e vivacidade.",
   "effects.blur_size": "Tamanho do borrão",
   "effects.blur_passes": "Passagens (cada uma custa GPU)",
   "effects.blur_vibrancy": "Vivacidade das cores no borrão",
@@ -1113,9 +1113,11 @@
   "effects.blur_xray_desc": "Bem mais leve: as janelas de trás não entram no borrão.",
   "effects.blur_ignore_opacity": "Desfocar atrás de janelas opacas",
   "effects.blur_ignore_opacity_desc": "Desligado economiza GPU: não borra o que ninguém vê.",
-  "effects.anim_advanced": "Ajustar no detalhe",
-  "effects.anim_advanced_desc": "Curvas, velocidade e estilo de cada animação.",
+  "effects.anim_advanced": "Animações avançadas",
+  "effects.anim_advanced_desc": "Curva, velocidade e estilo de cada tipo de animação.",
   "wallust.accent2_auto": "Destaque 2 (criado pelo tema)",
   "wallust.accent2_auto_toast": "Esse destaque é criado a partir do outro. Mude o Destaque 1 ou o papel de parede.",
-  "clipboard.paste_direct": "Colar direto"
+  "clipboard.paste_direct": "Colar direto",
+  "effects.blur_custom": "Personalizado",
+  "effects.blur_custom_desc": "Seus próprios valores, nos controles abaixo"
 }

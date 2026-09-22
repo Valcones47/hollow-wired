@@ -5498,7 +5498,8 @@ PanelWindow {
                                         model: [
                                             { key: "leve", label: Theme.t("effects.blur_light", "Leve"), desc: Theme.t("effects.blur_light_desc", "Para integradas: sem desfoque nos painéis grandes") },
                                             { key: "padrao", label: Theme.t("effects.blur_normal", "Padrão"), desc: Theme.t("effects.blur_normal_desc", "Equilíbrio entre visual e desempenho") },
-                                            { key: "forte", label: Theme.t("effects.blur_strong", "Forte"), desc: Theme.t("effects.blur_strong_desc", "Vidro mais fosco; pede uma placa dedicada") }
+                                            { key: "forte", label: Theme.t("effects.blur_strong", "Forte"), desc: Theme.t("effects.blur_strong_desc", "Vidro mais fosco; pede uma placa dedicada") },
+                                            { key: "manual", label: Theme.t("effects.blur_custom", "Personalizado"), desc: Theme.t("effects.blur_custom_desc", "Seus próprios valores, nos controles abaixo") }
                                         ]
                                         delegate: Rectangle {
                                             id: bqCard
@@ -5542,6 +5543,9 @@ PanelWindow {
                                                 cursorShape: Qt.PointingHandCursor
                                                 onClicked: {
                                                     win.blurQuality = bqCard.modelData.key;
+                                                    // Escolher "Personalizado" já abre os controles finos:
+                                                    // sem isso o card selecionava um modo sem nada visível.
+                                                    if (bqCard.modelData.key === "manual") win.blurAdvanced = true;
                                                     Quickshell.execDetached(["rice-hypr-prefs", "set", "blur_quality", bqCard.modelData.key]);
                                                 }
                                             }
@@ -5550,8 +5554,8 @@ PanelWindow {
                                 }
 
                                 CfgToggle {
-                                    title: Theme.t("effects.blur_advanced", "Ajustar no detalhe")
-                                    subtitle: Theme.t("effects.blur_advanced_desc", "Mostra os controles finos do desfoque. Mexer neles guarda um ajuste seu, fora dos três níveis.")
+                                    title: Theme.t("effects.blur_advanced", "Desfoque avançado")
+                                    subtitle: Theme.t("effects.blur_advanced_desc", "Mostra os controles de tamanho, passadas e vivacidade.")
                                     checked: win.blurAdvanced
                                     onToggled: nv => win.blurAdvanced = nv
                                 }
@@ -5690,8 +5694,8 @@ PanelWindow {
                                 // Presets, curva de Bézier por grupo, duração e estilo
                                 // (rice-anim). Ver AnimCurveEditor.qml.
                                 CfgToggle {
-                                    title: Theme.t("effects.anim_advanced", "Ajustar no detalhe")
-                                    subtitle: Theme.t("effects.anim_advanced_desc", "Curvas de Bézier, velocidade e estilo de cada tipo de animação, um por um.")
+                                    title: Theme.t("effects.anim_advanced", "Animações avançadas")
+                                    subtitle: Theme.t("effects.anim_advanced_desc", "Curva, velocidade e estilo de cada tipo de animação.")
                                     checked: win.animAdvanced
                                     onToggled: nv => win.animAdvanced = nv
                                 }
