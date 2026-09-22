@@ -78,6 +78,15 @@ PanelWindow {
     // para não atrapalhar quem está arrastando.
     property int lastWs: currentWs
     property int wsDir: 1
+    property bool wsVertical: false
+    FileView {
+        path: Quickshell.env("HOME") + "/.config/hypr/workspace-layout"
+        watchChanges: true
+        printErrors: false
+        onFileChanged: reload()
+        onLoaded: dwWindow.wsVertical = text().trim() === "vertical"
+        onLoadFailed: dwWindow.wsVertical = false
+    }
     onCurrentWsChanged: {
         selectedWidgetId = "";
         wsDir = currentWs >= lastWs ? 1 : -1;
@@ -371,7 +380,9 @@ PanelWindow {
         width: parent.width
         height: parent.height
         property real shift: 0
-        x: shift
+        // Acompanha a direção das áreas de trabalho (rice-workspace-layout).
+        x: dwWindow.wsVertical ? 0 : shift
+        y: dwWindow.wsVertical ? shift : 0
 
         Repeater {
             model: dwWindow.currentList
