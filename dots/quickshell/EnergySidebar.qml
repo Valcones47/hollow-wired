@@ -281,7 +281,7 @@ PanelWindow {
         }
     }
     Process { id: cleanCacheProc; command: ["kitty", "--class", "rice-clean-cache", "-e", "rice-clean-cache"]; onExited: cacheSizeProc.running = true }
-    Process { id: lockProc; command: ["bash", "-c", "pidof hyprlock || hyprlock"] }
+    Process { id: lockProc; command: ["rice-lock"] }
 
     property string uptimeText: ""
     Process {

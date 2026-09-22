@@ -6,37 +6,10 @@ ACTION="${1:-}"
 
 case "$ACTION" in
     switch-user|greeter|login-screen)
-        # "Encerrar sessão" não deveria fechar o que está aberto — a expectativa
-        # (a mesma do Windows) é só voltar para a tela de login. O SDDM expõe
-        # exatamente isso pelo D-Bus: um greeter novo num VT separado, com a
-        # sessão atual intacta atrás dele. Entrando de novo, tudo volta como
-        # estava. Fechar tudo de verdade virou uma ação separada (logout).
-        command -v rice-lock-info >/dev/null 2>&1 && (rice-lock-info weather-refresh >/dev/null 2>&1 &)
-        if command -v hyprlock >/dev/null 2>&1 && ! pgrep -x hyprlock >/dev/null 2>&1; then
-            hyprlock >/dev/null 2>&1 &
-            sleep 0.3
-        fi
-
-        SEAT="${XDG_SEAT:-seat0}"
-        SEAT_PATH="/org/freedesktop/DisplayManager/Seat${SEAT#seat}"
-        if command -v busctl >/dev/null 2>&1 && busctl --system call \
-                org.freedesktop.DisplayManager "$SEAT_PATH" \
-                org.freedesktop.DisplayManager.Seat SwitchToGreeter >/dev/null 2>&1; then
-            exit 0
-        fi
-
-        # LightDM, para quem não usa SDDM.
-        if command -v dm-tool >/dev/null 2>&1 && dm-tool switch-to-greeter >/dev/null 2>&1; then
-            exit 0
-        fi
-
-        # Sem gerenciador de login que saiba trocar de sessão: a tela fica
-        # bloqueada, que é o mais próximo disso — e melhor do que fechar tudo
-        # sem a pessoa ter pedido.
-        loginctl lock-session "${XDG_SESSION_ID:-self}" 2>/dev/null || true
-        notify-send -a "Sessão" -i system-lock-screen -t 6000 \
-            "Tela bloqueada" \
-            "O gerenciador de login não permite trocar de usuário sem fechar a sessão." 2>/dev/null || true
+        # "Ir para a tela de login" sem fechar nada: a tela de bloqueio do rice
+        # É a tela de login da sessão (mesma senha, tudo continua aberto atrás).
+        # Para trocar de WM há o botão "Trocar de WM" nela, que encerra a sessão.
+        rice-lock
         ;;
     logout)
         # Encerrar a sessão deixava o PC numa tela preta para sempre, sem voltar
@@ -83,20 +56,13 @@ case "$ACTION" in
             || loginctl terminate-user "$USER" 2>/dev/null || true
         ;;
     suspend|sleep)
-        # Bloqueia a tela antes de dormir — senão a sessão volta destravada.
-        command -v rice-lock-info >/dev/null 2>&1 && (rice-lock-info weather-refresh >/dev/null 2>&1 &)
-        if command -v hyprlock >/dev/null 2>&1 && ! pgrep -x hyprlock >/dev/null 2>&1; then
-            hyprlock &
-            sleep 0.3
-        fi
+        # Bloqueia antes de dormir — senão a sessão volta destravada.
+        rice-lock --wait
         systemctl suspend
         ;;
     hibernate)
-        command -v rice-lock-info >/dev/null 2>&1 && (rice-lock-info weather-refresh >/dev/null 2>&1 &)
-        if command -v hyprlock >/dev/null 2>&1 && ! pgrep -x hyprlock >/dev/null 2>&1; then
-            hyprlock &
-            sleep 0.3
-        fi
+        # Bloqueia antes de dormir — senão a sessão volta destravada.
+        rice-lock --wait
         systemctl hibernate
         ;;
     reboot)
@@ -106,10 +72,7 @@ case "$ACTION" in
         systemctl poweroff
         ;;
     lock)
-        command -v rice-lock-info >/dev/null 2>&1 && (rice-lock-info weather-refresh >/dev/null 2>&1 &)
-        if command -v hyprlock >/dev/null 2>&1; then
-            hyprlock &
-        fi
+        rice-lock
         ;;
     *)
         echo "Uso: rice-session-action [switch-user|logout|suspend|hibernate|reboot|poweroff|lock]"

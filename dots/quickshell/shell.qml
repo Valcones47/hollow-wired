@@ -14,8 +14,11 @@ ShellRoot {
     Binding {
         target: SysStats
         property: "active"
-        value: hub.visible || dw.hasStatsWidget
+        value: hub.visible || dw.hasStatsWidget || lockScreen.active
     }
+
+    // Tela de bloqueio (Super + L, inatividade, "Ir para a tela de login").
+    LockScreen { id: lockScreen }
 
     // ---------- fechar o hub clicando fora ----------
     // Camada transparente cobrindo a tela inteira no layer "Top" (abaixo do
@@ -533,9 +536,8 @@ ShellRoot {
 
             function toggleDnd(): void { NotifService.toggleDnd(); }
             function refresh(): void { NotifService.refresh(); }
-            // A tela de bloqueio lê isto: o hyprlock não tem como enxergar o
-            // estado do shell de outro jeito, e as notificações vivem em
-            // memória, não em arquivo.
+            // Lido pelo rice-lock-info (linha de notificações do hyprlock, que
+            // é a tela de bloqueio de reserva).
             function count(): string { return String(NotifService.unreadCount); }
             function clear(): void { NotifService.setCleared(NotifService.maxId); }
             function open(): void {

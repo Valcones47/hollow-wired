@@ -13,6 +13,33 @@ RowLayout {
     property bool dimmed: false
     readonly property bool dragging: area.pressed
     signal moved(real v)
+
+    // O valor real (PipeWire, backlight) só volta depois de aplicado; enquanto
+    // o usuário rola ou arrasta, o slider mostra e soma a partir do valor
+    // local. Antes cada passo da roda partia do valor antigo ainda não
+    // atualizado, e o slider "voltava" para trás.
+    property real localValue: -1
+    readonly property real shown: localValue >= 0 ? localValue : Math.max(0, Math.min(1, value))
+    property real wheelAcc: 0
+    function setLocal(v) {
+        localValue = Math.max(0, Math.min(1, v));
+        settleTimer.restart();
+        moved(localValue);
+    }
+    // Roda: acumula o delta (mouse comum = 120 por clique, touchpad manda
+    // vários pedacinhos) e anda 5% por clique inteiro.
+    function wheelStep(dy) {
+        wheelAcc += dy;
+        const steps = Math.trunc(wheelAcc / 120);
+        if (steps === 0) return;
+        wheelAcc -= steps * 120;
+        setLocal(Math.round((shown + steps * 0.05) * 20) / 20);
+    }
+    Timer {
+        id: settleTimer
+        interval: 800
+        onTriggered: if (!area.pressed) { root.localValue = -1; root.wheelAcc = 0; }
+    }
     signal iconClicked()
 
     Layout.fillWidth: true
@@ -64,14 +91,14 @@ RowLayout {
                 radius: 3
                 color: Theme.withAlpha(Theme.primary, 0.2)
                 Rectangle {
-                    width: parent.width * Math.max(0, Math.min(1, root.value))
+                    width: parent.width * Math.max(0, Math.min(1, root.shown))
                     height: parent.height
                     radius: 3
                     color: root.dimmed ? Theme.subtext : Theme.primary
                 }
             }
             Rectangle {
-                x: (track.width - width) * Math.max(0, Math.min(1, root.value))
+                x: (track.width - width) * Math.max(0, Math.min(1, root.shown))
                 anchors.verticalCenter: parent.verticalCenter
                 width: area.pressed || area.containsMouse ? 16 : 12
                 height: width
@@ -86,10 +113,11 @@ RowLayout {
                 hoverEnabled: true
                 preventStealing: true
                 cursorShape: Qt.PointingHandCursor
-                function set(mx) { root.moved(Math.max(0, Math.min(1, (mx - 4) / track.width))); }
+                function set(mx) { root.setLocal((mx - 4) / track.width); }
                 onPressed: mouse => set(mouse.x)
                 onPositionChanged: mouse => { if (pressed) set(mouse.x); }
-                onWheel: wheel => root.moved(Math.max(0, Math.min(1, root.value + (wheel.angleDelta.y > 0 ? 0.05 : -0.05))))
+                onReleased: settleTimer.restart()
+                onWheel: wheel => root.wheelStep(wheel.angleDelta.y !== 0 ? wheel.angleDelta.y : wheel.angleDelta.x)
             }
         }
     }
@@ -97,7 +125,7 @@ RowLayout {
     Text {
         Layout.preferredWidth: 34
         horizontalAlignment: Text.AlignRight
-        text: Math.round(root.value * 100) + "%"
+        text: Math.round(root.shown * 100) + "%"
         font.family: Theme.fontFamily
         font.pixelSize: 11
         color: Theme.subtext

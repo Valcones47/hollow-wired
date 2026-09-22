@@ -16,6 +16,7 @@ Ordem de resolução:
 
 Saída: caminho absoluto na stdout, código 0. Sem nada encontrado: código 1.
 Opções: --kind imprime também a origem (ex.: "waywallen\t/caminho").
+       --media imprime o arquivo de vídeo do wallpaper ativo (código 1 se não for vídeo).
 """
 import os
 import sqlite3
@@ -192,7 +193,38 @@ def resolve():
     return None, None
 
 
+VIDEO_EXTS = (".mp4", ".webm", ".mkv", ".mov", ".m4v")
+
+
+def waywallen_video():
+    """Arquivo de vídeo do wallpaper ativo do Waywallen, quando ele é um vídeo."""
+    last_id = waywallen_last_id()
+    if not last_id or not os.path.isfile(WAYWALLEN_DB):
+        return None
+    try:
+        conn = sqlite3.connect(f"file:{WAYWALLEN_DB}?mode=ro", uri=True)
+        row = conn.execute(
+            "SELECT item.path, library.path FROM item JOIN library ON library.id = item.library_id "
+            "WHERE item.id = ?", (last_id,)).fetchone()
+        conn.close()
+    except sqlite3.Error:
+        return None
+    if not row or not row[0]:
+        return None
+    media = os.path.join((row[1] or "").rstrip("/"), row[0])
+    return media if media.lower().endswith(VIDEO_EXTS) and os.path.isfile(media) else None
+
+
 def main():
+    if "--media" in sys.argv[1:]:
+        # Só o vídeo (a tela de bloqueio toca ele no fundo). Sem vídeo: código 1.
+        if from_static_pointer():
+            return 1
+        video = waywallen_video()
+        if not video:
+            return 1
+        print(video)
+        return 0
     show_kind = "--kind" in sys.argv[1:]
     kind, path = resolve()
     if not path:

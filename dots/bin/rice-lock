@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# rice-lock — bloqueia a sessão com a tela do shell (LockScreen.qml).
+#
+# O hyprlock fica só de reserva, para quando o Quickshell não estiver de pé
+# (travou, está reiniciando). Com --wait, só retorna depois que a tela está
+# bloqueada de verdade — o suspender usa isso para não dormir destravado.
+# ==============================================================================
+
+WAIT=0
+[ "${1:-}" = "--wait" ] && WAIT=1
+
+if command -v qs >/dev/null 2>&1 && timeout 3 qs ipc call lock lock >/dev/null 2>&1; then
+    if [ "$WAIT" = 1 ]; then
+        for _ in $(seq 20); do
+            [ "$(timeout 2 qs ipc call lock isLocked 2>/dev/null)" = "true" ] && exit 0
+            sleep 0.1
+        done
+    fi
+    exit 0
+fi
+
+command -v hyprlock >/dev/null 2>&1 || exit 1
+pidof hyprlock >/dev/null 2>&1 && exit 0
+if [ "$WAIT" = 1 ]; then
+    hyprlock >/dev/null 2>&1 &
+    sleep 0.5
+else
+    exec hyprlock
+fi

@@ -511,10 +511,11 @@ hl.bind(mainMod .. " + SUPER_L", hl.dsp.exec_cmd(menu), { release = true })
 hl.bind(mainMod .. " + P", hl.dsp.window.pseudo())
 hl.bind(mainMod .. " + J", hl.dsp.layout("togglesplit"))
 hl.bind(mainMod .. " + F", hl.dsp.window.fullscreen({ mode = "fullscreen", action = "toggle" }))
--- `locked = true` faz o atalho funcionar também com a sessão bloqueada: é a
--- saída sem TTY quando o hyprlock morre e sobra só o aviso do Hyprland. O
--- `pidof` impede abrir um segundo hyprlock quando o primeiro está vivo.
-hl.bind(mainMod .. " + L", hl.dsp.exec_cmd("pidof hyprlock || hyprlock"), { locked = true })
+-- Tela de bloqueio do shell (LockScreen.qml); o rice-lock cai no hyprlock se
+-- o Quickshell não estiver de pé. `locked = true` faz o atalho funcionar com a
+-- sessão bloqueada: é a saída sem TTY quando a tela de bloqueio morre e sobra
+-- só o aviso do Hyprland (allow_session_lock_restore, acima, permite retomar).
+hl.bind(mainMod .. " + L", hl.dsp.exec_cmd("rice-lock"), { locked = true })
 
 -- Super + esquerda/direita troca de área de trabalho. Antes as quatro setas
 -- moviam só o foco entre janelas — algo que quem vem do Windows não procura,

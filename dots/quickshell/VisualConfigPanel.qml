@@ -1123,10 +1123,16 @@ PanelWindow {
 
                 onPressed: mouse => updateVal(mouse.x)
                 onPositionChanged: mouse => { if (pressed) updateVal(mouse.x); }
+                // Acumula o delta: touchpad e mouse de rolagem fina mandam
+                // vários eventos pequenos por gesto, e cada um andava 5%.
+                property real wheelAcc: 0
                 onWheel: wheel => {
+                    wheelAcc += wheel.angleDelta.y !== 0 ? wheel.angleDelta.y : wheel.angleDelta.x;
+                    const steps = Math.trunc(wheelAcc / 120);
+                    if (steps === 0) return;
+                    wheelAcc -= steps * 120;
                     const step = (csld.maxVal - csld.minVal) / 20;
-                    const delta = wheel.angleDelta.y > 0 ? step : -step;
-                    const raw = Math.max(csld.minVal, Math.min(csld.maxVal, csld.value + delta));
+                    const raw = Math.max(csld.minVal, Math.min(csld.maxVal, csld.value + steps * step));
                     const finalVal = csld.decimals > 0 ? parseFloat(raw.toFixed(csld.decimals)) : Math.round(raw);
                     csld.changed(finalVal);
                 }

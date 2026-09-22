@@ -215,7 +215,7 @@ PanelWindow {
                                 { keys: ["Super", "Esc"], desc: Theme.t("cheatsheet.desc_taskmgr", "Gerenciador de tarefas") },
                                 { keys: ["Super", "'"], desc: Theme.t("cheatsheet.desc_dropterm", "Terminal drop-down suspenso") },
                                 { keys: ["Super", "Shift", "X"], desc: Theme.t("cheatsheet.desc_kill", "Encerrar janela travada (Kill)") },
-                                { keys: ["Super", "L"], desc: Theme.t("cheatsheet.desc_lock", "Bloquear sessão (hyprlock)") },
+                                { keys: ["Super", "L"], desc: Theme.t("cheatsheet.desc_lock", "Bloquear sessão") },
                                 { keys: ["Super", "M"], desc: Theme.t("cheatsheet.desc_exit", "Sair do Hyprland") }
                             ]
                         },

@@ -114,15 +114,66 @@ PanelWindow {
         repeat: true
         triggeredOnStart: true
         onTriggered: {
+            // Logo depois de uma mudança feita aqui, o sysfs ainda pode ter o
+            // valor antigo; reler agora desfazia o que o usuário acabou de rolar.
+            if (brHold.running || brSet.running) return;
             brCur.reload();
-            bar.brightness = (parseFloat(brCur.text()) || 0) / (parseFloat(brMax.text()) || 1);
+            bar.brightness = Math.max(0, Math.min(1, (parseFloat(brCur.text()) || 0) / (parseFloat(brMax.text()) || 1)));
         }
     }
-    Process { id: brSet; property int pct: 0; command: ["brightnessctl", "-q", "set", pct + "%"] }
+    Timer { id: brHold; interval: 1500 }
+    // Um brightnessctl por vez: com a roda chegam vários pedidos seguidos, e
+    // `running = true` num processo que já está rodando é ignorado — o valor
+    // final se perdia. O pedido mais recente fica guardado e roda na saída.
+    property int brPending: -1
+    Process {
+        id: brSet
+        property int pct: 0
+        command: ["brightnessctl", "-q", "set", pct + "%"]
+        onExited: {
+            if (bar.brPending >= 0) {
+                pct = bar.brPending;
+                bar.brPending = -1;
+                running = true;
+            }
+        }
+    }
     function setBrightness(v) {
-        brightness = Math.max(0.01, v);
-        brSet.pct = Math.max(1, Math.round(v * 100));
-        brSet.running = true;
+        brightness = Math.max(0.01, Math.min(1, v));
+        brHold.restart();
+        const pct = Math.max(1, Math.round(brightness * 100));
+        if (brSet.running) {
+            brPending = pct;
+        } else {
+            brSet.pct = pct;
+            brSet.running = true;
+        }
+    }
+    // Roda do mouse nos módulos da barra: acumula o delta e anda 5% por
+    // clique inteiro, somando a partir do último valor pedido (o volume do
+    // PipeWire demora um pouco para refletir a mudança).
+    property real wheelAcc: 0
+    property real volTarget: -1
+    Timer { id: volSettle; interval: 800; onTriggered: { bar.volTarget = -1; bar.wheelAcc = 0; } }
+    function wheelSteps(d) {
+        wheelAcc += d;
+        const steps = Math.trunc(wheelAcc / 120);
+        wheelAcc -= steps * 120;
+        return steps;
+    }
+    function wheelVolume(d) {
+        if (!sink || !sink.audio) return;
+        const steps = wheelSteps(d);
+        if (steps === 0) return;
+        const base = volTarget >= 0 ? volTarget : Math.min(1, sink.audio.volume);
+        volTarget = Math.max(0, Math.min(1, Math.round((base + steps * 0.05) * 20) / 20));
+        volSettle.restart();
+        sink.audio.volume = volTarget;
+    }
+    function wheelBrightness(d) {
+        const steps = wheelSteps(d);
+        if (steps === 0) return;
+        setBrightness(Math.round((brightness + steps * 0.05) * 20) / 20);
     }
 
     // --- bateria ---
@@ -602,15 +653,15 @@ PanelWindow {
                     id: audioMod
                     kind: "audio"
                     onClicked: if (bar.sink) bar.sink.audio.muted = !bar.sink.audio.muted
-                    onWheel: d => { if (bar.sink) bar.sink.audio.volume = Math.max(0, Math.min(1, bar.sink.audio.volume + (d > 0 ? 0.05 : -0.05))); }
+                    onWheel: d => bar.wheelVolume(d)
                     BarIcon { text: bar.volIcon(bar.sink) }
-                    BarText { text: bar.sink && bar.sink.audio ? Math.round(bar.sink.audio.volume * 100) + "%" : "--" }
+                    BarText { text: bar.sink && bar.sink.audio ? Math.round((bar.volTarget >= 0 ? bar.volTarget : bar.sink.audio.volume) * 100) + "%" : "--" }
                 }
 
                 Module {
                     id: brMod
                     kind: "brightness"
-                    onWheel: d => bar.setBrightness(bar.brightness + (d > 0 ? 0.05 : -0.05))
+                    onWheel: d => bar.wheelBrightness(d)
                     BarIcon { text: Theme.icons.brightness }
                     BarText { text: Math.round(bar.brightness * 100) + "%" }
                 }
