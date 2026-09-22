@@ -29,7 +29,9 @@ PanelWindow {
 
     anchors { top: true; left: true; right: true }
     implicitHeight: Theme.waybarHeight + 460
-    exclusiveZone: Theme.waybarHeight
+    // Barra que some no hover não reserva espaço: as janelas usam a tela toda
+    // e ela volta ao encostar o mouse na borda de cima.
+    exclusiveZone: ShellLayout.barAutohide ? 0 : Theme.waybarHeight
     color: "transparent"
     focusable: false
 
@@ -41,6 +43,13 @@ PanelWindow {
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
     readonly property int barH: Theme.waybarHeight
+
+    // ---- barra escondida (opção "aparecer só no hover") ----
+    property bool barHovered: false
+    readonly property bool barShown: !ShellLayout.barAutohide || barHovered
+        || bar.pop !== "" || bar.launcherOpen
+    Timer { id: barHideDelay; interval: 400; onTriggered: bar.barHovered = false }
+    Timer { id: barShowDelay; interval: 60; onTriggered: bar.barHovered = true }
 
     // Áreas de trabalho mostradas na barra. Com workspaceCount = 0 continua só
     // o que existe (comportamento antigo); com 1..10 os botões ficam sempre
@@ -75,7 +84,8 @@ PanelWindow {
         x: 0
         y: 0
         width: bar.width
-        height: bar.barH
+        // Escondida, sobra só uma faixa fina no topo para o mouse encontrar.
+        height: bar.barShown ? bar.barH : 4
         Region { item: popArea }
     }
 
@@ -349,6 +359,24 @@ PanelWindow {
     Item {
         id: root
         anchors.fill: parent
+        // Sai por cima da borda quando escondida, em vez de simplesmente
+        // sumir: o movimento mostra de onde ela volta.
+        y: bar.barShown ? 0 : -bar.barH
+        Behavior on y { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+
+        HoverHandler {
+            enabled: ShellLayout.barAutohide
+            onHoveredChanged: {
+                if (!enabled) return;
+                if (hovered) {
+                    barHideDelay.stop();
+                    barShowDelay.restart();
+                } else {
+                    barShowDelay.stop();
+                    barHideDelay.restart();
+                }
+            }
+        }
 
         // ---------- geometria animada do popup ----------
         readonly property real radius: Theme.frameRadius

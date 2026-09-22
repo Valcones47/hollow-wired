@@ -24,7 +24,7 @@ import "."
 // encosta na barra — é isso que dá o efeito de "a borda esticou".
 PanelWindow {
     id: sidebar
-    visible: true
+    visible: ShellLayout.sidebarEnabled
     focusable: false
     color: "transparent"
 
@@ -35,7 +35,10 @@ PanelWindow {
     WlrLayershell.namespace: "quickshell-sidebar"
     WlrLayershell.layer: launcherOpen ? WlrLayer.Overlay : WlrLayer.Top
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
-    exclusionMode: ExclusionMode.Ignore
+    // Fixa, ela reserva espaço como uma central de ações sempre aberta;
+    // no modo normal continua invisível para as janelas.
+    exclusionMode: sidebar.pinned ? ExclusionMode.Normal : ExclusionMode.Ignore
+    exclusiveZone: sidebar.pinned ? Theme.frameThickness + Theme.sidebarWidth : 0
 
     signal avatarClicked()
 
@@ -44,6 +47,12 @@ PanelWindow {
     property bool launcherOpen: false
     readonly property bool hasFullscreen: (Hyprland.focusedWorkspace && Hyprland.focusedWorkspace.hasFullscreen) || false
     readonly property bool allowHover: !hasFullscreen || launcherOpen
+
+    // "Sempre visível" em vez de aparecer no hover. As ações internas continuam
+    // chamando sidebar.open = false; com a barra fixa isso simplesmente não
+    // tem efeito visual, então nenhuma delas precisou mudar.
+    readonly property bool pinned: ShellLayout.sidebarEnabled && !ShellLayout.sidebarAutohide
+    readonly property bool effectiveOpen: sidebar.pinned ? !hasFullscreen : sidebar.open
 
     onHasFullscreenChanged: {
         if (hasFullscreen && !launcherOpen && open) {
@@ -67,7 +76,7 @@ PanelWindow {
     // Região que recebe mouse: sempre a faixa da moldura; aberta, também
     // barra e popup. O resto da janela (transparente) deixa o clique passar.
     // Em tela cheia sem launcher, a máscara fica vazia para não roubar cliques de jogos/vídeos.
-    mask: (allowHover || sidebar.open) ? fullMask : emptyMask
+    mask: (allowHover || sidebar.effectiveOpen) ? fullMask : emptyMask
 
     Region { id: emptyMask }
     Region {
@@ -400,13 +409,13 @@ PanelWindow {
 
         // ---------- geometria animada ----------
         readonly property real radius: Theme.frameRadius
-        property real bodyW: sidebar.open ? Theme.sidebarWidth : 0
+        property real bodyW: sidebar.effectiveOpen ? Theme.sidebarWidth : 0
         Behavior on bodyW { NumberAnimation { duration: 280; easing.type: Easing.OutCubic } }
         readonly property real bodyH: column.implicitHeight + Theme.gap * 4
         readonly property real bodyTop: Math.round((height - bodyH) / 2)
         readonly property real bodyBottom: bodyTop + bodyH
 
-        readonly property real popTargetW: sidebar.pop !== "" && sidebar.open
+        readonly property real popTargetW: sidebar.pop !== "" && sidebar.effectiveOpen
             ? Math.min(Theme.popoutMaxWidth, popContent.implicitWidth + 32) : 0
         readonly property real popTargetH: Math.max(52, popContent.implicitHeight + 28)
         property real popW: popTargetW

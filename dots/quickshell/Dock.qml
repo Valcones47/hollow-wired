@@ -27,7 +27,8 @@ PanelWindow {
 
     anchors { bottom: true; left: true; right: true }
     implicitHeight: Theme.frameThickness + dockH + 12 + 420
-    exclusionMode: ExclusionMode.Ignore
+    exclusionMode: dock.pinned ? ExclusionMode.Normal : ExclusionMode.Ignore
+    exclusiveZone: dock.pinned ? Theme.frameThickness + dockH : 0
     color: "transparent"
     focusable: false
 
@@ -49,8 +50,11 @@ PanelWindow {
     property int dragTo: -1
     readonly property bool workspaceEmpty: Hyprland.focusedWorkspace !== null
         && Hyprland.focusedWorkspace.toplevels.values.length === 0
-    // Só aparece com o mouse
-    readonly property bool shown: allowHover && (hovered || pop !== "" || dragFrom >= 0)
+    // Some no hover (padrão) ou fica sempre à mostra, como a barra de tarefas
+    // do Windows — nesse caso ela também reserva espaço para as janelas.
+    readonly property bool pinned: ShellLayout.dockEnabled && !ShellLayout.dockAutohide
+    readonly property bool shown: ShellLayout.dockEnabled
+        && (pinned ? !hasFullscreen : (allowHover && (hovered || pop !== "" || dragFrom >= 0)))
     onPopChanged: if (pop !== "games") gamesEdit = false
 
     Timer { id: hideDelay; interval: 450; onTriggered: dock.hovered = false }
@@ -182,7 +186,11 @@ PanelWindow {
 
         // ---------- geometria ----------
         readonly property real radius: Theme.frameRadius
-        readonly property real dockTargetW: row.implicitWidth + 24
+        // Em largura total a dock vai de ponta a ponta da moldura; senão ela
+        // só ocupa o tamanho dos ícones, centralizada.
+        readonly property real dockTargetW: ShellLayout.dockFullWidth
+            ? Math.max(row.implicitWidth + 24, width - 2 * Theme.frameThickness)
+            : row.implicitWidth + 24
         property real bodyH: dock.shown ? dock.dockH : 0
         property real bodyW: dockTargetW
         Behavior on bodyH { NumberAnimation { duration: 280; easing.type: Easing.OutCubic } }

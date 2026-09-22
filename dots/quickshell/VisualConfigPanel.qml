@@ -1188,19 +1188,27 @@ PanelWindow {
             Layout.fillWidth: true
             spacing: 1
             Text {
+                Layout.fillWidth: true
                 text: csw.title
                 font.family: Theme.fontFamily
                 font.pixelSize: 13
                 color: Theme.textColor
             }
             Text {
+                Layout.fillWidth: true
                 visible: csw.subtitle !== ""
                 text: csw.subtitle
+                wrapMode: Text.WordWrap
                 font.family: Theme.fontFamily
                 font.pixelSize: 11
                 color: Theme.subtext
             }
         }
+
+        // Empurra a chavinha para a borda direita: sem isso ela parava logo
+        // depois do texto e cada linha do painel ficava com o controle numa
+        // posição diferente.
+        Item { Layout.fillWidth: true; Layout.preferredHeight: 1 }
 
         Rectangle {
             implicitWidth: 43
@@ -1853,7 +1861,8 @@ PanelWindow {
                             readonly property var navItems: [
                                 { group: "look", tabIndex: 8, name: Theme.t("settings.cat_wallust", "Cores & Papel de Parede"), icon: Theme.icons.palette, desc: Theme.t("settings.desc_wallust", "Cores da tela toda"), keywords: "cores color colors wallust tema theme wallpaper papel de parede paleta palette dinamica accent visual fundo transicao transição transition onda wave varredura circulo fade" },
                                 { group: "look", tabIndex: 9, name: Theme.t("settings.cat_effects", "Efeitos & Janelas"), icon: Theme.icons.laptop, desc: Theme.t("settings.desc_effects", "Bordas & Animações"), keywords: "efeitos effects janelas windows blur desfoque bordas borders sombras shadows sddm animacoes animations transparência luz noturna curvas bezier curves velocidade" },
-                                { group: "look", tabIndex: 18, name: Theme.t("settings.cat_shell_custom", "Customização do Shell"), icon: Theme.icons.tune, desc: Theme.t("settings.desc_shell_custom", "Hub, Sidebar & Dock"), keywords: "shell quickshell customizacao dock topbar barra sidebar hub aparencia widgets glass solid glow borderless escala" },
+                                { group: "custom", tabIndex: 20, name: Theme.t("settings.cat_layout", "Organização da Interface"), icon: Theme.icons.dashboard, desc: Theme.t("settings.desc_layout", "Onde fica cada barra"), keywords: "organizacao layout arranjo interface barra topbar dock sidebar lateral taskbar windows areas de trabalho workspaces hover esconder largura total posicao preset estilo" },
+                                { group: "custom", tabIndex: 18, name: Theme.t("settings.cat_shell_custom", "Customização do Shell"), icon: Theme.icons.tune, desc: Theme.t("settings.desc_shell_custom", "Hub, Sidebar & Dock"), keywords: "shell quickshell customizacao dock topbar barra sidebar hub aparencia widgets glass solid glow borderless escala" },
                                 { group: "look", tabIndex: 2, name: Theme.t("settings.cat_mako", "Notificações"), icon: Theme.icons.bell, desc: Theme.t("settings.desc_mako", "Posição & Estilo"), keywords: "mako notificacoes notifications som posicao borda alert toast banner avisos" },
                                 { group: "look", tabIndex: 1, name: Theme.t("settings.cat_kitty", "Kitty Terminal"), icon: Theme.icons.console, desc: Theme.t("settings.desc_kitty", "Fonte & Opacidade"), keywords: "kitty terminal console fonte font opacidade padding cursor audio blur som transparencia" },
                                 { group: "look", tabIndex: 0, name: Theme.t("settings.cat_fastfetch", "Fastfetch"), icon: Theme.icons.packages, desc: Theme.t("settings.desc_fastfetch", "Logo & Módulos"), keywords: "fastfetch neofetch logo distro terminal specs cpu ram hardware modelo" },
@@ -1877,6 +1886,7 @@ PanelWindow {
 
                             readonly property var navGroups: [
                                 { id: "help", name: Theme.t("settings.group_help", "Ajuda") },
+                                { id: "custom", name: Theme.t("settings.group_custom", "Personalização") },
                                 { id: "look", name: Theme.t("settings.group_look", "Aparência") },
                                 { id: "hardware", name: Theme.t("settings.group_hardware", "Hardware") },
                                 { id: "system", name: Theme.t("settings.group_system", "Sistema") }
@@ -8847,6 +8857,287 @@ PanelWindow {
                         // ==========================================
                         // ABA 18: CUSTOMIZAÇÃO DO SHELL (HUB, SIDEBAR, DOCK)
                         // ==========================================
+                        // ============ ABA 20: ORGANIZAÇÃO DA INTERFACE ============
+                        // Onde cada peça do shell fica e quando ela aparece.
+                        // A aparência (estilo, cor, escala) continua na aba de
+                        // Customização do Shell — aqui é só o arranjo.
+                        Flickable {
+                            anchors.fill: parent
+                            visible: win.currentTab === 20
+                            contentHeight: layoutCol.implicitHeight + 30
+                            contentWidth: width
+                            clip: true
+                            boundsBehavior: Flickable.StopAtBounds
+                            ScrollBar.vertical: PanelScroll {}
+
+                            ColumnLayout {
+                                id: layoutCol
+                                width: parent.width
+                                spacing: 18
+
+                                SectionHeader {
+                                    title: Theme.t("layout.presets_title", "Arranjos prontos")
+                                    subtitle: Theme.t("layout.presets_sub", "Um clique muda tudo de lugar. Depois dá para ajustar peça por peça aqui embaixo.")
+                                }
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 12
+
+                                    Repeater {
+                                        model: [
+                                            {
+                                                key: "topbar",
+                                                name: Theme.t("layout.preset_topbar", "Clássico"),
+                                                desc: Theme.t("layout.preset_topbar_desc", "Barra em cima, dock que aparece no mouse"),
+                                                bar: true, barFull: true, dock: true, dockFull: false, side: false
+                                            },
+                                            {
+                                                key: "taskbar",
+                                                name: Theme.t("layout.preset_taskbar", "Estilo Windows"),
+                                                desc: Theme.t("layout.preset_taskbar_desc", "Dock larga sempre à mostra e central de ações fixa"),
+                                                bar: true, barFull: true, dock: true, dockFull: true, side: true
+                                            },
+                                            {
+                                                key: "clean",
+                                                name: Theme.t("layout.preset_clean", "Tela limpa"),
+                                                desc: Theme.t("layout.preset_clean_desc", "Nada à vista: tudo só ao encostar o mouse na borda"),
+                                                bar: false, barFull: false, dock: false, dockFull: false, side: false
+                                            }
+                                        ]
+                                        delegate: Rectangle {
+                                            id: lpCard
+                                            required property var modelData
+                                            readonly property bool active: ShellLayout.preset === lpCard.modelData.key
+                                            Layout.fillWidth: true
+                                            Layout.preferredHeight: lpCol.implicitHeight + 28
+                                            radius: 16
+                                            color: lpCard.active ? Theme.withAlpha(Theme.primary, 0.14) : (lpArea.containsMouse ? Theme.tileHigh : Theme.tile)
+                                            border.width: lpCard.active ? 2 : 1
+                                            border.color: lpCard.active ? Theme.primary : Theme.withAlpha(Theme.outline, 0.25)
+                                            Behavior on color { ColorAnimation { duration: 140 } }
+
+                                            ColumnLayout {
+                                                id: lpCol
+                                                anchors.left: parent.left
+                                                anchors.right: parent.right
+                                                anchors.top: parent.top
+                                                anchors.margins: 14
+                                                spacing: 10
+
+                                                // Miniatura da tela com as peças no lugar
+                                                Rectangle {
+                                                    id: lpMini
+                                                    Layout.fillWidth: true
+                                                    Layout.preferredHeight: width * 0.52
+                                                    radius: 8
+                                                    color: Theme.withAlpha(Theme.background, 0.8)
+                                                    border.width: 1
+                                                    border.color: Theme.withAlpha(Theme.outline, 0.3)
+                                                    clip: true
+
+                                                    // barra de cima
+                                                    Rectangle {
+                                                        x: 5; y: 5
+                                                        width: parent.width - 10
+                                                        height: 6
+                                                        radius: 3
+                                                        color: Theme.withAlpha(Theme.primary, lpCard.modelData.bar ? 0.55 : 0.18)
+                                                    }
+                                                    // dock embaixo
+                                                    Rectangle {
+                                                        height: 7
+                                                        radius: 3.5
+                                                        y: parent.height - height - 5
+                                                        width: lpCard.modelData.dockFull ? parent.width - 10 : parent.width * 0.42
+                                                        x: lpCard.modelData.dockFull ? 5 : (parent.width - width) / 2
+                                                        color: Theme.withAlpha(Theme.secondary, lpCard.modelData.dock ? 0.55 : 0.18)
+                                                    }
+                                                    // central de ações na direita
+                                                    Rectangle {
+                                                        width: 12
+                                                        radius: 4
+                                                        x: parent.width - width - 5
+                                                        y: 15
+                                                        height: parent.height - 28
+                                                        color: Theme.withAlpha(Theme.primary, lpCard.modelData.side ? 0.4 : 0.14)
+                                                    }
+                                                    // janela de exemplo
+                                                    Rectangle {
+                                                        x: parent.width * 0.12
+                                                        y: parent.height * 0.3
+                                                        width: parent.width * 0.5
+                                                        height: parent.height * 0.42
+                                                        radius: 4
+                                                        color: Theme.withAlpha(Theme.outline, 0.35)
+                                                    }
+                                                }
+
+                                                Text {
+                                                    text: lpCard.modelData.name
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 13
+                                                    font.weight: Font.DemiBold
+                                                    color: Theme.textColor
+                                                }
+                                                Text {
+                                                    Layout.fillWidth: true
+                                                    text: lpCard.modelData.desc
+                                                    wrapMode: Text.WordWrap
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 11
+                                                    color: Theme.subtext
+                                                }
+                                            }
+
+                                            MouseArea {
+                                                id: lpArea
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: ShellLayout.applyPreset(lpCard.modelData.key)
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: Theme.withAlpha(Theme.outline, 0.45) }
+
+                                SectionHeader {
+                                    title: Theme.t("layout.bar_title", "Barra principal")
+                                    subtitle: Theme.t("layout.bar_sub", "Relógio, áreas de trabalho e os indicadores do sistema.")
+                                }
+
+                                CfgToggle {
+                                    title: Theme.t("layout.bar_autohide", "Aparecer só com o mouse")
+                                    subtitle: Theme.t("layout.bar_autohide_desc", "A barra sai da tela e volta ao encostar o mouse na borda de cima.")
+                                    checked: ShellLayout.barAutohide
+                                    onToggled: nv => ShellLayout.set("bar", "autohide", nv)
+                                }
+
+                                CfgToggle {
+                                    title: Theme.t("layout.bar_title_win", "Mostrar o nome da janela aberta")
+                                    subtitle: Theme.t("layout.bar_title_win_desc", "Ao lado das áreas de trabalho.")
+                                    checked: ShellLayout.barShowTitle
+                                    onToggled: nv => ShellLayout.set("bar", "showTitle", nv)
+                                }
+
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 8
+
+                                    Text {
+                                        text: Theme.t("layout.ws_count", "Botões de área de trabalho")
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 13
+                                        color: Theme.textColor
+                                    }
+                                    Text {
+                                        Layout.fillWidth: true
+                                        text: Theme.t("layout.ws_count_desc", "Fixos, os botões ficam lá mesmo sem nenhuma janela — dá para pular para uma área vazia com o mouse.")
+                                        wrapMode: Text.WordWrap
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 11
+                                        color: Theme.subtext
+                                    }
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 8
+
+                                        Repeater {
+                                            model: [
+                                                { n: 0, label: Theme.t("layout.ws_dynamic", "Só as usadas") },
+                                                { n: 4, label: "4" },
+                                                { n: 6, label: "6" },
+                                                { n: 9, label: "9" },
+                                                { n: 10, label: "10" }
+                                            ]
+                                            delegate: Rectangle {
+                                                id: wsBtn
+                                                required property var modelData
+                                                readonly property bool active: ShellLayout.workspaceCount === wsBtn.modelData.n
+                                                implicitWidth: wsBtnText.implicitWidth + 26
+                                                implicitHeight: 34
+                                                radius: 10
+                                                color: wsBtn.active ? Theme.withAlpha(Theme.primary, 0.2) : (wsBtnArea.containsMouse ? Theme.tileHigh : Theme.tile)
+                                                border.width: 1
+                                                border.color: wsBtn.active ? Theme.primary : Theme.withAlpha(Theme.outline, 0.22)
+
+                                                Text {
+                                                    id: wsBtnText
+                                                    anchors.centerIn: parent
+                                                    text: wsBtn.modelData.label
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 12
+                                                    font.weight: wsBtn.active ? Font.DemiBold : Font.Normal
+                                                    color: wsBtn.active ? Theme.primary : Theme.textColor
+                                                }
+
+                                                MouseArea {
+                                                    id: wsBtnArea
+                                                    anchors.fill: parent
+                                                    hoverEnabled: true
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    onClicked: ShellLayout.set("bar", "workspaceCount", wsBtn.modelData.n)
+                                                }
+                                            }
+                                        }
+
+                                        Item { Layout.fillWidth: true }
+                                    }
+                                }
+
+                                Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: Theme.withAlpha(Theme.outline, 0.45) }
+
+                                SectionHeader {
+                                    title: Theme.t("layout.dock_title", "Dock")
+                                    subtitle: Theme.t("layout.dock_sub", "A fileira de aplicativos na borda de baixo.")
+                                }
+
+                                CfgToggle {
+                                    title: Theme.t("layout.dock_on", "Usar a dock")
+                                    subtitle: Theme.t("layout.dock_on_desc", "Desligada, os aplicativos ficam só no launcher.")
+                                    checked: ShellLayout.dockEnabled
+                                    onToggled: nv => ShellLayout.set("dock", "enabled", nv)
+                                }
+
+                                CfgToggle {
+                                    title: Theme.t("layout.dock_autohide", "Aparecer só com o mouse")
+                                    subtitle: Theme.t("layout.dock_autohide_desc", "Desligado, ela fica fixa e as janelas param acima dela.")
+                                    checked: ShellLayout.dockAutohide
+                                    onToggled: nv => ShellLayout.set("dock", "autohide", nv)
+                                }
+
+                                CfgToggle {
+                                    title: Theme.t("layout.dock_full", "Ocupar a largura toda")
+                                    subtitle: Theme.t("layout.dock_full_desc", "Como a barra de tarefas do Windows, de ponta a ponta.")
+                                    checked: ShellLayout.dockFullWidth
+                                    onToggled: nv => ShellLayout.set("dock", "fullWidth", nv)
+                                }
+
+                                Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: Theme.withAlpha(Theme.outline, 0.45) }
+
+                                SectionHeader {
+                                    title: Theme.t("layout.side_title", "Central de ações")
+                                    subtitle: Theme.t("layout.side_sub", "A barra da direita com avatar, bandeja, luz noturna e energia (Ctrl + Alt + Del).")
+                                }
+
+                                CfgToggle {
+                                    title: Theme.t("layout.side_on", "Usar a central de ações")
+                                    checked: ShellLayout.sidebarEnabled
+                                    onToggled: nv => ShellLayout.set("sidebar", "enabled", nv)
+                                }
+
+                                CfgToggle {
+                                    title: Theme.t("layout.side_autohide", "Aparecer só com o mouse")
+                                    subtitle: Theme.t("layout.side_autohide_desc", "Desligado, ela fica sempre aberta na lateral.")
+                                    checked: ShellLayout.sidebarAutohide
+                                    onToggled: nv => ShellLayout.set("sidebar", "autohide", nv)
+                                }
+                            }
+                        }
+
                         // ============ ABA 19: JEITO DE USAR (modo de janelas) ============
                         Flickable {
                             anchors.fill: parent
