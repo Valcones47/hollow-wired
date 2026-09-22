@@ -85,7 +85,9 @@ key=$(printf '%s' "$video" | sha256sum | cut -c1-32)
 # decodificar bem na hora em que a transição precisa desenhar. Em JPEG de
 # qualidade alta o arquivo fica na casa das centenas de KB e a diferença não
 # aparece numa imagem que fica menos de dois segundos na tela.
-out="$CACHE/$key.jpg"
+# "-f0": primeiro quadro. Os de antes eram dos 3 s e ficam para trás no cache
+# (nome diferente), sem risco de a transição usar o quadro errado.
+out="$CACHE/$key-f0.jpg"
 
 # Reaproveita o cache, a menos que o vídeo tenha sido trocado por baixo.
 if [ -f "$out" ] && [ "$out" -nt "$video" ]; then
@@ -95,10 +97,19 @@ fi
 
 [ "$cached_only" = 1 ] && { emit_fallback; exit 0; }
 
-# 3s evita fade-in preto que muitos wallpapers têm no começo. Se o vídeo for
-# mais curto que isso o ffmpeg falha, e aí tenta de novo no primeiro quadro.
-if ! ffmpeg -y -ss 3 -i "$video" -frames:v 1 -q:v 3 "$out" >/dev/null 2>&1 || [ ! -s "$out" ]; then
-    ffmpeg -y -i "$video" -frames:v 1 -q:v 3 "$out" >/dev/null 2>&1
+# O PRIMEIRO quadro exato: o vídeo começa dele, então a imagem que cobre a
+# tela na transição emenda sem pulo quando o vídeo aparece. (Antes era o
+# quadro dos 3 s, para fugir do começo preto — e a transição dava um salto.)
+# Exceção: começo praticamente preto (fade-in) daria uma paleta toda escura
+# para o wallust; aí vale o quadro dos 3 s.
+ffmpeg -y -i "$video" -frames:v 1 -q:v 2 "$out" >/dev/null 2>&1
+if [ -s "$out" ] && command -v magick >/dev/null 2>&1; then
+    lum=$(magick "$out" -colorspace Gray -format "%[fx:mean]" info: 2>/dev/null)
+    if awk -v l="${lum:-1}" 'BEGIN { exit !(l < 0.035) }'; then
+        ffmpeg -y -ss 3 -i "$video" -frames:v 1 -q:v 2 "$out.tmp.jpg" >/dev/null 2>&1 \
+            && [ -s "$out.tmp.jpg" ] && mv -f "$out.tmp.jpg" "$out"
+        rm -f "$out.tmp.jpg"
+    fi
 fi
 
 if [ -s "$out" ]; then
