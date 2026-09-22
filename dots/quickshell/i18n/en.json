@@ -35,7 +35,7 @@
   "cheatsheet.desc_lock": "Lock session",
   "cheatsheet.desc_exit": "Exit Hyprland compositor",
   "cheatsheet.desc_settings": "Rice Visual Settings Panel",
-  "cheatsheet.desc_cheatsheet": "Keyboard shortcut cheatsheet",
+  "cheatsheet.desc_cheatsheet": "This shortcut list",
   "cheatsheet.desc_widgets": "Desktop Widgets Editor",
   "cheatsheet.desc_notif": "Notifications Center",
   "cheatsheet.desc_dnd": "Toggle Do Not Disturb (DND)",
@@ -1259,7 +1259,6 @@
   "binds.act_dropterm": "Drop-down terminal",
   "binds.act_dropterm_desc": "Slides over everything and back up",
   "binds.act_change": "Change",
-  "welcome.hero_motto": "Close the world. Open the next.",
   "layout.preset_sidebar": "Side bar",
   "layout.preset_sidebar_desc": "Vertical bar on the side, like most rices",
   "welcome.layout_sidebar_desc": "The bar stands on the left edge, narrow, with the workspaces and indicators — the way most Hyprland rices are laid out.",
@@ -1276,5 +1275,14 @@
   "layout.mod_bright": "Brightness",
   "layout.mod_net": "Wi-Fi",
   "layout.mod_bat": "Battery",
-  "layout.mod_settings": "Settings"
+  "layout.mod_settings": "Settings",
+  "welcome.motto_1": "There is a network beneath the void.",
+  "welcome.motto_2": "Hollow inside. Wired outside.",
+  "welcome.motto_3": "Signal found. Presence unconfirmed.",
+  "welcome.motto_4": "You are not alone here. You are only alone.",
+  "welcome.motto_5": "Not everything here is finished. Nothing here needs to be.",
+  "welcome.motto_6": "Still loading. Always loading.",
+  "welcome.motto_7": "This is real too.",
+  "welcome.motto_8": "The void carries a signal too.",
+  "cheatsheet.desc_welcome": "Welcome guide"
 }

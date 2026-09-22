@@ -497,16 +497,27 @@ PanelWindow {
                         font.letterSpacing: 1
                         color: Theme.textColor
                     }
-                    // A frase do meio é a do símbolo (Lain / the Wired, de onde
-                    // vem o nome do rice); a de baixo é a parte prática.
-                    Text {
+                    // As frases do meio são as do símbolo (Lain / the Wired, de
+                    // onde vem o nome do rice) e trocam sozinhas; a de baixo é a
+                    // parte prática, que fica parada.
+                    GlitchText {
                         Layout.alignment: Qt.AlignHCenter
                         Layout.topMargin: 8
-                        text: Theme.t("welcome.hero_motto", "Feche o mundo. Abra o próximo.")
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 14
-                        font.letterSpacing: 2
-                        color: Theme.withAlpha(Theme.primary, 0.9)
+                        Layout.preferredWidth: 540
+                        Layout.preferredHeight: 22
+                        fontSize: 13
+                        running: welcomeWindow.open && welcomeWindow.page === 0
+                        baseColor: Theme.withAlpha(Theme.primary, 0.9)
+                        phrases: [
+                            Theme.t("welcome.motto_1", "Existe uma rede sob o vazio."),
+                            Theme.t("welcome.motto_2", "Vazio por dentro. Conectado por fora."),
+                            Theme.t("welcome.motto_3", "Sinal encontrado. Presença não confirmada."),
+                            Theme.t("welcome.motto_4", "Você não está sozinho aqui. Só está sozinho."),
+                            Theme.t("welcome.motto_5", "Nem tudo aqui está pronto. Nada aqui precisa estar."),
+                            Theme.t("welcome.motto_6", "Ainda carregando. Sempre carregando."),
+                            Theme.t("welcome.motto_7", "Isso aqui também é real."),
+                            Theme.t("welcome.motto_8", "O vazio também transmite sinal.")
+                        ]
                     }
                     Text {
                         Layout.alignment: Qt.AlignHCenter

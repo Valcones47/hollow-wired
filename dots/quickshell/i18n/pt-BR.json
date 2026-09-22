@@ -35,7 +35,7 @@
   "cheatsheet.desc_lock": "Bloquear sessão",
   "cheatsheet.desc_exit": "Sair do Hyprland",
   "cheatsheet.desc_settings": "Painel de Configurações do Rice",
-  "cheatsheet.desc_cheatsheet": "Cheatsheet de atalhos",
+  "cheatsheet.desc_cheatsheet": "Esta lista de atalhos",
   "cheatsheet.desc_widgets": "Editor de Widgets de Desktop",
   "cheatsheet.desc_notif": "Painel de Notificações",
   "cheatsheet.desc_dnd": "Alternar Não Perturbe (DND)",
@@ -1259,7 +1259,6 @@
   "binds.act_dropterm": "Terminal suspenso",
   "binds.act_dropterm_desc": "Desce por cima de tudo e volta a subir",
   "binds.act_change": "Trocar",
-  "welcome.hero_motto": "Feche o mundo. Abra o próximo.",
   "layout.preset_sidebar": "Barra lateral",
   "layout.preset_sidebar_desc": "Barra vertical na lateral, como na maioria dos rices",
   "welcome.layout_sidebar_desc": "A barra fica de pé na lateral esquerda, estreita, com as áreas de trabalho e os indicadores — é como a maioria dos rices de Hyprland se organiza.",
@@ -1276,5 +1275,14 @@
   "layout.mod_bright": "Brilho",
   "layout.mod_net": "Wi-Fi",
   "layout.mod_bat": "Bateria",
-  "layout.mod_settings": "Configurações"
+  "layout.mod_settings": "Configurações",
+  "welcome.motto_1": "Existe uma rede sob o vazio.",
+  "welcome.motto_2": "Vazio por dentro. Conectado por fora.",
+  "welcome.motto_3": "Sinal encontrado. Presença não confirmada.",
+  "welcome.motto_4": "Você não está sozinho aqui. Só está sozinho.",
+  "welcome.motto_5": "Nem tudo aqui está pronto. Nada aqui precisa estar.",
+  "welcome.motto_6": "Ainda carregando. Sempre carregando.",
+  "welcome.motto_7": "Isso aqui também é real.",
+  "welcome.motto_8": "O vazio também transmite sinal.",
+  "cheatsheet.desc_welcome": "Guia de boas-vindas"
 }

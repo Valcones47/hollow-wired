@@ -568,7 +568,11 @@ hl.bind("ALT + F4", function()
 end)
 hl.bind(mainMod .. " + M", hl.dsp.exit())
 hl.bind(mainMod .. " + E", hl.dsp.exec_cmd(fileManager))
-hl.bind(mainMod .. " + F1", hl.dsp.exec_cmd("quickshell ipc call cheatsheet toggle"))
+-- Super+F1 abre o guia de boas-vindas (é o que a própria tela promete quando
+-- diz "Super + F1 mostra tudo isso de novo"); a lista seca de atalhos ficou no
+-- Shift, e continua a um clique dentro do guia e do painel.
+hl.bind(mainMod .. " + F1", hl.dsp.exec_cmd("quickshell ipc call welcome toggle"))
+hl.bind(mainMod .. " + SHIFT + F1", hl.dsp.exec_cmd("quickshell ipc call cheatsheet toggle"))
 -- Gerenciador de tarefas: Super+Esc e o Ctrl+Shift+Esc de quem vem do Windows.
 hl.bind(mainMod .. " + Escape", hl.dsp.exec_cmd("rice-task-manager"))
 hl.bind("CTRL + SHIFT + Escape", hl.dsp.exec_cmd("rice-task-manager"))

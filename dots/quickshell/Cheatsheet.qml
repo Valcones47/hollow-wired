@@ -6,7 +6,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import "."
 
-// Modal de Cheatsheet de Atalhos (Super + F1) estilo Caelestia.
+// Modal de Cheatsheet de Atalhos (Super + Shift + F1) estilo Caelestia.
 // Exibe os principais atalhos organizados por categoria com barra de pesquisa instantânea.
 PanelWindow {
     id: sheetWindow
@@ -237,7 +237,8 @@ PanelWindow {
                             category: Theme.t("cheatsheet.cat_ricing", "Ricing & Customização"),
                             items: [
                                 { keys: ["Super", "I"], desc: Theme.t("cheatsheet.desc_settings", "Painel de Configurações do Rice") },
-                                { keys: ["Super", "F1"], desc: Theme.t("cheatsheet.desc_cheatsheet", "Cheatsheet de atalhos") },
+                                { keys: ["Super", "F1"], desc: Theme.t("cheatsheet.desc_welcome", "Guia de boas-vindas") },
+                                { keys: ["Super", "Shift", "F1"], desc: Theme.t("cheatsheet.desc_cheatsheet", "Esta lista de atalhos") },
                                 { keys: ["Super", "W"], desc: Theme.t("cheatsheet.desc_widgets", "Editor de Widgets de Desktop") },
                                 { keys: ["Super", "N"], desc: Theme.t("cheatsheet.desc_notif", "Painel de Notificações") },
                                 { keys: ["Super", "Shift", "N"], desc: Theme.t("cheatsheet.desc_dnd", "Alternar Não Perturbe (DND)") },
