@@ -178,8 +178,8 @@
   "settings.desc_gaming": "Graphics Card & Steam",
   "settings.cat_storage": "Storage & Disk",
   "settings.desc_storage": "Disk Cleanup",
-  "settings.cat_shortcuts": "Shortcut Guide",
-  "settings.desc_shortcuts": "Rice Keys",
+  "settings.cat_shortcuts": "All Shortcuts",
+  "settings.desc_shortcuts": "The whole list, side by side",
   "settings.cat_system": "System & Recovery",
   "settings.desc_system": "Snapshots & Auto-Repair",
   "settings.cat_store": "Programs & Updates",
@@ -582,7 +582,7 @@
   "storage.clean_btn": "Clean",
   "storage.empty_btn": "Empty",
   "storage.deep_clean_btn": "Run Full Deep Cleanup",
-  "binds.section_title": "Keybinding & Shortcut Guide",
+  "binds.section_title": "All shortcuts",
   "binds.section_sub": "Click a shortcut to change the keys. Right click restores it.",
   "binds.search_placeholder": "Search shortcut...",
   "binds.cat_windows": "Windows & Navigation",
@@ -649,7 +649,7 @@
   "header.title_12": "Default System Applications",
   "header.title_13": "Gaming & NVIDIA Graphics",
   "header.title_14": "Storage & Disk Cleanup",
-  "header.title_15": "Keybindings & Shortcuts Guide",
+  "header.title_15": "All Shortcuts",
   "header.title_16": "System, Snapshots & Repair",
   "header.title_17": "Programs & Updates",
   "header.title_18": "Shell Customization",
@@ -1284,5 +1284,6 @@
   "welcome.motto_6": "Still loading. Always loading.",
   "welcome.motto_7": "This is real too.",
   "welcome.motto_8": "The void carries a signal too.",
-  "cheatsheet.desc_welcome": "Welcome guide"
+  "cheatsheet.desc_welcome": "Welcome guide",
+  "binds.cat_mine": "Your shortcuts"
 }

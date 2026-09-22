@@ -178,8 +178,8 @@
   "settings.desc_gaming": "Placa de Vídeo & Steam",
   "settings.cat_storage": "Armazenamento",
   "settings.desc_storage": "Limpeza de Disco",
-  "settings.cat_shortcuts": "Guia de Atalhos",
-  "settings.desc_shortcuts": "Teclas do Rice",
+  "settings.cat_shortcuts": "Todos os Atalhos",
+  "settings.desc_shortcuts": "A lista inteira, lado a lado",
   "settings.cat_system": "Sistema & Reparo",
   "settings.desc_system": "Snapshots & Auto-Reparo",
   "settings.cat_store": "Programas & Atualizações",
@@ -582,7 +582,7 @@
   "storage.clean_btn": "Limpar",
   "storage.empty_btn": "Esvaziar",
   "storage.deep_clean_btn": "Executar Limpeza Profunda Completa",
-  "binds.section_title": "Guia de Teclas & Atalhos",
+  "binds.section_title": "Todos os atalhos",
   "binds.section_sub": "Clique num atalho para trocar as teclas. Botão direito devolve o original.",
   "binds.search_placeholder": "Buscar atalho...",
   "binds.cat_windows": "Janelas & Navegação",
@@ -649,7 +649,7 @@
   "header.title_12": "Aplicativos Padrão do Sistema",
   "header.title_13": "Jogos & Gráficos NVIDIA",
   "header.title_14": "Armazenamento & Limpeza de Disco",
-  "header.title_15": "Guia de Teclas & Atalhos",
+  "header.title_15": "Todos os Atalhos",
   "header.title_16": "Sistema, Snapshots & Reparo",
   "header.title_17": "Programas & Atualizações",
   "header.title_18": "Customização do Shell",
@@ -1284,5 +1284,6 @@
   "welcome.motto_6": "Ainda carregando. Sempre carregando.",
   "welcome.motto_7": "Isso aqui também é real.",
   "welcome.motto_8": "O vazio também transmite sinal.",
-  "cheatsheet.desc_welcome": "Guia de boas-vindas"
+  "cheatsheet.desc_welcome": "Guia de boas-vindas",
+  "binds.cat_mine": "Seus atalhos"
 }

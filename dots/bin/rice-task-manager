@@ -2,8 +2,62 @@
 # rice-task-manager — o "Gerenciador de Tarefas" (Super+Esc / Ctrl+Shift+Esc).
 #
 # Se já estiver aberto, traz a janela para a frente em vez de abrir outra.
-# Ordem de preferência: Mission Center (o mais parecido com o do Windows),
-# Monitor do Sistema do Plasma, o do GNOME e, por último, btop no terminal.
+# Qual monitor abrir é escolha do usuário (painel → Aplicativos Padrão); sem
+# escolha, segue a ordem de preferência de baixo para cima: Mission Center (o
+# mais parecido com o do Windows), Monitor do Sistema do Plasma, o do GNOME e,
+# por último, btop no terminal.
+#
+# Uso:
+#   rice-task-manager            abre (ou foca) o monitor escolhido
+#   rice-task-manager list       JSON com os monitores instalados e o atual
+#   rice-task-manager get        imprime o id escolhido ("auto" se não há)
+#   rice-task-manager set <id>   grava a escolha
+
+set -uo pipefail
+
+PREF_DIR="$HOME/.config/hollow-wired"
+PREF_FILE="$PREF_DIR/task-manager"
+
+# id|executável|classe da janela|nome amigável
+CANDIDATES=(
+    "missioncenter|missioncenter|io.missioncenter.MissionCenter|Mission Center"
+    "plasma|plasma-systemmonitor|org.kde.plasma-systemmonitor|Monitor do Sistema (KDE)"
+    "gnome|gnome-system-monitor|gnome-system-monitor|Monitor do Sistema (GNOME)"
+    "btop|btop|rice-btop|btop (terminal)"
+)
+
+field() { printf '%s' "$1" | cut -d'|' -f"$2"; }
+
+current() {
+    [ -f "$PREF_FILE" ] && tr -d '[:space:]' < "$PREF_FILE" || echo auto
+}
+
+case "${1:-}" in
+    get)
+        current
+        exit 0
+        ;;
+    set)
+        [ -n "${2:-}" ] || { echo "uso: rice-task-manager set <id>" >&2; exit 1; }
+        mkdir -p "$PREF_DIR"
+        printf '%s\n' "$2" > "$PREF_FILE"
+        exit 0
+        ;;
+    list)
+        cur=$(current)
+        printf '{"current":"%s","apps":[' "$cur"
+        first=1
+        for c in "${CANDIDATES[@]}"; do
+            id=$(field "$c" 1); bin=$(field "$c" 2); name=$(field "$c" 4)
+            command -v "$bin" >/dev/null 2>&1 || continue
+            [ $first -eq 1 ] || printf ','
+            first=0
+            printf '{"id":"%s","name":"%s","bin":"%s"}' "$id" "$name" "$bin"
+        done
+        printf ']}\n'
+        exit 0
+        ;;
+esac
 
 focus_existing() {
     local addr
@@ -13,23 +67,31 @@ focus_existing() {
     hyprctl dispatch "hl.dsp.focus({ window = \"address:$addr\" })" >/dev/null
 }
 
-try_app() {
+launch() {
     # $1 = executável, $2 = classe da janela
     command -v "$1" >/dev/null 2>&1 || return 1
     focus_existing "$2" && exit 0
-    setsid -f "$1" >/dev/null 2>&1
+    if [ "$1" = "btop" ]; then
+        setsid -f kitty --class rice-btop -e btop >/dev/null 2>&1
+    else
+        setsid -f "$1" >/dev/null 2>&1
+    fi
     exit 0
 }
 
-try_app missioncenter io.missioncenter.MissionCenter
-try_app plasma-systemmonitor org.kde.plasma-systemmonitor
-try_app gnome-system-monitor gnome-system-monitor
-
-if command -v btop >/dev/null 2>&1; then
-    focus_existing rice-btop && exit 0
-    setsid -f kitty --class rice-btop -e btop >/dev/null 2>&1
-    exit 0
+CUR=$(current)
+if [ "$CUR" != "auto" ]; then
+    for c in "${CANDIDATES[@]}"; do
+        [ "$(field "$c" 1)" = "$CUR" ] || continue
+        launch "$(field "$c" 2)" "$(field "$c" 3)"
+        # escolhido mas não instalado: cai na ordem padrão abaixo
+        break
+    done
 fi
+
+for c in "${CANDIDATES[@]}"; do
+    launch "$(field "$c" 2)" "$(field "$c" 3)"
+done
 
 notify-send -a "Sistema" "Nenhum monitor do sistema instalado" \
     "Instale o Mission Center pela loja de apps (ou: sudo pacman -S mission-center)."

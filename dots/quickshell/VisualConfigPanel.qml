@@ -349,6 +349,98 @@ PanelWindow {
         win.bindCapturing = true;
         recordAppBindProc.running = true;
     }
+    // Catálogo dos atalhos que o rice define. Fica aqui (e não dentro da aba)
+    // porque a lista é distribuída em colunas por bindColumns.
+    readonly property var bindCatalog: [
+        {
+            cat: Theme.t("binds.cat_windows", "Janelas & Navegação"),
+            binds: [
+                { key: "Super + Q", action: Theme.t("binds.act_kitty", "Abrir Terminal Kitty") },
+                { key: "Super + C", action: Theme.t("binds.act_close", "Fechar Janela Ativa") },
+                { key: "Alt + F4", action: Theme.t("binds.act_close_alt", "Fechar Janela Ativa (Padrão Windows)") },
+                { key: "Super + F", action: Theme.t("binds.act_fullscreen", "Alternar Tela Cheia (Fullscreen)") },
+                { key: "Super + Shift + V", action: Theme.t("binds.act_floating", "Alternar Janela Flutuante") },
+                { key: "Super + P", action: Theme.t("binds.act_pseudo", "Alternar Modo Pseudo-Tiling") },
+                { key: "Super + J", action: Theme.t("binds.act_split", "Alternar Divisão Horizontal / Vertical") },
+                { key: "Super + Setas", action: Theme.t("binds.act_focus", "Mudar Foco entre Janelas") },
+                { key: "Super + 1..9", action: Theme.t("binds.act_workspace", "Mudar para Área de Trabalho (Workspace)") },
+                { key: "Super + Shift + 1..9", action: Theme.t("binds.act_movetoworkspace", "Mover Janela para Área de Trabalho") },
+                { key: "Super + A", action: Theme.t("binds.act_scratchpad", "Abrir Área Especial (Scratchpad)") }
+            ]
+        },
+        {
+            cat: Theme.t("binds.cat_rice", "Aplicativos & Ferramentas do Rice"),
+            binds: [
+                { key: "Ctrl + Alt + Del", action: Theme.t("binds.act_powermenu", "Menu de Energia / Desligar / Suspender") },
+                { key: "Super / Super + R", action: Theme.t("binds.act_launcher", "Menu de Aplicativos (Launcher Quickshell)") },
+                { key: "Super + E", action: Theme.t("binds.act_dolphin", "Gerenciador de Pastas (Dolphin)") },
+                { key: "Super + I", action: Theme.t("binds.act_ricepanel", "Painel de Controle Rice (Esta Central Gráfica)") },
+                { key: "Super + S", action: Theme.t("binds.act_wallpaper", "Trocar Papel de Parede (Waywallen Switcher)") },
+                { key: "Super + V", action: Theme.t("binds.act_clipboard", "Histórico da Área de Transferência") },
+                { key: "Super + Ctrl + V", action: Theme.t("binds.act_clipboard_fav", "Favoritos da Área de Transferência") },
+                { key: "Super + B", action: Theme.t("binds.act_blur", "Alternar Desfoque de Janelas (Blur On/Off)") },
+                { key: "Super + W", action: Theme.t("binds.act_widgets", "Editar Widgets da Área de Trabalho") },
+                { key: "Super + N", action: Theme.t("binds.act_notifcenter", "Abrir Central de Notificações") },
+                { key: "Super + Shift + N", action: Theme.t("binds.act_dnd", "Alternar Não Perturbe (DND)") },
+                { key: "Super + L", action: Theme.t("binds.act_lock", "Bloquear Tela (Hyprlock)") },
+                { key: "Alt + Tab", action: Theme.t("binds.act_alttab", "Alternador de Janelas com Miniaturas") },
+                { key: "Super + Tab", action: Theme.t("binds.act_overview", "Visão Geral das Áreas de Trabalho (Carrossel)") },
+                { key: "Super + Esc", action: Theme.t("binds.act_taskmgr", "Gerenciador de Tarefas (também Ctrl + Shift + Esc)") }
+            ]
+        },
+        {
+            cat: Theme.t("binds.cat_capture", "Captura & Gravação de Tela"),
+            binds: [
+                { key: "Print / Super+Shift+S", action: Theme.t("binds.act_screenshot_region", "Captura de Região (Esc cancela)") },
+                { key: "Super + Alt + S", action: Theme.t("binds.act_screenshot_swappy", "Captura com Editor de Anotações (Swappy)") },
+                { key: "Shift + Print", action: Theme.t("binds.act_screenshot_full", "Captura da Tela Inteira") },
+                { key: "Ctrl + Print", action: Theme.t("binds.act_screenshot_window", "Captura da Janela Ativa") },
+                { key: "Super + Shift + R", action: Theme.t("binds.act_record_full", "Gravar Vídeo da Tela Inteira") }
+            ]
+        },
+        {
+            cat: Theme.t("binds.cat_media", "Áudio & Multimídia"),
+            binds: [
+                { key: "Volume + / -", action: Theme.t("binds.act_vol", "Aumentar / Diminuir Volume") },
+                { key: "Mute", action: Theme.t("binds.act_mute", "Silenciar / Reativar Som") },
+                { key: "NumLock", action: Theme.t("binds.act_mic_mute", "Silenciar Microfone Instantaneamente") },
+                { key: "Brilho + / -", action: Theme.t("binds.act_bright", "Aumentar / Diminuir Brilho do Monitor") },
+                { key: "Play / Pause", action: Theme.t("binds.act_playpause", "Reproduzir / Pausar Música") }
+            ]
+        }
+    ]
+
+    // Todos os atalhos em três colunas: cada categoria inteira vai para a
+    // coluna mais curta no momento, o que equilibra sem quebrar grupo no meio.
+    // Os atalhos criados pela pessoa entram como uma categoria a mais.
+    readonly property var bindColumns: {
+        const q = win.bindsFilter;
+        const matches = b => !q || b.key.toLowerCase().includes(q) || b.action.toLowerCase().includes(q);
+
+        const groups = [];
+        for (let i = 0; i < win.bindCatalog.length; i++) {
+            const c = win.bindCatalog[i];
+            const items = c.binds.filter(matches);
+            if (items.length > 0) groups.push({ cat: c.cat, binds: items });
+        }
+
+        const mine = (win.appBinds || [])
+            .map(b => ({ key: b.combo, action: b.name || b.cmd || "", user: true }))
+            .filter(matches);
+        if (mine.length > 0)
+            groups.push({ cat: Theme.t("binds.cat_mine", "Seus atalhos"), binds: mine });
+
+        const cols = [[], [], []];
+        const sizes = [0, 0, 0];
+        for (let i = 0; i < groups.length; i++) {
+            let m = 0;
+            for (let k = 1; k < 3; k++) if (sizes[k] < sizes[m]) m = k;
+            cols[m].push(groups[i]);
+            sizes[m] += groups[i].binds.length + 1;
+        }
+        return cols;
+    }
+
     readonly property var bindAppsFiltered: {
         const q = win.bindAppQuery.trim().toLowerCase();
         const all = win.availableApps || [];
@@ -1873,7 +1965,7 @@ PanelWindow {
                                 { group: "look", tabIndex: 8, name: Theme.t("settings.cat_wallust", "Cores & Papel de Parede"), icon: Theme.icons.palette, desc: Theme.t("settings.desc_wallust", "Cores da tela toda"), keywords: "cores color colors wallust tema theme wallpaper papel de parede paleta palette dinamica accent visual fundo transicao transição transition onda wave varredura circulo fade" },
                                 { group: "look", tabIndex: 9, name: Theme.t("settings.cat_effects", "Efeitos & Janelas"), icon: Theme.icons.laptop, desc: Theme.t("settings.desc_effects", "Bordas & Animações"), keywords: "efeitos effects janelas windows blur desfoque bordas borders sombras shadows sddm animacoes animations transparência luz noturna curvas bezier curves velocidade" },
                                 { group: "custom", tabIndex: 20, name: Theme.t("settings.cat_layout", "Organização da Interface"), icon: Theme.icons.dashboard, desc: Theme.t("settings.desc_layout", "Onde fica cada barra"), keywords: "organizacao layout arranjo interface barra topbar dock sidebar lateral taskbar windows areas de trabalho workspaces hover esconder largura total posicao preset estilo" },
-                                { group: "custom", tabIndex: 21, name: Theme.t("settings.cat_binds", "Atalhos do Teclado"), icon: Theme.icons.cursor, desc: Theme.t("settings.desc_binds", "Criar e trocar atalhos"), keywords: "atalhos shortcuts teclas binds keybinds combinacao gravar programa abrir steam heroic jogos discord mute deafen microfone push to talk user-binds" },
+                                { group: "custom", tabIndex: 21, name: Theme.t("settings.cat_binds", "Atalhos do Teclado"), icon: Theme.icons.keyboard, desc: Theme.t("settings.desc_binds", "Criar e trocar atalhos"), keywords: "atalhos shortcuts teclas binds keybinds combinacao gravar programa abrir steam heroic jogos discord mute deafen microfone push to talk user-binds" },
                                 { group: "custom", tabIndex: 18, name: Theme.t("settings.cat_shell_custom", "Customização do Shell"), icon: Theme.icons.tune, desc: Theme.t("settings.desc_shell_custom", "Hub, Sidebar & Dock"), keywords: "shell quickshell customizacao dock topbar barra sidebar hub aparencia widgets glass solid glow borderless escala" },
                                 { group: "look", tabIndex: 2, name: Theme.t("settings.cat_mako", "Notificações"), icon: Theme.icons.bell, desc: Theme.t("settings.desc_mako", "Posição & Estilo"), keywords: "mako notificacoes notifications som posicao borda alert toast banner avisos" },
                                 { group: "look", tabIndex: 1, name: Theme.t("settings.cat_kitty", "Kitty Terminal"), icon: Theme.icons.console, desc: Theme.t("settings.desc_kitty", "Fonte & Opacidade"), keywords: "kitty terminal console fonte font opacidade padding cursor audio blur som transparencia" },
@@ -1893,7 +1985,7 @@ PanelWindow {
                                 { group: "system", tabIndex: 14, name: Theme.t("settings.cat_storage", "Armazenamento"), icon: Theme.icons.disk, desc: Theme.t("settings.desc_storage", "Limpeza de Disco"), keywords: "armazenamento storage disco disk hd ssd espaco limpar limpeza cache lixeira logs btrfs free space" },
                                 { group: "system", tabIndex: 16, name: Theme.t("settings.cat_system", "Sistema & Reparo"), icon: Theme.icons.health, desc: Theme.t("settings.desc_system", "Snapshots & Auto-Reparo"), keywords: "sistema system reparo repair consertar snapshot restauracao backup btrfs auto-reparo diagnostico info logs status" },
 
-                                { group: "help", tabIndex: 15, name: Theme.t("settings.cat_shortcuts", "Guia de Atalhos"), icon: Theme.icons.magnify, desc: Theme.t("settings.desc_shortcuts", "Teclas do Rice"), keywords: "atalhos shortcuts teclas binds keybinds cheatsheet super mod custom user-binds ajuda boas-vindas" }
+                                { group: "help", tabIndex: 15, name: Theme.t("settings.cat_shortcuts", "Todos os Atalhos"), icon: Theme.icons.magnify, desc: Theme.t("settings.desc_shortcuts", "A lista inteira, lado a lado"), keywords: "atalhos shortcuts teclas binds keybinds cheatsheet super mod custom user-binds ajuda boas-vindas" }
                             ]
 
                             readonly property var navGroups: [
@@ -2175,7 +2267,7 @@ PanelWindow {
                                     Theme.t("header.title_12", "Aplicativos Padrão do Sistema"),
                                     Theme.t("header.title_13", "Jogos & Gráficos NVIDIA"),
                                     Theme.t("header.title_14", "Armazenamento & Limpeza de Disco"),
-                                    Theme.t("header.title_15", "Guia de Teclas & Atalhos"),
+                                    Theme.t("header.title_15", "Todos os Atalhos"),
                                     Theme.t("header.title_16", "Sistema, Snapshots & Reparo"),
                                     Theme.t("header.title_17", "Programas & Atualizações"),
                                     Theme.t("header.title_18", "Customização do Shell"),
@@ -7016,7 +7108,7 @@ PanelWindow {
                                 RowLayout {
                                     Layout.fillWidth: true
                                     SectionHeader {
-                                        title: Theme.t("binds.section_title", "Guia de Teclas & Atalhos")
+                                        title: Theme.t("binds.section_title", "Todos os atalhos")
                                         subtitle: Theme.t("binds.section_sub", "Clique num atalho para trocar a combinação de teclas. Botão direito devolve a original.")
                                     }
                                     Item { Layout.fillWidth: true }
@@ -7126,170 +7218,139 @@ PanelWindow {
                                     }
                                 }
 
-                                Repeater {
-                                    model: [
-                                        {
-                                            cat: Theme.t("binds.cat_windows", "Janelas & Navegação"),
-                                            binds: [
-                                                { key: "Super + Q", action: Theme.t("binds.act_kitty", "Abrir Terminal Kitty") },
-                                                { key: "Super + C", action: Theme.t("binds.act_close", "Fechar Janela Ativa") },
-                                                { key: "Alt + F4", action: Theme.t("binds.act_close_alt", "Fechar Janela Ativa (Padrão Windows)") },
-                                                { key: "Super + F", action: Theme.t("binds.act_fullscreen", "Alternar Tela Cheia (Fullscreen)") },
-                                                { key: "Super + Shift + V", action: Theme.t("binds.act_floating", "Alternar Janela Flutuante") },
-                                                { key: "Super + P", action: Theme.t("binds.act_pseudo", "Alternar Modo Pseudo-Tiling") },
-                                                { key: "Super + J", action: Theme.t("binds.act_split", "Alternar Divisão Horizontal / Vertical") },
-                                                { key: "Super + Setas", action: Theme.t("binds.act_focus", "Mudar Foco entre Janelas") },
-                                                { key: "Super + 1..9", action: Theme.t("binds.act_workspace", "Mudar para Área de Trabalho (Workspace)") },
-                                                { key: "Super + Shift + 1..9", action: Theme.t("binds.act_movetoworkspace", "Mover Janela para Área de Trabalho") },
-                                                { key: "Super + A", action: Theme.t("binds.act_scratchpad", "Abrir Área Especial (Scratchpad)") }
-                                            ]
-                                        },
-                                        {
-                                            cat: Theme.t("binds.cat_rice", "Aplicativos & Ferramentas do Rice"),
-                                            binds: [
-                                                { key: "Ctrl + Alt + Del", action: Theme.t("binds.act_powermenu", "Menu de Energia / Desligar / Suspender") },
-                                                { key: "Super / Super + R", action: Theme.t("binds.act_launcher", "Menu de Aplicativos (Launcher Quickshell)") },
-                                                { key: "Super + E", action: Theme.t("binds.act_dolphin", "Gerenciador de Pastas (Dolphin)") },
-                                                { key: "Super + I", action: Theme.t("binds.act_ricepanel", "Painel de Controle Rice (Esta Central Gráfica)") },
-                                                { key: "Super + S", action: Theme.t("binds.act_wallpaper", "Trocar Papel de Parede (Waywallen Switcher)") },
-                                                { key: "Super + V", action: Theme.t("binds.act_clipboard", "Histórico da Área de Transferência") },
-                                                { key: "Super + Ctrl + V", action: Theme.t("binds.act_clipboard_fav", "Favoritos da Área de Transferência") },
-                                                { key: "Super + B", action: Theme.t("binds.act_blur", "Alternar Desfoque de Janelas (Blur On/Off)") },
-                                                { key: "Super + W", action: Theme.t("binds.act_widgets", "Editar Widgets da Área de Trabalho") },
-                                                { key: "Super + N", action: Theme.t("binds.act_notifcenter", "Abrir Central de Notificações") },
-                                                { key: "Super + Shift + N", action: Theme.t("binds.act_dnd", "Alternar Não Perturbe (DND)") },
-                                                { key: "Super + L", action: Theme.t("binds.act_lock", "Bloquear Tela (Hyprlock)") },
-                                                { key: "Alt + Tab", action: Theme.t("binds.act_alttab", "Alternador de Janelas com Miniaturas") },
-                                                { key: "Super + Tab", action: Theme.t("binds.act_overview", "Visão Geral das Áreas de Trabalho (Carrossel)") },
-                                                { key: "Super + Esc", action: Theme.t("binds.act_taskmgr", "Gerenciador de Tarefas (também Ctrl + Shift + Esc)") }
-                                            ]
-                                        },
-                                        {
-                                            cat: Theme.t("binds.cat_capture", "Captura & Gravação de Tela"),
-                                            binds: [
-                                                { key: "Print / Super+Shift+S", action: Theme.t("binds.act_screenshot_region", "Captura de Região (Esc cancela)") },
-                                                { key: "Super + Alt + S", action: Theme.t("binds.act_screenshot_swappy", "Captura com Editor de Anotações (Swappy)") },
-                                                { key: "Shift + Print", action: Theme.t("binds.act_screenshot_full", "Captura da Tela Inteira") },
-                                                { key: "Ctrl + Print", action: Theme.t("binds.act_screenshot_window", "Captura da Janela Ativa") },
-                                                { key: "Super + Shift + R", action: Theme.t("binds.act_record_full", "Gravar Vídeo da Tela Inteira") }
-                                            ]
-                                        },
-                                        {
-                                            cat: Theme.t("binds.cat_media", "Áudio & Multimídia"),
-                                            binds: [
-                                                { key: "Volume + / -", action: Theme.t("binds.act_vol", "Aumentar / Diminuir Volume") },
-                                                { key: "Mute", action: Theme.t("binds.act_mute", "Silenciar / Reativar Som") },
-                                                { key: "NumLock", action: Theme.t("binds.act_mic_mute", "Silenciar Microfone Instantaneamente") },
-                                                { key: "Brilho + / -", action: Theme.t("binds.act_bright", "Aumentar / Diminuir Brilho do Monitor") },
-                                                { key: "Play / Pause", action: Theme.t("binds.act_playpause", "Reproduzir / Pausar Música") }
-                                            ]
-                                        }
-                                    ]
-                                    delegate: ColumnLayout {
-                                        id: catBindsCol
-                                        required property var modelData
-                                        Layout.fillWidth: true
-                                        spacing: 8
+                                // Todos os atalhos em três colunas, categorias
+                                // inteiras distribuídas na coluna mais curta —
+                                // antes era um Flow por categoria, e cada chip
+                                // tinha uma largura, o que embaralhava a leitura.
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    Layout.topMargin: 4
+                                    spacing: 14
 
-                                        property var filteredBinds: catBindsCol.modelData.binds.filter(b => {
-                                            if (!win.bindsFilter) return true;
-                                            return b.key.toLowerCase().includes(win.bindsFilter) || b.action.toLowerCase().includes(win.bindsFilter);
-                                        })
-
-                                        visible: filteredBinds.length > 0
-
-                                        Text {
-                                            text: catBindsCol.modelData.cat
-                                            font.family: Theme.fontFamily
-                                            font.pixelSize: 13
-                                            font.weight: Font.Bold
-                                            color: Theme.primary
-                                        }
-
-                                        Flow {
+                                    Repeater {
+                                        model: 3
+                                        delegate: ColumnLayout {
+                                            id: bindCol
+                                            required property int index
                                             Layout.fillWidth: true
-                                            spacing: 8
+                                            Layout.alignment: Qt.AlignTop
+                                            spacing: 10
 
                                             Repeater {
-                                                model: catBindsCol.filteredBinds
-                                                delegate: Rectangle {
-                                                    id: guideBind
+                                                model: win.bindColumns[bindCol.index] || []
+                                                delegate: ColumnLayout {
+                                                    id: catBlock
                                                     required property var modelData
-                                                    // O guia era só leitura. Agora cada atalho que o
-                                                    // rice define numa linha sozinha pode ser trocado
-                                                    // daqui: o rice-app-binds desfaz o original e
-                                                    // religa a mesma ação na tecla nova.
-                                                    readonly property var info: win.systemBindInfo(guideBind.modelData.key)
-                                                    readonly property bool editable: guideBind.info !== null && guideBind.info.customizable
-                                                    readonly property bool changed: guideBind.info !== null && guideBind.info.overridden
-                                                    implicitHeight: 38
-                                                    implicitWidth: bindRow.implicitWidth + 20
-                                                    radius: 8
-                                                    color: guideArea.containsMouse && guideBind.editable ? Theme.tileHigh : Theme.tile
-                                                    border.width: 1
-                                                    border.color: guideBind.changed ? Theme.primary
-                                                                                    : Theme.withAlpha(Theme.outline, 0.2)
+                                                    Layout.fillWidth: true
+                                                    spacing: 5
 
-                                                    RowLayout {
-                                                        id: bindRow
-                                                        anchors.centerIn: parent
-                                                        spacing: 8
-
-                                                        Rectangle {
-                                                            implicitHeight: 22
-                                                            implicitWidth: keyTxt.implicitWidth + 12
-                                                            radius: 6
-                                                            color: Theme.background
-                                                            border.width: 1
-                                                            border.color: Theme.withAlpha(Theme.primary, 0.4)
-                                                            Text {
-                                                                id: keyTxt
-                                                                anchors.centerIn: parent
-                                                                // Só troca o texto quando a combinação
-                                                                // foi realmente alterada: senão o guia
-                                                                // perderia a grafia amigável ("Super +
-                                                                // Setas") em favor do formato interno.
-                                                                text: guideBind.changed ? guideBind.info.current
-                                                                                        : guideBind.modelData.key
-                                                                font.family: Theme.monoFamily
-                                                                font.pixelSize: 11
-                                                                font.weight: Font.Bold
-                                                                color: Theme.primary
-                                                            }
-                                                        }
-
-                                                        Text {
-                                                            text: guideBind.modelData.action
-                                                            font.family: Theme.fontFamily
-                                                            font.pixelSize: 12
-                                                            color: Theme.textColor
-                                                        }
-
-                                                        Text {
-                                                            visible: guideBind.editable
-                                                            text: guideBind.changed ? Theme.icons.restore : Theme.icons.pencil
-                                                            font.family: Theme.iconFontFamily
-                                                            font.pixelSize: 13
-                                                            color: guideArea.containsMouse ? Theme.primary : Theme.subtext
-                                                        }
+                                                    Text {
+                                                        Layout.fillWidth: true
+                                                        Layout.topMargin: 2
+                                                        text: catBlock.modelData.cat
+                                                        wrapMode: Text.WordWrap
+                                                        font.family: Theme.fontFamily
+                                                        font.pixelSize: 12
+                                                        font.weight: Font.Bold
+                                                        color: Theme.secondary
                                                     }
 
-                                                    MouseArea {
-                                                        id: guideArea
-                                                        anchors.fill: parent
-                                                        hoverEnabled: true
-                                                        enabled: guideBind.editable
-                                                        acceptedButtons: Qt.LeftButton | Qt.RightButton
-                                                        cursorShape: Qt.PointingHandCursor
-                                                        onClicked: mouse => {
-                                                            if (mouse.button === Qt.RightButton || guideBind.changed) {
-                                                                // botão direito (ou um já trocado) devolve o original
-                                                                saveSysBindProc.command = ["rice-app-binds", "override-reset",
-                                                                                           guideBind.modelData.key];
-                                                                saveSysBindProc.running = true;
-                                                                win.showToast(Theme.t("toast.bind_restored", "Atalho original restaurado"));
-                                                            } else {
-                                                                win.startSysBindCapture(guideBind.modelData.key, guideBind.modelData.action);
+                                                    Repeater {
+                                                        model: catBlock.modelData.binds
+                                                        delegate: Rectangle {
+                                                            id: guideBind
+                                                            required property var modelData
+                                                            // Cada atalho que o rice define numa linha
+                                                            // sozinha pode ser trocado daqui: o
+                                                            // rice-app-binds desfaz o original e religa
+                                                            // a mesma ação na tecla nova.
+                                                            readonly property var info: guideBind.modelData.user
+                                                                ? null : win.systemBindInfo(guideBind.modelData.key)
+                                                            readonly property bool editable: guideBind.info !== null && guideBind.info.customizable
+                                                            readonly property bool changed: guideBind.info !== null && guideBind.info.overridden
+
+                                                            Layout.fillWidth: true
+                                                            implicitHeight: Math.max(34, bindCol2.implicitHeight + 12)
+                                                            radius: 8
+                                                            color: guideArea.containsMouse && guideBind.editable ? Theme.tileHigh : Theme.tile
+                                                            border.width: 1
+                                                            border.color: guideBind.changed ? Theme.primary
+                                                                                            : Theme.withAlpha(Theme.outline, 0.2)
+
+                                                            ColumnLayout {
+                                                                id: bindCol2
+                                                                anchors.left: parent.left
+                                                                anchors.right: parent.right
+                                                                anchors.verticalCenter: parent.verticalCenter
+                                                                anchors.leftMargin: 10
+                                                                anchors.rightMargin: 10
+                                                                spacing: 2
+
+                                                                RowLayout {
+                                                                    Layout.fillWidth: true
+                                                                    spacing: 6
+
+                                                                    Rectangle {
+                                                                        implicitHeight: 20
+                                                                        implicitWidth: keyTxt.implicitWidth + 12
+                                                                        radius: 6
+                                                                        color: Theme.background
+                                                                        border.width: 1
+                                                                        border.color: Theme.withAlpha(Theme.primary, 0.4)
+                                                                        Text {
+                                                                            id: keyTxt
+                                                                            anchors.centerIn: parent
+                                                                            // Só troca o texto quando a combinação
+                                                                            // foi realmente alterada: senão o guia
+                                                                            // perderia a grafia amigável.
+                                                                            text: guideBind.changed ? guideBind.info.current
+                                                                                                    : guideBind.modelData.key
+                                                                            font.family: Theme.monoFamily
+                                                                            font.pixelSize: 10
+                                                                            font.weight: Font.Bold
+                                                                            color: Theme.primary
+                                                                        }
+                                                                    }
+
+                                                                    Item { Layout.fillWidth: true }
+
+                                                                    Text {
+                                                                        visible: guideBind.editable
+                                                                        text: guideBind.changed ? Theme.icons.restore : Theme.icons.pencil
+                                                                        font.family: Theme.iconFontFamily
+                                                                        font.pixelSize: 12
+                                                                        color: guideArea.containsMouse ? Theme.primary : Theme.subtext
+                                                                    }
+                                                                }
+
+                                                                Text {
+                                                                    Layout.fillWidth: true
+                                                                    text: guideBind.modelData.action
+                                                                    wrapMode: Text.WordWrap
+                                                                    font.family: Theme.fontFamily
+                                                                    font.pixelSize: 11
+                                                                    color: Theme.textColor
+                                                                }
+                                                            }
+
+                                                            MouseArea {
+                                                                id: guideArea
+                                                                anchors.fill: parent
+                                                                hoverEnabled: true
+                                                                enabled: guideBind.editable
+                                                                acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                                                cursorShape: Qt.PointingHandCursor
+                                                                onClicked: mouse => {
+                                                                    if (mouse.button === Qt.RightButton || guideBind.changed) {
+                                                                        // botão direito (ou um já trocado) devolve o original
+                                                                        saveSysBindProc.command = ["rice-app-binds", "override-reset",
+                                                                                                   guideBind.modelData.key];
+                                                                        saveSysBindProc.running = true;
+                                                                        win.showToast(Theme.t("toast.bind_restored", "Atalho original restaurado"));
+                                                                    } else {
+                                                                        win.startSysBindCapture(guideBind.modelData.key, guideBind.modelData.action);
+                                                                    }
+                                                                }
                                                             }
                                                         }
                                                     }
@@ -7361,125 +7422,6 @@ PanelWindow {
                                     font.family: Theme.fontFamily
                                     font.pixelSize: 12
                                     color: "#ffb347"
-                                }
-
-                                // ---- ações do próprio rice ----
-                                // Não são programas: são comandos do rice que
-                                // ficavam espalhados por outras abas (jogos,
-                                // notificações, gravação) e que muita gente quer
-                                // numa tecla.
-                                SectionHeader {
-                                    title: Theme.t("binds.actions_title", "Ações do rice")
-                                    subtitle: Theme.t("binds.actions_sub", "Ligar e desligar coisas do sistema sem abrir menu nenhum.")
-                                }
-
-                                Repeater {
-                                    model: [
-                                        { cmd: "rice-gaming toggle-gamemode", name: Theme.t("binds.act_gamemode", "Feral GameMode"),
-                                          desc: Theme.t("binds.act_gamemode_desc", "Prioriza o processador para o jogo em foco") },
-                                        { cmd: "steam", name: Theme.t("binds.act_steam", "Abrir a Steam"),
-                                          desc: Theme.t("binds.act_steam_desc", "Também serve para trazer a janela de volta") },
-                                        { cmd: "heroic", name: Theme.t("binds.act_heroic", "Abrir o Heroic"),
-                                          desc: Theme.t("binds.act_heroic_desc", "Launcher da Epic, GOG e Amazon") },
-                                        { cmd: "rice-dnd", name: Theme.t("binds.act_dnd", "Não perturbe"),
-                                          desc: Theme.t("binds.act_dnd_desc", "Segura as notificações até você desligar") },
-                                        { cmd: "rice-caffeine", name: Theme.t("binds.act_caffeine", "Não deixar a tela apagar"),
-                                          desc: Theme.t("binds.act_caffeine_desc", "Para assistir algo sem o bloqueio automático") },
-                                        { cmd: "rice-blur-toggle", name: Theme.t("binds.act_blur", "Ligar e desligar o desfoque"),
-                                          desc: Theme.t("binds.act_blur_desc", "O jeito rápido de ganhar quadros por segundo") },
-                                        { cmd: "rice-record full", name: Theme.t("binds.act_record", "Gravar a tela"),
-                                          desc: Theme.t("binds.act_record_desc", "Começa e termina a gravação da tela inteira") },
-                                        { cmd: "rice-dropterm", name: Theme.t("binds.act_dropterm", "Terminal suspenso"),
-                                          desc: Theme.t("binds.act_dropterm_desc", "Desce por cima de tudo e volta a subir") }
-                                    ]
-                                    delegate: Rectangle {
-                                        id: actRow
-                                        required property var modelData
-                                        // Se já existe um atalho apontando para o mesmo comando,
-                                        // mostra ele em vez de oferecer criar outro.
-                                        readonly property var existing: {
-                                            const list = win.appBinds || [];
-                                            for (let i = 0; i < list.length; i++) {
-                                                if ((list[i].cmd || "") === actRow.modelData.cmd) return list[i];
-                                            }
-                                            return null;
-                                        }
-
-                                        Layout.fillWidth: true
-                                        implicitHeight: 58
-                                        radius: 12
-                                        color: Theme.tile
-                                        border.width: 1
-                                        border.color: Theme.withAlpha(Theme.outline, 0.18)
-
-                                        RowLayout {
-                                            anchors.fill: parent
-                                            anchors.leftMargin: 16
-                                            anchors.rightMargin: 16
-                                            spacing: 12
-
-                                            ColumnLayout {
-                                                Layout.fillWidth: true
-                                                spacing: 1
-                                                Text {
-                                                    Layout.fillWidth: true
-                                                    text: actRow.modelData.name
-                                                    font.family: Theme.fontFamily
-                                                    font.pixelSize: 13
-                                                    font.weight: Font.DemiBold
-                                                    color: Theme.textColor
-                                                }
-                                                Text {
-                                                    Layout.fillWidth: true
-                                                    text: actRow.modelData.desc
-                                                    elide: Text.ElideRight
-                                                    font.family: Theme.fontFamily
-                                                    font.pixelSize: 11
-                                                    color: Theme.subtext
-                                                }
-                                            }
-
-                                            Rectangle {
-                                                visible: actRow.existing !== null
-                                                implicitWidth: actComboText.implicitWidth + 20
-                                                implicitHeight: 26
-                                                radius: 8
-                                                color: Theme.withAlpha(Theme.primary, 0.16)
-                                                border.width: 1
-                                                border.color: Theme.withAlpha(Theme.primary, 0.35)
-
-                                                Text {
-                                                    id: actComboText
-                                                    anchors.centerIn: parent
-                                                    text: actRow.existing ? actRow.existing.combo : ""
-                                                    font.family: Theme.fontFamily
-                                                    font.pixelSize: 11
-                                                    font.weight: Font.DemiBold
-                                                    color: Theme.primary
-                                                }
-                                            }
-
-                                            ActionBtn {
-                                                icon: Theme.icons.plus
-                                                primary: actRow.existing === null
-                                                text: actRow.existing === null
-                                                    ? Theme.t("binds.sub_set", "Definir atalho")
-                                                    : Theme.t("binds.act_change", "Trocar")
-                                                onClicked: win.startBindCapture(actRow.modelData.cmd, actRow.modelData.name)
-                                            }
-
-                                            ActionBtn {
-                                                visible: actRow.existing !== null
-                                                icon: Theme.icons.trash
-                                                text: ""
-                                                onClicked: {
-                                                    if (!actRow.existing) return;
-                                                    saveAppBindProc.command = ["rice-app-binds", "remove", actRow.existing.combo];
-                                                    saveAppBindProc.running = true;
-                                                }
-                                            }
-                                        }
-                                    }
                                 }
 
                                 // ---- programas que já têm atalho ----
