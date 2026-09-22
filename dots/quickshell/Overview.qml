@@ -49,6 +49,18 @@ PanelWindow {
     onCurrentChanged: pos = current
 
     property real monAspect: 16 / 9
+
+    // Áreas de trabalho na vertical (rice-workspace-layout): o carrossel
+    // empilha de cima para baixo e gira no eixo horizontal.
+    property bool vertical: false
+    FileView {
+        path: Quickshell.env("HOME") + "/.config/hypr/workspace-layout"
+        watchChanges: true
+        printErrors: false
+        onFileChanged: reload()
+        onLoaded: ov.vertical = text().trim() === "vertical"
+        onLoadFailed: ov.vertical = false
+    }
     property string wallpaper: ""
 
     onOpenChanged: {
@@ -241,8 +253,10 @@ PanelWindow {
         focus: true
         Keys.onPressed: event => {
             const k = event.key;
-            if (k === Qt.Key_Right || k === Qt.Key_Tab || k === Qt.Key_L || k === Qt.Key_D) ov.step(1);
-            else if (k === Qt.Key_Left || k === Qt.Key_Backtab || k === Qt.Key_H || k === Qt.Key_A) ov.step(-1);
+            const next = ov.vertical ? [Qt.Key_Down, Qt.Key_J, Qt.Key_S] : [Qt.Key_Right, Qt.Key_L, Qt.Key_D];
+            const prev = ov.vertical ? [Qt.Key_Up, Qt.Key_K, Qt.Key_W] : [Qt.Key_Left, Qt.Key_H, Qt.Key_A];
+            if (k === Qt.Key_Tab || next.includes(k)) ov.step(1);
+            else if (k === Qt.Key_Backtab || prev.includes(k)) ov.step(-1);
             else if (k === Qt.Key_Return || k === Qt.Key_Enter || k === Qt.Key_Space) ov.goTo(ov.current);
             else if (k === Qt.Key_Escape) ov.hide();
             else if (k >= Qt.Key_1 && k <= Qt.Key_9) {
@@ -260,14 +274,18 @@ PanelWindow {
 
     // ================= título =================
     Column {
-        anchors.horizontalCenter: parent.horizontalCenter
-        y: stage.y + stage.height * 0.5 - cardH * 0.5 - height - 34 - (1 - ov.shown) * 20
+        id: titleCol
+        // Horizontal: em cima do cartão do meio. Vertical: ao lado dele.
+        x: ov.vertical ? stage.width / 2 + stage.cardW / 2 + 48 - (1 - ov.shown) * 20
+                       : (parent.width - width) / 2
+        y: ov.vertical ? stage.y + stage.height * 0.5 - height / 2
+                       : stage.y + stage.height * 0.5 - cardH * 0.5 - height - 34 - (1 - ov.shown) * 20
         opacity: ov.shown
         spacing: 4
         readonly property real cardH: stage.cardW / ov.monAspect
 
         Text {
-            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.horizontalCenter: ov.vertical ? undefined : parent.horizontalCenter
             text: ov.spaceLabel(ov.spaces[ov.current])
             font.family: Theme.fontFamily
             font.pixelSize: 22
@@ -275,7 +293,7 @@ PanelWindow {
             color: "white"
         }
         Text {
-            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.horizontalCenter: ov.vertical ? undefined : parent.horizontalCenter
             readonly property var s: ov.spaces[ov.current]
             text: !s ? "" : s.kind === "new" ? Theme.t("overview.new_hint", "Enter para abrir uma área vazia")
                 : s.wins.length === 0 ? Theme.t("overview.empty", "Vazia")
@@ -294,7 +312,8 @@ PanelWindow {
         anchors.right: parent.right
         y: parent.height * 0.1
         height: parent.height * 0.62
-        readonly property real cardW: Math.min(width * 0.5, height * 0.86 * ov.monAspect)
+        readonly property real cardW: ov.vertical ? Math.min(width * 0.42, height * 0.5 * ov.monAspect)
+                                                  : Math.min(width * 0.5, height * 0.86 * ov.monAspect)
 
         Repeater {
             model: ov.spaces
@@ -310,9 +329,9 @@ PanelWindow {
 
                 width: stage.cardW
                 height: stage.cardW / ov.monAspect
-                x: stage.width / 2 - width / 2
-                   + Math.sign(d) * (Math.min(ad, 1) * width * 0.74 + Math.max(ad - 1, 0) * width * 0.4)
-                y: stage.height / 2 - height / 2 + (1 - enter) * 70
+                readonly property real offset: Math.sign(d) * (Math.min(ad, 1) * 0.74 + Math.max(ad - 1, 0) * 0.4)
+                x: stage.width / 2 - width / 2 + (ov.vertical ? 0 : offset * width)
+                y: stage.height / 2 - height / 2 + (ov.vertical ? offset * height : 0) + (1 - enter) * 70
                 z: 100 - ad * 10
                 scale: (1 - Math.min(ad, 2.5) * 0.17) * (0.85 + 0.15 * enter)
                 opacity: enter * Math.max(0, 1 - Math.max(0, ad - 2.2))
@@ -321,8 +340,8 @@ PanelWindow {
                 transform: Rotation {
                     origin.x: card.width / 2
                     origin.y: card.height / 2
-                    axis { x: 0; y: 1; z: 0 }
-                    angle: -Math.max(-1, Math.min(1, card.d)) * 32
+                    axis { x: ov.vertical ? 1 : 0; y: ov.vertical ? 0 : 1; z: 0 }
+                    angle: (ov.vertical ? 28 : -32) * Math.max(-1, Math.min(1, card.d))
                 }
 
                 // sombra
@@ -583,7 +602,9 @@ PanelWindow {
         anchors.bottom: appsBar.top
         anchors.bottomMargin: 14
         opacity: ov.shown * 0.7
-        text: Theme.t("overview.keys", "← → navegar  ·  Enter abrir  ·  clique numa janela para ir até ela  ·  Esc fechar")
+        text: ov.vertical
+              ? Theme.t("overview.keys_vertical", "↑ ↓ navegar  ·  Enter abrir  ·  clique numa janela para ir até ela  ·  Esc fechar")
+              : Theme.t("overview.keys", "← → navegar  ·  Enter abrir  ·  clique numa janela para ir até ela  ·  Esc fechar")
         font.family: Theme.fontFamily
         font.pixelSize: 12
         color: "white"

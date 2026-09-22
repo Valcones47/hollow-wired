@@ -1088,5 +1088,12 @@
   "welcome.greeter_title": "Login screen with the rice look (optional)",
   "welcome.greeter_active": "Already active: the computer boots into the same screen as the lock screen.",
   "welcome.greeter_desc": "Same as the lock screen, with a session list. An assistant explains and asks before switching.",
-  "welcome.greeter_btn": "Set up"
+  "welcome.greeter_btn": "Set up",
+  "binds.ws_vertical_title": "Vertical workspaces",
+  "binds.ws_vertical_on": "Super + ↑/↓ switches workspace (Shift takes the window along), Super + ←/→ switches window. Super + Tab stacks top to bottom.",
+  "binds.ws_vertical_off": "Now: Super + ←/→ switches workspace and Super + ↑/↓ switches window. On, workspaces sit one above the other.",
+  "overview.keys_vertical": "↑ ↓ navigate  ·  Enter open  ·  click a window to go to it  ·  Esc close",
+  "cheatsheet.desc_ws_switch": "Previous / next workspace",
+  "cheatsheet.desc_ws_move": "Move the window to the next workspace",
+  "cheatsheet.desc_focus": "Move focus between windows"
 }

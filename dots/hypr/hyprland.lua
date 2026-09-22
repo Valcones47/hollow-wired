@@ -21,6 +21,32 @@ local home = os.getenv("HOME")
 -- waywallen continua regenerando colors.conf normalmente.
 -----------------------------------------------------------------------
 
+-- Áreas de trabalho na vertical ou na horizontal (rice-workspace-layout grava
+-- ~/.config/hypr/workspace-layout). Muda as setas e a animação de troca.
+local wsVertical = false
+do
+    local f = io.open(home .. "/.config/hypr/workspace-layout", "r")
+    if f then
+        wsVertical = (f:read("*l") or ""):match("^%s*vertical") ~= nil
+        f:close()
+    end
+end
+
+-- A animação das áreas de trabalho vem do animations.lua (rice-anim), que só
+-- conhece estilos horizontais. Em vez de duplicar isso lá, todo hl.animation
+-- das áreas de trabalho passa por aqui e ganha o "vert" no modo vertical.
+do
+    local origAnimation = hl.animation
+    hl.animation = function(t)
+        if wsVertical and type(t) == "table" and type(t.style) == "string"
+            and (t.leaf == "workspaces" or t.leaf == "workspacesIn" or t.leaf == "workspacesOut") then
+            t.style = t.style:gsub("^slidefade(%s)", "slidefadevert%1"):gsub("^slidefade$", "slidefadevert")
+            if t.style == "slide" then t.style = "slidevert" end
+        end
+        return origAnimation(t)
+    end
+end
+
 local function loadWallustColors(path)
     local colors = {}
     local f = io.open(path, "r")
@@ -525,14 +551,22 @@ hl.bind(mainMod .. " + L", hl.dsp.exec_cmd("rice-lock"), { locked = true })
 -- moviam só o foco entre janelas — algo que quem vem do Windows não procura,
 -- enquanto trocar de workspace é a ação do dia a dia (e já existia escondida
 -- na roda do mouse). Mover o foco continua disponível em Super + Alt + setas.
-hl.bind(mainMod .. " + left",  hl.dsp.focus({ workspace = "-1" }))
-hl.bind(mainMod .. " + right", hl.dsp.focus({ workspace = "+1" }))
-hl.bind(mainMod .. " + up",    hl.dsp.focus({ direction = "up" }))
-hl.bind(mainMod .. " + down",  hl.dsp.focus({ direction = "down" }))
+-- No modo vertical as áreas ficam uma embaixo da outra: quem troca são as
+-- setas para cima/baixo, e esquerda/direita passam a mover o foco.
+local wsPrev, wsNext = "left", "right"
+local focusA, focusB = "up", "down"
+if wsVertical then
+    wsPrev, wsNext = "up", "down"
+    focusA, focusB = "left", "right"
+end
+hl.bind(mainMod .. " + " .. wsPrev, hl.dsp.focus({ workspace = "-1" }))
+hl.bind(mainMod .. " + " .. wsNext, hl.dsp.focus({ workspace = "+1" }))
+hl.bind(mainMod .. " + " .. focusA, hl.dsp.focus({ direction = focusA }))
+hl.bind(mainMod .. " + " .. focusB, hl.dsp.focus({ direction = focusB }))
 
--- Levar a janela atual junto para a área de trabalho do lado.
-hl.bind(mainMod .. " + SHIFT + left",  hl.dsp.window.move({ workspace = "-1" }))
-hl.bind(mainMod .. " + SHIFT + right", hl.dsp.window.move({ workspace = "+1" }))
+-- Levar a janela atual junto para a área de trabalho vizinha.
+hl.bind(mainMod .. " + SHIFT + " .. wsPrev, hl.dsp.window.move({ workspace = "-1" }))
+hl.bind(mainMod .. " + SHIFT + " .. wsNext, hl.dsp.window.move({ workspace = "+1" }))
 
 -- Foco entre janelas, que era o papel antigo do Super + setas.
 hl.bind(mainMod .. " + ALT + left",  hl.dsp.focus({ direction = "left" }))

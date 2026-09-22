@@ -11,6 +11,17 @@ import "."
 PanelWindow {
     id: sheetWindow
 
+    // Setas das áreas de trabalho mudam no modo vertical (rice-workspace-layout).
+    property bool wsVertical: false
+    FileView {
+        path: Quickshell.env("HOME") + "/.config/hypr/workspace-layout"
+        watchChanges: true
+        printErrors: false
+        onFileChanged: reload()
+        onLoaded: sheetWindow.wsVertical = text().trim() === "vertical"
+        onLoadFailed: sheetWindow.wsVertical = false
+    }
+
     property bool open: false
 
     visible: true
@@ -212,6 +223,9 @@ PanelWindow {
                                 { keys: ["Super", "E"], desc: Theme.t("cheatsheet.desc_dolphin", "Gerenciador Dolphin") },
                                 { keys: ["Alt", "Tab"], desc: Theme.t("cheatsheet.desc_alttab", "Alternar janelas com miniaturas") },
                                 { keys: ["Super", "Tab"], desc: Theme.t("cheatsheet.desc_overview", "Visão geral das áreas de trabalho") },
+                                { keys: ["Super", sheetWindow.wsVertical ? "↑ / ↓" : "← / →"], desc: Theme.t("cheatsheet.desc_ws_switch", "Área de trabalho anterior / próxima") },
+                                { keys: ["Super", "Shift", sheetWindow.wsVertical ? "↑ / ↓" : "← / →"], desc: Theme.t("cheatsheet.desc_ws_move", "Levar a janela para a área vizinha") },
+                                { keys: ["Super", sheetWindow.wsVertical ? "← / →" : "↑ / ↓"], desc: Theme.t("cheatsheet.desc_focus", "Trocar o foco entre janelas") },
                                 { keys: ["Super", "Esc"], desc: Theme.t("cheatsheet.desc_taskmgr", "Gerenciador de tarefas") },
                                 { keys: ["Super", "'"], desc: Theme.t("cheatsheet.desc_dropterm", "Terminal drop-down suspenso") },
                                 { keys: ["Super", "Shift", "X"], desc: Theme.t("cheatsheet.desc_kill", "Encerrar janela travada (Kill)") },

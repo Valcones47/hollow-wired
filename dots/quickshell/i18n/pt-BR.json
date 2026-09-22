@@ -1088,5 +1088,12 @@
   "welcome.greeter_title": "Tela de login com a cara do rice (opcional)",
   "welcome.greeter_active": "Já ativa: o computador abre na mesma tela da tela de bloqueio.",
   "welcome.greeter_desc": "Igual à tela de bloqueio, com a lista de sessões. Um assistente explica e pergunta antes de trocar.",
-  "welcome.greeter_btn": "Configurar"
+  "welcome.greeter_btn": "Configurar",
+  "binds.ws_vertical_title": "Áreas de trabalho na vertical",
+  "binds.ws_vertical_on": "Super + ↑/↓ troca de área (Shift leva a janela junto), Super + ←/→ troca de janela. O Super + Tab empilha de cima para baixo.",
+  "binds.ws_vertical_off": "Hoje: Super + ←/→ troca de área e Super + ↑/↓ troca de janela. Ligado, as áreas ficam uma embaixo da outra.",
+  "overview.keys_vertical": "↑ ↓ navegar  ·  Enter abrir  ·  clique numa janela para ir até ela  ·  Esc fechar",
+  "cheatsheet.desc_ws_switch": "Área de trabalho anterior / próxima",
+  "cheatsheet.desc_ws_move": "Levar a janela para a área vizinha",
+  "cheatsheet.desc_focus": "Trocar o foco entre janelas"
 }

@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# rice-workspace-layout — áreas de trabalho na horizontal (padrão) ou vertical.
+#
+#   rice-workspace-layout status | horizontal | vertical | toggle
+#
+# Vertical: Super + ↑/↓ troca de área, Super + Shift + ↑/↓ leva a janela junto,
+# Super + ←/→ move o foco entre janelas, a animação de troca desliza na
+# vertical e o carrossel do Super + Tab empilha de cima para baixo.
+# A escolha fica em ~/.config/hypr/workspace-layout (lida pelo hyprland.lua e
+# pelo Overview.qml).
+# ==============================================================================
+set -uo pipefail
+FILE="$HOME/.config/hypr/workspace-layout"
+
+current() { [ "$(head -1 "$FILE" 2>/dev/null | tr -d '[:space:]')" = "vertical" ] && echo vertical || echo horizontal; }
+
+apply() {
+    mkdir -p "$(dirname "$FILE")"
+    echo "$1" > "$FILE"
+    hyprctl reload >/dev/null 2>&1 || true
+    if [ "$1" = vertical ]; then
+        notify-send -a "Áreas de trabalho" -i view-grid "Áreas de trabalho na vertical" \
+            "Super + ↑/↓ troca de área · Super + ←/→ troca de janela" 2>/dev/null || true
+    else
+        notify-send -a "Áreas de trabalho" -i view-grid "Áreas de trabalho na horizontal" \
+            "Super + ←/→ troca de área · Super + ↑/↓ troca de janela" 2>/dev/null || true
+    fi
+}
+
+case "${1:-status}" in
+    status)     current ;;
+    vertical)   apply vertical ;;
+    horizontal) apply horizontal ;;
+    toggle)     [ "$(current)" = vertical ] && apply horizontal || apply vertical ;;
+    *) sed -n '3,12p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+esac

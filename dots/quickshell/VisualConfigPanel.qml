@@ -7244,6 +7244,36 @@ PanelWindow {
                                     Item { Layout.fillWidth: true }
                                 }
 
+                                // Áreas de trabalho na vertical (rice-workspace-layout):
+                                // troca as setas e o visual do Super + Tab.
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    implicitHeight: wsLayoutRow.implicitHeight + 24
+                                    radius: 12
+                                    color: Theme.tile
+                                    border.width: 1
+                                    border.color: Theme.withAlpha(Theme.outline, 0.2)
+
+                                    RowLayout {
+                                        id: wsLayoutRow
+                                        anchors.fill: parent
+                                        anchors.margins: 12
+                                        spacing: 10
+
+                                        CfgToggle {
+                                            title: Theme.t("binds.ws_vertical_title", "Áreas de trabalho na vertical")
+                                            subtitle: win.wsVertical
+                                                ? Theme.t("binds.ws_vertical_on", "Super + ↑/↓ troca de área (Shift leva a janela junto), Super + ←/→ troca de janela. O Super + Tab empilha de cima para baixo.")
+                                                : Theme.t("binds.ws_vertical_off", "Hoje: Super + ←/→ troca de área e Super + ↑/↓ troca de janela. Ligado, as áreas ficam uma embaixo da outra.")
+                                            checked: win.wsVertical
+                                            onToggled: nextVal => {
+                                                win.wsVertical = nextVal;
+                                                Quickshell.execDetached(["rice-workspace-layout", nextVal ? "vertical" : "horizontal"]);
+                                            }
+                                        }
+                                    }
+                                }
+
                                 Rectangle {
                                     Layout.fillWidth: true
                                     implicitHeight: tipsRow.implicitHeight + 24
@@ -9377,6 +9407,15 @@ PanelWindow {
     // Dicas de uso em notificação (rice-tips).
     property bool tipsEnabled: true
     property int tipsRemaining: 0
+    property bool wsVertical: false
+    FileView {
+        path: Quickshell.env("HOME") + "/.config/hypr/workspace-layout"
+        watchChanges: true
+        printErrors: false
+        onFileChanged: reload()
+        onLoaded: win.wsVertical = text().trim() === "vertical"
+        onLoadFailed: win.wsVertical = false
+    }
     Process {
         id: loadTipsProc
         command: ["rice-tips", "status"]
