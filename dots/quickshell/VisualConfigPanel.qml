@@ -1311,7 +1311,7 @@ PanelWindow {
                             spacing: 4
                             Repeater {
                                 model: 3
-                                Rectangle { width: 7; height: 7; radius: 3.5; color: index === 2 ? "#e06c75" : Theme.withAlpha(Theme.textColor, 0.35) }
+                                Rectangle { width: 7; height: 7; radius: 3.5; color: index === 2 ? "#e06c75" : Theme.withAlpha(Theme.textColor, 0.55) }
                             }
                         }
                     }
@@ -3858,7 +3858,7 @@ PanelWindow {
                                                     }
                                                     Rectangle {
                                                         width: 8; height: 8; radius: 4
-                                                        color: win.discordRunning ? "#10b981" : Theme.withAlpha(Theme.subtext, 0.5)
+                                                        color: win.discordRunning ? "#10b981" : Theme.withAlpha(Theme.subtext, 0.75)
                                                     }
                                                     Text {
                                                         text: win.discordRunning ? "Em execução" : "Não detectado no momento"
