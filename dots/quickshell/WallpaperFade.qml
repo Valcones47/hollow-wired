@@ -388,9 +388,11 @@ Scope {
         // Revela o wallpaper novo, agora que o renderizador dele está no ar.
         function reveal(): void { fadeScope.reveal(); }
         // Quanto tempo o chamador deve esperar antes de aplicar a troca.
-        // A troca só é enviada quando a tela está 100% coberta, para que o
-        // arranque pesado do Flatpak/Vulkan não roube quadros da animação da onda.
-        function coverDelay(): string { return String(fadeScope.coverMs); }
+        // O renderizador do Waywallen leva cerca de 800-850ms no total (Flatpak + Vulkan)
+        // para entregar o primeiro quadro. Disparamos a troca com antecedência calculada
+        // para que a entrega do quadro coincida exatamente com o final da animação,
+        // sem deixar a tela parada após a varredura nem engasgar o início.
+        function coverDelay(): string { return String(Math.max(0, fadeScope.coverMs - 850)); }
         // Troca o estilo sem reiniciar o shell (usado pelo painel e para teste).
         function setStyle(name: string): void { fadeScope.style = name; }
         function currentStyle(): string { return fadeScope.style; }

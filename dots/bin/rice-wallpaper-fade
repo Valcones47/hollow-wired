@@ -124,8 +124,8 @@ case "${1:-}" in
         done
 
         if [ -n "$pid" ]; then
-            # Aguarda a fração necessária para o pipeline Vulkan/Wayland conectar (~150ms)
-            sleep 0.15
+            # Aguarda a inicialização do pipeline gráfico Vulkan/VA-API (~450ms)
+            sleep 0.45
             trace "renderizador pronto e ativo: $target"
         else
             trace "renderizador novo NÃO apareceu em 8s: $target"
