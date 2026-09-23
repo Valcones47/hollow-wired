@@ -216,6 +216,8 @@ PanelWindow {
 
     onOpenChanged: {
         hoverThumb = "";
+        hoverKey = "";
+        hoverText = "";
         if (open) {
             searchField.text = "";
             selectedIndex = 0;
@@ -405,6 +407,69 @@ PanelWindow {
 
     // Prévia grande da imagem sob o mouse, à esquerda da janela.
     property string hoverThumb: ""
+    // Texto: o `cliphist list` só traz o começo, então o texto inteiro vem de um
+    // `cliphist decode` (limitado a 20 kB). hoverKey descarta resposta atrasada
+    // de uma linha que o mouse já deixou.
+    property string hoverText: ""
+    property string hoverKey: ""
+    function peekText(key, raw, known) {
+        hoverKey = key;
+        hoverText = "";
+        if (known !== undefined) { hoverText = known; return; }
+        textPeek.key = key;
+        textPeek.rawLine = raw;
+        if (textPeek.running) textPeek.pendingRestart = true;
+        else textPeek.running = true;
+    }
+    function clearPeek(key) {
+        if (hoverKey !== key) return;
+        hoverKey = "";
+        hoverText = "";
+    }
+    Process {
+        id: textPeek
+        property string key: ""
+        property string rawLine: ""
+        property bool pendingRestart: false
+        command: ["bash", "-c", "printf '%s' \"$RAW\" | cliphist decode | head -c 20000"]
+        environment: ({ RAW: rawLine })
+        stdout: StdioCollector {
+            onStreamFinished: if (textPeek.key === clipWindow.hoverKey && !textPeek.pendingRestart) clipWindow.hoverText = text
+        }
+        onExited: if (pendingRestart) { pendingRestart = false; running = true; }
+    }
+    Rectangle {
+        id: textPreview
+        // Mais alta que a prévia de imagem (420): texto longo precisa de altura.
+        anchors.right: card.left
+        anchors.rightMargin: 16
+        anchors.verticalCenter: card.verticalCenter
+        width: 440
+        height: Math.min(640, peekBody.implicitHeight + 28)
+        radius: Theme.radius
+        color: Theme.surface
+        border.color: Theme.withAlpha(Theme.outline, 0.35)
+        border.width: 1
+        clip: true
+        opacity: clipWindow.open && clipWindow.hoverText !== "" ? 1 : 0
+        visible: opacity > 0
+        Behavior on opacity { NumberAnimation { duration: 120 } }
+        Text {
+            id: peekBody
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.margins: 14
+            text: clipWindow.hoverText
+            textFormat: Text.PlainText
+            wrapMode: Text.WrapAnywhere
+            elide: Text.ElideRight
+            maximumLineCount: 36
+            font.family: Theme.monoFamily
+            font.pixelSize: 12
+            color: Theme.textColor
+        }
+    }
     Rectangle {
         id: bigPreview
         readonly property int maxSide: 420
@@ -936,8 +1001,16 @@ PanelWindow {
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onContainsMouseChanged: {
-                            if (containsMouse) clipWindow.hoverThumb = rowRect.thumb;
-                            else if (clipWindow.hoverThumb === rowRect.thumb) clipWindow.hoverThumb = "";
+                            if (rowRect.isImage) {
+                                if (containsMouse) clipWindow.hoverThumb = rowRect.thumb;
+                                else if (clipWindow.hoverThumb === rowRect.thumb) clipWindow.hoverThumb = "";
+                                return;
+                            }
+                            const key = (rowRect.isFav ? "fav:" : "h:") + (rowRect.isFav ? rowRect.label : rowRect.modelData.id);
+                            if (containsMouse) {
+                                if (rowRect.isFav) clipWindow.peekText(key, "", rowRect.modelData.text || rowRect.label);
+                                else clipWindow.peekText(key, rowRect.modelData.raw);
+                            } else clipWindow.clearPeek(key);
                         }
                         onClicked: mouse => {
                             // Ctrl segurado: só copia, não cola.
