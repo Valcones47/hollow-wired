@@ -35,33 +35,21 @@ Scope {
 
     property string style: "wipe"
 
-    // Tempos calibrados: transição ágil e revelação suave assim que o novo
-    // renderizador estiver pronto.
-    property int coverMs: 700
-    property int hold: 6000
-    property int revealMs: 400
+    // Tempos calibrados para transição contínua sem pausa perceptível:
+    // a cobertura varre a tela e a revelação ocorre em fluxo contínuo.
+    property int coverMs: 550
+    property int hold: 4000
+    property int revealMs: 320
 
     property string source: ""
     property bool covering: false
 
     // Progresso da máscara: 0 = nada coberto, 1 = tela inteira coberta.
-    // Os estilos com máscara animam isto; o `fade` anima a opacidade e deixa
-    // o progresso em 1 o tempo todo.
     property real progress: 0
 
-    // Se algo der errado no meio do caminho (o backend travou, o script morreu),
-    // a camada NUNCA pode ficar presa cobrindo a área de trabalho inteira.
-    readonly property int safetyTimeout: coverMs + hold + revealMs + 4000
-
+    readonly property int safetyTimeout: coverMs + hold + revealMs + 3000
     readonly property bool masked: style === "wipe" || style === "wave" || style === "grow"
-
-    // Espera a imagem estar decodificada antes de animar. Uma imagem de tela
-    // cheia leva algumas dezenas de ms para decodificar, e começar a varredura
-    // antes disso desperdiça o começo da animação desenhando nada.
     property bool pendingCover: false
-
-    // Duração da animação de opacidade. É definida ANTES de mexer em
-    // `covering`, de propósito.
     property int opDuration: 0
 
     function cover(path) {
@@ -81,31 +69,25 @@ Scope {
             return;
         fadeScope.pendingCover = false;
         decodeGuard.stop();
-        // Nos estilos com máscara a opacidade salta para 1 e quem revela a
-        // imagem aos poucos é a máscara.
         fadeScope.opDuration = fadeScope.masked ? 0 : fadeScope.coverMs;
         fadeScope.covering = true;
-        // Sem o restart explícito, cobrir duas vezes seguidas deixaria a
-        // animação de máscara parada no valor anterior.
         if (fadeScope.masked)
             coverAnim.restart();
     }
 
-    // Se a imagem não carregar (arquivo sumiu, formato estranho), a transição
-    // não pode ficar esperando para sempre.
     Timer {
         id: decodeGuard
-        interval: 250
+        interval: 150
         onTriggered: fadeScope.maybeStart()
     }
 
-    // Revela o wallpaper novo. Chamado quando o renderizador novo já está no ar
-    // (ver rice-wallpaper-fade --reveal-when-ready).
     property bool revealQueued: false
 
     function reveal() {
         if (!fadeScope.covering && !fadeScope.pendingCover)
             return;
+        // Se a animação de cobertura ainda estiver correndo, enfileira
+        // para revelar imediatamente no término da onda sem congelamento.
         if (coverAnim.running) {
             fadeScope.revealQueued = true;
             return;
