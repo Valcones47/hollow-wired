@@ -215,6 +215,7 @@ PanelWindow {
     WlrLayershell.keyboardFocus: clipWindow.open ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
     onOpenChanged: {
+        hoverThumb = "";
         if (open) {
             searchField.text = "";
             selectedIndex = 0;
@@ -399,6 +400,38 @@ PanelWindow {
         MouseArea {
             anchors.fill: parent
             onClicked: clipWindow.open = false
+        }
+    }
+
+    // Prévia grande da imagem sob o mouse, à esquerda da janela.
+    property string hoverThumb: ""
+    Rectangle {
+        id: bigPreview
+        readonly property int maxSide: 420
+        anchors.right: card.left
+        anchors.rightMargin: 16
+        anchors.verticalCenter: card.verticalCenter
+        width: bigImg.status === Image.Ready ? bigImg.paintedWidth + 12 : 0
+        height: bigImg.status === Image.Ready ? bigImg.paintedHeight + 12 : 0
+        radius: Theme.radius
+        color: Theme.surface
+        border.color: Theme.withAlpha(Theme.outline, 0.35)
+        border.width: 1
+        opacity: clipWindow.open && clipWindow.hoverThumb !== "" && bigImg.status === Image.Ready ? 1 : 0
+        visible: opacity > 0
+        Behavior on opacity { NumberAnimation { duration: 120 } }
+
+        Image {
+            id: bigImg
+            anchors.centerIn: parent
+            width: bigPreview.maxSide
+            height: bigPreview.maxSide
+            source: clipWindow.hoverThumb
+            sourceSize.width: bigPreview.maxSide * 2
+            sourceSize.height: bigPreview.maxSide * 2
+            fillMode: Image.PreserveAspectFit
+            asynchronous: true
+            cache: false
         }
     }
 
@@ -902,6 +935,10 @@ PanelWindow {
                         anchors.rightMargin: 64
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
+                        onContainsMouseChanged: {
+                            if (containsMouse) clipWindow.hoverThumb = rowRect.thumb;
+                            else if (clipWindow.hoverThumb === rowRect.thumb) clipWindow.hoverThumb = "";
+                        }
                         onClicked: mouse => {
                             // Ctrl segurado: só copia, não cola.
                             const paste = !(mouse.modifiers & Qt.ControlModifier) && clipWindow.pasteOnPick;
