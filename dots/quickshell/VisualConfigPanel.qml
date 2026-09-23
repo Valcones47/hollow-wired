@@ -1234,7 +1234,7 @@ PanelWindow {
                 width: parent.width
                 height: 6
                 radius: 3
-                color: Theme.withAlpha(Theme.primary, 0.2)
+                color: Theme.tileHigh
 
                 Rectangle {
                     width: parent.width * ctrack.fraction
@@ -1381,7 +1381,7 @@ PanelWindow {
         Layout.fillWidth: true
         Layout.preferredHeight: mcCol.implicitHeight + 36
         radius: 16
-        color: mc.active ? Theme.withAlpha(Theme.primary, 0.14) : (mcArea.containsMouse ? Theme.tileHigh : Theme.tile)
+        color: mc.active ? Theme.tileHigh : (mcArea.containsMouse ? Theme.tileHigh : Theme.tile)
         border.width: mc.active ? 2 : 1
         border.color: mc.active ? Theme.primary : Theme.withAlpha(Theme.outline, 0.25)
         Behavior on color { ColorAnimation { duration: 140 } }
@@ -1406,7 +1406,7 @@ PanelWindow {
 
                 Rectangle {
                     x: 0; y: 0; width: parent.width; height: 8
-                    color: Theme.withAlpha(Theme.primary, 0.25)
+                    color: Theme.tileHigh
                 }
                 Repeater {
                     model: mc.mode === "windows"
@@ -1678,7 +1678,7 @@ PanelWindow {
         property string subtitle: ""
         // quiet: o estilo novo (título pequeno, maiúsculo e neutro), usado nas
         // abas já redesenhadas.
-        property bool quiet: false
+        property bool quiet: true
         Layout.fillWidth: true
         Layout.topMargin: quiet ? 10 : 0
         spacing: quiet ? 4 : 2
@@ -1721,9 +1721,8 @@ PanelWindow {
             : Math.max(abtn.minWidth, btnRow.implicitWidth + 24)
         radius: 8
         color: abtn.primary ? (abtnArea.pressed ? Theme.withAlpha(Theme.primary, 0.7) : Theme.primary)
-                            : (abtnArea.pressed ? Theme.tileHigh : (abtnArea.containsMouse ? Theme.tileHigh : Theme.tile))
-        border.width: 1
-        border.color: abtn.primary ? Theme.primary : Theme.withAlpha(Theme.outline, 0.25)
+                            : (abtnArea.pressed || abtnArea.containsMouse ? Theme.tileHigh : Theme.withAlpha(Theme.tile, 0.8))
+        border.width: 0
 
         RowLayout {
             id: btnRow
@@ -1847,7 +1846,7 @@ PanelWindow {
                     Layout.fillWidth: true
                     spacing: 1
                     Text {
-                        Layout.alignment: Qt.AlignLeft
+                        Layout.fillWidth: true
                         text: Theme.t("binds.sub_capturing", "Aperte a combinação de teclas agora...")
                         font.family: Theme.fontFamily
                         font.pixelSize: 15
@@ -1855,7 +1854,7 @@ PanelWindow {
                         color: Theme.textColor
                     }
                     Text {
-                        Layout.alignment: Qt.AlignLeft
+                        Layout.fillWidth: true
                         text: win.bindRecordingName + " · " + Theme.t("binds.sub_capturing_hint", "qualquer tecla vale, inclusive o Esc")
                         font.family: Theme.fontFamily
                         font.pixelSize: 12
@@ -1877,7 +1876,7 @@ PanelWindow {
             radius: card.radius + 2
             color: "transparent"
             border.width: 1
-            border.color: Theme.withAlpha(Theme.primary, 0.15)
+            border.color: Theme.withAlpha(Theme.outline, 0.2)
             z: -1
         }
 
@@ -2005,7 +2004,7 @@ PanelWindow {
                             implicitWidth: 40
                             implicitHeight: 40
                             radius: 10
-                            color: Theme.withAlpha(Theme.primary, 0.2)
+                            color: Theme.tileHigh
 
                             Text {
                                 anchors.centerIn: parent
@@ -2020,7 +2019,7 @@ PanelWindow {
                             Layout.fillWidth: true
                             spacing: 1
                             Text {
-                                Layout.alignment: Qt.AlignLeft
+                                Layout.fillWidth: true
                                 text: Theme.t("settings.panel_title", "Painel Rice")
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 17
@@ -2028,7 +2027,7 @@ PanelWindow {
                                 color: Theme.textColor
                             }
                             Text {
-                                Layout.alignment: Qt.AlignLeft
+                                Layout.fillWidth: true
                                 text: Theme.t("settings.panel_subtitle", "Central de Controle Gráfica")
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 11
@@ -2212,7 +2211,7 @@ PanelWindow {
                                     color: navDelegate.isHeader
                                         ? "transparent"
                                         : (win.currentTab === navDelegate.targetTab
-                                            ? Theme.withAlpha(Theme.primary, 0.22)
+                                            ? Theme.tileHigh
                                             : (navItemArea.containsMouse ? Theme.tileHigh : "transparent"))
                                     border.width: !navDelegate.isHeader && win.currentTab === navDelegate.targetTab ? 1 : 0
                                     border.color: Theme.primary
@@ -2266,7 +2265,7 @@ PanelWindow {
                                             spacing: 1
 
                                             Text {
-                                                Layout.alignment: Qt.AlignLeft
+                                                Layout.fillWidth: true
                                                 text: navDelegate.modelData.name
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: 13
@@ -2279,7 +2278,7 @@ PanelWindow {
                                             }
 
                                             Text {
-                                                Layout.alignment: Qt.AlignLeft
+                                                Layout.fillWidth: true
                                                 text: navDelegate.modelData.desc || ""
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: 11
@@ -2431,7 +2430,7 @@ PanelWindow {
                             spacing: 1
 
                             Text {
-                                Layout.alignment: Qt.AlignLeft
+                                Layout.fillWidth: true
                                 text: [
                                     Theme.t("header.title_0", "Fastfetch & Terminal Fetch"),
                                     Theme.t("header.title_1", "Kitty Terminal & Tipografia"),
@@ -2452,7 +2451,9 @@ PanelWindow {
                                     Theme.t("header.title_16", "Sistema, Snapshots & Reparo"),
                                     Theme.t("header.title_17", "Programas & Atualizações"),
                                     Theme.t("header.title_18", "Customização do Shell"),
-                                    Theme.t("header.title_19", "Jeito de Usar")
+                                    Theme.t("header.title_19", "Jeito de Usar"),
+                                    Theme.t("header.title_20", "Organização da interface"),
+                                    Theme.t("header.title_21", "Atalhos do teclado")
                                 ][win.currentTab] || Theme.t("settings.panel_title", "Configurações")
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 18
@@ -2461,7 +2462,7 @@ PanelWindow {
                             }
 
                             Text {
-                                Layout.alignment: Qt.AlignLeft
+                                Layout.fillWidth: true
                                 text: [
                                     Theme.t("header.sub_0", "Personalize o logo, dimensões e informações mostradas no terminal."),
                                     Theme.t("header.sub_1", "Ajuste opacidade, tamanho de texto, espaçamento interno e cursor."),
@@ -2482,7 +2483,9 @@ PanelWindow {
                                     Theme.t("header.sub_16", "Crie pontos de restauração Btrfs e resolva problemas comuns com 1 clique."),
                                     Theme.t("header.sub_17", "Atualize o sistema e o hollow-wired, e abra a loja de programas para instalar o que quiser."),
                                     Theme.t("header.sub_18", "Ajuste estilo, escala, blur e cores de destaque dos componentes do shell."),
-                                    Theme.t("header.sub_19", "Janelas lado a lado (Hyprland) ou soltas como no Windows. Troca na hora, sem sair da sessão.")
+                                    Theme.t("header.sub_19", "Janelas lado a lado (Hyprland) ou soltas como no Windows. Troca na hora, sem sair da sessão."),
+                                    Theme.t("header.sub_20", "Onde ficam a barra, a dock e a central de ações."),
+                                    Theme.t("header.sub_21", "Crie e troque atalhos.")
                                 ][win.currentTab] || ""
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 12
@@ -2569,7 +2572,7 @@ PanelWindow {
                                         Layout.preferredHeight: 110
                                         radius: Theme.tileRadius
                                         color: win.ffCurrentLogo === "" || win.ffCurrentLogo === "arch"
-                                            ? Theme.withAlpha(Theme.primary, 0.25)
+                                            ? Theme.tileHigh
                                             : (archArea.containsMouse ? Theme.tileHigh : Theme.tile)
                                         border.width: win.ffCurrentLogo === "" || win.ffCurrentLogo === "arch" ? 1.5 : 0
                                         border.color: Theme.primary
@@ -2614,7 +2617,7 @@ PanelWindow {
                                             Layout.preferredHeight: 110
                                             radius: Theme.tileRadius
                                             color: win.ffCurrentLogo === modelData.path
-                                                ? Theme.withAlpha(Theme.primary, 0.25)
+                                                ? Theme.tileHigh
                                                 : (imgArea.containsMouse ? Theme.tileHigh : Theme.tile)
                                             border.width: win.ffCurrentLogo === modelData.path ? 1.5 : 0
                                             border.color: Theme.primary
@@ -2719,7 +2722,7 @@ PanelWindow {
                                             implicitHeight: 34
                                             implicitWidth: modRow.implicitWidth + 18
                                             radius: 8
-                                            color: active ? Theme.withAlpha(Theme.primary, 0.22) : Theme.tile
+                                            color: active ? Theme.tileHigh : Theme.tile
                                             border.width: active ? 1 : 0
                                             border.color: Theme.primary
 
@@ -2853,7 +2856,7 @@ PanelWindow {
                                             Layout.fillWidth: true
                                             implicitHeight: 43
                                             radius: 10
-                                            color: active ? Theme.withAlpha(Theme.primary, 0.22) : (curArea.containsMouse ? Theme.tileHigh : Theme.tile)
+                                            color: active ? Theme.tileHigh : (curArea.containsMouse ? Theme.tileHigh : Theme.tile)
                                             border.width: active ? 1.5 : 0
                                             border.color: Theme.primary
 
@@ -2964,7 +2967,7 @@ PanelWindow {
                                             Layout.fillWidth: true
                                             spacing: 4
                                             Text {
-                                                Layout.alignment: Qt.AlignLeft
+                                                Layout.fillWidth: true
                                                 text: Theme.t("mako.problem_title", "As notificações estão com problema")
                                                 color: "#ffb347"
                                                 font.pixelSize: 16
@@ -3025,7 +3028,7 @@ PanelWindow {
                                             Layout.fillWidth: true
                                             implicitHeight: 43
                                             radius: 10
-                                            color: active ? Theme.withAlpha(Theme.primary, 0.22) : (posArea.containsMouse ? Theme.tileHigh : Theme.tile)
+                                            color: active ? Theme.tileHigh : (posArea.containsMouse ? Theme.tileHigh : Theme.tile)
                                             border.width: active ? 1.5 : 0
                                             border.color: Theme.primary
 
@@ -3160,7 +3163,7 @@ PanelWindow {
                                             Layout.fillWidth: true
                                             implicitHeight: 78
                                             radius: 12
-                                            color: monCard.isSelected ? Theme.withAlpha(Theme.primary, 0.18) : Theme.tile
+                                            color: monCard.isSelected ? Theme.tileHigh : Theme.tile
                                             border.width: monCard.isSelected ? 1.5 : 1
                                             border.color: monCard.isSelected ? Theme.primary : Theme.withAlpha(Theme.outline, 0.2)
 
@@ -3175,7 +3178,7 @@ PanelWindow {
                                                     implicitWidth: 47
                                                     implicitHeight: 47
                                                     radius: 10
-                                                    color: Theme.withAlpha(Theme.primary, 0.2)
+                                                    color: Theme.tileHigh
                                                     Text {
                                                         anchors.centerIn: parent
                                                         text: Theme.icons.monitor
@@ -3202,7 +3205,7 @@ PanelWindow {
                                                             implicitHeight: 16
                                                             implicitWidth: hzBadge.implicitWidth + 12
                                                             radius: 8
-                                                            color: Theme.withAlpha(Theme.primary, 0.25)
+                                                            color: Theme.tileHigh
                                                             Text {
                                                                 id: hzBadge
                                                                 anchors.centerIn: parent
@@ -3261,7 +3264,7 @@ PanelWindow {
                                             Layout.fillWidth: true
                                             implicitHeight: 65
                                             radius: 10
-                                            color: resCard.isCurrent ? Theme.withAlpha(Theme.primary, 0.25) : (resArea.containsMouse ? Theme.tileHigh : Theme.tile)
+                                            color: resCard.isCurrent ? Theme.tileHigh : (resArea.containsMouse ? Theme.tileHigh : Theme.tile)
                                             border.width: resCard.isCurrent ? 1.5 : 1
                                             border.color: resCard.isCurrent ? Theme.primary : Theme.withAlpha(Theme.outline, 0.15)
 
@@ -3321,7 +3324,7 @@ PanelWindow {
                                             Layout.fillWidth: true
                                             implicitHeight: 65
                                             radius: 10
-                                            color: hzCard.isCurrent ? Theme.withAlpha(Theme.primary, 0.25) : (hzArea.containsMouse ? Theme.tileHigh : Theme.tile)
+                                            color: hzCard.isCurrent ? Theme.tileHigh : (hzArea.containsMouse ? Theme.tileHigh : Theme.tile)
                                             border.width: hzCard.isCurrent ? 1.5 : 1
                                             border.color: hzCard.isCurrent ? Theme.primary : Theme.withAlpha(Theme.outline, 0.15)
 
@@ -3385,7 +3388,7 @@ PanelWindow {
                                             Layout.fillWidth: true
                                             implicitHeight: 65
                                             radius: 10
-                                            color: scaleCard.isCurrent ? Theme.withAlpha(Theme.primary, 0.25) : (scaleArea.containsMouse ? Theme.tileHigh : Theme.tile)
+                                            color: scaleCard.isCurrent ? Theme.tileHigh : (scaleArea.containsMouse ? Theme.tileHigh : Theme.tile)
                                             border.width: scaleCard.isCurrent ? 1.5 : 1
                                             border.color: scaleCard.isCurrent ? Theme.primary : Theme.withAlpha(Theme.outline, 0.15)
 
@@ -3448,7 +3451,7 @@ PanelWindow {
                                             Layout.fillWidth: true
                                             implicitHeight: 58
                                             radius: 10
-                                            color: rotCard.isCurrent ? Theme.withAlpha(Theme.primary, 0.25) : (rotArea.containsMouse ? Theme.tileHigh : Theme.tile)
+                                            color: rotCard.isCurrent ? Theme.tileHigh : (rotArea.containsMouse ? Theme.tileHigh : Theme.tile)
                                             border.width: rotCard.isCurrent ? 1.5 : 1
                                             border.color: rotCard.isCurrent ? Theme.primary : Theme.withAlpha(Theme.outline, 0.15)
 
@@ -3568,7 +3571,7 @@ PanelWindow {
                                             Layout.fillWidth: true
                                             implicitHeight: 63
                                             radius: 10
-                                            color: sinkCard.modelData.is_default ? Theme.withAlpha(Theme.primary, 0.22) : (sinkArea.containsMouse ? Theme.tileHigh : Theme.tile)
+                                            color: sinkCard.modelData.is_default ? Theme.tileHigh : (sinkArea.containsMouse ? Theme.tileHigh : Theme.tile)
                                             border.width: sinkCard.modelData.is_default ? 1.5 : 0
                                             border.color: Theme.primary
 
@@ -3588,7 +3591,7 @@ PanelWindow {
                                                     Layout.fillWidth: true
                                                     spacing: 1
                                                     Text {
-                                                        Layout.alignment: Qt.AlignLeft
+                                                        Layout.fillWidth: true
                                                         text: sinkCard.modelData.description
                                                         font.family: Theme.fontFamily
                                                         font.pixelSize: 13
@@ -3596,7 +3599,7 @@ PanelWindow {
                                                         color: Theme.textColor
                                                     }
                                                     Text {
-                                                        Layout.alignment: Qt.AlignLeft
+                                                        Layout.fillWidth: true
                                                         text: sinkCard.modelData.is_default ? Theme.t("audio.default_active", "Dispositivo Padrão Ativo") + " · " + sinkCard.modelData.volume + "%" : Theme.t("audio.click_select", "Clique para selecionar")
                                                         font.family: Theme.fontFamily
                                                         font.pixelSize: 11
@@ -3663,7 +3666,7 @@ PanelWindow {
                                             Layout.fillWidth: true
                                             implicitHeight: 63
                                             radius: 10
-                                            color: sourceCard.modelData.is_default ? Theme.withAlpha(Theme.primary, 0.22) : (sourceArea.containsMouse ? Theme.tileHigh : Theme.tile)
+                                            color: sourceCard.modelData.is_default ? Theme.tileHigh : (sourceArea.containsMouse ? Theme.tileHigh : Theme.tile)
                                             border.width: sourceCard.modelData.is_default ? 1.5 : 0
                                             border.color: Theme.primary
 
@@ -3683,7 +3686,7 @@ PanelWindow {
                                                     Layout.fillWidth: true
                                                     spacing: 1
                                                     Text {
-                                                        Layout.alignment: Qt.AlignLeft
+                                                        Layout.fillWidth: true
                                                         text: sourceCard.modelData.description
                                                         font.family: Theme.fontFamily
                                                         font.pixelSize: 13
@@ -3691,7 +3694,7 @@ PanelWindow {
                                                         color: Theme.textColor
                                                     }
                                                     Text {
-                                                        Layout.alignment: Qt.AlignLeft
+                                                        Layout.fillWidth: true
                                                         text: sourceCard.modelData.is_default ? Theme.t("audio.default_in_active", "Microfone Padrão Ativo") + " · " + sourceCard.modelData.volume + "%" : Theme.t("audio.click_select", "Clique para selecionar")
                                                         font.family: Theme.fontFamily
                                                         font.pixelSize: 11
@@ -3836,7 +3839,7 @@ PanelWindow {
                                             Layout.fillWidth: true
                                             implicitHeight: 65
                                             radius: 10
-                                            color: kbCard.isCurrent ? Theme.withAlpha(Theme.primary, 0.22) : (kbArea.containsMouse ? Theme.tileHigh : Theme.tile)
+                                            color: kbCard.isCurrent ? Theme.tileHigh : (kbArea.containsMouse ? Theme.tileHigh : Theme.tile)
                                             border.width: kbCard.isCurrent ? 1.5 : 1
                                             border.color: kbCard.isCurrent ? Theme.primary : Theme.withAlpha(Theme.outline, 0.15)
 
@@ -3999,7 +4002,7 @@ PanelWindow {
                                         Layout.fillWidth: true
                                         implicitHeight: 64
                                         radius: 12
-                                        color: win.mouseAccel === "flat" ? Theme.withAlpha(Theme.primary, 0.22) : (flatArea.containsMouse ? Theme.tileHigh : Theme.tile)
+                                        color: win.mouseAccel === "flat" ? Theme.tileHigh : (flatArea.containsMouse ? Theme.tileHigh : Theme.tile)
                                         border.width: win.mouseAccel === "flat" ? 1.5 : 0
                                         border.color: Theme.primary
 
@@ -4017,7 +4020,7 @@ PanelWindow {
                                                 Layout.fillWidth: true
                                                 spacing: 1
                                                 Text {
-                                                    Layout.alignment: Qt.AlignLeft
+                                                    Layout.fillWidth: true
                                                     text: Theme.t("input.accel_flat", "Flat (Sem Aceleração - 1:1)")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 15
@@ -4025,7 +4028,7 @@ PanelWindow {
                                                     color: Theme.textColor
                                                 }
                                                 Text {
-                                                    Layout.alignment: Qt.AlignLeft
+                                                    Layout.fillWidth: true
                                                     text: Theme.t("input.accel_flat_desc", "Movimento previsível e consistente. Essencial para jogos (FPS).")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 11
@@ -4051,7 +4054,7 @@ PanelWindow {
                                         Layout.fillWidth: true
                                         implicitHeight: 64
                                         radius: 12
-                                        color: win.mouseAccel === "adaptive" ? Theme.withAlpha(Theme.primary, 0.22) : (adaptArea.containsMouse ? Theme.tileHigh : Theme.tile)
+                                        color: win.mouseAccel === "adaptive" ? Theme.tileHigh : (adaptArea.containsMouse ? Theme.tileHigh : Theme.tile)
                                         border.width: win.mouseAccel === "adaptive" ? 1.5 : 0
                                         border.color: Theme.primary
 
@@ -4069,7 +4072,7 @@ PanelWindow {
                                                 Layout.fillWidth: true
                                                 spacing: 1
                                                 Text {
-                                                    Layout.alignment: Qt.AlignLeft
+                                                    Layout.fillWidth: true
                                                     text: Theme.t("input.accel_adapt", "Adaptativo (Com Aceleração)")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 15
@@ -4077,7 +4080,7 @@ PanelWindow {
                                                     color: Theme.textColor
                                                 }
                                                 Text {
-                                                    Layout.alignment: Qt.AlignLeft
+                                                    Layout.fillWidth: true
                                                     text: Theme.t("input.accel_adapt_desc", "Aumenta a velocidade em gestos rápidos. Padrão confortável.")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 11
@@ -4155,7 +4158,7 @@ PanelWindow {
                                             Layout.fillWidth: true
                                             implicitHeight: 74
                                             radius: 12
-                                            color: active ? Theme.withAlpha(Theme.primary, 0.22) : (pCardArea.containsMouse ? Theme.tileHigh : Theme.tile)
+                                            color: active ? Theme.tileHigh : (pCardArea.containsMouse ? Theme.tileHigh : Theme.tile)
                                             border.width: active ? 1.5 : 0
                                             border.color: Theme.primary
 
@@ -4175,7 +4178,7 @@ PanelWindow {
                                                     Layout.fillWidth: true
                                                     spacing: 2
                                                     Text {
-                                                        Layout.alignment: Qt.AlignLeft
+                                                        Layout.fillWidth: true
                                                         text: pCard.modelData.name
                                                         font.family: Theme.fontFamily
                                                         font.pixelSize: 15
@@ -4183,7 +4186,7 @@ PanelWindow {
                                                         color: Theme.textColor
                                                     }
                                                     Text {
-                                                        Layout.alignment: Qt.AlignLeft
+                                                        Layout.fillWidth: true
                                                         text: pCard.modelData.desc
                                                         font.family: Theme.fontFamily
                                                         font.pixelSize: 11
@@ -4336,7 +4339,7 @@ PanelWindow {
                                                     Layout.fillWidth: true
                                                     implicitHeight: 36
                                                     radius: 8
-                                                    color: idleChip.isCurrent ? Theme.withAlpha(Theme.primary, 0.25) : (idleChipArea.containsMouse ? Theme.tileHigh : Theme.tile)
+                                                    color: idleChip.isCurrent ? Theme.tileHigh : (idleChipArea.containsMouse ? Theme.tileHigh : Theme.tile)
                                                     border.width: idleChip.isCurrent ? 1.5 : 1
                                                     border.color: idleChip.isCurrent ? Theme.primary : Theme.withAlpha(Theme.outline, 0.15)
 
@@ -4404,7 +4407,7 @@ PanelWindow {
                                     spacing: 8
 
                                     Text {
-                                        Layout.alignment: Qt.AlignLeft
+                                        Layout.fillWidth: true
                                         visible: win.autostartEntries.length === 0
                                         text: Theme.t("boot.empty_autostart", "Nenhum aplicativo configurado para iniciar automaticamente.")
                                         font.family: Theme.fontFamily
@@ -4433,7 +4436,7 @@ PanelWindow {
                                                     implicitWidth: 36
                                                     implicitHeight: 36
                                                     radius: 8
-                                                    color: Theme.withAlpha(Theme.primary, 0.15)
+                                                    color: Theme.tileHigh
                                                     Text {
                                                         anchors.centerIn: parent
                                                         text: Theme.icons.speed
@@ -4447,7 +4450,7 @@ PanelWindow {
                                                     Layout.fillWidth: true
                                                     spacing: 1
                                                     Text {
-                                                        Layout.alignment: Qt.AlignLeft
+                                                        Layout.fillWidth: true
                                                         text: autoCard.modelData.name
                                                         font.family: Theme.fontFamily
                                                         font.pixelSize: 13
@@ -4455,7 +4458,7 @@ PanelWindow {
                                                         color: Theme.textColor
                                                     }
                                                     Text {
-                                                        Layout.alignment: Qt.AlignLeft
+                                                        Layout.fillWidth: true
                                                         text: autoCard.modelData.exec || autoCard.modelData.filename
                                                         font.family: Theme.monoFamily
                                                         font.pixelSize: 11
@@ -4595,7 +4598,7 @@ PanelWindow {
                                             implicitHeight: 36
                                             implicitWidth: appChipRow.implicitWidth + 20
                                             radius: 8
-                                            color: appChip.modelData.already_added ? Theme.withAlpha(Theme.primary, 0.2) : (appChipArea.containsMouse ? Theme.tileHigh : Theme.tile)
+                                            color: appChip.modelData.already_added ? Theme.tileHigh : (appChipArea.containsMouse ? Theme.tileHigh : Theme.tile)
                                             border.width: appChip.modelData.already_added ? 1 : 0
                                             border.color: Theme.primary
 
@@ -4710,14 +4713,14 @@ PanelWindow {
                                                     Layout.fillWidth: true
                                                     spacing: 1
                                                     Text {
-                                                        Layout.alignment: Qt.AlignLeft
+                                                        Layout.fillWidth: true
                                                         text: colorCard.modelData.label
                                                         font.family: Theme.fontFamily
                                                         font.pixelSize: 12
                                                         color: Theme.subtext
                                                     }
                                                     Text {
-                                                        Layout.alignment: Qt.AlignLeft
+                                                        Layout.fillWidth: true
                                                         text: colorCard.modelData.hex
                                                         font.family: Theme.monoFamily
                                                         font.pixelSize: 13
@@ -4875,7 +4878,7 @@ PanelWindow {
                                             Layout.fillWidth: true
                                             spacing: 6
                                             Text {
-                                                Layout.alignment: Qt.AlignLeft
+                                                Layout.fillWidth: true
                                                 text: wGroup.modelData.title
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: 13
@@ -4893,7 +4896,7 @@ PanelWindow {
                                                         width: wChipCol.implicitWidth + 28
                                                         height: 46
                                                         radius: 10
-                                                        color: active ? Theme.withAlpha(Theme.primary, 0.22) : (wChipArea.containsMouse ? Theme.tileHigh : Theme.tile)
+                                                        color: active ? Theme.tileHigh : (wChipArea.containsMouse ? Theme.tileHigh : Theme.tile)
                                                         border.width: active ? 1.5 : 1
                                                         border.color: active ? Theme.primary : Theme.withAlpha(Theme.outline, 0.15)
                                                         ColumnLayout {
@@ -5011,7 +5014,7 @@ PanelWindow {
                                             Layout.fillWidth: true
                                             implicitHeight: 58
                                             radius: 10
-                                            color: active ? Theme.withAlpha(Theme.primary, 0.22) : (trArea.containsMouse ? Theme.tileHigh : Theme.tile)
+                                            color: active ? Theme.tileHigh : (trArea.containsMouse ? Theme.tileHigh : Theme.tile)
                                             border.width: active ? 1.5 : 0
                                             border.color: Theme.primary
 
@@ -5625,7 +5628,7 @@ PanelWindow {
                                             Layout.fillWidth: true
                                             spacing: 2
                                             Text {
-                                                Layout.alignment: Qt.AlignLeft
+                                                Layout.fillWidth: true
                                                 text: win.btData && win.btData.powered ? "Bluetooth Ativado" : Theme.t("bt.status_off", "Bluetooth Desativado")
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: 15
@@ -5633,7 +5636,7 @@ PanelWindow {
                                                 color: Theme.textColor
                                             }
                                             Text {
-                                                Layout.alignment: Qt.AlignLeft
+                                                Layout.fillWidth: true
                                                 text: win.btData && win.btData.powered ? Theme.t("bt.status_on_desc", "Pronto para conexões e pareamento automático") : "Ligue o adaptador para conectar periféricos"
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: 12
@@ -5668,7 +5671,7 @@ PanelWindow {
                                             Layout.fillWidth: true
                                             implicitHeight: 64
                                             radius: 12
-                                            color: btDevCard.modelData.connected ? Theme.withAlpha(Theme.primary, 0.14) : Theme.tile
+                                            color: btDevCard.modelData.connected ? Theme.tileHigh : Theme.tile
                                             border.width: btDevCard.modelData.connected ? 1.5 : 1
                                             border.color: btDevCard.modelData.connected ? Theme.primary : Theme.withAlpha(Theme.outline, 0.2)
 
@@ -5681,7 +5684,7 @@ PanelWindow {
                                                     implicitWidth: 43
                                                     implicitHeight: 43
                                                     radius: 10
-                                                    color: btDevCard.modelData.connected ? Theme.withAlpha(Theme.primary, 0.25) : Theme.tileHigh
+                                                    color: btDevCard.modelData.connected ? Theme.tileHigh : Theme.tileHigh
 
                                                     Text {
                                                         anchors.centerIn: parent
@@ -5713,7 +5716,7 @@ PanelWindow {
                                                             implicitWidth: 70
                                                             implicitHeight: 18
                                                             radius: 9
-                                                            color: Theme.withAlpha(Theme.primary, 0.25)
+                                                            color: Theme.tileHigh
                                                             border.width: 1
                                                             border.color: Theme.primary
                                                             Text {
@@ -5741,7 +5744,7 @@ PanelWindow {
                                                         }
                                                     }
                                                     Text {
-                                                        Layout.alignment: Qt.AlignLeft
+                                                        Layout.fillWidth: true
                                                         text: btDevCard.modelData.mac
                                                         font.family: Theme.monoFamily
                                                         font.pixelSize: 11
@@ -5752,7 +5755,7 @@ PanelWindow {
                                                 ActionBtn {
                                                     icon: btDevCard.modelData.connected ? Theme.icons.close : Theme.icons.btConnected
                                                     text: btDevCard.modelData.connected ? Theme.t("bt.disconnect", "Desconectar") : "Conectar"
-                                                    primary: !btDevCard.modelData.connected
+                                                    primary: false
                                                     onClicked: {
                                                         if (btDevCard.modelData.connected) {
                                                             Quickshell.execDetached(["rice-bluetooth", "disconnect", btDevCard.modelData.mac]);
@@ -5791,7 +5794,7 @@ PanelWindow {
                                     }
 
                                     Text {
-                                        Layout.alignment: Qt.AlignLeft
+                                        Layout.fillWidth: true
                                         visible: !win.btData || !win.btData.devices || win.btData.devices.length === 0
                                         text: Theme.t("bt.empty", "Nenhum dispositivo encontrado. Coloque seu controle ou fone em modo de pareamento e clique em 'Escanear'.")
                                         font.family: Theme.fontFamily
@@ -5838,7 +5841,7 @@ PanelWindow {
                                     Layout.fillWidth: true
                                     implicitHeight: 100
                                     radius: 12
-                                    color: win.netData && win.netData.connected_ssid ? Theme.withAlpha(Theme.primary, 0.15) : Theme.tile
+                                    color: win.netData && win.netData.connected_ssid ? Theme.tileHigh : Theme.tile
                                     border.width: 1.5
                                     border.color: win.netData && win.netData.connected_ssid ? Theme.primary : Theme.withAlpha(Theme.outline, 0.2)
 
@@ -5851,7 +5854,7 @@ PanelWindow {
                                             implicitWidth: 52
                                             implicitHeight: 52
                                             radius: 12
-                                            color: Theme.withAlpha(Theme.primary, 0.25)
+                                            color: Theme.tileHigh
                                             Text {
                                                 anchors.centerIn: parent
                                                 text: win.netData && win.netData.wifi_enabled ? Theme.icons.wifi4 : Theme.icons.wifiOff
@@ -5966,7 +5969,7 @@ PanelWindow {
                                             Layout.fillWidth: true
                                             implicitHeight: isConnecting ? 96 : 50
                                             radius: 10
-                                            color: wifiCard.modelData.active ? Theme.withAlpha(Theme.primary, 0.15) : Theme.tile
+                                            color: wifiCard.modelData.active ? Theme.tileHigh : Theme.tile
                                             border.width: 1
                                             border.color: wifiCard.modelData.active ? Theme.primary : Theme.withAlpha(Theme.outline, 0.2)
 
@@ -6049,7 +6052,7 @@ PanelWindow {
                                                         implicitWidth: 64
                                                         implicitHeight: 27
                                                         radius: 12
-                                                        color: Theme.withAlpha(Theme.primary, 0.2)
+                                                        color: Theme.tileHigh
                                                         Text {
                                                             anchors.centerIn: parent
                                                             text: Theme.t("net.active_badge", "Ativa")
@@ -6179,7 +6182,7 @@ PanelWindow {
                                                     Layout.fillWidth: true
                                                     spacing: 1
                                                     Text {
-                                                        Layout.alignment: Qt.AlignLeft
+                                                        Layout.fillWidth: true
                                                         text: defCatCard.modelData.title
                                                         font.family: Theme.fontFamily
                                                         font.pixelSize: 15
@@ -6187,7 +6190,7 @@ PanelWindow {
                                                         color: Theme.textColor
                                                     }
                                                     Text {
-                                                        Layout.alignment: Qt.AlignLeft
+                                                        Layout.fillWidth: true
                                                         text: defCatCard.modelData.desc
                                                         font.family: Theme.fontFamily
                                                         font.pixelSize: 11
@@ -6222,7 +6225,7 @@ PanelWindow {
                                                         Layout.fillWidth: true
                                                         spacing: 0
                                                         Text {
-                                                            Layout.alignment: Qt.AlignLeft
+                                                            Layout.fillWidth: true
                                                             text: (defCatCard.catInfo && defCatCard.catInfo.current_name) ? defCatCard.catInfo.current_name : Theme.t("defaults.not_set", "Não definido")
                                                             font.family: Theme.fontFamily
                                                             font.pixelSize: 13
@@ -6231,7 +6234,7 @@ PanelWindow {
                                                             elide: Text.ElideRight
                                                         }
                                                         Text {
-                                                            Layout.alignment: Qt.AlignLeft
+                                                            Layout.fillWidth: true
                                                             text: (defCatCard.catInfo && defCatCard.catInfo.current_desktop) ? defCatCard.catInfo.current_desktop : Theme.t("defaults.no_app_assoc", "Nenhum aplicativo associado")
                                                             font.family: Theme.monoFamily
                                                             font.pixelSize: 10
@@ -6244,7 +6247,7 @@ PanelWindow {
                                                         implicitHeight: 22
                                                         implicitWidth: currentBadgeRow.implicitWidth + 14
                                                         radius: 6
-                                                        color: (defCatCard.catInfo && defCatCard.catInfo.is_set) ? Theme.withAlpha(Theme.primary, 0.2) : Theme.withAlpha(Theme.warning, 0.2)
+                                                        color: (defCatCard.catInfo && defCatCard.catInfo.is_set) ? Theme.tileHigh : Theme.withAlpha(Theme.warning, 0.2)
                                                         border.width: 1
                                                         border.color: (defCatCard.catInfo && defCatCard.catInfo.is_set) ? Theme.primary : Theme.warning
 
@@ -6382,7 +6385,7 @@ PanelWindow {
                                                     implicitHeight: 38
                                                     implicitWidth: pickBtnRow.implicitWidth + 20
                                                     radius: 8
-                                                    color: defCatCard.isPicking ? Theme.withAlpha(Theme.primary, 0.25) : (pickBtnArea.containsMouse ? Theme.tileHigh : Theme.background)
+                                                    color: defCatCard.isPicking ? Theme.tileHigh : (pickBtnArea.containsMouse ? Theme.tileHigh : Theme.background)
                                                     border.width: 1
                                                     border.color: defCatCard.isPicking ? Theme.primary : Theme.withAlpha(Theme.outline, 0.3)
 
@@ -6535,7 +6538,7 @@ PanelWindow {
                                                                             Layout.fillWidth: true
                                                                             spacing: 0
                                                                             Text {
-                                                                                Layout.alignment: Qt.AlignLeft
+                                                                                Layout.fillWidth: true
                                                                                 text: appItemRow.modelData.name
                                                                                 font.family: Theme.fontFamily
                                                                                 font.pixelSize: 12
@@ -6544,7 +6547,7 @@ PanelWindow {
                                                                                 elide: Text.ElideRight
                                                                             }
                                                                             Text {
-                                                                                Layout.alignment: Qt.AlignLeft
+                                                                                Layout.fillWidth: true
                                                                                 text: appItemRow.modelData.filename
                                                                                 font.family: Theme.monoFamily
                                                                                 font.pixelSize: 10
@@ -6672,7 +6675,7 @@ PanelWindow {
                                             spacing: 10
                                             Rectangle {
                                                 implicitWidth: 43; implicitHeight: 43; radius: 10
-                                                color: Theme.withAlpha(Theme.primary, 0.2)
+                                                color: Theme.tileHigh
                                                 Text {
                                                     anchors.centerIn: parent
                                                     text: Theme.icons.memory
@@ -6714,7 +6717,7 @@ PanelWindow {
                                             spacing: 10
                                             Rectangle {
                                                 implicitWidth: 43; implicitHeight: 43; radius: 10
-                                                color: Theme.withAlpha(Theme.primary, 0.2)
+                                                color: Theme.tileHigh
                                                 Text {
                                                     anchors.centerIn: parent
                                                     text: Theme.icons.gpu
@@ -6767,7 +6770,7 @@ PanelWindow {
                                             Layout.fillWidth: true
                                             spacing: 2
                                             Text {
-                                                Layout.alignment: Qt.AlignLeft
+                                                Layout.fillWidth: true
                                                 text: Theme.t("gaming.gamemode_title", "Feral GameMode")
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: 15
@@ -6775,7 +6778,7 @@ PanelWindow {
                                                 color: Theme.textColor
                                             }
                                             Text {
-                                                Layout.alignment: Qt.AlignLeft
+                                                Layout.fillWidth: true
                                                 text: Theme.t("gaming.gamemode_desc", "Otimiza a CPU para priorizar taxas de quadros (FPS) e reduz a latência nos jogos")
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: 12
@@ -6823,7 +6826,7 @@ PanelWindow {
                                                 Layout.fillWidth: true
                                                 spacing: 2
                                                 Text {
-                                                    Layout.alignment: Qt.AlignLeft
+                                                    Layout.fillWidth: true
                                                     text: steamCard.modelData.title
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 13
@@ -6831,14 +6834,14 @@ PanelWindow {
                                                     color: Theme.textColor
                                                 }
                                                 Text {
-                                                    Layout.alignment: Qt.AlignLeft
+                                                    Layout.fillWidth: true
                                                     text: steamCard.modelData.desc
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 11
                                                     color: Theme.subtext
                                                 }
                                                 Text {
-                                                    Layout.alignment: Qt.AlignLeft
+                                                    Layout.fillWidth: true
                                                     text: steamCard.modelData.param
                                                     font.family: Theme.monoFamily
                                                     font.pixelSize: 11
@@ -6850,7 +6853,7 @@ PanelWindow {
                                             ActionBtn {
                                                 icon: Theme.icons.confirm
                                                 text: Theme.t("gaming.copy", "Copiar")
-                                                primary: true
+                                                primary: false
                                                 onClicked: {
                                                     Quickshell.execDetached(["rice-gaming", "copy-param", steamCard.modelData.id]);
                                                     showToast(Theme.t("toast.param_copied", "Parâmetro copiado para a área de transferência!"));
@@ -7098,7 +7101,7 @@ PanelWindow {
                                                 Layout.fillWidth: true
                                                 spacing: 1
                                                 Text {
-                                                    Layout.alignment: Qt.AlignLeft
+                                                    Layout.fillWidth: true
                                                     text: Theme.t("storage.clean_pacman_title", "Limpar Pacotes Antigos do Pacman")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 13
@@ -7106,7 +7109,7 @@ PanelWindow {
                                                     color: Theme.textColor
                                                 }
                                                 Text {
-                                                    Layout.alignment: Qt.AlignLeft
+                                                    Layout.fillWidth: true
                                                     text: Theme.t("storage.clean_pacman_desc", "Mantém as 2 últimas versões instaladas para rollback seguro e remove o restante.")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 11
@@ -7145,7 +7148,7 @@ PanelWindow {
                                                 Layout.fillWidth: true
                                                 spacing: 1
                                                 Text {
-                                                    Layout.alignment: Qt.AlignLeft
+                                                    Layout.fillWidth: true
                                                     text: Theme.t("storage.clean_thumbs_title", "Limpar Miniaturas em Cache")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 13
@@ -7153,7 +7156,7 @@ PanelWindow {
                                                     color: Theme.textColor
                                                 }
                                                 Text {
-                                                    Layout.alignment: Qt.AlignLeft
+                                                    Layout.fillWidth: true
                                                     text: Theme.t("storage.clean_thumbs_desc", "Remove thumbnails geradas para arquivos e vídeos. Elas serão recriadas se necessário.")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 11
@@ -7192,7 +7195,7 @@ PanelWindow {
                                                 Layout.fillWidth: true
                                                 spacing: 1
                                                 Text {
-                                                    Layout.alignment: Qt.AlignLeft
+                                                    Layout.fillWidth: true
                                                     text: Theme.t("storage.empty_trash_title", "Esvaziar Lixeira do Usuário")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 13
@@ -7200,7 +7203,7 @@ PanelWindow {
                                                     color: Theme.textColor
                                                 }
                                                 Text {
-                                                    Layout.alignment: Qt.AlignLeft
+                                                    Layout.fillWidth: true
                                                     text: Theme.t("storage.empty_trash_desc", "Apaga permanentemente os arquivos descartados em ~/.local/share/Trash.")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 11
@@ -7404,7 +7407,7 @@ PanelWindow {
                                                 implicitWidth: 40
                                                 implicitHeight: 40
                                                 radius: 10
-                                                color: Theme.withAlpha(Theme.primary, 0.2)
+                                                color: Theme.tileHigh
                                                 Text {
                                                     anchors.centerIn: parent
                                                     text: Theme.icons.tune
@@ -7418,7 +7421,7 @@ PanelWindow {
                                                 Layout.fillWidth: true
                                                 spacing: 2
                                                 Text {
-                                                    Layout.alignment: Qt.AlignLeft
+                                                    Layout.fillWidth: true
                                                     text: Theme.t("binds.custom_title", "Personalizar Atalhos Próprios (~/.config/hypr/user-binds.lua)")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 15
@@ -7692,7 +7695,7 @@ PanelWindow {
                                                 Layout.fillWidth: true
                                                 spacing: 1
                                                 Text {
-                                                    Layout.alignment: Qt.AlignLeft
+                                                    Layout.fillWidth: true
                                                     text: boundRow.modelData.name
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 13
@@ -7713,7 +7716,7 @@ PanelWindow {
                                                 implicitWidth: Math.max(100, boundCombo.implicitWidth + 20)
                                                 implicitHeight: 31
                                                 radius: 7
-                                                color: Theme.withAlpha(Theme.primary, 0.18)
+                                                color: Theme.tileHigh
                                                 Text {
                                                     id: boundCombo
                                                     anchors.centerIn: parent
@@ -7858,7 +7861,7 @@ PanelWindow {
                                                 Layout.fillWidth: true
                                                 spacing: 1
                                                 Text {
-                                                    Layout.alignment: Qt.AlignLeft
+                                                    Layout.fillWidth: true
                                                     text: freeRow.modelData.name
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 13
@@ -7918,7 +7921,7 @@ PanelWindow {
 
                                             Rectangle {
                                                 width: 36; height: 36; radius: 18
-                                                color: Theme.withAlpha(Theme.primary, 0.2)
+                                                color: Theme.tileHigh
                                                 Text {
                                                     anchors.centerIn: parent
                                                     text: "󰙯"
@@ -7952,7 +7955,7 @@ PanelWindow {
                                                     }
                                                 }
                                                 Text {
-                                                    Layout.alignment: Qt.AlignLeft
+                                                    Layout.fillWidth: true
                                                     text: Theme.t("discord.bind_note", "Os atalhos gravam diretamente em ~/.config/hypr/hyprland.lua usando hl.bind")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 11
@@ -7998,7 +8001,7 @@ PanelWindow {
                                             radius: 8
                                             color: Theme.withAlpha(Theme.primary, 0.08)
                                             border.width: 1
-                                            border.color: Theme.withAlpha(Theme.primary, 0.25)
+                                            border.color: Theme.withAlpha(Theme.outline, 0.2)
                                             RowLayout {
                                                 id: simNoteRow
                                                 anchors.fill: parent
@@ -8034,7 +8037,7 @@ PanelWindow {
                                                     Layout.fillWidth: true
                                                     spacing: 2
                                                     Text {
-                                                        Layout.alignment: Qt.AlignLeft
+                                                        Layout.fillWidth: true
                                                         text: Theme.t("discord.mute_title", "Mutar / Desmutar Microfone (Mute)")
                                                         font.family: Theme.fontFamily
                                                         font.pixelSize: 12
@@ -8042,7 +8045,7 @@ PanelWindow {
                                                         color: Theme.textColor
                                                     }
                                                     Text {
-                                                        Layout.alignment: Qt.AlignLeft
+                                                        Layout.fillWidth: true
                                                         text: Theme.t("discord.mute_desc", "Simula o envio de Ctrl + Shift + M para o Discord/Vesktop")
                                                         font.family: Theme.fontFamily
                                                         font.pixelSize: 11
@@ -8054,7 +8057,7 @@ PanelWindow {
                                                 Rectangle {
                                                     implicitWidth: mbBadgeRow.implicitWidth + 16
                                                     implicitHeight: 31; radius: 14
-                                                    color: Theme.withAlpha(Theme.primary, 0.15)
+                                                    color: Theme.tileHigh
                                                     border.width: 1; border.color: Theme.primary
                                                     RowLayout {
                                                         id: mbBadgeRow
@@ -8265,7 +8268,7 @@ PanelWindow {
                                                     Layout.fillWidth: true
                                                     spacing: 2
                                                     Text {
-                                                        Layout.alignment: Qt.AlignLeft
+                                                        Layout.fillWidth: true
                                                         text: Theme.t("discord.deafen_title", "Desativar / Ativar Áudio (Deafen)")
                                                         font.family: Theme.fontFamily
                                                         font.pixelSize: 12
@@ -8273,7 +8276,7 @@ PanelWindow {
                                                         color: Theme.textColor
                                                     }
                                                     Text {
-                                                        Layout.alignment: Qt.AlignLeft
+                                                        Layout.fillWidth: true
                                                         text: Theme.t("discord.deafen_desc", "Simula o envio de Ctrl + Shift + D para o Discord/Vesktop")
                                                         font.family: Theme.fontFamily
                                                         font.pixelSize: 11
@@ -8285,7 +8288,7 @@ PanelWindow {
                                                 Rectangle {
                                                     implicitWidth: dbBadgeRow.implicitWidth + 16
                                                     implicitHeight: 31; radius: 14
-                                                    color: Theme.withAlpha(Theme.primary, 0.15)
+                                                    color: Theme.tileHigh
                                                     border.width: 1; border.color: Theme.primary
                                                     RowLayout {
                                                         id: dbBadgeRow
@@ -8546,7 +8549,7 @@ PanelWindow {
                                                     implicitWidth: 29
                                                     implicitHeight: 29
                                                     radius: 6
-                                                    color: Theme.withAlpha(Theme.primary, 0.2)
+                                                    color: Theme.tileHigh
                                                     Text {
                                                         anchors.centerIn: parent
                                                         text: Theme.icons.disk
@@ -8560,7 +8563,7 @@ PanelWindow {
                                                     Layout.fillWidth: true
                                                     spacing: 1
                                                     Text {
-                                                        Layout.alignment: Qt.AlignLeft
+                                                        Layout.fillWidth: true
                                                         text: "#" + snapCard.modelData.id + " · " + snapCard.modelData.description
                                                         font.family: Theme.fontFamily
                                                         font.pixelSize: 12
@@ -8569,7 +8572,7 @@ PanelWindow {
                                                         elide: Text.ElideRight
                                                     }
                                                     Text {
-                                                        Layout.alignment: Qt.AlignLeft
+                                                        Layout.fillWidth: true
                                                         text: snapCard.modelData.date + " · Tipo: " + snapCard.modelData.type
                                                         font.family: Theme.fontFamily
                                                         font.pixelSize: 10
@@ -8638,7 +8641,7 @@ PanelWindow {
                                                 implicitWidth: 43
                                                 implicitHeight: 43
                                                 radius: 10
-                                                color: Theme.withAlpha(Theme.primary, 0.2)
+                                                color: Theme.tileHigh
                                                 Text {
                                                     anchors.centerIn: parent
                                                     text: Theme.icons.volHigh
@@ -8652,7 +8655,7 @@ PanelWindow {
                                                 Layout.fillWidth: true
                                                 spacing: 2
                                                 Text {
-                                                    Layout.alignment: Qt.AlignLeft
+                                                    Layout.fillWidth: true
                                                     text: Theme.t("sys.audio_repair_title", "Reiniciar Sistema de Áudio (PipeWire)")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 13
@@ -8660,7 +8663,7 @@ PanelWindow {
                                                     color: Theme.textColor
                                                 }
                                                 Text {
-                                                    Layout.alignment: Qt.AlignLeft
+                                                    Layout.fillWidth: true
                                                     text: Theme.t("sys.audio_repair_desc", "Se o som parou ou o microfone não responde após conectar um fone/headset.")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 11
@@ -8671,7 +8674,7 @@ PanelWindow {
                                             ActionBtn {
                                                 icon: Theme.icons.refresh
                                                 text: Theme.t("sys.audio_repair_btn", "Reiniciar Áudio")
-                                                primary: true
+                                                primary: false
                                                 onClicked: {
                                                     Quickshell.execDetached(["rice-maintenance", "audio"]);
                                                     win.showToast(Theme.t("toast.pipewire_restart", "Reiniciando PipeWire e WirePlumber..."));
@@ -8698,7 +8701,7 @@ PanelWindow {
                                                 implicitWidth: 43
                                                 implicitHeight: 43
                                                 radius: 10
-                                                color: Theme.withAlpha(Theme.primary, 0.2)
+                                                color: Theme.tileHigh
                                                 Text {
                                                     anchors.centerIn: parent
                                                     text: Theme.icons.lock
@@ -8712,7 +8715,7 @@ PanelWindow {
                                                 Layout.fillWidth: true
                                                 spacing: 2
                                                 Text {
-                                                    Layout.alignment: Qt.AlignLeft
+                                                    Layout.fillWidth: true
                                                     text: Theme.t("sys.pacman_unlock_title", "Destravar Pacman (Remover db.lck)")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 13
@@ -8720,7 +8723,7 @@ PanelWindow {
                                                     color: Theme.textColor
                                                 }
                                                 Text {
-                                                    Layout.alignment: Qt.AlignLeft
+                                                    Layout.fillWidth: true
                                                     text: Theme.t("sys.pacman_unlock_desc", "Resolve o erro 'banco de dados está bloqueado' se o terminal fechou durante um update.")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 11
@@ -8756,7 +8759,7 @@ PanelWindow {
                                                 implicitWidth: 43
                                                 implicitHeight: 43
                                                 radius: 10
-                                                color: Theme.withAlpha(Theme.primary, 0.2)
+                                                color: Theme.tileHigh
                                                 Text {
                                                     anchors.centerIn: parent
                                                     text: Theme.icons.broom
@@ -8770,7 +8773,7 @@ PanelWindow {
                                                 Layout.fillWidth: true
                                                 spacing: 2
                                                 Text {
-                                                    Layout.alignment: Qt.AlignLeft
+                                                    Layout.fillWidth: true
                                                     text: Theme.t("sys.clean_disk_title", "Limpeza de Disco & Caches Antigos")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 13
@@ -8778,7 +8781,7 @@ PanelWindow {
                                                     color: Theme.textColor
                                                 }
                                                 Text {
-                                                    Layout.alignment: Qt.AlignLeft
+                                                    Layout.fillWidth: true
                                                     text: Theme.t("sys.clean_disk_desc", "Remove versões antigas de pacotes do pacman e miniaturas expiradas com segurança.")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 11
@@ -8815,7 +8818,7 @@ PanelWindow {
                                                 implicitWidth: 43
                                                 implicitHeight: 43
                                                 radius: 10
-                                                color: Theme.withAlpha(Theme.primary, 0.2)
+                                                color: Theme.tileHigh
                                                 Text {
                                                     anchors.centerIn: parent
                                                     text: Theme.icons.health
@@ -8829,7 +8832,7 @@ PanelWindow {
                                                 Layout.fillWidth: true
                                                 spacing: 2
                                                 Text {
-                                                    Layout.alignment: Qt.AlignLeft
+                                                    Layout.fillWidth: true
                                                     text: Theme.t("sys.doctor_title", "Assistente de Diagnóstico (Rice Doctor)")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 13
@@ -8837,7 +8840,7 @@ PanelWindow {
                                                     color: Theme.textColor
                                                 }
                                                 Text {
-                                                    Layout.alignment: Qt.AlignLeft
+                                                    Layout.fillWidth: true
                                                     text: Theme.t("sys.doctor_desc", "Varredura completa de integridade de áudio, GPU, Waywallen, SDDM e zRAM.")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 11
@@ -8848,7 +8851,7 @@ PanelWindow {
                                             ActionBtn {
                                                 icon: Theme.icons.console
                                                 text: Theme.t("sys.doctor_btn", "Executar Rice Doctor")
-                                                primary: true
+                                                primary: false
                                                 onClicked: {
                                                     Quickshell.execDetached(["rice-maintenance", "doctor"]);
                                                 }
@@ -8923,7 +8926,7 @@ PanelWindow {
                                             spacing: 3
 
                                             Text {
-                                                Layout.alignment: Qt.AlignLeft
+                                                Layout.fillWidth: true
                                                 text: win.softwareUpdatesData.sys_count > 0
                                                     ? win.softwareUpdatesData.sys_count + " " + Theme.t("store.updates_pending", "atualizações pendentes")
                                                     : Theme.t("store.up_to_date", "Sistema em dia")
@@ -9002,7 +9005,7 @@ PanelWindow {
                                             implicitWidth: 45
                                             implicitHeight: 45
                                             radius: 10
-                                            color: Theme.withAlpha(Theme.primary, 0.2)
+                                            color: Theme.tileHigh
                                             Text {
                                                 anchors.centerIn: parent
                                                 text: Theme.icons.packages
@@ -9016,7 +9019,7 @@ PanelWindow {
                                             Layout.fillWidth: true
                                             spacing: 2
                                             Text {
-                                                Layout.alignment: Qt.AlignLeft
+                                                Layout.fillWidth: true
                                                 text: Theme.t("store.open_store", "Abrir a loja de programas")
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: 16
@@ -9024,7 +9027,7 @@ PanelWindow {
                                                 color: Theme.textColor
                                             }
                                             Text {
-                                                Layout.alignment: Qt.AlignLeft
+                                                Layout.fillWidth: true
                                                 text: win.softwareUpdatesData.store && win.softwareUpdatesData.store !== ""
                                                     ? win.softwareUpdatesData.store
                                                     : Theme.t("store.no_store", "Nenhuma instalada — clique para instalar o Shelly")
@@ -9087,7 +9090,7 @@ PanelWindow {
                                                 implicitHeight: 63
                                                 radius: 14
                                                 color: win.riceHasUpdate
-                                                    ? Theme.withAlpha(Theme.primary, 0.18)
+                                                    ? Theme.tileHigh
                                                     : (win.riceCheckFailed ? Theme.withAlpha("#f59e0b", 0.18) : Theme.withAlpha("#10b981", 0.18))
                                                 Text {
                                                     anchors.centerIn: parent
@@ -9105,7 +9108,7 @@ PanelWindow {
                                                 spacing: 3
 
                                                 Text {
-                                                    Layout.alignment: Qt.AlignLeft
+                                                    Layout.fillWidth: true
                                                     text: win.riceHasUpdate
                                                         ? (win.riceInfo.count || 0) + " " + Theme.t("store.rice_available", "atualizações do rice disponíveis")
                                                         : (win.riceCheckFailed
@@ -9183,7 +9186,7 @@ PanelWindow {
                                             }
 
                                             Text {
-                                                Layout.alignment: Qt.AlignLeft
+                                                Layout.fillWidth: true
                                                 text: Theme.t("store.rice_changes", "O que vem nesta atualização:")
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: 12
@@ -9776,7 +9779,7 @@ PanelWindow {
                                                         Layout.fillWidth: true
                                                         spacing: 2
                                                         Text {
-                                                            Layout.alignment: Qt.AlignLeft
+                                                            Layout.fillWidth: true
                                                             text: (shellCustomTab.targetComp === "hub" ? "Rice Central Hub" : (shellCustomTab.targetComp === "sidebar" ? "Energy & Quick Sidebar" : "Hollow-Wired Dock"))
                                                             font.family: Theme.fontFamily
                                                             font.pixelSize: 12
@@ -9784,7 +9787,7 @@ PanelWindow {
                                                             color: Theme.textColor
                                                         }
                                                         Text {
-                                                            Layout.alignment: Qt.AlignLeft
+                                                            Layout.fillWidth: true
                                                             text: Theme.t("shell_custom.style_label", "Estilo: ") + ShellCustomization.getStyle(shellCustomTab.targetComp)
                                                                 + "  ·  " + Theme.t("shell_custom.scale_label", "escala ") + Math.round(ShellCustomization.getScale(shellCustomTab.targetComp) * 100) + "%"
                                                             font.family: Theme.fontFamily
@@ -9818,7 +9821,7 @@ PanelWindow {
                                             Layout.fillWidth: true
                                             spacing: 8
                                             Text {
-                                                Layout.alignment: Qt.AlignLeft
+                                                Layout.fillWidth: true
                                                 text: Theme.t("shell_custom.style", "Estilo Visual")
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: 12
@@ -9873,7 +9876,7 @@ PanelWindow {
                                             Layout.fillWidth: true
                                             spacing: 8
                                             Text {
-                                                Layout.alignment: Qt.AlignLeft
+                                                Layout.fillWidth: true
                                                 text: Theme.t("shell_custom.scale", "Escala de Tamanho")
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: 12
@@ -9927,7 +9930,7 @@ PanelWindow {
                                             Layout.fillWidth: true
                                             spacing: 8
                                             Text {
-                                                Layout.alignment: Qt.AlignLeft
+                                                Layout.fillWidth: true
                                                 text: Theme.t("shell_custom.opacity", "Opacidade do Fundo")
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: 12
@@ -9982,7 +9985,7 @@ PanelWindow {
                                             Layout.fillWidth: true
                                             spacing: 8
                                             Text {
-                                                Layout.alignment: Qt.AlignLeft
+                                                Layout.fillWidth: true
                                                 text: Theme.t("shell_custom.accent", "Cor de Destaque")
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: 12
