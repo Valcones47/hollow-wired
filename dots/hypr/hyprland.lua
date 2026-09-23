@@ -988,7 +988,11 @@ function rice_set_window_mode(mode, convert)
     if on then
         if hyprbars_setup() then hl.config({ plugin = { hyprbars = { enabled = true } } }) end
     elseif hl.plugin.hyprbars then
+        -- Só desligar (enabled = false) não basta: carregado, o plugin ainda
+        -- segurava o clique no topo das janelas e virava arrasto. Descarrega.
         hl.config({ plugin = { hyprbars = { enabled = false } } })
+        rice_hyprbars_ready = false
+        hl.exec_cmd("hyprctl plugin unload " .. hyprbarsLib)
     end
     if not convert then return end
     -- As janelas já abertas acompanham a troca: soltas num tamanho
@@ -1048,8 +1052,10 @@ end
 if rice_window_mode == "windows" then
     rice_set_window_mode("windows", false)
 elseif hl.plugin.hyprbars then
-    -- Plugin continua carregado depois de voltar ao modo Hyprland.
+    -- Plugin continua carregado depois de voltar ao modo Hyprland: descarrega
+    -- (desligado, ainda segurava o clique no topo das janelas).
     hl.config({ plugin = { hyprbars = { enabled = false } } })
+    hl.exec_cmd("hyprctl plugin unload " .. hyprbarsLib)
 end
 
 -- Terminal drop-down (rice-dropterm): mora no workspace especial "dropterm",
