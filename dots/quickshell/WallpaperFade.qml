@@ -38,7 +38,7 @@ Scope {
     // Tempos calibrados para sincronização quadro a quadro:
     // a cobertura varre a tela com o quadro 0 e a revelação é imediata assim
     // que o renderizador sobe, para o vídeo começar direto sem salto de tempo.
-    property int coverMs: 500
+    property int coverMs: 650
     property int hold: 4000
     property int revealMs: 0
 
@@ -388,11 +388,10 @@ Scope {
         // Revela o wallpaper novo, agora que o renderizador dele está no ar.
         function reveal(): void { fadeScope.reveal(); }
         // Quanto tempo o chamador deve esperar antes de aplicar a troca.
-        // O renderizador do Waywallen leva ~240-260ms para subir e desenhar
-        // o primeiro quadro. Disparando em ~45% do coverMs (ex: ~225ms em 500ms),
-        // o novo renderizador entrega seu quadro 0 exatamente quando a onda
-        // termina de cobrir a tela, eliminando o adiantamento de quadros por baixo.
-        function coverDelay(): string { return String(Math.round(fadeScope.coverMs * 0.45)); }
+        // O renderizador do Waywallen leva cerca de 800-850ms no total (spawn + Vulkan)
+        // para renderizar o quadro 0. Disparando logo no início (50ms), o renderizador
+        // entrega o quadro 0 quase simultaneamente ao término da onda de cobertura (650ms).
+        function coverDelay(): string { return "50"; }
         // Troca o estilo sem reiniciar o shell (usado pelo painel e para teste).
         function setStyle(name: string): void { fadeScope.style = name; }
         function currentStyle(): string { return fadeScope.style; }
