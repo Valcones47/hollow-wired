@@ -1502,5 +1502,15 @@
   "dock.logout": "Log out",
   "dock.reboot": "Restart",
   "dock.poweroff": "Shut down",
-  "edit.target_dock": "Dock"
+  "edit.target_dock": "Dock",
+  "dock.tip_uptodate": "All up to date.",
+  "dock.tip_updates": "%1 pending. Click to update.",
+  "dock.tip_rec_stop": "Recording. Click to stop.",
+  "dock.tip_rec_start": "Click to record the whole screen.",
+  "dock.tip_on": "On. Click to turn off.",
+  "dock.tip_off": "Off. Click to turn on.",
+  "dock.tip_caf_on": "The screen won't turn off by itself. Click to disable.",
+  "dock.tip_caf_off": "Click so the screen doesn't turn off by itself.",
+  "dock.tip_gpu_on": "On (an app is using it).",
+  "dock.tip_gpu_off": "Sleeping, saving battery."
 }

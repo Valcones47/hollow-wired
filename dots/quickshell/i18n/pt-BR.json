@@ -1502,5 +1502,15 @@
   "dock.logout": "Sair da sessão",
   "dock.reboot": "Reiniciar",
   "dock.poweroff": "Desligar",
-  "edit.target_dock": "Dock"
+  "edit.target_dock": "Dock",
+  "dock.tip_uptodate": "Tudo em dia.",
+  "dock.tip_updates": "%1 pendentes. Clique para atualizar.",
+  "dock.tip_rec_stop": "Gravando. Clique para parar.",
+  "dock.tip_rec_start": "Clique para gravar a tela inteira.",
+  "dock.tip_on": "Ligada. Clique para desligar.",
+  "dock.tip_off": "Desligada. Clique para ligar.",
+  "dock.tip_caf_on": "A tela não apaga sozinha. Clique para desligar.",
+  "dock.tip_caf_off": "Clique para a tela não apagar sozinha.",
+  "dock.tip_gpu_on": "Ligada (algum app está usando).",
+  "dock.tip_gpu_off": "Dormindo, sem gastar bateria."
 }

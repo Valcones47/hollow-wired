@@ -31,6 +31,9 @@ PanelWindow {
     // x≈0 ficava por baixo da barra. Só afeta a exibição; a posição salva não muda.
     readonly property real insetL: ShellLayout.barEnabled && ShellLayout.barPosition === "left" && !ShellLayout.barAutohide ? 52 + Theme.frameThickness : 0
     readonly property real insetR: ShellLayout.barEnabled && ShellLayout.barPosition === "right" && !ShellLayout.barAutohide ? 52 + Theme.frameThickness : 0
+    // Idem para a dock sempre à mostra (estilo Windows): widget perto da base
+    // ficava por baixo dela. 64 = Dock.dockH.
+    readonly property real insetB: ShellLayout.dockEnabled && !ShellLayout.dockAutohide ? 64 + Theme.frameThickness : 0
 
     property bool editMode: false
     // O modo edição geral (ShellLayout.editing) liga e desliga o dos widgets.
@@ -406,7 +409,7 @@ PanelWindow {
                 readonly property bool isSelected: dwWindow.editMode && dwWindow.selectedWidgetId === modelData.id
 
                 x: Math.max(dwWindow.insetL + 10, Math.min(modelData.x || 100, dwWindow.width - dwWindow.insetR - width - 10))
-                y: modelData.y || 100
+                y: Math.min(modelData.y || 100, dwWindow.height - dwWindow.insetB - height - 10)
                 // Entrada escalonada: cada widget surge um instante depois do
                 // anterior, subindo e crescendo levemente.
                 opacity: 0
@@ -475,7 +478,7 @@ PanelWindow {
                     drag.minimumX: dwWindow.insetL + 10
                     drag.maximumX: dwWindow.width - dwWindow.insetR - widgetContainer.width - 10
                     drag.minimumY: Theme.waybarHeight + 6
-                    drag.maximumY: dwWindow.height - widgetContainer.height - 10
+                    drag.maximumY: dwWindow.height - dwWindow.insetB - widgetContainer.height - 10
                     cursorShape: dwWindow.editMode ? Qt.SizeAllCursor : Qt.ArrowCursor
 
                     onClicked: {

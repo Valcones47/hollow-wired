@@ -155,7 +155,7 @@ PanelWindow {
     }
 
     // ================= popup =================
-    property string pop: ""          // "" | app | games | power
+    property string pop: ""          // "" | app | games | power | tray | tip
     property var popItem: null
     property real popAnchorX: 0
     Timer { id: popHide; interval: 260; onTriggered: dock.pop = "" }
@@ -614,6 +614,10 @@ PanelWindow {
                     property string icon: ""
                     property color tint: Theme.textColor
                     property string badge: ""
+                    // Popup do hover: nome e estado (como os rótulos da sidebar).
+                    property string tipTitle: ""
+                    property string tipText: ""
+                    property string popKind: "tip"
                     signal activated()
                     implicitWidth: 38
                     implicitHeight: 38
@@ -650,6 +654,11 @@ PanelWindow {
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
+                        onEntered: {
+                            if (tb.popKind === "tip" && tb.tipTitle === "") return;
+                            dock.showPop(tb.popKind, { title: tb.tipTitle, text: tb.tipText }, tb);
+                        }
+                        onExited: dock.leavePop()
                         onClicked: tb.activated()
                     }
                 }
@@ -680,14 +689,15 @@ PanelWindow {
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+                            // Hover abre o menu do app no popup da dock (TrayMenu,
+                            // o mesmo da sidebar e da barra lateral).
+                            onEntered: dock.showPop("tray", trayIt.modelData, trayIt)
+                            onExited: dock.leavePop()
                             onClicked: mouse => {
                                 const it = trayIt.modelData;
                                 if (mouse.button === Qt.MiddleButton) it.secondaryActivate();
-                                else if (mouse.button === Qt.RightButton || it.onlyMenu) {
-                                    // menu do próprio app, abrindo para cima
-                                    const p = trayIt.mapToItem(null, 0, 0);
-                                    it.display(dock, p.x, p.y - 8);
-                                } else it.activate();
+                                else if (mouse.button === Qt.RightButton || it.onlyMenu) dock.showPop("tray", it, trayIt);
+                                else it.activate();
                             }
                             onWheel: w => trayIt.modelData.scroll(w.angleDelta.y, false)
                         }
@@ -705,6 +715,9 @@ PanelWindow {
                 TrayBtn {
                     visible: ShellLayout.dockHas("updates")
                     icon: Theme.icons.update
+                    tipTitle: Theme.t("side.item_update", "Atualizações")
+                    tipText: !dock.energy || dock.energy.updateCount === 0 ? Theme.t("dock.tip_uptodate", "Tudo em dia.")
+                        : Theme.t("dock.tip_updates", "%1 pendentes. Clique para atualizar.").replace("%1", dock.energy.updateCount)
                     tint: dock.energy && dock.energy.updateCount > 0 ? Theme.primary : Theme.textColor
                     badge: dock.energy && dock.energy.updateCount > 0
                         ? (dock.energy.updateCount > 99 ? "99+" : String(dock.energy.updateCount)) : ""
@@ -713,6 +726,9 @@ PanelWindow {
                 TrayBtn {
                     visible: ShellLayout.dockHas("record")
                     icon: Theme.icons.record
+                    tipTitle: Theme.t("bar.item_record", "Gravar tela")
+                    tipText: dock.energy && dock.energy.recording ? Theme.t("dock.tip_rec_stop", "Gravando. Clique para parar.")
+                        : Theme.t("dock.tip_rec_start", "Clique para gravar a tela inteira.")
                     tint: dock.energy && dock.energy.recording ? Theme.critical : Theme.textColor
                     onActivated: {
                         if (dock.energy && dock.energy.recording) dock.energy.stopRecording();
@@ -722,23 +738,33 @@ PanelWindow {
                 TrayBtn {
                     visible: ShellLayout.dockHas("night")
                     icon: Theme.icons.night
+                    tipTitle: Theme.t("side.item_night", "Luz noturna")
+                    tipText: dock.energy && dock.energy.nightLight ? Theme.t("dock.tip_on", "Ligada. Clique para desligar.") : Theme.t("dock.tip_off", "Desligada. Clique para ligar.")
                     tint: dock.energy && dock.energy.nightLight ? Theme.primary : Theme.textColor
                     onActivated: if (dock.energy) dock.energy.toggleNight()
                 }
                 TrayBtn {
                     visible: ShellLayout.dockHas("caffeine")
                     icon: dock.energy && dock.energy.caffeine ? Theme.icons.coffee : Theme.icons.coffeeOff
+                    tipTitle: Theme.t("side.item_caffeine", "Manter acordado")
+                    tipText: dock.energy && dock.energy.caffeine ? Theme.t("dock.tip_caf_on", "A tela não apaga sozinha. Clique para desligar.")
+                        : Theme.t("dock.tip_caf_off", "Clique para a tela não apagar sozinha.")
                     tint: dock.energy && dock.energy.caffeine ? Theme.primary : Theme.textColor
                     onActivated: if (dock.energy) dock.energy.toggleCaffeine()
                 }
                 TrayBtn {
                     visible: ShellLayout.dockHas("gpu")
                     icon: Theme.icons.gpu
+                    tipTitle: Theme.t("side.item_gpu", "GPU NVIDIA")
+                    tipText: dock.energy && dock.energy.nvidiaState === "active" ? Theme.t("dock.tip_gpu_on", "Ligada (algum app está usando).")
+                        : Theme.t("dock.tip_gpu_off", "Dormindo, sem gastar bateria.")
                     tint: dock.energy && dock.energy.nvidiaState === "active" ? Theme.primary : Theme.subtext
                 }
                 TrayBtn {
                     visible: ShellLayout.dockHas("lock")
                     icon: Theme.icons.lock
+                    tipTitle: Theme.t("dock.lock", "Bloquear")
+                    tipText: "Super + L"
                     onActivated: Quickshell.execDetached(["rice-session-action", "lock"])
                 }
                 TrayBtn {
@@ -746,7 +772,8 @@ PanelWindow {
                     visible: ShellLayout.dockHas("power")
                     icon: Theme.icons.power
                     tint: Theme.secondary
-                    onActivated: dock.pop === "power" ? dock.pop = "" : dock.showPop("power", null, powerBtn)
+                    popKind: "power"
+                    onActivated: dock.showPop("power", null, powerBtn)
                 }
             }
         }
@@ -773,7 +800,8 @@ PanelWindow {
                 width: implicitWidth
                 height: implicitHeight
                 readonly property Item current: dock.pop === "app" ? appPop : dock.pop === "games" ? gamesPop
-                    : dock.pop === "power" ? powerPop : null
+                    : dock.pop === "power" ? powerPop : dock.pop === "tray" ? trayPop
+                    : dock.pop === "tip" ? tipPop : null
                 opacity: root.popTargetW > 0 && Math.abs(root.popW - root.popTargetW) < 30
                     && Math.abs(root.popH - root.popTargetH) < 30 ? 1 : 0
                 Behavior on opacity { NumberAnimation { duration: Theme.ms(130) } }
@@ -864,6 +892,33 @@ PanelWindow {
                         selected: appPop.item && appPop.item.pinned
                         label: appPop.item && appPop.item.pinned ? Theme.t("launcher.unpin_dock", "Desafixar da dock") : Theme.t("launcher.pin_dock", "Fixar na dock")
                         onActivated: DockConfig.togglePin(appPop.item.key)
+                    }
+                }
+
+                // ---------- bandeja: menu do app ----------
+                TrayMenu {
+                    id: trayPop
+                    visible: popContent.current === trayPop
+                    width: 268
+                    item: dock.pop === "tray" ? dock.popItem : null
+                    onTriggered: dock.pop = ""
+                }
+
+                // ---------- rótulo (botões da direita) ----------
+                ColumnLayout {
+                    id: tipPop
+                    visible: popContent.current === tipPop
+                    width: Math.min(260, Math.max(tipTitleText.implicitWidth, tipBody.implicitWidth))
+                    spacing: 2
+                    PopTitle {
+                        id: tipTitleText
+                        text: dock.popItem && dock.popItem.title ? dock.popItem.title : ""
+                    }
+                    PopText {
+                        id: tipBody
+                        Layout.maximumWidth: 260
+                        visible: text !== ""
+                        text: dock.popItem && dock.popItem.text ? dock.popItem.text : ""
                     }
                 }
 
