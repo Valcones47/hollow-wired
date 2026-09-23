@@ -120,8 +120,7 @@ Scope {
         // Ao término da animação, a camada se retira imediatamente para o vídeo
         // aparecer na tela sem nenhuma pausa estática.
         onFinished: fadeScope.reveal(true)
-        easing.type: Easing.Bezier
-        easing.bezierCurve: [0.25, 0.1, 0.25, 1.0, 1.0, 1.0]
+        easing.type: Easing.InOutQuad
     }
 
     // Limite: se o sinal de "renderizador novo no ar" nunca chegar, revela
@@ -292,10 +291,9 @@ Scope {
                     // Borda macia bem larga: é o que dá o ar de desfoque.
                     const feather = w * 0.24;
                     const far = Math.sqrt(cx * cx + (h - cy) * (h - cy));
-                    // Começa com a frente já encostando no canto superior
-                    // direito, sem gastar o começo da animação fora da tela.
+                    // Começa já encostando na quina da tela e termina cobrindo 100% no canto oposto
                     const near = Math.sqrt((cx - w) * (cx - w) + cy * cy);
-                    const R = near + p * (far + feather * 1.12 - near);
+                    const R = (near + feather * 0.2) + p * (far - near + feather * 0.3);
 
                     function softDisc(x, y, r, solid) {
                         // Opaco até `solid` do raio, some até a borda. Com a
@@ -311,9 +309,8 @@ Scope {
                         ctx.fillRect(x - r, y - r, r * 2, r * 2);
                     }
 
-                    // Em p = 0 nada coberto: a frente ainda está fora da tela
-                    // e o alfa sobe junto com o começo do movimento.
-                    ctx.globalAlpha = Math.min(1, p * 6);
+                    // A onda entra visível suavemente desde o começo do movimento.
+                    ctx.globalAlpha = Math.min(1, 0.2 + p * 4);
 
                     // Disco principal.
                     softDisc(cx, cy, R, (R - feather) / R);

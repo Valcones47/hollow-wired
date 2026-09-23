@@ -129,6 +129,9 @@ case "${1:-}" in
             trace "renderizador novo NÃO apareceu em 8s: $target"
         fi
 
+        # Garante que o novo wallpaper inicie a reprodução (despausado) assim que estiver ativo
+        gdbus call --session --dest org.waywallen.waywallen.Daemon --object-path /org/waywallen/waywallen/Daemon --method org.waywallen.waywallen.Daemon1.Resume >/dev/null 2>&1 || true
+
         # Revela imediatamente o wallpaper; a paleta do wallust roda em segundo
         # plano sem segurar a tela coberta nem introduzir atraso na transição.
         qs_call reveal >/dev/null 2>&1 || true
