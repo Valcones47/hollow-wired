@@ -9,6 +9,9 @@ import Quickshell.Services.Pipewire
 import Quickshell.Services.UPower
 import Quickshell.Networking
 import Quickshell.Bluetooth
+import Quickshell.Services.SystemTray
+import Quickshell.Services.Mpris
+import Quickshell.Widgets
 import "."
 
 // Barra lateral vertical — a alternativa à barra de cima, que é como a maior
@@ -63,8 +66,10 @@ PanelWindow {
     // ---- popup do hover ----
     property string pop: ""
     property real popAnchorY: 0
-    function showPop(kind, item) {
+    property var popTray: null
+    function showPop(kind, item, trayItem) {
         popHide.stop();
+        vbar.popTray = trayItem || null;
         vbar.popAnchorY = item.mapToItem(null, 0, item.height / 2).y;
         vbar.pop = kind;
     }
@@ -109,6 +114,12 @@ PanelWindow {
     readonly property PwNode sink: Pipewire.defaultAudioSink
     readonly property PwNode source: Pipewire.defaultAudioSource
     PwObjectTracker { objects: [vbar.sink, vbar.source] }
+
+    // Mídia: o primeiro player que estiver tocando, senão o primeiro que houver.
+    readonly property var player: {
+        const ps = Mpris.players.values;
+        return ps.find(p => p.isPlaying) || (ps.length > 0 ? ps[0] : null);
+    }
 
     function fmtTime(secs) {
         if (!secs || secs <= 0) return "";
@@ -376,7 +387,94 @@ PanelWindow {
                     }
                 }
 
+                // ---- mídia: capa pequena no meio da barra, popup no hover ----
+                Rectangle {
+                    id: mediaBtn
+                    visible: vbar.player !== null
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.topMargin: 6
+                    implicitWidth: 36
+                    implicitHeight: 36
+                    radius: 10
+                    color: Theme.tileHigh
+                    clip: true
+                    Image {
+                        id: artImg
+                        anchors.fill: parent
+                        source: vbar.player && vbar.player.trackArtUrl ? vbar.player.trackArtUrl : ""
+                        fillMode: Image.PreserveAspectCrop
+                        sourceSize: Qt.size(72, 72)
+                        asynchronous: true
+                        visible: status === Image.Ready
+                        opacity: vbar.player && vbar.player.isPlaying ? 1 : 0.55
+                    }
+                    Text {
+                        anchors.centerIn: parent
+                        visible: !artImg.visible
+                        text: Theme.icons.album
+                        font.family: Theme.iconFontFamily
+                        font.pixelSize: 17
+                        color: Theme.textColor
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onEntered: vbar.showPop("media", mediaBtn)
+                        onExited: vbar.leavePop()
+                        onClicked: if (vbar.player && vbar.player.canTogglePlaying) vbar.player.togglePlaying()
+                    }
+                }
+
                 Item { Layout.fillHeight: true }
+
+                // ---- bandeja (apps em segundo plano) ----
+                Repeater {
+                    model: SystemTray.items
+                    delegate: Item {
+                        id: trayBtn
+                        required property SystemTrayItem modelData
+                        Layout.alignment: Qt.AlignHCenter
+                        implicitWidth: 36
+                        implicitHeight: 30
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: 10
+                            color: trayArea.containsMouse || (vbar.pop === "tray" && vbar.popTray === trayBtn.modelData)
+                                ? Theme.tileHigh : "transparent"
+                        }
+                        IconImage {
+                            anchors.centerIn: parent
+                            implicitSize: 18
+                            source: trayBtn.modelData.icon
+                            opacity: trayBtn.modelData.status === Status.Passive ? 0.6 : 1
+                        }
+                        MouseArea {
+                            id: trayArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            acceptedButtons: Qt.LeftButton | Qt.MiddleButton
+                            onEntered: vbar.showPop("tray", trayBtn, trayBtn.modelData)
+                            onExited: vbar.leavePop()
+                            onClicked: mouse => {
+                                if (mouse.button === Qt.MiddleButton)
+                                    trayBtn.modelData.secondaryActivate();
+                                else if (!trayBtn.modelData.onlyMenu)
+                                    trayBtn.modelData.activate();
+                            }
+                            onWheel: wheel => trayBtn.modelData.scroll(wheel.angleDelta.y, false)
+                        }
+                    }
+                }
+
+                Rectangle {
+                    visible: SystemTray.items.values.length > 0
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.preferredWidth: 20
+                    Layout.preferredHeight: 1
+                    color: Theme.withAlpha(Theme.outline, 0.35)
+                }
 
                 // ---- indicadores ----
                 BarButton {
@@ -573,6 +671,95 @@ PanelWindow {
                     vbar.perfModeEnabled = !vbar.perfModeEnabled;
                     perfToggleProc.running = true;
                 }
+            }
+
+            // ---- mídia ----
+            RowLayout {
+                visible: vbar.pop === "media" && vbar.player !== null
+                Layout.fillWidth: true
+                spacing: 12
+                Rectangle {
+                    implicitWidth: 64
+                    implicitHeight: 64
+                    radius: 10
+                    color: Theme.tileHigh
+                    clip: true
+                    Image {
+                        anchors.fill: parent
+                        source: vbar.player && vbar.player.trackArtUrl ? vbar.player.trackArtUrl : ""
+                        fillMode: Image.PreserveAspectCrop
+                        sourceSize: Qt.size(128, 128)
+                        asynchronous: true
+                    }
+                }
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 2
+                    Text {
+                        Layout.fillWidth: true
+                        text: vbar.player ? (vbar.player.trackTitle || vbar.player.identity || "") : ""
+                        elide: Text.ElideRight
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 13
+                        font.weight: Font.DemiBold
+                        color: Theme.textColor
+                    }
+                    Text {
+                        Layout.fillWidth: true
+                        text: vbar.player ? (vbar.player.trackArtist || vbar.player.identity || "") : ""
+                        elide: Text.ElideRight
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 11
+                        color: Theme.subtext
+                    }
+                    Row {
+                        spacing: 4
+                        Repeater {
+                            model: [
+                                { icon: Theme.icons.prev, act: "prev" },
+                                { icon: vbar.player && vbar.player.isPlaying ? Theme.icons.pause : Theme.icons.play, act: "toggle" },
+                                { icon: Theme.icons.next, act: "next" }
+                            ]
+                            delegate: Rectangle {
+                                id: mBtn
+                                required property var modelData
+                                width: 32
+                                height: 28
+                                radius: 8
+                                color: mBtnArea.containsMouse ? Theme.tileHigh : "transparent"
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: mBtn.modelData.icon
+                                    font.family: Theme.iconFontFamily
+                                    font.pixelSize: 16
+                                    color: Theme.textColor
+                                }
+                                MouseArea {
+                                    id: mBtnArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        const pl = vbar.player;
+                                        if (!pl) return;
+                                        if (mBtn.modelData.act === "prev" && pl.canGoPrevious) pl.previous();
+                                        else if (mBtn.modelData.act === "next" && pl.canGoNext) pl.next();
+                                        else if (mBtn.modelData.act === "toggle" && pl.canTogglePlaying) pl.togglePlaying();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ---- bandeja: o menu do próprio app ----
+            TrayMenu {
+                visible: vbar.pop === "tray"
+                Layout.fillWidth: true
+                item: vbar.pop === "tray" ? vbar.popTray : null
+                maxWidth: popBox.width - 28
+                onTriggered: vbar.pop = ""
             }
 
             // ---- rede ----
