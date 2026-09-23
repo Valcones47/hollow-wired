@@ -1,0 +1,78 @@
+#!/usr/bin/env python3
+"""rice-minimize-listener — faz o botão "minimizar" dos próprios apps funcionar.
+
+O Hyprland não tem minimizar: quando um app pede (o botão da barra própria do
+Firefox, Discord, apps GNOME...), ele só avisa no socket de eventos
+("minimized>>ENDEREÇO,1") e a janela continua onde estava. Aqui esse aviso vira
+o mesmo que o Super + D: a janela vai para a área escondida (special:magic),
+de onde volta com Super + A.
+
+Uma instância só (trava em $XDG_RUNTIME_DIR). Sobe no hyprland.start.
+"""
+
+import fcntl
+import os
+import socket
+import subprocess
+import sys
+import time
+
+RUN = os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
+
+
+def instance_sig():
+    sig = os.environ.get("HYPRLAND_INSTANCE_SIGNATURE", "")
+    if sig:
+        return sig
+    try:
+        d = os.path.join(RUN, "hypr")
+        return max(os.listdir(d), key=lambda n: os.path.getmtime(os.path.join(d, n)))
+    except (OSError, ValueError):
+        return ""
+
+
+def minimize(addr):
+    if not addr.startswith("0x"):
+        addr = "0x" + addr
+    subprocess.run(["hyprctl", "dispatch",
+                    f'hl.dsp.window.move({{ workspace = "special:magic", window = "address:{addr}" }})'],
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def listen(path):
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    s.connect(path)
+    buf = b""
+    while True:
+        chunk = s.recv(4096)
+        if not chunk:
+            return
+        buf += chunk
+        while b"\n" in buf:
+            line, buf = buf.split(b"\n", 1)
+            ev, _, data = line.decode("utf-8", "replace").partition(">>")
+            if ev == "minimized":
+                addr, _, state = data.partition(",")
+                if state.strip() == "1" and addr:
+                    minimize(addr.strip())
+
+
+def main():
+    lock = open(os.path.join(RUN, "rice-minimize-listener.lock"), "w")
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        return 0   # já tem uma rodando
+    while True:
+        sig = instance_sig()
+        path = os.path.join(RUN, "hypr", sig, ".socket2.sock")
+        try:
+            listen(path)
+        except OSError:
+            pass
+        # Hyprland reiniciou ou o socket caiu: tenta de novo.
+        time.sleep(2)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

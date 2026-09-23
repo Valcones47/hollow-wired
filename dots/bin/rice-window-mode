@@ -21,6 +21,12 @@ apply() {
     mkdir -p "$(dirname "$FILE")"
     printf '%s\n' "$mode" > "$FILE"
     if [ -n "$HYPRLAND_INSTANCE_SIGNATURE" ]; then
+        # Barra de título (hyprbars): pelo Lua o plugin não fica carregado na
+        # mesma chamada do setup; carregar antes pelo hyprctl garante a barra.
+        # "Cannot load a plugin twice" quando já está carregado é esperado.
+        if [ "$mode" = windows ] && [ -f /usr/lib/libhyprbars.so ]; then
+            hyprctl plugin load /usr/lib/libhyprbars.so >/dev/null 2>&1 || true
+        fi
         out=$(hyprctl eval "rice_set_window_mode('$mode', true)" 2>&1)
         case "$out" in *rror*) echo "$out" >&2 ;; esac
     fi

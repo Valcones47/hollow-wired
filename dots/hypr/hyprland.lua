@@ -834,6 +834,10 @@ hl.bind(mainMod .. " + Tab", hl.dsp.global("quickshell:overview"))
 -- restaurar depois). O equivalente é mandar a janela pro workspace especial
 -- oculto (o mesmo "magic" do Super+A) e trazer de volta com Super+A.
 hl.bind(mainMod .. " + D", hl.dsp.window.move({ workspace = "special:magic" }))
+-- O botão "minimizar" dos próprios apps (Firefox, Discord, apps GNOME...) só
+-- manda um pedido que o Hyprland ignora. O rice-minimize-listener escuta esse
+-- pedido no socket de eventos e faz o mesmo que o Super + D.
+hl.on("hyprland.start", function() hl.exec_cmd("rice-minimize-listener") end)
 
 --------------------
 ---- WINDOW RULES --
@@ -906,7 +910,18 @@ local function hyprbars_setup()
         if not f then return false end
         f:close()
         local ok = pcall(hl.plugin.load, hyprbarsLib)
-        if not ok or not hl.plugin.hyprbars then return false end
+        if not ok or not hl.plugin.hyprbars then
+            -- Medido: pelo Lua o plugin não fica carregado nesta mesma chamada
+            -- ("no plugins loaded", hl.plugin.hyprbars nil), e o modo Windows
+            -- ficava sem barra nenhuma — só os apps com barra própria tinham
+            -- botões. Pelo hyprctl ele carrega; aí o setup é refeito.
+            if not rice_hyprbars_retry then
+                rice_hyprbars_retry = true
+                hl.exec_cmd("sh -c 'hyprctl plugin load " .. hyprbarsLib
+                    .. " >/dev/null 2>&1; sleep 0.3; hyprctl eval \"rice_set_window_mode(rice_window_mode, false)\" >/dev/null 2>&1'")
+            end
+            return false
+        end
     end
     local bg = wallust.wallust_background or "#1e1e2e"
     local fg = wallust.wallust_foreground or "#ffffff"
@@ -948,6 +963,7 @@ local function hyprbars_setup()
         ["hyprbars:no_bar"] = true,
     })
     rice_hyprbars_ready = true
+    rice_hyprbars_retry = false
     return true
 end
 
