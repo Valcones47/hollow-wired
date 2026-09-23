@@ -73,7 +73,6 @@ PanelWindow {
             blurCheck.running = true;
             nightCheck.running = true;
             cc.readBrightness();
-            cc.mediaPoll();
         } else {
             cc.hoverMode = false;
             cc.btOpen = false;
@@ -87,8 +86,11 @@ PanelWindow {
     readonly property PwNode sink: Pipewire.defaultAudioSink
     readonly property PwNode source: Pipewire.defaultAudioSource
     readonly property var sinks: Pipewire.nodes.values.filter(n => n.audio && !n.isStream && n.isSink)
-    readonly property var streams: Pipewire.nodes.values.filter(n => n.audio && n.isStream
-        && (n.properties["media.class"] || "") === "Stream/Output/Audio")
+    // Stream de reprodução = isStream && isSink no Quickshell. Sem o nó vinculado
+    // as `properties` vêm vazias, então filtrar por media.class não achava nada.
+    // Fora ficam o equalizador e os loopbacks do próprio rice.
+    readonly property var streams: Pipewire.nodes.values.filter(n => n.audio && n.isStream && n.isSink
+        && n.name !== "hollow_eq_out" && !String(n.name).startsWith("output.loopback"))
     PwObjectTracker { objects: [cc.sink, cc.source].concat(cc.sinks, cc.streams) }
     function nodeName(n) {
         if (!n) return "";
@@ -190,45 +192,8 @@ PanelWindow {
     Process { id: nightToggle; command: ["rice-nightlight", "toggle"]; onExited: nightRecheck.restart() }
     Timer { id: nightRecheck; interval: 400; onTriggered: nightCheck.running = true }
 
-    // --- mídia ---
-    // Mesmo cuidado da VerticalBar: o isPlaying do Mpris trava com alguns
-    // players, então o estado vem do `playerctl status` (a cada 1 s aberto) e o
-    // clique usa PlayPause do próprio player.
-    readonly property var player: {
-        const ps = Mpris.players.values;
-        return ps.find(p => p.isPlaying) || (ps.length > 0 ? ps[0] : null);
-    }
-    property var mediaState: null
-    property real mediaClickAt: 0
-    readonly property bool mediaPlaying: mediaState !== null ? mediaState : (player !== null && player.isPlaying)
-    function playerName() {
-        return player ? String(player.dbusName).replace("org.mpris.MediaPlayer2.", "") : "";
-    }
-    function mediaPoll() {
-        if (!player || mediaProc.running) return;
-        mediaProc.command = ["playerctl", "-p", playerName(), "status"];
-        mediaProc.running = true;
-    }
-    function mediaCmd(cmd) {
-        if (!player) return;
-        if (cmd === "play-pause") {
-            mediaState = !mediaPlaying;
-            mediaClickAt = Date.now();
-        }
-        Quickshell.execDetached(["playerctl", "-p", playerName(), cmd]);
-    }
-    onPlayerChanged: { mediaState = null; mediaPoll(); }
-    Timer { interval: 1000; repeat: true; running: cc.open && cc.player !== null; onTriggered: cc.mediaPoll() }
-    Process {
-        id: mediaProc
-        stdout: StdioCollector {
-            onStreamFinished: {
-                if (Date.now() - cc.mediaClickAt < 1600) return;
-                const st = text.trim();
-                if (st === "Playing" || st === "Paused" || st === "Stopped") cc.mediaState = st === "Playing";
-            }
-        }
-    }
+    // --- mídia (estado e comandos no MediaState) ---
+    readonly property var player: MediaState.player
 
     // --- seções que abrem ---
     property bool btOpen: false
@@ -656,7 +621,7 @@ PanelWindow {
                         Repeater {
                             model: [
                                 { icon: Theme.icons.prev, cmd: "previous" },
-                                { icon: cc.mediaPlaying ? Theme.icons.pause : Theme.icons.play, cmd: "play-pause" },
+                                { icon: MediaState.playing ? Theme.icons.pause : Theme.icons.play, cmd: "toggle" },
                                 { icon: Theme.icons.next, cmd: "next" }
                             ]
                             delegate: Rectangle {
@@ -678,11 +643,26 @@ PanelWindow {
                                     anchors.fill: parent
                                     hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
-                                    onClicked: cc.mediaCmd(mb.modelData.cmd)
+                                    onClicked: {
+                                        if (mb.modelData.cmd === "previous") MediaState.previous();
+                                        else if (mb.modelData.cmd === "next") MediaState.next();
+                                        else MediaState.toggle();
+                                    }
                                 }
                             }
                         }
                     }
+                }
+
+                PopSlider {
+                    Layout.fillWidth: true
+                    visible: cc.player !== null && MediaState.hasVolume
+                    icon: MediaState.muted ? Theme.icons.volOff : Theme.icons.music
+                    label: MediaState.player ? (MediaState.player.identity || "") : ""
+                    value: MediaState.shownVolume
+                    dimmed: MediaState.muted
+                    onMoved: v => MediaState.setVolume(v)
+                    onIconClicked: MediaState.toggleMute()
                 }
 
                 // ---------- bateria e perfil de energia ----------

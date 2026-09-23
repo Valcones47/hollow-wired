@@ -92,82 +92,9 @@ PanelWindow {
     readonly property PwNode source: Pipewire.defaultAudioSource
     PwObjectTracker { objects: [vbar.sink, vbar.source] }
 
-    // Mídia: o primeiro player que estiver tocando, senão o primeiro que houver.
-    // Depois de um clique o player fica preso (mediaLock): senão, ao pausar, a
-    // barra podia pular para outro player e o segundo clique ia para ele.
-    readonly property var player: {
-        const ps = Mpris.players.values;
-        if (mediaLock && ps.indexOf(mediaLock) >= 0) return mediaLock;
-        return ps.find(p => p.isPlaying) || (ps.length > 0 ? ps[0] : null);
-    }
-
-    // Estado mostrado. O Mpris do Quickshell não é confiável com alguns players
-    // (o Sonora, players web): medido, ele ficou 5+ s dizendo "pausado" com a
-    // música tocando, mesmo sem clique, e cliques rápidos pioram (o player
-    // processa com ~1,5 s de atraso e manda estados velhos). Por isso a verdade é
-    // o `playerctl status`, consultado a cada 2 s enquanto a barra lateral está
-    // à mostra, a cada 0,5 s logo após um clique e sempre que o Mpris muda. Logo
-    // depois de um clique vale o estado pedido (a consulta ainda veria o velho).
-    property var mediaOverride: null
-    property var mediaLock: null
-    property int mediaFast: 0
-    property real mediaClickAt: 0
-    readonly property bool mediaPlaying: mediaOverride !== null ? mediaOverride
-        : (player !== null && player.isPlaying)
-
-    function mediaToggle() {
-        const pl = player;
-        if (!pl) return;
-        const want = !mediaPlaying;
-        mediaLock = pl;
-        mediaOverride = want;
-        mediaClickAt = Date.now();
-        // PlayPause no próprio player: ele inverte o estado *dele*. Mandar
-        // play()/pause() pelo que o ícone mostra falhava quando o ícone estava
-        // atrasado (pause para quem já estava pausado = nada acontece), e o
-        // togglePlaying() do Quickshell decide pelo isPlaying dele, que trava.
-        Quickshell.execDetached(["playerctl", "-p",
-            String(pl.dbusName).replace("org.mpris.MediaPlayer2.", ""), "play-pause"]);
-        mediaFast = 10;
-    }
-    function mediaRelease() {
-        mediaOverride = null;
-        mediaLock = null;
-        mediaFast = 3;
-        mediaPoll();
-    }
-    function mediaPoll() {
-        const pl = vbar.player;
-        if (!pl || mediaSyncProc.running) return;
-        mediaSyncProc.command = ["playerctl", "-p",
-            String(pl.dbusName).replace("org.mpris.MediaPlayer2.", ""), "status"];
-        mediaSyncProc.running = true;
-    }
-    onPlayerChanged: if (!mediaLock) { mediaOverride = null; mediaPoll(); }
-    Connections {
-        target: vbar.player
-        function onIsPlayingChanged() { vbar.mediaPoll(); }
-    }
-    Timer {
-        interval: vbar.mediaFast > 0 ? 500 : 2000
-        repeat: true
-        running: vbar.visible && vbar.player !== null
-        onTriggered: vbar.mediaPoll()
-    }
-    Process {
-        id: mediaSyncProc
-        stdout: StdioCollector {
-            onStreamFinished: {
-                if (vbar.mediaFast > 0) vbar.mediaFast--;
-                else vbar.mediaLock = null;
-                // resposta de antes do player processar o clique: ignora
-                if (Date.now() - vbar.mediaClickAt < 1600) return;
-                const st = text.trim();
-                if (st === "Playing" || st === "Paused" || st === "Stopped")
-                    vbar.mediaOverride = st === "Playing";
-            }
-        }
-    }
+    // Mídia: estado e comandos no MediaState (compartilhado com a TopBar e a
+    // central; lá está o porquê do playerctl).
+    readonly property var player: MediaState.player
 
     function fmtTime(secs) {
         if (!secs || secs <= 0) return "";
@@ -559,7 +486,7 @@ PanelWindow {
                         sourceSize: Qt.size(72, 72)
                         asynchronous: true
                         visible: status === Image.Ready
-                        opacity: vbar.mediaPlaying ? 1 : 0.55
+                        opacity: MediaState.playing ? 1 : 0.55
                     }
                     Text {
                         anchors.centerIn: parent
@@ -575,7 +502,9 @@ PanelWindow {
                         cursorShape: Qt.PointingHandCursor
                         onEntered: vbar.showPop("media", mediaBtn)
                         onExited: vbar.leavePop()
-                        onClicked: vbar.mediaToggle()
+                        onClicked: MediaState.toggle()
+                        // roda: volume do app que está tocando
+                        onWheel: w => MediaState.wheel(w.angleDelta.y)
                     }
                 }
 
@@ -764,7 +693,7 @@ PanelWindow {
     // ================= popup lateral =================
     Rectangle {
         id: popBox
-        readonly property bool busy: false
+        readonly property bool busy: mediaVol.dragging
         readonly property real gap: 10
         // Largura fixa: medir pelo implicitWidth do ColumnLayout (que conta ~0
         // para linhas com fillWidth) deixava o conteúdo vazar da caixa.
@@ -840,7 +769,7 @@ PanelWindow {
                         Repeater {
                             model: [
                                 { icon: Theme.icons.prev, act: "prev" },
-                                { icon: vbar.mediaPlaying ? Theme.icons.pause : Theme.icons.play, act: "toggle" },
+                                { icon: MediaState.playing ? Theme.icons.pause : Theme.icons.play, act: "toggle" },
                                 { icon: Theme.icons.next, act: "next" }
                             ]
                             delegate: Rectangle {
@@ -863,17 +792,26 @@ PanelWindow {
                                     hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
                                     onClicked: {
-                                        const pl = vbar.player;
-                                        if (!pl) return;
-                                        if (mBtn.modelData.act === "prev" && pl.canGoPrevious) { vbar.mediaRelease(); pl.previous(); }
-                                        else if (mBtn.modelData.act === "next" && pl.canGoNext) { vbar.mediaRelease(); pl.next(); }
-                                        else if (mBtn.modelData.act === "toggle") vbar.mediaToggle();
+                                        if (mBtn.modelData.act === "prev") MediaState.previous();
+                                        else if (mBtn.modelData.act === "next") MediaState.next();
+                                        else MediaState.toggle();
                                     }
                                 }
                             }
                         }
                     }
                 }
+            }
+
+            PopSlider {
+                id: mediaVol
+                visible: vbar.pop === "media" && MediaState.hasVolume
+                Layout.fillWidth: true
+                icon: MediaState.muted ? Theme.icons.volOff : Theme.icons.music
+                value: MediaState.shownVolume
+                dimmed: MediaState.muted
+                onMoved: v => MediaState.setVolume(v)
+                onIconClicked: MediaState.toggleMute()
             }
 
             // ---- bandeja: o menu do próprio app ----
