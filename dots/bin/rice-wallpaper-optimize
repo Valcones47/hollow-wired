@@ -278,7 +278,177 @@ def optimize_folder(folder_path):
         if vid.suffix.lower() in [".mp4", ".webm", ".mkv"] and not vid.name.endswith(".original") and not vid.name.startswith("tmp_"):
             optimize_video(vid)
 
+# ---------------------------------------------------------------------------
+# Modo "vídeos" do painel (aba Cores e papel de parede): procura vídeos maiores
+# que 1080p na pasta do Wallpaper Engine ou numa pasta escolhida pelo usuário
+# (com subpastas), converte para 1080p e restaura. Saída em JSON para o QML.
+#   videos-scan     <pasta|workshop>   → {"dir", "videos": [...], "restorable"}
+#   videos-optimize <pasta|workshop|arquivo> → uma linha JSON por evento
+#   videos-restore  <pasta|workshop>   → {"restored": n}
+#   pick-folder                        → caminho escolhido (zenity/kdialog)
+#   prefs-get / prefs-set <source> <dir>  (~/.config/hollow-wired/wallpaper-optimize.json)
+VIDEO_EXT = (".mp4", ".webm", ".mkv", ".mov")
+PREFS = Path.home() / ".config/hollow-wired/wallpaper-optimize.json"
+
+
+def resolve_dir(arg):
+    return DEFAULT_WORKSHOP_DIR if arg == "workshop" else Path(arg).expanduser().resolve()
+
+
+def iter_videos(root, max_depth=4):
+    """Vídeos (sem backups nem temporários), até max_depth níveis abaixo."""
+    root = Path(root)
+    if root.is_file():
+        if root.suffix.lower() in VIDEO_EXT:
+            yield root
+        return
+    if not root.is_dir():
+        return
+    base = len(root.parts)
+    for dirpath, dirnames, filenames in os.walk(root):
+        if len(Path(dirpath).parts) - base >= max_depth:
+            dirnames[:] = []
+        dirnames[:] = [d for d in dirnames if not d.startswith(".")]
+        for fn in sorted(filenames):
+            if fn.startswith("tmp_") or fn.endswith(".original"):
+                continue
+            if Path(fn).suffix.lower() in VIDEO_EXT:
+                yield Path(dirpath) / fn
+
+
+def emit(obj):
+    print(json.dumps(obj, ensure_ascii=False), flush=True)
+
+
+def is_big(w, h):
+    """Maior que 1080p na orientação do próprio vídeo (vertical 1080x1920 não é)."""
+    if not w or not h:
+        return False
+    return max(w, h) > 1920 or min(w, h) > 1080
+
+
+def transcode(video_path, target_w=1920, target_h=1080):
+    """Converte para caber em 1920x1080 (mantém proporção). Backup em .original.
+
+    O WebM não aceita H.264: vai com VP9 no mesmo contêiner, para o arquivo
+    continuar com o nome que o project.json do Wallpaper Engine espera.
+    """
+    bak_path = video_path.with_name(video_path.name + ".original")
+    if not bak_path.exists():
+        shutil.copy2(video_path, bak_path)
+    tmp_out = video_path.with_name("tmp_" + video_path.name)
+    w, h = get_video_info(bak_path)
+    if w and h and h > w:
+        target_w, target_h = target_h, target_w   # vídeo vertical: cabe em 1080x1920
+    scale = f"scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,scale=trunc(iw/2)*2:trunc(ih/2)*2"
+    if video_path.suffix.lower() == ".webm":
+        codec = ["-c:v", "libvpx-vp9", "-crf", "32", "-b:v", "0", "-row-mt", "1", "-deadline", "good", "-cpu-used", "4"]
+    else:
+        # Teto de bitrate: com CRF puro, um original 4K em HEVC/AV1 de bitrate
+        # baixo virava um 1080p H.264 maior que ele (medido: 17,8 → 31,9 MB).
+        codec = ["-c:v", "libx264", "-crf", "20", "-preset", "fast", "-pix_fmt", "yuv420p",
+                 "-maxrate", "6M", "-bufsize", "12M"]
+    cmd = ["ffmpeg", "-y", "-loglevel", "error", "-i", str(bak_path), "-vf", scale] + codec + ["-c:a", "copy", str(tmp_out)]
+    res = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+    if res.returncode != 0 or not tmp_out.exists():
+        if tmp_out.exists():
+            tmp_out.unlink()
+        return False, (res.stderr or "").strip()[-200:]
+    tmp_out.replace(video_path)
+    return True, ""
+
+
+def videos_scan(arg):
+    root = resolve_dir(arg)
+    out, restorable = [], 0
+    for v in iter_videos(root):
+        if v.with_name(v.name + ".original").exists():
+            restorable += 1
+        w, h = get_video_info(v)
+        if not is_big(w, h):
+            continue
+        out.append({"path": str(v), "name": v.name, "folder": v.parent.name,
+                    "w": w, "h": h, "mb": round(v.stat().st_size / 1048576, 1)})
+    emit({"dir": str(root), "exists": root.exists(), "videos": out, "restorable": restorable})
+
+
+def videos_optimize(arg):
+    root = resolve_dir(arg)
+    todo = []
+    for v in iter_videos(root):
+        w, h = get_video_info(v)
+        if is_big(w, h):
+            todo.append((v, w, h))
+    before_all = after_all = 0
+    done = 0
+    for i, (v, w, h) in enumerate(todo, 1):
+        before = v.stat().st_size
+        emit({"event": "start", "i": i, "n": len(todo), "name": v.name, "w": w, "h": h})
+        ok, err = transcode(v)
+        if ok:
+            after = v.stat().st_size
+            before_all += before
+            after_all += after
+            done += 1
+            emit({"event": "done", "i": i, "n": len(todo), "name": v.name,
+                  "before_mb": round(before / 1048576, 1), "after_mb": round(after / 1048576, 1)})
+        else:
+            emit({"event": "error", "i": i, "n": len(todo), "name": v.name, "error": err})
+    emit({"event": "end", "done": done, "n": len(todo),
+          "before_mb": round(before_all / 1048576, 1), "after_mb": round(after_all / 1048576, 1)})
+
+
+def videos_restore(arg):
+    root = resolve_dir(arg)
+    n = 0
+    for v in iter_videos(root):
+        bak = v.with_name(v.name + ".original")
+        if bak.exists():
+            shutil.copy2(bak, v)
+            bak.unlink()
+            n += 1
+    emit({"restored": n})
+
+
+def pick_folder():
+    for cmd in (["zenity", "--file-selection", "--directory", "--title=Pasta com vídeos de wallpaper"],
+                ["kdialog", "--getexistingdirectory", str(Path.home())]):
+        if shutil.which(cmd[0]):
+            r = subprocess.run(cmd, capture_output=True, text=True)
+            print(r.stdout.strip())
+            return
+    print("")
+
+
+def prefs_get():
+    try:
+        d = json.loads(PREFS.read_text())
+    except Exception:
+        d = {}
+    emit({"source": d.get("source", "workshop"), "dir": d.get("dir", "")})
+
+
+def prefs_set(source, folder):
+    PREFS.parent.mkdir(parents=True, exist_ok=True)
+    tmp = PREFS.with_suffix(".tmp")
+    tmp.write_text(json.dumps({"source": source, "dir": folder}, ensure_ascii=False, indent=2) + "\n")
+    tmp.replace(PREFS)
+
+
+VIDEO_CMDS = {
+    "videos-scan": lambda a: videos_scan(a[0]),
+    "videos-optimize": lambda a: videos_optimize(a[0]),
+    "videos-restore": lambda a: videos_restore(a[0]),
+    "pick-folder": lambda a: pick_folder(),
+    "prefs-get": lambda a: prefs_get(),
+    "prefs-set": lambda a: prefs_set(a[0], a[1] if len(a) > 1 else ""),
+}
+
+
 def main():
+    if len(sys.argv) >= 2 and sys.argv[1] in VIDEO_CMDS:
+        VIDEO_CMDS[sys.argv[1]](sys.argv[2:])
+        return
     if len(sys.argv) < 2:
         print("Uso:")
         print("  rice-wallpaper-optimize --all                       # Otimiza TODOS os wallpapers da Steam")

@@ -766,6 +766,93 @@ PanelWindow {
         }
     }
 
+    // ---- vídeos 4K/6K → 1080p (rice-wallpaper-optimize videos-*) ----
+    // Fonte: "workshop" (pasta do Wallpaper Engine) ou "custom" (vidDir,
+    // escolhida pelo usuário). Guardado em ~/.config/hollow-wired/wallpaper-optimize.json.
+    property string vidSource: "workshop"
+    property string vidDir: ""
+    property var vidScan: null          // { dir, exists, videos: [...], restorable }
+    property string vidState: ""        // "" | scanning | converting | restoring
+    property string vidMsg: ""
+    readonly property string vidTarget: vidSource === "custom" ? vidDir : "workshop"
+    function vidRescan() {
+        if (win.vidTarget === "" || vidScanProc.running) return;
+        win.vidState = "scanning";
+        vidScanProc.command = ["rice-wallpaper-optimize", "videos-scan", win.vidTarget];
+        vidScanProc.running = true;
+    }
+    function vidSavePrefs() {
+        Quickshell.execDetached(["rice-wallpaper-optimize", "prefs-set", win.vidSource, win.vidDir]);
+    }
+    Process {
+        id: vidPrefsProc
+        command: ["rice-wallpaper-optimize", "prefs-get"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const d = JSON.parse(text);
+                    win.vidSource = d.source === "custom" ? "custom" : "workshop";
+                    win.vidDir = d.dir || "";
+                } catch (e) {}
+                win.vidRescan();
+            }
+        }
+    }
+    Process {
+        id: vidScanProc
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try { win.vidScan = JSON.parse(text); } catch (e) { win.vidScan = null; }
+                if (win.vidState === "scanning") win.vidState = "";
+            }
+        }
+    }
+    Process {
+        id: vidPickProc
+        command: ["rice-wallpaper-optimize", "pick-folder"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const d = text.trim();
+                if (d === "") return;
+                win.vidDir = d;
+                win.vidSource = "custom";
+                win.vidSavePrefs();
+                win.vidMsg = "";
+                win.vidRescan();
+            }
+        }
+    }
+    Process {
+        id: vidOptProc
+        stdout: SplitParser {
+            onRead: line => {
+                let e;
+                try { e = JSON.parse(line); } catch (err) { return; }
+                if (e.event === "start")
+                    win.vidMsg = Theme.t("vid.converting", "Convertendo %1 de %2: ").replace("%1", e.i).replace("%2", e.n) + e.name;
+                else if (e.event === "end")
+                    win.vidMsg = e.n === 0 ? Theme.t("vid.nothing", "Nada para converter.")
+                        : Theme.t("vid.done", "Pronto: %1 de %2 convertidos (%3 MB → %4 MB).")
+                            .replace("%1", e.done).replace("%2", e.n).replace("%3", e.before_mb).replace("%4", e.after_mb);
+                else if (e.event === "error")
+                    win.vidMsg = Theme.t("vid.error", "Falhou: ") + e.name;
+            }
+        }
+        onExited: { win.vidState = ""; win.vidRescan(); }
+    }
+    Process {
+        id: vidRestoreProc
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const d = JSON.parse(text);
+                    win.vidMsg = Theme.t("vid.restored", "%1 vídeos voltaram ao original.").replace("%1", d.restored);
+                } catch (e) {}
+            }
+        }
+        onExited: { win.vidState = ""; win.vidRescan(); }
+    }
+
     // ---- perfis de desempenho (rice-perf-profile) ----
     // perf = { profile, values: {blur_level, shadows, anim_windows, ...} }.
     // Um pedido por vez: `running = true` num processo rodando é ignorado, então
@@ -1190,6 +1277,7 @@ PanelWindow {
         loadNightlightProc.running = true;
         loadHyprPrefsProc.running = true;
         perfGetProc.running = true;
+        vidPrefsProc.running = true;
         loadMonitorsProc.running = true;
         checkBacklightProc.running = true;
         checkTouchpadProc.running = true;
@@ -5121,6 +5209,101 @@ PanelWindow {
                                     font.family: Theme.fontFamily
                                     font.pixelSize: 11
                                     color: Theme.withAlpha(Theme.subtext, 0.8)
+                                }
+
+                                SectionHeader {
+                                    title: Theme.t("vid.title", "Vídeos em 4K/6K para 1080p")
+                                    subtitle: Theme.t("vid.sub", "Vídeo acima de 1080p pesa na placa integrada sem ficar mais nítido numa tela 1080p. A conversão guarda o original ao lado (.original) e pode ser desfeita.")
+                                }
+                                OptionGroup {
+                                    OptionRow {
+                                        title: Theme.t("vid.where", "Onde procurar")
+                                        Segmented {
+                                            options: [
+                                                { value: "workshop", label: Theme.t("vid.src_we", "Wallpaper Engine") },
+                                                { value: "custom", label: Theme.t("vid.src_custom", "Pasta escolhida") }
+                                            ]
+                                            current: win.vidSource
+                                            onPicked: v => {
+                                                win.vidSource = v;
+                                                win.vidSavePrefs();
+                                                win.vidMsg = "";
+                                                win.vidScan = null;
+                                                if (v === "custom" && win.vidDir === "") vidPickProc.running = true;
+                                                else win.vidRescan();
+                                            }
+                                        }
+                                    }
+                                    RowDivider { visible: win.vidSource === "custom" }
+                                    OptionRow {
+                                        visible: win.vidSource === "custom"
+                                        title: win.vidDir !== "" ? win.vidDir : Theme.t("vid.no_dir", "Nenhuma pasta escolhida")
+                                        subtitle: Theme.t("vid.subfolders", "Procura também nas subpastas.")
+                                        ActionBtn {
+                                            icon: Theme.icons.folder
+                                            text: Theme.t("vid.pick", "Escolher pasta")
+                                            onClicked: if (!vidPickProc.running) vidPickProc.running = true
+                                        }
+                                    }
+                                    RowDivider {}
+                                    OptionRow {
+                                        title: win.vidState === "scanning" ? Theme.t("vid.scanning", "Procurando…")
+                                            : !win.vidScan ? Theme.t("vid.not_scanned", "Ainda não procurado")
+                                            : !win.vidScan.exists ? Theme.t("vid.missing", "Pasta não encontrada")
+                                            : win.vidScan.videos.length === 0 ? Theme.t("vid.none", "Nenhum vídeo acima de 1080p")
+                                            : Theme.t("vid.found", "%1 vídeos acima de 1080p").replace("%1", win.vidScan.videos.length)
+                                        subtitle: win.vidMsg
+                                        Row {
+                                            spacing: 8
+                                            ActionBtn {
+                                                minWidth: 0
+                                                icon: Theme.icons.refresh
+                                                onClicked: win.vidRescan()
+                                            }
+                                            ActionBtn {
+                                                visible: win.vidScan && win.vidScan.restorable > 0
+                                                minWidth: 0
+                                                text: Theme.t("vid.restore", "Restaurar originais")
+                                                opacity: win.vidState === "" ? 1 : 0.45
+                                                onClicked: {
+                                                    if (win.vidState !== "") return;
+                                                    win.vidState = "restoring";
+                                                    vidRestoreProc.command = ["rice-wallpaper-optimize", "videos-restore", win.vidTarget];
+                                                    vidRestoreProc.running = true;
+                                                }
+                                            }
+                                            ActionBtn {
+                                                visible: win.vidScan && win.vidScan.videos.length > 0
+                                                minWidth: 0
+                                                primary: true
+                                                text: win.vidState === "converting" ? Theme.t("vid.working", "Convertendo…") : Theme.t("vid.convert", "Converter para 1080p")
+                                                opacity: win.vidState === "" ? 1 : 0.6
+                                                onClicked: {
+                                                    if (win.vidState !== "") return;
+                                                    win.vidState = "converting";
+                                                    win.vidMsg = "";
+                                                    vidOptProc.command = ["rice-wallpaper-optimize", "videos-optimize", win.vidTarget];
+                                                    vidOptProc.running = true;
+                                                }
+                                            }
+                                        }
+                                    }
+                                    Repeater {
+                                        model: win.vidScan ? win.vidScan.videos.slice(0, 8) : []
+                                        delegate: Text {
+                                            required property var modelData
+                                            Layout.fillWidth: true
+                                            Layout.leftMargin: 16
+                                            Layout.rightMargin: 16
+                                            Layout.bottomMargin: 6
+                                            text: modelData.w + "×" + modelData.h + "  ·  " + modelData.mb + " MB  ·  " + modelData.name
+                                            elide: Text.ElideMiddle
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: 11
+                                            color: Theme.subtext
+                                        }
+                                    }
+                                    Item { implicitHeight: 4; visible: win.vidScan && win.vidScan.videos.length > 0 }
                                 }
 
                                 SectionHeader {
