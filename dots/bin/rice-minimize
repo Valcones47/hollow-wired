@@ -20,9 +20,19 @@ hyprctl dispatch "hl.dsp.window.move({ workspace = \"special:minimized\", window
 # Próxima janela da área atual pela ordem de uso (focusHistoryID menor = mais recente).
 next=$(hyprctl clients -j 2>/dev/null | jq -r --arg a "$addr" --argjson ws "${ws:-0}" \
     '[.[] | select(.mapped and .workspace.id == $ws and .address != $a)] | sort_by(.focusHistoryID) | .[0].address // empty')
-if [ -n "$next" ]; then
-    hyprctl dispatch "hl.dsp.focus({ window = \"address:$next\" })" >/dev/null 2>&1
-else
-    # Área vazia: foca a própria área, e o teclado sai da janela escondida.
-    hyprctl dispatch "hl.dsp.focus({ workspace = $ws })" >/dev/null 2>&1
-fi
+hand_off() {
+    if [ -n "$next" ]; then
+        hyprctl dispatch "hl.dsp.focus({ window = \"address:$next\" })" >/dev/null 2>&1
+    else
+        # Área vazia: foca a própria área, e o teclado sai da janela escondida.
+        hyprctl dispatch "hl.dsp.focus({ workspace = $ws })" >/dev/null 2>&1
+    fi
+}
+hand_off
+# Clicando no botão da barra, o soltar do clique ainda devolvia o foco à
+# janela que acabou de sumir (o usuário continuava digitando nela). Confere
+# por ~0,6 s e passa o foco de novo se ele voltar para ela.
+for _ in 1 2 3 4 5 6; do
+    sleep 0.1
+    [ "$(hyprctl activewindow -j 2>/dev/null | jq -r '.address // empty')" = "$addr" ] && hand_off
+done

@@ -942,7 +942,9 @@ local function hyprbars_setup()
         bar_button_padding = 8,
         bar_part_of_window = true,
         bar_precedence_over_border = true,
-        on_double_click = [[hyprctl dispatch 'hl.dsp.window.fullscreen({ mode = "maximized", action = "toggle" })']],
+        -- rice-maximize: ocupa a área livre (a dock continua); o maximizado do
+        -- Hyprland é tela cheia e escondia a dock.
+        on_double_click = [[rice-maximize]],
     } } })
     -- Da direita para a esquerda: fechar, maximizar, minimizar.
     hl.plugin.hyprbars.add_button({
@@ -951,7 +953,7 @@ local function hyprbars_setup()
     })
     hl.plugin.hyprbars.add_button({
         bg_color = hex(wallust.wallust_accent2 or fg), fg_color = hex(bg), size = 16, icon = "󰖯",
-        action = [[hyprctl dispatch 'hl.dsp.window.fullscreen({ mode = "maximized", action = "toggle" })']],
+        action = [[rice-maximize]],
     })
     hl.plugin.hyprbars.add_button({
         bg_color = hex(wallust.wallust_accent1 or fg), fg_color = hex(bg), size = 16, icon = "󰖰",

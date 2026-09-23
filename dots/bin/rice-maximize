@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# rice-maximize — maximizar como no Windows (botão e duplo clique da barra do
+# modo Windows).
+#
+# O "maximizado" do Hyprland é um modo de tela cheia (fullscreen 1): a dock se
+# esconde em qualquer tela cheia, e a barra de tarefas sumia ao maximizar. Aqui
+# a janela continua solta e só passa a ocupar a área livre do monitor (menos a
+# barra de cima e a dock, pelo "reserved" do monitor). O tamanho anterior fica
+# guardado e volta no segundo clique.
+#
+# Uso: rice-maximize [endereço]   (sem endereço: a janela ativa)
+
+addr="${1:-}"
+[ -n "$addr" ] || addr=$(hyprctl activewindow -j 2>/dev/null | jq -r '.address // empty')
+[ -n "$addr" ] || exit 0
+case "$addr" in 0x*) ;; *) addr="0x$addr" ;; esac
+
+dir="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/rice-maximize"
+mkdir -p "$dir"
+saved="$dir/$addr"
+w="address:$addr"
+
+if [ -f "$saved" ]; then
+    read -r x y ww hh < "$saved"
+    rm -f "$saved"
+    hyprctl dispatch "hl.dsp.window.resize({ x = $ww, y = $hh, exact = true, window = \"$w\" })" >/dev/null 2>&1
+    hyprctl dispatch "hl.dsp.window.move({ x = $x, y = $y, exact = true, window = \"$w\" })" >/dev/null 2>&1
+    exit 0
+fi
+
+client=$(hyprctl clients -j 2>/dev/null | jq -c --arg a "$addr" '.[] | select(.address == $a)')
+[ -n "$client" ] || exit 0
+# Saiu da tela cheia de antes (ex.: pedido do próprio app) antes de medir.
+if [ "$(jq -r '.fullscreen' <<<"$client")" != "0" ]; then
+    hyprctl dispatch "hl.dsp.window.fullscreen({ mode = \"maximized\", action = \"toggle\" })" >/dev/null 2>&1
+    sleep 0.1
+    client=$(hyprctl clients -j | jq -c --arg a "$addr" '.[] | select(.address == $a)')
+fi
+[ "$(jq -r '.floating' <<<"$client")" = "true" ] || \
+    hyprctl dispatch "hl.dsp.window.float({ action = \"enable\", window = \"$w\" })" >/dev/null 2>&1
+jq -r '"\(.at[0]) \(.at[1]) \(.size[0]) \(.size[1])"' <<<"$client" > "$saved"
+
+mon=$(jq -r '.monitor' <<<"$client")
+read -r mx my mw mh sc rl rt rr rb < <(hyprctl monitors -j | jq -r --argjson m "$mon" \
+    '.[] | select(.id == $m) | "\(.x) \(.y) \(.width) \(.height) \(.scale) \(.reserved[0]) \(.reserved[1]) \(.reserved[2]) \(.reserved[3])"')
+gap=6
+read -r X Y W H < <(awk -v mx="$mx" -v my="$my" -v mw="$mw" -v mh="$mh" -v sc="$sc" \
+    -v rl="$rl" -v rt="$rt" -v rr="$rr" -v rb="$rb" -v g="$gap" 'BEGIN {
+    lw = mw / sc; lh = mh / sc
+    printf "%d %d %d %d\n", mx + rl + g, my + rt + g, lw - rl - rr - 2*g, lh - rt - rb - 2*g }')
+hyprctl dispatch "hl.dsp.window.resize({ x = $W, y = $H, exact = true, window = \"$w\" })" >/dev/null 2>&1
+hyprctl dispatch "hl.dsp.window.move({ x = $X, y = $Y, exact = true, window = \"$w\" })" >/dev/null 2>&1
