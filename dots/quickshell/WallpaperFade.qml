@@ -253,12 +253,12 @@ Scope {
                 }
             }
 
-            // "Onda" (referência: vídeo 2042.mp4, analisado pelo Antigravity):
-            // uma frente reta e contínua na diagonal, entrando pelo canto
-            // superior direito e saindo pelo inferior esquerdo. O topo lidera
-            // (inclinação de ~37° da vertical) e a borda é um degradê macio de
-            // ~140 px (na tela de 1920). Antes era um disco enorme cercado de
-            // bolhas desfocadas; a referência não tem anel nem bolhas.
+            // "Onda" (referência: vídeo 2042.mp4, analisado pelo Antigravity, e a
+            // captura de um quadro enviada pelo usuário): uma frente na
+            // diagonal, entrando pelo canto superior direito e saindo pelo
+            // inferior esquerdo, o topo liderando (~37° da vertical), com
+            // ondulações grandes e arredondadas e borda macia em camadas, como
+            // fumaça desfocada. Não é líquido, não tem anel nem bolhas soltas.
             //
             // Tudo desenhado aqui dentro, em coordenadas de pintura, com um
             // degradê linear do próprio Canvas: um `Item` girado dentro da
@@ -286,22 +286,58 @@ Scope {
                     const h = height;
                     if (!(w > 0) || !(h > 0)) return;
                     // n: normal da frente, apontando para o lado ainda não
-                    // coberto (esquerda e para baixo). u = ponto · n.
+                    // coberto (esquerda e para baixo); t: ao longo da frente.
+                    // u = ponto · n, s = ponto · t.
                     const theta = 37 * Math.PI / 180;
                     const nx = -Math.cos(theta), ny = Math.sin(theta);
-                    const feather = Math.max(80, Math.min(150, w * 0.073));
-                    // u no canto superior direito (primeiro a ser coberto) e no
-                    // inferior esquerdo (último).
-                    const uMin = w * nx;
-                    const uMax = h * ny;
-                    // A frente F vai de "nada na tela" a "tudo coberto, com a
-                    // borda macia já fora da tela".
-                    const F = uMin + p * (uMax - uMin + feather);
-                    const g = ctx.createLinearGradient(nx * (F - feather), ny * (F - feather), nx * F, ny * F);
-                    g.addColorStop(0, "rgba(255,255,255,1)");
-                    g.addColorStop(1, "rgba(255,255,255,0)");
-                    ctx.fillStyle = g;
-                    ctx.fillRect(0, 0, w, h);
+                    const tx = Math.sin(theta), ty = Math.cos(theta);
+                    const diag = Math.sqrt(w * w + h * h);
+                    // Ondulações grandes e arredondadas na frente (a captura do
+                    // usuário: "ondulações feitas com desfoque, meio suave, não
+                    // líquido"): duas ondas lentas somadas, que andam devagar
+                    // ao longo da frente enquanto ela avança.
+                    const A = w * 0.06;
+                    const l1 = diag * 0.55, l2 = diag * 0.31;
+                    const ph = p * 2.6;
+                    function bump(sv) {
+                        return A * (0.62 * Math.sin(2 * Math.PI * sv / l1 + ph)
+                                  + 0.38 * Math.sin(2 * Math.PI * sv / l2 - ph * 1.35 + 1.3));
+                    }
+                    const feather = Math.max(90, Math.min(170, w * 0.08));
+                    const uMin = w * nx, uMax = h * ny;
+                    // s nos quatro cantos, para a frente atravessar a tela toda.
+                    const sA = 0, sB = w * tx, sC = h * ty, sD = w * tx + h * ty;
+                    const sLo = Math.min(sA, sB, sC, sD) - diag * 0.1;
+                    const sHi = Math.max(sA, sB, sC, sD) + diag * 0.1;
+                    // Frente F: de "nada na tela" (a ondulação mais saliente
+                    // ainda antes do canto) a "tudo coberto, borda fora da tela".
+                    const F0 = uMin - A;
+                    const F1 = uMax + A + feather;
+                    const F = F0 + p * (F1 - F0);
+                    // Borda macia em camadas: N cópias da forma, cada uma um
+                    // pouco mais para fora e bem transparente. A soma dá opaco
+                    // por dentro e some na borda (desfoque real no Canvas custa
+                    // caro a cada quadro).
+                    const N = 12;
+                    const steps = 56;
+                    const back = uMin - diag;   // bem atrás, lado já coberto
+                    ctx.fillStyle = "white";
+                    ctx.globalAlpha = 0.34;
+                    for (let i = 0; i < N; i++) {
+                        const off = -feather + feather * i / (N - 1);
+                        ctx.beginPath();
+                        for (let k = 0; k <= steps; k++) {
+                            const sv = sLo + (sHi - sLo) * k / steps;
+                            const u = F + off + bump(sv);
+                            const x = nx * u + tx * sv, y = ny * u + ty * sv;
+                            if (k === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                        }
+                        ctx.lineTo(nx * back + tx * sHi, ny * back + ty * sHi);
+                        ctx.lineTo(nx * back + tx * sLo, ny * back + ty * sLo);
+                        ctx.closePath();
+                        ctx.fill();
+                    }
+                    ctx.globalAlpha = 1;
                 }
             }
 
