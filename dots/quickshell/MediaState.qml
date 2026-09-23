@@ -64,7 +64,10 @@ Singleton {
         statusProc.command = ["playerctl", "-p", name, "status"];
         statusProc.running = true;
     }
-    onPlayerChanged: if (!lock) { override = null; poll(); }
+    onPlayerChanged: {
+        if (!lock) { override = null; poll(); }
+        position = player ? player.position : 0;
+    }
     property Connections mprisConn: Connections {
         target: root.player
         function onIsPlayingChanged() { root.poll(); }
@@ -87,6 +90,37 @@ Singleton {
                     root.override = st === "Playing";
             }
         }
+    }
+
+    // ---------- posição na faixa ----------
+    // O MPRIS não empurra a posição durante a reprodução; ler `player.position`
+    // devolve a estimativa atual, então um timer relê a cada segundo tocando.
+    property real position: 0
+    readonly property real length: player && player.length > 0 ? player.length : 0
+    readonly property bool canSeek: player !== null && player.canSeek && length > 0
+    property Timer posTimer: Timer {
+        interval: 1000
+        repeat: true
+        triggeredOnStart: true
+        running: root.player !== null && root.playing
+        onTriggered: root.position = root.player.position
+    }
+    property Connections trackConn: Connections {
+        target: root.player
+        function onTrackTitleChanged() { root.position = root.player.position; }
+        function onPositionChanged() { root.position = root.player.position; }
+    }
+    function seek(sec) {
+        if (!canSeek) return;
+        sec = Math.max(0, Math.min(length, sec));
+        player.position = sec;
+        position = sec;
+    }
+    function fmt(sec) {
+        sec = Math.max(0, Math.floor(sec || 0));
+        const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60;
+        const ss = (s < 10 ? "0" : "") + s;
+        return h > 0 ? h + ":" + (m < 10 ? "0" : "") + m + ":" + ss : m + ":" + ss;
     }
 
     // ---------- volume do app ----------

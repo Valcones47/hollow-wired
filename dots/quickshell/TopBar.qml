@@ -986,7 +986,7 @@ PanelWindow {
                 width: implicitWidth
                 height: implicitHeight
                 // Arrastando um slider: não fecha nem se o mouse escapar do popup.
-                readonly property bool busy: audioPop.dragging || EqService.dragging || mediaVolSlider.dragging
+                readonly property bool busy: audioPop.dragging || EqService.dragging || mediaPop.dragging
                 readonly property Item current: {
                     switch (bar.pop) {
                     case "audio": return audioPop;
@@ -1006,9 +1006,12 @@ PanelWindow {
                     visible: popContent.current === mediaPop
                     width: 440
                     spacing: 10
+                    readonly property bool dragging: seekArea.pressed || volArea.pressed
 
-                    Row {
-                        spacing: 2
+                    // abas largas, dividindo a largura
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 4
                         Repeater {
                             model: [
                                 { k: "media", label: Theme.t("topbar.media_tab", "Mídia") },
@@ -1018,12 +1021,11 @@ PanelWindow {
                                 id: mt
                                 required property var modelData
                                 readonly property bool on: bar.mediaTab === mt.modelData.k
-                                width: mtText.implicitWidth + 22
-                                height: 26
-                                radius: 8
-                                color: mt.on ? Theme.tileHigh : (mtArea.containsMouse ? Theme.withAlpha(Theme.tileHigh, 0.5) : "transparent")
+                                Layout.fillWidth: true
+                                implicitHeight: 32
+                                radius: 9
+                                color: mt.on ? Theme.tileHigh : (mtArea.containsMouse ? Theme.withAlpha(Theme.tileHigh, 0.5) : Theme.withAlpha(Theme.tile, 0.5))
                                 Text {
-                                    id: mtText
                                     anchors.centerIn: parent
                                     text: mt.modelData.label
                                     font.family: Theme.fontFamily
@@ -1050,109 +1052,245 @@ PanelWindow {
                     RowLayout {
                         visible: bar.mediaTab === "media" && MediaState.player !== null
                         Layout.fillWidth: true
-                        spacing: 12
-                        Rectangle {
-                            implicitWidth: 72
-                            implicitHeight: 72
-                            radius: 12
-                            color: Theme.tileHigh
-                            clip: true
-                            Image {
-                                id: mediaArt
-                                anchors.fill: parent
-                                source: MediaState.player && MediaState.player.trackArtUrl ? MediaState.player.trackArtUrl : ""
-                                fillMode: Image.PreserveAspectCrop
-                                sourceSize: Qt.size(144, 144)
-                                asynchronous: true
-                                visible: status === Image.Ready
-                            }
-                            Text {
-                                anchors.centerIn: parent
-                                visible: !mediaArt.visible
-                                text: Theme.icons.album
-                                font.family: Theme.iconFontFamily
-                                font.pixelSize: 24
-                                color: Theme.subtext
-                            }
-                        }
+                        spacing: 14
+
                         ColumnLayout {
                             Layout.fillWidth: true
-                            spacing: 2
-                            Text {
+                            spacing: 10
+                            RowLayout {
                                 Layout.fillWidth: true
-                                text: MediaState.player ? (MediaState.player.trackTitle || MediaState.player.identity || "") : ""
-                                elide: Text.ElideRight
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 14
-                                font.weight: Font.DemiBold
-                                color: Theme.textColor
-                            }
-                            Text {
-                                Layout.fillWidth: true
-                                text: MediaState.player ? (MediaState.player.trackArtist || "") : ""
-                                visible: text !== ""
-                                elide: Text.ElideRight
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 12
-                                color: Theme.subtext
-                            }
-                            Text {
-                                Layout.fillWidth: true
-                                text: MediaState.player ? (MediaState.player.identity || "") : ""
-                                elide: Text.ElideRight
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 10
-                                color: Theme.withAlpha(Theme.subtext, 0.7)
-                            }
-                            Row {
-                                Layout.topMargin: 4
-                                spacing: 4
-                                Repeater {
-                                    model: [
-                                        { icon: Theme.icons.prev, act: "prev" },
-                                        { icon: MediaState.playing ? Theme.icons.pause : Theme.icons.play, act: "toggle" },
-                                        { icon: Theme.icons.next, act: "next" }
-                                    ]
-                                    delegate: Rectangle {
-                                        id: mbtn
-                                        required property var modelData
-                                        width: 36
-                                        height: 30
-                                        radius: 9
-                                        color: mbtnArea.containsMouse ? Theme.tileHigh : Theme.withAlpha(Theme.tile, 0.6)
-                                        Text {
-                                            anchors.centerIn: parent
-                                            text: mbtn.modelData.icon
-                                            font.family: Theme.iconFontFamily
-                                            font.pixelSize: 17
-                                            color: Theme.textColor
-                                        }
-                                        MouseArea {
-                                            id: mbtnArea
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            cursorShape: Qt.PointingHandCursor
-                                            onClicked: {
-                                                if (mbtn.modelData.act === "prev") MediaState.previous();
-                                                else if (mbtn.modelData.act === "next") MediaState.next();
-                                                else MediaState.toggle();
+                                spacing: 12
+                                Rectangle {
+                                    implicitWidth: 72
+                                    implicitHeight: 72
+                                    radius: 12
+                                    color: Theme.tileHigh
+                                    clip: true
+                                    Image {
+                                        id: mediaArt
+                                        anchors.fill: parent
+                                        source: MediaState.player && MediaState.player.trackArtUrl ? MediaState.player.trackArtUrl : ""
+                                        fillMode: Image.PreserveAspectCrop
+                                        sourceSize: Qt.size(144, 144)
+                                        asynchronous: true
+                                        visible: status === Image.Ready
+                                    }
+                                    Text {
+                                        anchors.centerIn: parent
+                                        visible: !mediaArt.visible
+                                        text: Theme.icons.album
+                                        font.family: Theme.iconFontFamily
+                                        font.pixelSize: 24
+                                        color: Theme.subtext
+                                    }
+                                }
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 2
+                                    Text {
+                                        Layout.fillWidth: true
+                                        text: MediaState.player ? (MediaState.player.trackTitle || MediaState.player.identity || "") : ""
+                                        elide: Text.ElideRight
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 14
+                                        font.weight: Font.DemiBold
+                                        color: Theme.textColor
+                                    }
+                                    Text {
+                                        Layout.fillWidth: true
+                                        text: MediaState.player ? (MediaState.player.trackArtist || "") : ""
+                                        visible: text !== ""
+                                        elide: Text.ElideRight
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 12
+                                        color: Theme.subtext
+                                    }
+                                    Text {
+                                        Layout.fillWidth: true
+                                        text: MediaState.player ? (MediaState.player.identity || "") : ""
+                                        elide: Text.ElideRight
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 10
+                                        color: Theme.withAlpha(Theme.subtext, 0.7)
+                                    }
+                                    Row {
+                                        Layout.topMargin: 4
+                                        spacing: 4
+                                        Repeater {
+                                            model: [
+                                                { icon: Theme.icons.prev, act: "prev" },
+                                                { icon: MediaState.playing ? Theme.icons.pause : Theme.icons.play, act: "toggle" },
+                                                { icon: Theme.icons.next, act: "next" }
+                                            ]
+                                            delegate: Rectangle {
+                                                id: mbtn
+                                                required property var modelData
+                                                width: 36
+                                                height: 30
+                                                radius: 9
+                                                color: mbtnArea.containsMouse ? Theme.tileHigh : Theme.withAlpha(Theme.tile, 0.6)
+                                                Text {
+                                                    anchors.centerIn: parent
+                                                    text: mbtn.modelData.icon
+                                                    font.family: Theme.iconFontFamily
+                                                    font.pixelSize: 17
+                                                    color: Theme.textColor
+                                                }
+                                                MouseArea {
+                                                    id: mbtnArea
+                                                    anchors.fill: parent
+                                                    hoverEnabled: true
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    onClicked: {
+                                                        if (mbtn.modelData.act === "prev") MediaState.previous();
+                                                        else if (mbtn.modelData.act === "next") MediaState.next();
+                                                        else MediaState.toggle();
+                                                    }
+                                                }
                                             }
                                         }
                                     }
                                 }
                             }
+
+                            // duração: arrastar/clicar busca (se o player deixar)
+                            RowLayout {
+                                Layout.fillWidth: true
+                                visible: MediaState.length > 0
+                                spacing: 8
+                                readonly property real shownPos: seekArea.pressed ? seekArea.dragPos : MediaState.position
+                                Text {
+                                    text: MediaState.fmt(parent.shownPos)
+                                    font.family: Theme.monoFamily
+                                    font.pixelSize: 10
+                                    color: Theme.subtext
+                                }
+                                Item {
+                                    id: seekBar
+                                    Layout.fillWidth: true
+                                    implicitHeight: 16
+                                    readonly property real frac: MediaState.length > 0
+                                        ? Math.max(0, Math.min(1, parent.shownPos / MediaState.length)) : 0
+                                    Rectangle {
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: parent.width
+                                        height: 4
+                                        radius: 2
+                                        color: Theme.withAlpha(Theme.outline, 0.35)
+                                        Rectangle {
+                                            width: parent.width * seekBar.frac
+                                            height: parent.height
+                                            radius: 2
+                                            color: Theme.primary
+                                        }
+                                    }
+                                    Rectangle {
+                                        visible: MediaState.canSeek
+                                        x: seekBar.width * seekBar.frac - width / 2
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: seekArea.containsMouse || seekArea.pressed ? 12 : 8
+                                        height: width
+                                        radius: width / 2
+                                        color: Theme.textColor
+                                    }
+                                    MouseArea {
+                                        id: seekArea
+                                        anchors.fill: parent
+                                        enabled: MediaState.canSeek
+                                        hoverEnabled: true
+                                        preventStealing: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        property real dragPos: 0
+                                        function at(x) { return Math.max(0, Math.min(1, x / width)) * MediaState.length; }
+                                        onPressed: mouse => dragPos = at(mouse.x)
+                                        onPositionChanged: mouse => { if (pressed) dragPos = at(mouse.x); }
+                                        onReleased: MediaState.seek(dragPos)
+                                    }
+                                }
+                                Text {
+                                    text: MediaState.fmt(MediaState.length)
+                                    font.family: Theme.monoFamily
+                                    font.pixelSize: 10
+                                    color: Theme.subtext
+                                }
+                            }
                         }
-                    }
-                    PopSlider {
-                        id: mediaVolSlider
-                        visible: bar.mediaTab === "media" && MediaState.player !== null && MediaState.hasVolume
-                        Layout.fillWidth: true
-                        icon: MediaState.muted ? Theme.icons.volOff : Theme.icons.music
-                        label: Theme.t("topbar.app_volume", "Volume do app")
-                        value: MediaState.shownVolume
-                        dimmed: MediaState.muted
-                        onMoved: v => MediaState.setVolume(v)
-                        onIconClicked: MediaState.toggleMute()
+
+                        // volume do app, na vertical à direita
+                        ColumnLayout {
+                            visible: MediaState.hasVolume
+                            Layout.fillHeight: true
+                            Layout.preferredWidth: 34
+                            spacing: 6
+                            Text {
+                                Layout.alignment: Qt.AlignHCenter
+                                text: Math.round(volCol.shown * 100) + "%"
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 10
+                                color: Theme.subtext
+                            }
+                            Item {
+                                id: volCol
+                                Layout.alignment: Qt.AlignHCenter
+                                Layout.fillHeight: true
+                                Layout.minimumHeight: 70
+                                implicitWidth: 24
+                                // valor local enquanto arrasta (o PipeWire demora a refletir)
+                                property real local: -1
+                                readonly property real shown: volArea.pressed && local >= 0 ? local : MediaState.shownVolume
+                                Rectangle {
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    width: 6
+                                    height: parent.height
+                                    radius: 3
+                                    color: Theme.withAlpha(Theme.outline, 0.35)
+                                    Rectangle {
+                                        anchors.bottom: parent.bottom
+                                        width: parent.width
+                                        height: parent.height * volCol.shown
+                                        radius: 3
+                                        color: MediaState.muted ? Theme.subtext : Theme.primary
+                                    }
+                                }
+                                Rectangle {
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    y: (parent.height - height) * (1 - volCol.shown)
+                                    width: volArea.containsMouse || volArea.pressed ? 14 : 10
+                                    height: width
+                                    radius: width / 2
+                                    color: Theme.textColor
+                                }
+                                MouseArea {
+                                    id: volArea
+                                    anchors.fill: parent
+                                    anchors.margins: -4
+                                    hoverEnabled: true
+                                    preventStealing: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    function at(y) { return Math.max(0, Math.min(1, 1 - (y - 4) / volCol.height)); }
+                                    onPressed: mouse => { volCol.local = at(mouse.y); MediaState.setVolume(volCol.local); }
+                                    onPositionChanged: mouse => {
+                                        if (!pressed) return;
+                                        volCol.local = at(mouse.y);
+                                        MediaState.setVolume(volCol.local);
+                                    }
+                                    onWheel: w => MediaState.wheel(w.angleDelta.y)
+                                }
+                            }
+                            Text {
+                                Layout.alignment: Qt.AlignHCenter
+                                text: MediaState.muted ? Theme.icons.volOff : Theme.icons.music
+                                font.family: Theme.iconFontFamily
+                                font.pixelSize: 15
+                                color: MediaState.muted ? Theme.subtext : Theme.textColor
+                                MouseArea {
+                                    anchors.fill: parent
+                                    anchors.margins: -4
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: MediaState.toggleMute()
+                                }
+                            }
+                        }
                     }
 
                     // --- equalizador ---
