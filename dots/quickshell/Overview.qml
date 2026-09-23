@@ -203,7 +203,10 @@ PanelWindow {
         for (const w of normal)
             list.push({ kind: "ws", id: w.id, name: w.name, wins: byWs[w.id] || [] });
 
-        for (const w of workspaces.filter(w => w.id < 0 && w.windows > 0))
+        // A área dos minimizados não vira cartão: minimizar tem que parecer
+        // "sumir", não "ir para outra área" (as janelas voltam pela dock e
+        // aparecem no Alt+Tab).
+        for (const w of workspaces.filter(w => w.id < 0 && w.windows > 0 && w.name !== "special:minimized"))
             list.push({ kind: "special", id: w.id, name: w.name, wins: byWs[w.id] || [],
                         visibleNow: specialOpen === w.name });
 

@@ -48,7 +48,10 @@ PanelWindow {
                 let list = [];
                 try {
                     list = JSON.parse(text)
-                        .filter(c => c.mapped && c.workspace.id > 0 && c.class !== "dropterm")
+                        // Minimizadas (special:minimized) entram, como no Windows:
+                        // escolher uma traz de volta (DockConfig.focusWindow).
+                        .filter(c => c.mapped && (c.workspace.id > 0 || c.workspace.name === "special:minimized")
+                            && c.class !== "dropterm")
                         .sort((a, b) => a.focusHistoryID - b.focusHistoryID);
                 } catch (e) {
                     console.log("AltTab: hyprctl inválido:", e);

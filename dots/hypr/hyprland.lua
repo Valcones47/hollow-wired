@@ -899,7 +899,8 @@ rice_hyprbars_ready = false
 -- os botões deles não funcionavam direito — o minimizar é descartado pelo
 -- Hyprland (medido: nenhum evento) e o maximizar chega com estado errado (o
 -- app abre achando que já está maximizado).
-local ownTitlebar = "^(com.anthropic.Claude|discord|vesktop|youtube-music-desktop-app|spotify|code|code-oss|Code|steam|"
+-- (O app do Claude respeita o button-layout e ficava sem botão nenhum: ganha a barra.)
+local ownTitlebar = "^(discord|vesktop|youtube-music-desktop-app|spotify|code|code-oss|Code|steam|"
     .. "dropterm|xdg-desktop-portal-gtk)$"
 
 local function hex(c, alpha)
