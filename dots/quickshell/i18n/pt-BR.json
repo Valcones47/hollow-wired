@@ -1321,5 +1321,20 @@
   "wallust.adv_reset": "Voltar ao padrão do rice",
   "vbar.game_mode": "Modo jogo",
   "vbar.blur": "Desfoque",
-  "vbar.ultra_perf": "Ultra desempenho"
+  "vbar.ultra_perf": "Ultra desempenho",
+  "layout.ws_count_short": "Fixos, aparecem mesmo sem janela aberta.",
+  "layout.side_sub_short": "Avatar, bandeja, luz noturna e energia (Ctrl + Alt + Del).",
+  "effects.g_nightlight": "Luz noturna",
+  "effects.nightlight_toggle2": "Luz noturna",
+  "effects.nightlight_toggle2_desc": "Tela mais quente, menos luz azul.",
+  "effects.g_blur": "Desfoque",
+  "effects.blur_quality": "Qualidade",
+  "effects.blur_quality_desc": "Em placa integrada, prefira Leve. Super + B liga e desliga.",
+  "effects.g_windows": "Janelas",
+  "effects.dim_toggle2": "Escurecer as janelas de fundo",
+  "effects.dim_toggle2_desc": "A janela em uso fica em evidência.",
+  "effects.dim_strength2": "Quanto escurece",
+  "effects.rounding2": "Cantos arredondados",
+  "effects.gaps_in2": "Espaço entre janelas",
+  "effects.g_anim": "Animações"
 }

@@ -1321,5 +1321,20 @@
   "wallust.adv_reset": "Back to the rice default",
   "vbar.game_mode": "Game mode",
   "vbar.blur": "Blur",
-  "vbar.ultra_perf": "Ultra performance"
+  "vbar.ultra_perf": "Ultra performance",
+  "layout.ws_count_short": "Fixed, shown even with no window open.",
+  "layout.side_sub_short": "Avatar, tray, night light and power (Ctrl + Alt + Del).",
+  "effects.g_nightlight": "Night light",
+  "effects.nightlight_toggle2": "Night light",
+  "effects.nightlight_toggle2_desc": "Warmer screen, less blue light.",
+  "effects.g_blur": "Blur",
+  "effects.blur_quality": "Quality",
+  "effects.blur_quality_desc": "On integrated graphics, pick Light. Super + B toggles it.",
+  "effects.g_windows": "Windows",
+  "effects.dim_toggle2": "Dim background windows",
+  "effects.dim_toggle2_desc": "The window in use stands out.",
+  "effects.dim_strength2": "How much it dims",
+  "effects.rounding2": "Rounded corners",
+  "effects.gaps_in2": "Space between windows",
+  "effects.g_anim": "Animations"
 }

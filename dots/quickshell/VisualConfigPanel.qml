@@ -1521,25 +1521,185 @@ PanelWindow {
         }
     }
 
+    // ---------------- visual novo (menos caixas, um destaque só) ----------------
+    // Título de grupo: pequeno, maiúsculo e neutro. A cor forte fica só para o
+    // que está selecionado e para a ação principal da aba.
+    component GroupLabel: Text {
+        Layout.fillWidth: true
+        Layout.topMargin: 10
+        font.family: Theme.fontFamily
+        font.pixelSize: 11
+        font.weight: Font.DemiBold
+        font.letterSpacing: 1.2
+        font.capitalization: Font.AllUppercase
+        color: Theme.withAlpha(Theme.subtext, 0.75)
+    }
+
+    // Bloco de opções: um fundo só para o grupo inteiro, linhas separadas por
+    // um fio — em vez de cada opção ser uma caixa com contorno.
+    component OptionGroup: Rectangle {
+        default property alias rows: groupCol.data
+        Layout.fillWidth: true
+        implicitHeight: groupCol.implicitHeight + 8
+        radius: 12
+        color: Theme.withAlpha(Theme.tile, 0.55)
+        ColumnLayout {
+            id: groupCol
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.topMargin: 4
+            spacing: 0
+        }
+    }
+
+    component RowDivider: Rectangle {
+        Layout.fillWidth: true
+        Layout.leftMargin: 16
+        Layout.preferredHeight: 1
+        color: Theme.withAlpha(Theme.outline, 0.32)
+    }
+
+    // Linha de opção: texto à esquerda, controle à direita (filho padrão).
+    component OptionRow: RowLayout {
+        id: orow
+        property string title: ""
+        property string subtitle: ""
+        default property alias control: orowSlot.data
+        Layout.fillWidth: true
+        Layout.leftMargin: 16
+        Layout.rightMargin: 16
+        Layout.topMargin: 11
+        Layout.bottomMargin: 11
+        spacing: 16
+        ColumnLayout {
+            Layout.fillWidth: true
+            spacing: 2
+            Text {
+                Layout.fillWidth: true
+                text: orow.title
+                font.family: Theme.fontFamily
+                font.pixelSize: 13
+                color: Theme.textColor
+            }
+            Text {
+                Layout.fillWidth: true
+                visible: orow.subtitle !== ""
+                text: orow.subtitle
+                wrapMode: Text.WordWrap
+                font.family: Theme.fontFamily
+                font.pixelSize: 11
+                color: Theme.withAlpha(Theme.subtext, 0.8)
+            }
+        }
+        Item {
+            id: orowSlot
+            Layout.alignment: Qt.AlignVCenter
+            implicitWidth: childrenRect.width
+            implicitHeight: childrenRect.height
+        }
+    }
+
+    // Toggle dentro de um OptionGroup (mesma chave do CfgToggle, com a linha).
+    component OptionToggle: OptionRow {
+        id: otg
+        property bool checked: false
+        signal toggled(bool nextVal)
+        Rectangle {
+            width: 40
+            height: 22
+            radius: 11
+            color: otg.checked ? Theme.primary : Theme.tileHigh
+            Behavior on color { ColorAnimation { duration: 140 } }
+            Rectangle {
+                width: 16; height: 16; radius: 8
+                anchors.verticalCenter: parent.verticalCenter
+                x: otg.checked ? parent.width - width - 3 : 3
+                color: otg.checked ? Theme.background : Theme.subtext
+                Behavior on x { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+            }
+            MouseArea {
+                anchors.fill: parent
+                cursorShape: Qt.PointingHandCursor
+                onClicked: otg.toggled(!otg.checked)
+            }
+        }
+    }
+
+    // Seletor segmentado: uma trilha só, a opção ativa "levanta". Neutro — sem
+    // contorno colorido por opção.
+    component Segmented: Rectangle {
+        id: seg
+        property var options: []        // [{ value, label }]
+        property var current
+        signal picked(var value)
+        implicitWidth: segRow.implicitWidth + 6
+        implicitHeight: 32
+        radius: 9
+        color: Theme.withAlpha(Theme.background, 0.55)
+        Row {
+            id: segRow
+            anchors.centerIn: parent
+            spacing: 2
+            Repeater {
+                model: seg.options
+                delegate: Rectangle {
+                    id: segItem
+                    required property var modelData
+                    readonly property bool active: seg.current === segItem.modelData.value
+                    width: segText.implicitWidth + 24
+                    height: 26
+                    radius: 7
+                    color: segItem.active ? Theme.tileHigh : (segArea.containsMouse ? Theme.withAlpha(Theme.tileHigh, 0.45) : "transparent")
+                    Behavior on color { ColorAnimation { duration: 120 } }
+                    Text {
+                        id: segText
+                        anchors.centerIn: parent
+                        text: segItem.modelData.label
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 12
+                        font.weight: segItem.active ? Font.DemiBold : Font.Normal
+                        color: segItem.active ? Theme.textColor : Theme.subtext
+                    }
+                    MouseArea {
+                        id: segArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: seg.picked(segItem.modelData.value)
+                    }
+                }
+            }
+        }
+    }
+
     component SectionHeader: ColumnLayout {
         property string title: ""
         property string subtitle: ""
+        // quiet: o estilo novo (título pequeno, maiúsculo e neutro), usado nas
+        // abas já redesenhadas.
+        property bool quiet: false
         Layout.fillWidth: true
-        spacing: 2
+        Layout.topMargin: quiet ? 10 : 0
+        spacing: quiet ? 4 : 2
 
         Text {
             text: parent.title
             font.family: Theme.fontFamily
-            font.pixelSize: 15
+            font.pixelSize: parent.quiet ? 11 : 15
             font.weight: Font.DemiBold
-            color: Theme.secondary
+            font.letterSpacing: parent.quiet ? 1.2 : 0
+            font.capitalization: parent.quiet ? Font.AllUppercase : Font.MixedCase
+            color: parent.quiet ? Theme.withAlpha(Theme.subtext, 0.75) : Theme.secondary
         }
         Text {
+            Layout.fillWidth: true
             visible: parent.subtitle !== ""
             text: parent.subtitle
+            wrapMode: Text.WordWrap
             font.family: Theme.fontFamily
-            font.pixelSize: 12
-            color: Theme.subtext
+            font.pixelSize: parent.quiet ? 11 : 12
+            color: parent.quiet ? Theme.withAlpha(Theme.subtext, 0.8) : Theme.subtext
         }
     }
 
@@ -5063,136 +5223,83 @@ PanelWindow {
                             ColumnLayout {
                                 id: effCol
                                 width: parent.width - 18   // faixa da barra de rolagem
-                                spacing: 16
+                                spacing: 10
 
-                                SectionHeader {
-                                    title: Theme.t("effects.nightlight_title", "Luz Noturna (Filtro de Luz Azul)")
-                                    subtitle: Theme.t("effects.nightlight_sub", "Reduz o cansaço visual ajustando a temperatura de cor da tela")
-                                }
+                                GroupLabel { Layout.topMargin: 0; text: Theme.t("effects.g_nightlight", "Luz noturna") }
 
-                                CfgToggle {
-                                    title: Theme.t("effects.nightlight_toggle", "Ativar Luz Noturna")
-                                    subtitle: Theme.t("effects.nightlight_toggle_desc", "Aplica filtro quente instantaneamente via hyprsunset")
-                                    checked: win.nightlightActive
-                                    onToggled: nv => {
-                                        win.nightlightActive = nv;
-                                        Quickshell.execDetached(["rice-nightlight", "toggle"]);
+                                OptionGroup {
+                                    OptionToggle {
+                                        title: Theme.t("effects.nightlight_toggle2", "Luz noturna")
+                                        subtitle: Theme.t("effects.nightlight_toggle2_desc", "Tela mais quente, menos luz azul.")
+                                        checked: win.nightlightActive
+                                        onToggled: nv => {
+                                            win.nightlightActive = nv;
+                                            Quickshell.execDetached(["rice-nightlight", "toggle"]);
+                                        }
                                     }
-                                }
-
-                                CfgSlider {
-                                    title: Theme.t("effects.nightlight_temp", "Temperatura de Cor")
-                                    minVal: 2500; maxVal: 6500; value: win.nightlightTemp; unit: " K"
-                                    onChanged: newVal => {
-                                        win.nightlightTemp = Math.round(newVal);
-                                        debounceTimer.exec(() => {
-                                            Quickshell.execDetached(["rice-nightlight", "set", String(win.nightlightTemp)]);
-                                        });
+                                    RowDivider {}
+                                    CfgSlider {
+                                        Layout.leftMargin: 16; Layout.rightMargin: 16; Layout.topMargin: 10; Layout.bottomMargin: 12
+                                        title: Theme.t("effects.nightlight_temp", "Temperatura de Cor")
+                                        minVal: 2500; maxVal: 6500; value: win.nightlightTemp; unit: " K"
+                                        onChanged: newVal => {
+                                            win.nightlightTemp = Math.round(newVal);
+                                            debounceTimer.exec(() => {
+                                                Quickshell.execDetached(["rice-nightlight", "set", String(win.nightlightTemp)]);
+                                            });
+                                        }
                                     }
-                                }
-
-                                SectionHeader {
-                                    title: Theme.t("effects.nightlight_sched", "Ligar sozinha")
-                                    subtitle: Theme.t("effects.nightlight_sched_sub", "O horário do sol é calculado no próprio computador, sem internet — continua certo com o notebook fora de casa.")
-                                }
-
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 12
-
-                                    Repeater {
-                                        model: [
-                                            { id: "off",   name: Theme.t("effects.nl_off", "Só no botão"), desc: Theme.t("effects.nl_off_desc", "Nunca liga sozinha") },
-                                            { id: "sun",   name: Theme.t("effects.nl_sun", "Pelo sol"), desc: Theme.t("effects.nl_sun_desc", "Do pôr ao nascer do sol") },
-                                            { id: "fixed", name: Theme.t("effects.nl_fixed", "Horário fixo"), desc: Theme.t("effects.nl_fixed_desc", "Você escolhe as horas") }
-                                        ]
-                                        delegate: Rectangle {
-                                            required property var modelData
-                                            readonly property bool active: win.nightlightSchedule === modelData.id
+                                    RowDivider {}
+                                    OptionRow {
+                                        title: Theme.t("effects.nightlight_sched", "Ligar sozinha")
+                                        subtitle: win.nightlightSchedule === "sun" && win.nightlightSunset !== ""
+                                            ? Theme.t("effects.nl_today", "Hoje aqui: o sol se põe às ") + win.nightlightSunset
+                                              + Theme.t("effects.nl_today2", " e nasce às ") + win.nightlightSunrise + "."
+                                            : ""
+                                        Segmented {
+                                            options: [
+                                                { value: "off", label: Theme.t("effects.nl_off", "Só no botão") },
+                                                { value: "sun", label: Theme.t("effects.nl_sun", "Pelo sol") },
+                                                { value: "fixed", label: Theme.t("effects.nl_fixed", "Horário fixo") }
+                                            ]
+                                            current: win.nightlightSchedule
+                                            onPicked: v => {
+                                                win.nightlightSchedule = v;
+                                                Quickshell.execDetached(["rice-nightlight", "schedule", v]);
+                                                nlRecheck.restart();
+                                            }
+                                        }
+                                    }
+                                    RowLayout {
+                                        visible: win.nightlightSchedule === "fixed"
+                                        Layout.fillWidth: true
+                                        Layout.leftMargin: 16; Layout.rightMargin: 16; Layout.topMargin: 10; Layout.bottomMargin: 12
+                                        spacing: 24
+                                        CfgSlider {
                                             Layout.fillWidth: true
-                                            implicitHeight: 58
-                                            radius: 10
-                                            color: active ? Theme.withAlpha(Theme.primary, 0.22) : (nlArea.containsMouse ? Theme.tileHigh : Theme.tile)
-                                            border.width: active ? 1.5 : 0
-                                            border.color: Theme.primary
-
-                                            ColumnLayout {
-                                                anchors.centerIn: parent
-                                                spacing: 2
-                                                Text {
-                                                    Layout.alignment: Qt.AlignHCenter
-                                                    text: parent.parent.modelData.name
-                                                    font.family: Theme.fontFamily
-                                                    font.pixelSize: 13
-                                                    font.weight: parent.parent.active ? Font.DemiBold : Font.Normal
-                                                    color: Theme.textColor
-                                                }
-                                                Text {
-                                                    Layout.alignment: Qt.AlignHCenter
-                                                    text: parent.parent.modelData.desc
-                                                    font.family: Theme.fontFamily
-                                                    font.pixelSize: 11
-                                                    color: parent.parent.active ? Theme.primary : Theme.subtext
-                                                }
-                                            }
-
-                                            MouseArea {
-                                                id: nlArea
-                                                anchors.fill: parent
-                                                hoverEnabled: true
-                                                cursorShape: Qt.PointingHandCursor
-                                                onClicked: {
-                                                    win.nightlightSchedule = parent.modelData.id;
-                                                    Quickshell.execDetached(["rice-nightlight", "schedule", parent.modelData.id]);
-                                                    nlRecheck.restart();
-                                                }
+                                            title: Theme.t("effects.nl_start", "Liga às")
+                                            minVal: 0; maxVal: 23
+                                            value: parseInt(win.nightlightStart.split(":")[0]) || 19
+                                            unit: "h"
+                                            onChanged: newVal => {
+                                                win.nightlightStart = ("0" + Math.round(newVal)).slice(-2) + ":00";
+                                                debounceTimer.exec(() => {
+                                                    Quickshell.execDetached(["rice-nightlight", "times", win.nightlightStart, win.nightlightEnd]);
+                                                });
                                             }
                                         }
-                                    }
-                                }
-
-                                Text {
-                                    Layout.fillWidth: true
-                                    visible: win.nightlightSchedule === "sun" && win.nightlightSunset !== ""
-                                    text: Theme.t("effects.nl_today", "Hoje aqui: o sol se põe às ") + win.nightlightSunset
-                                        + Theme.t("effects.nl_today2", " e nasce às ") + win.nightlightSunrise + "."
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: 12
-                                    color: Theme.subtext
-                                }
-
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 12
-                                    visible: win.nightlightSchedule === "fixed"
-
-                                    CfgSlider {
-                                        Layout.fillWidth: true
-                                        title: Theme.t("effects.nl_start", "Liga às")
-                                        minVal: 0; maxVal: 23
-                                        value: parseInt(win.nightlightStart.split(":")[0]) || 19
-                                        unit: "h"
-                                        onChanged: newVal => {
-                                            win.nightlightStart = ("0" + Math.round(newVal)).slice(-2) + ":00";
-                                            debounceTimer.exec(() => {
-                                                Quickshell.execDetached(["rice-nightlight", "times",
-                                                    win.nightlightStart, win.nightlightEnd]);
-                                            });
-                                        }
-                                    }
-
-                                    CfgSlider {
-                                        Layout.fillWidth: true
-                                        title: Theme.t("effects.nl_end", "Desliga às")
-                                        minVal: 0; maxVal: 23
-                                        value: parseInt(win.nightlightEnd.split(":")[0]) || 7
-                                        unit: "h"
-                                        onChanged: newVal => {
-                                            win.nightlightEnd = ("0" + Math.round(newVal)).slice(-2) + ":00";
-                                            debounceTimer.exec(() => {
-                                                Quickshell.execDetached(["rice-nightlight", "times",
-                                                    win.nightlightStart, win.nightlightEnd]);
-                                            });
+                                        CfgSlider {
+                                            Layout.fillWidth: true
+                                            title: Theme.t("effects.nl_end", "Desliga às")
+                                            minVal: 0; maxVal: 23
+                                            value: parseInt(win.nightlightEnd.split(":")[0]) || 7
+                                            unit: "h"
+                                            onChanged: newVal => {
+                                                win.nightlightEnd = ("0" + Math.round(newVal)).slice(-2) + ":00";
+                                                debounceTimer.exec(() => {
+                                                    Quickshell.execDetached(["rice-nightlight", "times", win.nightlightStart, win.nightlightEnd]);
+                                                });
+                                            }
                                         }
                                     }
                                 }
@@ -5203,221 +5310,173 @@ PanelWindow {
                                     onTriggered: loadNightlightProc.running = true
                                 }
 
-                                SectionHeader {
-                                    title: Theme.t("effects.blur_title", "Desfoque (Blur)")
-                                    subtitle: Theme.t("effects.blur_sub", "Quanto mais forte, mais bonito e mais pesado. Em placas de vídeo integradas, o leve evita travadas. Super + B liga e desliga.")
-                                }
+                                GroupLabel { text: Theme.t("effects.g_blur", "Desfoque") }
 
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 12
+                                OptionGroup {
+                                    OptionRow {
+                                        title: Theme.t("effects.blur_quality", "Qualidade")
+                                        subtitle: Theme.t("effects.blur_quality_desc", "Em placa integrada, prefira Leve. Super + B liga e desliga.")
+                                        Segmented {
+                                            options: [
+                                                { value: "leve", label: Theme.t("effects.blur_light", "Leve") },
+                                                { value: "padrao", label: Theme.t("effects.blur_normal", "Padrão") },
+                                                { value: "forte", label: Theme.t("effects.blur_strong", "Forte") },
+                                                { value: "manual", label: Theme.t("effects.blur_custom", "Personalizado") }
+                                            ]
+                                            current: win.blurQuality
+                                            onPicked: v => {
+                                                win.blurQuality = v;
+                                                // "Personalizado" já abre os controles finos.
+                                                if (v === "manual") win.blurAdvanced = true;
+                                                Quickshell.execDetached(["rice-hypr-prefs", "set", "blur_quality", v]);
+                                            }
+                                        }
+                                    }
+                                    RowDivider {}
+                                    OptionToggle {
+                                        title: Theme.t("effects.blur_advanced", "Desfoque avançado")
+                                        checked: win.blurAdvanced
+                                        onToggled: nv => win.blurAdvanced = nv
+                                    }
+                                    ColumnLayout {
+                                        id: blurAdvCol
+                                        Layout.fillWidth: true
+                                        spacing: 0
+                                        visible: win.blurAdvanced
 
-                                    Repeater {
-                                        model: [
-                                            { key: "leve", label: Theme.t("effects.blur_light", "Leve"), desc: Theme.t("effects.blur_light_desc", "Para integradas: sem desfoque nos painéis grandes") },
-                                            { key: "padrao", label: Theme.t("effects.blur_normal", "Padrão"), desc: Theme.t("effects.blur_normal_desc", "Equilíbrio entre visual e desempenho") },
-                                            { key: "forte", label: Theme.t("effects.blur_strong", "Forte"), desc: Theme.t("effects.blur_strong_desc", "Vidro mais fosco; pede uma placa dedicada") },
-                                            { key: "manual", label: Theme.t("effects.blur_custom", "Personalizado"), desc: Theme.t("effects.blur_custom_desc", "Seus próprios valores, nos controles abaixo") }
-                                        ]
-                                        delegate: Rectangle {
-                                            id: bqCard
-                                            required property var modelData
-                                            readonly property bool active: win.blurQuality === modelData.key
+                                        function saveManual() {
+                                            win.blurQuality = "manual";
+                                            Quickshell.execDetached(["rice-hypr-prefs", "set", "blur_quality", "manual"]);
+                                        }
+
+                                        RowDivider {}
+                                        RowLayout {
                                             Layout.fillWidth: true
-                                            implicitHeight: bqCol.implicitHeight + 20
-                                            radius: 12
-                                            color: bqCard.active ? Theme.withAlpha(Theme.primary, 0.18) : (bqArea.containsMouse ? Theme.tileHigh : Theme.tile)
-                                            border.width: 1
-                                            border.color: bqCard.active ? Theme.primary : Theme.withAlpha(Theme.outline, 0.2)
-                                            Behavior on color { ColorAnimation { duration: 140 } }
-
-                                            ColumnLayout {
-                                                id: bqCol
-                                                anchors.left: parent.left
-                                                anchors.right: parent.right
-                                                anchors.verticalCenter: parent.verticalCenter
-                                                anchors.margins: 12
-                                                spacing: 2
-                                                Text {
-                                                    text: bqCard.modelData.label
-                                                    font.family: Theme.fontFamily
-                                                    font.pixelSize: 13
-                                                    font.weight: Font.DemiBold
-                                                    color: Theme.textColor
-                                                }
-                                                Text {
-                                                    Layout.fillWidth: true
-                                                    text: bqCard.modelData.desc
-                                                    wrapMode: Text.WordWrap
-                                                    font.family: Theme.fontFamily
-                                                    font.pixelSize: 11
-                                                    color: Theme.subtext
+                                            Layout.leftMargin: 16; Layout.rightMargin: 16; Layout.topMargin: 10; Layout.bottomMargin: 12
+                                            spacing: 24
+                                            CfgSlider {
+                                                title: Theme.t("effects.blur_size", "Tamanho do borrão")
+                                                minVal: 1; maxVal: 12; value: win.blurSize
+                                                onChanged: newVal => {
+                                                    win.blurSize = Math.round(newVal);
+                                                    debounceTimer.exec(() => {
+                                                        Quickshell.execDetached(["rice-hypr-prefs", "set", "blur_size", String(win.blurSize)]);
+                                                        blurAdvCol.saveManual();
+                                                    });
                                                 }
                                             }
-                                            MouseArea {
-                                                id: bqArea
-                                                anchors.fill: parent
-                                                hoverEnabled: true
-                                                cursorShape: Qt.PointingHandCursor
-                                                onClicked: {
-                                                    win.blurQuality = bqCard.modelData.key;
-                                                    // Escolher "Personalizado" já abre os controles finos:
-                                                    // sem isso o card selecionava um modo sem nada visível.
-                                                    if (bqCard.modelData.key === "manual") win.blurAdvanced = true;
-                                                    Quickshell.execDetached(["rice-hypr-prefs", "set", "blur_quality", bqCard.modelData.key]);
+                                            CfgSlider {
+                                                title: Theme.t("effects.blur_passes", "Passagens (cada uma custa GPU)")
+                                                minVal: 1; maxVal: 4; value: win.blurPasses
+                                                onChanged: newVal => {
+                                                    win.blurPasses = Math.round(newVal);
+                                                    debounceTimer.exec(() => {
+                                                        Quickshell.execDetached(["rice-hypr-prefs", "set", "blur_passes", String(win.blurPasses)]);
+                                                        blurAdvCol.saveManual();
+                                                    });
                                                 }
+                                            }
+                                            CfgSlider {
+                                                title: Theme.t("effects.blur_vibrancy", "Vivacidade das cores no borrão")
+                                                minVal: 0; maxVal: 1; value: win.blurVibrancy; decimals: 2
+                                                onChanged: newVal => {
+                                                    win.blurVibrancy = newVal;
+                                                    debounceTimer.exec(() => {
+                                                        Quickshell.execDetached(["rice-hypr-prefs", "set", "blur_vibrancy", String(win.blurVibrancy)]);
+                                                        blurAdvCol.saveManual();
+                                                    });
+                                                }
+                                            }
+                                        }
+                                        RowDivider {}
+                                        OptionToggle {
+                                            title: Theme.t("effects.blur_xray", "Desfocar só o papel de parede (xray)")
+                                            subtitle: Theme.t("effects.blur_xray_desc", "Bem mais leve: as janelas de trás não entram no borrão.")
+                                            checked: win.blurXray
+                                            onToggled: nv => {
+                                                win.blurXray = nv;
+                                                Quickshell.execDetached(["rice-hypr-prefs", "set", "blur_xray", nv ? "true" : "false"]);
+                                                blurAdvCol.saveManual();
+                                            }
+                                        }
+                                        RowDivider {}
+                                        OptionToggle {
+                                            title: Theme.t("effects.blur_ignore_opacity", "Desfocar atrás de janelas opacas")
+                                            subtitle: Theme.t("effects.blur_ignore_opacity_desc", "Desligado economiza GPU: não borra o que ninguém vê.")
+                                            checked: win.blurIgnoreOpacity
+                                            onToggled: nv => {
+                                                win.blurIgnoreOpacity = nv;
+                                                Quickshell.execDetached(["rice-hypr-prefs", "set", "blur_ignore_opacity", nv ? "true" : "false"]);
+                                                blurAdvCol.saveManual();
                                             }
                                         }
                                     }
                                 }
 
-                                CfgToggle {
-                                    title: Theme.t("effects.blur_advanced", "Desfoque avançado")
-                                    subtitle: Theme.t("effects.blur_advanced_desc", "Mostra os controles de tamanho, passadas e vivacidade.")
-                                    checked: win.blurAdvanced
-                                    onToggled: nv => win.blurAdvanced = nv
-                                }
+                                GroupLabel { text: Theme.t("effects.g_windows", "Janelas") }
 
-                                ColumnLayout {
-                                    id: blurAdvCol
-                                    Layout.fillWidth: true
-                                    spacing: 10
-                                    visible: win.blurAdvanced
-
-                                    function saveManual() {
-                                        win.blurQuality = "manual";
-                                        Quickshell.execDetached(["rice-hypr-prefs", "set", "blur_quality", "manual"]);
+                                OptionGroup {
+                                    OptionToggle {
+                                        title: Theme.t("effects.dim_toggle2", "Escurecer as janelas de fundo")
+                                        subtitle: Theme.t("effects.dim_toggle2_desc", "A janela em uso fica em evidência.")
+                                        checked: win.dimInactive
+                                        onToggled: nv => {
+                                            win.dimInactive = nv;
+                                            Quickshell.execDetached(["rice-hypr-prefs", "set", "dim_inactive", nv ? "true" : "false"]);
+                                        }
                                     }
-
+                                    CfgSlider {
+                                        visible: win.dimInactive
+                                        Layout.leftMargin: 16; Layout.rightMargin: 16; Layout.topMargin: 10; Layout.bottomMargin: 12
+                                        title: Theme.t("effects.dim_strength2", "Quanto escurece")
+                                        minVal: 0.05; maxVal: 0.50; value: win.dimStrength; decimals: 2
+                                        onChanged: newVal => {
+                                            win.dimStrength = newVal;
+                                            debounceTimer.exec(() => {
+                                                Quickshell.execDetached(["rice-hypr-prefs", "set", "dim_strength", String(win.dimStrength)]);
+                                            });
+                                        }
+                                    }
+                                    RowDivider {}
                                     RowLayout {
                                         Layout.fillWidth: true
-                                        spacing: 20
+                                        Layout.leftMargin: 16; Layout.rightMargin: 16; Layout.topMargin: 10; Layout.bottomMargin: 12
+                                        spacing: 24
                                         CfgSlider {
-                                            title: Theme.t("effects.blur_size", "Tamanho do borrão")
-                                            minVal: 1; maxVal: 12; value: win.blurSize
+                                            title: Theme.t("effects.rounding2", "Cantos arredondados")
+                                            minVal: 0; maxVal: 20; value: win.rounding; unit: " px"
                                             onChanged: newVal => {
-                                                win.blurSize = Math.round(newVal);
+                                                win.rounding = Math.round(newVal);
                                                 debounceTimer.exec(() => {
-                                                    Quickshell.execDetached(["rice-hypr-prefs", "set", "blur_size", String(win.blurSize)]);
-                                                    blurAdvCol.saveManual();
+                                                    Quickshell.execDetached(["rice-hypr-prefs", "set", "rounding", String(win.rounding)]);
                                                 });
                                             }
                                         }
                                         CfgSlider {
-                                            title: Theme.t("effects.blur_passes", "Passagens (cada uma custa GPU)")
-                                            minVal: 1; maxVal: 4; value: win.blurPasses
+                                            title: Theme.t("effects.gaps_in2", "Espaço entre janelas")
+                                            minVal: 0; maxVal: 18; value: win.gapsIn; unit: " px"
                                             onChanged: newVal => {
-                                                win.blurPasses = Math.round(newVal);
+                                                win.gapsIn = Math.round(newVal);
                                                 debounceTimer.exec(() => {
-                                                    Quickshell.execDetached(["rice-hypr-prefs", "set", "blur_passes", String(win.blurPasses)]);
-                                                    blurAdvCol.saveManual();
+                                                    Quickshell.execDetached(["rice-hypr-prefs", "set", "gaps_in", String(win.gapsIn)]);
                                                 });
                                             }
                                         }
                                     }
-                                    CfgSlider {
-                                        title: Theme.t("effects.blur_vibrancy", "Vivacidade das cores no borrão")
-                                        minVal: 0; maxVal: 1; value: win.blurVibrancy; decimals: 2
-                                        onChanged: newVal => {
-                                            win.blurVibrancy = newVal;
-                                            debounceTimer.exec(() => {
-                                                Quickshell.execDetached(["rice-hypr-prefs", "set", "blur_vibrancy", String(win.blurVibrancy)]);
-                                                blurAdvCol.saveManual();
-                                            });
-                                        }
-                                    }
-                                    CfgToggle {
-                                        title: Theme.t("effects.blur_xray", "Desfocar só o papel de parede (xray)")
-                                        subtitle: Theme.t("effects.blur_xray_desc", "Bem mais leve: as janelas de trás não entram no borrão.")
-                                        checked: win.blurXray
-                                        onToggled: nv => {
-                                            win.blurXray = nv;
-                                            Quickshell.execDetached(["rice-hypr-prefs", "set", "blur_xray", nv ? "true" : "false"]);
-                                            blurAdvCol.saveManual();
-                                        }
-                                    }
-                                    CfgToggle {
-                                        title: Theme.t("effects.blur_ignore_opacity", "Desfocar atrás de janelas opacas")
-                                        subtitle: Theme.t("effects.blur_ignore_opacity_desc", "Desligado economiza GPU: não borra o que ninguém vê.")
-                                        checked: win.blurIgnoreOpacity
-                                        onToggled: nv => {
-                                            win.blurIgnoreOpacity = nv;
-                                            Quickshell.execDetached(["rice-hypr-prefs", "set", "blur_ignore_opacity", nv ? "true" : "false"]);
-                                            blurAdvCol.saveManual();
-                                        }
+                                }
+
+                                GroupLabel { text: Theme.t("effects.g_anim", "Animações") }
+
+                                OptionGroup {
+                                    OptionToggle {
+                                        title: Theme.t("effects.anim_advanced", "Animações avançadas")
+                                        subtitle: Theme.t("effects.anim_advanced_desc", "Curva, velocidade e estilo de cada tipo de animação.")
+                                        checked: win.animAdvanced
+                                        onToggled: nv => win.animAdvanced = nv
                                     }
                                 }
 
-                                SectionHeader {
-                                    title: Theme.t("effects.dim_title", "Foco & Janelas Inativas")
-                                    subtitle: Theme.t("effects.dim_sub", "Escurece as janelas que não estão recebendo comandos no momento")
-                                }
-
-                                CfgToggle {
-                                    title: Theme.t("effects.dim_toggle", "Escurecer Janelas Inativas (Dim Inactive)")
-                                    subtitle: Theme.t("effects.dim_toggle_desc", "Destaca a janela atualmente em uso escurecendo as janelas de fundo")
-                                    checked: win.dimInactive
-                                    onToggled: nv => {
-                                        win.dimInactive = nv;
-                                        Quickshell.execDetached(["rice-hypr-prefs", "set", "dim_inactive", nv ? "true" : "false"]);
-                                    }
-                                }
-
-                                CfgSlider {
-                                    title: Theme.t("effects.dim_strength", "Intensidade do Escurecimento (Dim Strength)")
-                                    minVal: 0.05; maxVal: 0.50; value: win.dimStrength; decimals: 2
-                                    onChanged: newVal => {
-                                        win.dimStrength = newVal;
-                                        debounceTimer.exec(() => {
-                                            Quickshell.execDetached(["rice-hypr-prefs", "set", "dim_strength", String(win.dimStrength)]);
-                                        });
-                                    }
-                                }
-
-                                SectionHeader {
-                                    title: Theme.t("effects.geom_title", "Geometria do Hyprland")
-                                    subtitle: Theme.t("effects.geom_sub", "Curvatura dos cantos e espaçamento entre janelas")
-                                }
-
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 20
-                                    CfgSlider {
-                                        title: Theme.t("effects.rounding", "Arredondamento dos Cantos (Rounding)")
-                                        minVal: 0; maxVal: 20; value: win.rounding; unit: " px"
-                                        onChanged: newVal => {
-                                            win.rounding = Math.round(newVal);
-                                            debounceTimer.exec(() => {
-                                                Quickshell.execDetached(["rice-hypr-prefs", "set", "rounding", String(win.rounding)]);
-                                            });
-                                        }
-                                    }
-                                    CfgSlider {
-                                        title: Theme.t("effects.gaps_in", "Espaçamento Interno (Gaps In)")
-                                        minVal: 0; maxVal: 18; value: win.gapsIn; unit: " px"
-                                        onChanged: newVal => {
-                                            win.gapsIn = Math.round(newVal);
-                                            debounceTimer.exec(() => {
-                                                Quickshell.execDetached(["rice-hypr-prefs", "set", "gaps_in", String(win.gapsIn)]);
-                                            });
-                                        }
-                                    }
-                                }
-
-                                SectionHeader {
-                                    title: Theme.t("effects.anim_title", "Estilo de Animação")
-                                    subtitle: Theme.t("effects.anim_sub", "Curvas de Bézier e velocidade para abertura, fechamento e workspaces — escolha um preset ou ajuste cada parte")
-                                }
-
-                                // Presets, curva de Bézier por grupo, duração e estilo
-                                // (rice-anim). Ver AnimCurveEditor.qml.
-                                CfgToggle {
-                                    title: Theme.t("effects.anim_advanced", "Animações avançadas")
-                                    subtitle: Theme.t("effects.anim_advanced_desc", "Curva, velocidade e estilo de cada tipo de animação.")
-                                    checked: win.animAdvanced
-                                    onToggled: nv => win.animAdvanced = nv
-                                }
-
+                                // Presets, curva de Bézier por grupo, duração e estilo (rice-anim).
                                 AnimCurveEditor {
                                     Layout.fillWidth: true
                                     visible: win.animAdvanced
@@ -5425,6 +5484,7 @@ PanelWindow {
                                 }
 
                                 SectionHeader {
+                                    quiet: true
                                     title: Theme.t("greeter.panel_title", "Tela de login do rice")
                                     subtitle: {
                                         if (win.greeterState === "active")
@@ -5470,6 +5530,7 @@ PanelWindow {
                                 }
 
                                 SectionHeader {
+                                    quiet: true
                                     title: Theme.t("effects.boot_login_title", "Inicialização & Tela de Login (SDDM & Limine)")
                                     subtitle: Theme.t("effects.boot_login_sub", "Aplica o tema SilentSDDM e wallpaper suavizado no bootloader do sistema")
                                 }
@@ -9186,12 +9247,9 @@ PanelWindow {
                             ColumnLayout {
                                 id: layoutCol
                                 width: parent.width - 18   // faixa da barra de rolagem
-                                spacing: 18
+                                spacing: 10
 
-                                SectionHeader {
-                                    title: Theme.t("layout.presets_title", "Arranjos prontos")
-                                    subtitle: Theme.t("layout.presets_sub", "Um clique muda tudo de lugar. Depois dá para ajustar peça por peça aqui embaixo.")
-                                }
+                                GroupLabel { Layout.topMargin: 0; text: Theme.t("layout.presets_title", "Arranjos prontos") }
 
                                 RowLayout {
                                     Layout.fillWidth: true
@@ -9230,10 +9288,10 @@ PanelWindow {
                                             readonly property bool active: ShellLayout.preset === lpCard.modelData.key
                                             Layout.fillWidth: true
                                             Layout.preferredHeight: lpCol.implicitHeight + 28
-                                            radius: 16
-                                            color: lpCard.active ? Theme.withAlpha(Theme.primary, 0.14) : (lpArea.containsMouse ? Theme.tileHigh : Theme.tile)
-                                            border.width: lpCard.active ? 2 : 1
-                                            border.color: lpCard.active ? Theme.primary : Theme.withAlpha(Theme.outline, 0.25)
+                                            radius: 12
+                                            color: lpArea.containsMouse ? Theme.tileHigh : Theme.withAlpha(Theme.tile, 0.55)
+                                            border.width: lpCard.active ? 2 : 0
+                                            border.color: Theme.primary
                                             Behavior on color { ColorAnimation { duration: 140 } }
 
                                             ColumnLayout {
@@ -9283,286 +9341,161 @@ PanelWindow {
                                     }
                                 }
 
-                                Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: Theme.withAlpha(Theme.outline, 0.45) }
+                                GroupLabel { text: Theme.t("layout.bar_title", "Barra principal") }
 
-                                SectionHeader {
-                                    title: Theme.t("layout.bar_title", "Barra principal")
-                                    subtitle: Theme.t("layout.bar_sub", "Relógio, áreas de trabalho e os indicadores do sistema.")
-                                }
-
-                                ColumnLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 8
-
-                                    Text {
-                                        Layout.alignment: Qt.AlignLeft
-                                        text: Theme.t("layout.bar_pos", "Onde fica a barra")
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: 13
-                                        color: Theme.textColor
-                                    }
-                                    Text {
-                                        Layout.fillWidth: true
-                                        text: Theme.t("layout.bar_pos_desc", "Na lateral ela fica vertical e estreita; os indicadores abrem a página do assunto em vez de um popup.")
-                                        wrapMode: Text.WordWrap
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: 11
-                                        color: Theme.subtext
-                                    }
-
-                                    RowLayout {
-                                        Layout.fillWidth: true
-                                        spacing: 8
-
-                                        Repeater {
-                                            model: [
-                                                { pos: "top", label: Theme.t("layout.pos_top", "Em cima") },
-                                                { pos: "left", label: Theme.t("layout.pos_left", "À esquerda") },
-                                                { pos: "right", label: Theme.t("layout.pos_right", "À direita") }
+                                OptionGroup {
+                                    OptionRow {
+                                        title: Theme.t("layout.bar_pos", "Onde fica a barra")
+                                        Segmented {
+                                            options: [
+                                                { value: "top", label: Theme.t("layout.pos_top", "Em cima") },
+                                                { value: "left", label: Theme.t("layout.pos_left", "À esquerda") },
+                                                { value: "right", label: Theme.t("layout.pos_right", "À direita") }
                                             ]
-                                            delegate: Rectangle {
-                                                id: posBtn
-                                                required property var modelData
-                                                readonly property bool active: ShellLayout.barPosition === posBtn.modelData.pos
-                                                implicitWidth: posBtnText.implicitWidth + 28
-                                                implicitHeight: 34
-                                                radius: 10
-                                                color: posBtn.active ? Theme.withAlpha(Theme.primary, 0.2) : (posBtnArea.containsMouse ? Theme.tileHigh : Theme.tile)
-                                                border.width: 1
-                                                border.color: posBtn.active ? Theme.primary : Theme.withAlpha(Theme.outline, 0.22)
-
-                                                Text {
-                                                    id: posBtnText
-                                                    anchors.centerIn: parent
-                                                    text: posBtn.modelData.label
-                                                    font.family: Theme.fontFamily
-                                                    font.pixelSize: 12
-                                                    font.weight: posBtn.active ? Font.DemiBold : Font.Normal
-                                                    color: posBtn.active ? Theme.primary : Theme.textColor
-                                                }
-
-                                                MouseArea {
-                                                    id: posBtnArea
-                                                    anchors.fill: parent
-                                                    hoverEnabled: true
-                                                    cursorShape: Qt.PointingHandCursor
-                                                    onClicked: ShellLayout.set("bar", "position", posBtn.modelData.pos)
-                                                }
-                                            }
+                                            current: ShellLayout.barPosition
+                                            onPicked: v => ShellLayout.set("bar", "position", v)
                                         }
-
-                                        Item { Layout.fillWidth: true }
                                     }
-                                }
-
-                                CfgToggle {
-                                    title: Theme.t("layout.bar_autohide", "Aparecer só com o mouse")
-                                    subtitle: Theme.t("layout.bar_autohide_desc", "A barra sai da tela e volta ao encostar o mouse na borda de cima.")
-                                    checked: ShellLayout.barAutohide
-                                    onToggled: nv => ShellLayout.set("bar", "autohide", nv)
-                                }
-
-                                CfgToggle {
-                                    visible: !ShellLayout.barVertical
-                                    title: Theme.t("layout.bar_title_win", "Mostrar o nome da janela aberta")
-                                    subtitle: Theme.t("layout.bar_title_win_desc", "Ao lado das áreas de trabalho.")
-                                    checked: ShellLayout.barShowTitle
-                                    onToggled: nv => ShellLayout.set("bar", "showTitle", nv)
-                                }
-
-                                ColumnLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 8
-
-                                    Text {
-                                        Layout.alignment: Qt.AlignLeft
-                                        text: Theme.t("layout.ws_count", "Botões de área de trabalho")
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: 13
-                                        color: Theme.textColor
+                                    RowDivider {}
+                                    OptionToggle {
+                                        title: Theme.t("layout.bar_autohide", "Aparecer só com o mouse")
+                                        checked: ShellLayout.barAutohide
+                                        onToggled: nv => ShellLayout.set("bar", "autohide", nv)
                                     }
-                                    Text {
-                                        Layout.fillWidth: true
-                                        text: Theme.t("layout.ws_count_desc", "Fixos, os botões ficam lá mesmo sem nenhuma janela — dá para pular para uma área vazia com o mouse.")
-                                        wrapMode: Text.WordWrap
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: 11
-                                        color: Theme.subtext
+                                    RowDivider { visible: !ShellLayout.barVertical }
+                                    OptionToggle {
+                                        visible: !ShellLayout.barVertical
+                                        title: Theme.t("layout.bar_title_win", "Mostrar o nome da janela aberta")
+                                        checked: ShellLayout.barShowTitle
+                                        onToggled: nv => ShellLayout.set("bar", "showTitle", nv)
                                     }
-
-                                    RowLayout {
-                                        Layout.fillWidth: true
-                                        spacing: 8
-
-                                        Repeater {
-                                            model: [
-                                                { n: 0, label: Theme.t("layout.ws_dynamic", "Só as usadas") },
-                                                { n: 4, label: "4" },
-                                                { n: 6, label: "6" },
-                                                { n: 9, label: "9" },
-                                                { n: 10, label: "10" }
+                                    RowDivider {}
+                                    OptionRow {
+                                        title: Theme.t("layout.ws_count", "Botões de área de trabalho")
+                                        subtitle: Theme.t("layout.ws_count_short", "Fixos, aparecem mesmo sem janela aberta.")
+                                        Segmented {
+                                            options: [
+                                                { value: 0, label: Theme.t("layout.ws_dynamic", "Só as usadas") },
+                                                { value: 4, label: "4" },
+                                                { value: 6, label: "6" },
+                                                { value: 9, label: "9" },
+                                                { value: 10, label: "10" }
                                             ]
-                                            delegate: Rectangle {
-                                                id: wsBtn
-                                                required property var modelData
-                                                readonly property bool active: ShellLayout.workspaceCount === wsBtn.modelData.n
-                                                implicitWidth: wsBtnText.implicitWidth + 26
-                                                implicitHeight: 34
-                                                radius: 10
-                                                color: wsBtn.active ? Theme.withAlpha(Theme.primary, 0.2) : (wsBtnArea.containsMouse ? Theme.tileHigh : Theme.tile)
-                                                border.width: 1
-                                                border.color: wsBtn.active ? Theme.primary : Theme.withAlpha(Theme.outline, 0.22)
-
-                                                Text {
-                                                    id: wsBtnText
-                                                    anchors.centerIn: parent
-                                                    text: wsBtn.modelData.label
-                                                    font.family: Theme.fontFamily
-                                                    font.pixelSize: 12
-                                                    font.weight: wsBtn.active ? Font.DemiBold : Font.Normal
-                                                    color: wsBtn.active ? Theme.primary : Theme.textColor
-                                                }
-
-                                                MouseArea {
-                                                    id: wsBtnArea
-                                                    anchors.fill: parent
-                                                    hoverEnabled: true
-                                                    cursorShape: Qt.PointingHandCursor
-                                                    onClicked: ShellLayout.set("bar", "workspaceCount", wsBtn.modelData.n)
-                                                }
-                                            }
+                                            current: ShellLayout.workspaceCount
+                                            onPicked: v => ShellLayout.set("bar", "workspaceCount", v)
                                         }
-
-                                        Item { Layout.fillWidth: true }
                                     }
-                                }
-
-                                ColumnLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 8
-
-                                    Text {
-                                        Layout.alignment: Qt.AlignLeft
-                                        text: Theme.t("layout.bar_modules", "O que a barra mostra")
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: 13
-                                        color: Theme.textColor
-                                    }
-                                    Text {
+                                    RowDivider {}
+                                    ColumnLayout {
                                         Layout.fillWidth: true
-                                        text: Theme.t("layout.bar_modules_desc", "Desligue o que você não usa. O que o computador não tem (Wi-Fi, Bluetooth, bateria) já some sozinho.")
-                                        wrapMode: Text.WordWrap
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: 11
-                                        color: Theme.subtext
-                                    }
+                                        Layout.margins: 16
+                                        Layout.topMargin: 11
+                                        spacing: 10
+                                        Text {
+                                            Layout.fillWidth: true
+                                            text: Theme.t("layout.bar_modules", "O que a barra mostra")
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: 13
+                                            color: Theme.textColor
+                                        }
+                                        Flow {
+                                            Layout.fillWidth: true
+                                            spacing: 6
+                                            Repeater {
+                                                model: [
+                                                    { key: "clock", icon: Theme.icons.clock, label: Theme.t("layout.mod_clock", "Relógio") },
+                                                    { key: "notifications", icon: Theme.icons.bell, label: Theme.t("layout.mod_notif", "Notificações") },
+                                                    { key: "audio", icon: Theme.icons.volHigh, label: Theme.t("layout.mod_audio", "Volume") },
+                                                    { key: "brightness", icon: Theme.icons.brightness, label: Theme.t("layout.mod_bright", "Brilho") },
+                                                    { key: "network", icon: Theme.icons.wifi4, label: Theme.t("layout.mod_net", "Wi-Fi") },
+                                                    { key: "bluetooth", icon: Theme.icons.bt, label: "Bluetooth" },
+                                                    { key: "battery", icon: Theme.icons.bat, label: Theme.t("layout.mod_bat", "Bateria") },
+                                                    { key: "settings", icon: Theme.icons.tune, label: Theme.t("layout.mod_settings", "Configurações") }
+                                                ]
+                                                delegate: Rectangle {
+                                                    id: modChip
+                                                    required property var modelData
+                                                    readonly property bool on: ShellLayout.barModule(modChip.modelData.key)
+                                                    width: modChipRow.implicitWidth + 22
+                                                    height: 30
+                                                    radius: 8
+                                                    color: modChip.on ? Theme.tileHigh : (modChipArea.containsMouse ? Theme.withAlpha(Theme.tileHigh, 0.45) : "transparent")
+                                                    border.width: modChip.on ? 0 : 1
+                                                    border.color: Theme.withAlpha(Theme.outline, 0.2)
+                                                    Behavior on color { ColorAnimation { duration: 120 } }
 
-                                    Flow {
-                                        Layout.fillWidth: true
-                                        spacing: 8
-
-                                        Repeater {
-                                            model: [
-                                                { key: "clock", icon: Theme.icons.clock, label: Theme.t("layout.mod_clock", "Relógio") },
-                                                { key: "notifications", icon: Theme.icons.bell, label: Theme.t("layout.mod_notif", "Notificações") },
-                                                { key: "audio", icon: Theme.icons.volHigh, label: Theme.t("layout.mod_audio", "Volume") },
-                                                { key: "brightness", icon: Theme.icons.brightness, label: Theme.t("layout.mod_bright", "Brilho") },
-                                                { key: "network", icon: Theme.icons.wifi4, label: Theme.t("layout.mod_net", "Wi-Fi") },
-                                                { key: "bluetooth", icon: Theme.icons.bt, label: "Bluetooth" },
-                                                { key: "battery", icon: Theme.icons.bat, label: Theme.t("layout.mod_bat", "Bateria") },
-                                                { key: "settings", icon: Theme.icons.tune, label: Theme.t("layout.mod_settings", "Configurações") }
-                                            ]
-                                            delegate: Rectangle {
-                                                id: modChip
-                                                required property var modelData
-                                                readonly property bool on: ShellLayout.barModule(modChip.modelData.key)
-                                                width: modChipRow.implicitWidth + 24
-                                                height: 34
-                                                radius: 10
-                                                color: modChip.on ? Theme.withAlpha(Theme.primary, 0.18)
-                                                     : (modChipArea.containsMouse ? Theme.tileHigh : Theme.tile)
-                                                border.width: 1
-                                                border.color: modChip.on ? Theme.withAlpha(Theme.primary, 0.5) : Theme.withAlpha(Theme.outline, 0.22)
-
-                                                Row {
-                                                    id: modChipRow
-                                                    anchors.centerIn: parent
-                                                    spacing: 7
-
-                                                    Text {
-                                                        anchors.verticalCenter: parent.verticalCenter
-                                                        text: modChip.modelData.icon
-                                                        font.family: Theme.iconFontFamily
-                                                        font.pixelSize: 14
-                                                        color: modChip.on ? Theme.primary : Theme.subtext
+                                                    Row {
+                                                        id: modChipRow
+                                                        anchors.centerIn: parent
+                                                        spacing: 6
+                                                        Text {
+                                                            anchors.verticalCenter: parent.verticalCenter
+                                                            text: modChip.modelData.icon
+                                                            font.family: Theme.iconFontFamily
+                                                            font.pixelSize: 13
+                                                            color: modChip.on ? Theme.textColor : Theme.withAlpha(Theme.subtext, 0.6)
+                                                        }
+                                                        Text {
+                                                            anchors.verticalCenter: parent.verticalCenter
+                                                            text: modChip.modelData.label
+                                                            font.family: Theme.fontFamily
+                                                            font.pixelSize: 12
+                                                            font.strikeout: !modChip.on
+                                                            color: modChip.on ? Theme.textColor : Theme.withAlpha(Theme.subtext, 0.6)
+                                                        }
                                                     }
-                                                    Text {
-                                                        anchors.verticalCenter: parent.verticalCenter
-                                                        text: modChip.modelData.label
-                                                        font.family: Theme.fontFamily
-                                                        font.pixelSize: 12
-                                                        color: modChip.on ? Theme.textColor : Theme.subtext
+
+                                                    MouseArea {
+                                                        id: modChipArea
+                                                        anchors.fill: parent
+                                                        hoverEnabled: true
+                                                        cursorShape: Qt.PointingHandCursor
+                                                        onClicked: ShellLayout.setBarModule(modChip.modelData.key, !modChip.on)
                                                     }
                                                 }
-
-                                                MouseArea {
-                                                    id: modChipArea
-                                                    anchors.fill: parent
-                                                    hoverEnabled: true
-                                                    cursorShape: Qt.PointingHandCursor
-                                                    onClicked: ShellLayout.setBarModule(modChip.modelData.key, !modChip.on)
-                                                }
                                             }
                                         }
                                     }
                                 }
 
-                                Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: Theme.withAlpha(Theme.outline, 0.45) }
+                                GroupLabel { text: Theme.t("layout.dock_title", "Dock") }
 
-                                SectionHeader {
-                                    title: Theme.t("layout.dock_title", "Dock")
-                                    subtitle: Theme.t("layout.dock_sub", "A fileira de aplicativos na borda de baixo.")
+                                OptionGroup {
+                                    OptionToggle {
+                                        title: Theme.t("layout.dock_on", "Usar a dock")
+                                        checked: ShellLayout.dockEnabled
+                                        onToggled: nv => ShellLayout.set("dock", "enabled", nv)
+                                    }
+                                    RowDivider {}
+                                    OptionToggle {
+                                        title: Theme.t("layout.dock_autohide", "Aparecer só com o mouse")
+                                        subtitle: Theme.t("layout.dock_autohide_desc", "Desligado, ela fica fixa e as janelas param acima dela.")
+                                        checked: ShellLayout.dockAutohide
+                                        onToggled: nv => ShellLayout.set("dock", "autohide", nv)
+                                    }
+                                    RowDivider {}
+                                    OptionToggle {
+                                        title: Theme.t("layout.dock_full", "Ocupar a largura toda")
+                                        checked: ShellLayout.dockFullWidth
+                                        onToggled: nv => ShellLayout.set("dock", "fullWidth", nv)
+                                    }
                                 }
 
-                                CfgToggle {
-                                    title: Theme.t("layout.dock_on", "Usar a dock")
-                                    subtitle: Theme.t("layout.dock_on_desc", "Desligada, os aplicativos ficam só no launcher.")
-                                    checked: ShellLayout.dockEnabled
-                                    onToggled: nv => ShellLayout.set("dock", "enabled", nv)
-                                }
+                                GroupLabel { text: Theme.t("layout.side_title", "Central de ações") }
 
-                                CfgToggle {
-                                    title: Theme.t("layout.dock_autohide", "Aparecer só com o mouse")
-                                    subtitle: Theme.t("layout.dock_autohide_desc", "Desligado, ela fica fixa e as janelas param acima dela.")
-                                    checked: ShellLayout.dockAutohide
-                                    onToggled: nv => ShellLayout.set("dock", "autohide", nv)
-                                }
-
-                                CfgToggle {
-                                    title: Theme.t("layout.dock_full", "Ocupar a largura toda")
-                                    subtitle: Theme.t("layout.dock_full_desc", "Como a barra de tarefas do Windows, de ponta a ponta.")
-                                    checked: ShellLayout.dockFullWidth
-                                    onToggled: nv => ShellLayout.set("dock", "fullWidth", nv)
-                                }
-
-                                Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: Theme.withAlpha(Theme.outline, 0.45) }
-
-                                SectionHeader {
-                                    title: Theme.t("layout.side_title", "Central de ações")
-                                    subtitle: Theme.t("layout.side_sub", "A barra da direita com avatar, bandeja, luz noturna e energia (Ctrl + Alt + Del).")
-                                }
-
-                                CfgToggle {
-                                    title: Theme.t("layout.side_on", "Usar a central de ações")
-                                    checked: ShellLayout.sidebarEnabled
-                                    onToggled: nv => ShellLayout.set("sidebar", "enabled", nv)
-                                }
-
-                                CfgToggle {
-                                    title: Theme.t("layout.side_autohide", "Aparecer só com o mouse")
-                                    subtitle: Theme.t("layout.side_autohide_desc", "Desligado, ela fica sempre aberta na lateral.")
-                                    checked: ShellLayout.sidebarAutohide
-                                    onToggled: nv => ShellLayout.set("sidebar", "autohide", nv)
+                                OptionGroup {
+                                    OptionToggle {
+                                        title: Theme.t("layout.side_on", "Usar a central de ações")
+                                        subtitle: Theme.t("layout.side_sub_short", "Avatar, bandeja, luz noturna e energia (Ctrl + Alt + Del).")
+                                        checked: ShellLayout.sidebarEnabled
+                                        onToggled: nv => ShellLayout.set("sidebar", "enabled", nv)
+                                    }
+                                    RowDivider {}
+                                    OptionToggle {
+                                        title: Theme.t("layout.side_autohide", "Aparecer só com o mouse")
+                                        checked: ShellLayout.sidebarAutohide
+                                        onToggled: nv => ShellLayout.set("sidebar", "autohide", nv)
+                                    }
                                 }
                             }
                         }
