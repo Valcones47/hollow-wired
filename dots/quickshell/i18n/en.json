@@ -1439,5 +1439,6 @@
   "topbar.media_tab": "Media",
   "topbar.eq_tab": "Equalizer",
   "topbar.nothing_playing": "Nothing playing right now.",
-  "topbar.app_volume": "App volume"
+  "topbar.app_volume": "App volume",
+  "wallust.tr_fixed": "Fixed at 800 ms: that's how long the new wallpaper takes to start playing. Longer and the wave gets cut off midway; shorter and the screen flickers."
 }

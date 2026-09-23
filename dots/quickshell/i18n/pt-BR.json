@@ -1439,5 +1439,6 @@
   "topbar.media_tab": "Mídia",
   "topbar.eq_tab": "Equalizador",
   "topbar.nothing_playing": "Nada tocando agora.",
-  "topbar.app_volume": "Volume do app"
+  "topbar.app_volume": "Volume do app",
+  "wallust.tr_fixed": "Duração fixa em 800 ms: é o tempo que o wallpaper novo leva para começar a tocar. Mais que isso a onda é cortada no meio; menos, a tela pisca."
 }

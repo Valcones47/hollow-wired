@@ -5097,6 +5097,11 @@ PanelWindow {
                                                 onClicked: {
                                                     win.wallTransition = parent.modelData.id;
                                                     Quickshell.execDetached(["rice-wallpaper-fade", "--style", parent.modelData.id]);
+                                                    // duração casada com a subida do renderer (ver texto abaixo)
+                                                    if (win.wallTransitionMs !== 800) {
+                                                        win.wallTransitionMs = 800;
+                                                        Quickshell.execDetached(["rice-hypr-prefs", "set", "wallpaper_transition_ms", "800"]);
+                                                    }
                                                     win.showToast(Theme.t("toast.wall_transition", "Transição: ") + parent.modelData.name);
                                                 }
                                             }
@@ -5104,19 +5109,18 @@ PanelWindow {
                                     }
                                 }
 
-                                CfgSlider {
-                                    title: Theme.t("wallust.tr_duration", "Duração da transição")
-                                    minVal: 300
-                                    maxVal: 2500
-                                    value: win.wallTransitionMs
-                                    unit: " ms"
-                                    onChanged: newVal => {
-                                        win.wallTransitionMs = Math.round(newVal);
-                                        debounceTimer.exec(() => {
-                                            Quickshell.execDetached(["rice-hypr-prefs", "set",
-                                                "wallpaper_transition_ms", String(win.wallTransitionMs)]);
-                                        });
-                                    }
+                                // Duração fixa: a onda termina quando o wallpaper novo já está
+                                // tocando (o renderer leva ~850 ms para entregar o 1º quadro).
+                                // Medido pelo usuário: acima de 800 ms a onda é cortada no
+                                // meio (o vídeo aparece antes); abaixo, a tela pisca esperando
+                                // o renderer. Por isso não há mais slider.
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: Theme.t("wallust.tr_fixed", "Duração fixa em 800 ms: é o tempo que o wallpaper novo leva para começar a tocar. Mais que isso a onda é cortada no meio; menos, a tela pisca.")
+                                    wrapMode: Text.WordWrap
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 11
+                                    color: Theme.withAlpha(Theme.subtext, 0.8)
                                 }
 
                                 SectionHeader {
