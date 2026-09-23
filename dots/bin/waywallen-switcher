@@ -5,6 +5,7 @@ Bind to Super+S. Scroll or Left/Right moves the carousel, Enter or clicking
 the center card applies it, clicking a side card brings it to the center,
 Escape (or Super+S again) closes without changing anything.
 """
+import json
 import math
 import os
 import sqlite3
@@ -593,6 +594,14 @@ class SwitcherWindow(Gtk.ApplicationWindow):
             return
         wallpaper = self.wallpapers[self.selected]
 
+        # Congela o wallpaper atual imediatamente via D-Bus (Pause).
+        # Isso economiza GPU e reproduz o comportamento observado no vídeo 2042.mp4,
+        # onde o wallpaper antigo pausa no instante em que a transição é acionada.
+        try:
+            self.proxy.call_sync("Pause", None, Gio.DBusCallFlags.NONE, 200, None)
+        except Exception:
+            pass
+
         # O carrossel sai da frente ANTES da transição começar.
         #
         # Na primeira versão a ordem era: cobre a tela, espera, troca, fecha o
@@ -612,10 +621,24 @@ class SwitcherWindow(Gtk.ApplicationWindow):
     def _cover_then_apply(self, wallpaper):
         """Cobre a tela com a imagem do wallpaper novo e agenda a troca.
 
-        A troca de verdade só é mandada depois que a tela está coberta, senão o
-        engasgo do renderizador aparece no meio da varredura.
+        Suporta dois modos (user-prefs.json > wallpaper_transition_mode):
+          "live"  (padrão): o wallpaper anterior foi pausado no apply(), a cobertura
+                  inicia e a troca é disparada imediatamente. O novo renderizador
+                  sobe debaixo da animação (~850ms) e já está rodando ao vivo
+                  quando a onda termina.
+          "cover" (reserva): método anterior — aguarda a onda cobrir a tela inteira
+                  (coverDelay) antes de mandar o ApplyById.
         """
         still = self._still_for(wallpaper)
+
+        # Modo de transição: "live" (padrão) ou "cover" (reserva)
+        mode = "live"
+        prefs_path = os.path.expanduser("~/.config/hypr/user-prefs.json")
+        try:
+            with open(prefs_path, "r", encoding="utf-8") as f:
+                mode = json.load(f).get("wallpaper_transition_mode", "live")
+        except Exception:
+            pass
 
         delay = 0
         fader = os.path.expanduser("~/.local/bin/rice-wallpaper-fade")
@@ -629,10 +652,17 @@ class SwitcherWindow(Gtk.ApplicationWindow):
             except Exception:
                 delay = 0
 
-        if delay > 0:
-            GLib.timeout_add(delay, self._apply_now, wallpaper)
+        if mode == "cover":
+            # Modo reserva: espera a onda cobrir para mandar a troca
+            if delay > 0:
+                GLib.timeout_add(delay, self._apply_now, wallpaper)
+            else:
+                self._apply_now(wallpaper)
         else:
-            self._apply_now(wallpaper)
+            # Modo live: dispara a troca com antecedência mínima (~25ms para a
+            # janela de cobertura mapear no compositor), permitindo que o vídeo
+            # novo inicialize no meio da transição e já esteja em execução ao final.
+            GLib.timeout_add(25, self._apply_now, wallpaper)
 
     # Quadros em resolução real, por id de wallpaper. Preenchido em segundo
     # plano (ver prefetch_stills): extrair na hora do clique custava de 0,3 a
@@ -702,6 +732,10 @@ class SwitcherWindow(Gtk.ApplicationWindow):
             )
         except GLib.Error as e:
             print(f"Falha ao aplicar wallpaper: {e}", file=sys.stderr)
+            try:
+                self.proxy.call_sync("Resume", None, Gio.DBusCallFlags.NONE, 200, None)
+            except Exception:
+                pass
             fader = os.path.expanduser("~/.local/bin/rice-wallpaper-fade")
             if os.path.isfile(fader):
                 subprocess.Popen([fader, "--dismiss"],
