@@ -957,7 +957,9 @@ local function hyprbars_setup()
         bg_color = hex(wallust.wallust_accent1 or fg), fg_color = hex(bg), size = 16, icon = "󰖰",
         -- Área escondida própria (não a do Super+A): a janela volta clicando
         -- no ícone dela na dock (DockConfig.focusWindow).
-        action = [[hyprctl dispatch 'hl.dsp.window.move({ workspace = "special:minimized" })']],
+        -- rice-minimize: move e passa o foco para a janela anterior (mover
+        -- sozinho deixava o teclado na janela escondida).
+        action = [[rice-minimize]],
     })
     -- Com o plugin carregado a regra passa a existir.
     rice_nobar_rule = hl.window_rule({
@@ -1028,6 +1030,18 @@ hl.on("window.open", function(w)
     local sh = w.size.y or w.size[2] or 0
     if sw > m.width / m.scale * 0.9 or sh > m.height / m.scale * 0.85 then comfy(w) end
 end)
+
+-- Proteção: na leitura da config o plugin pode ainda não estar pronto para o
+-- setup (pelo Lua ele não carrega na mesma chamada). Um timer de 400 ms refaz
+-- o setup logo depois de cada leitura (login e `hyprctl reload`, que o perfil
+-- de desempenho e o desfoque usam). Assinatura: hl.timer(fn, { timeout = ms,
+-- type = "oneshot" | "repeat" }).
+if rice_window_mode == "windows" then
+    hl.timer(function()
+        rice_hyprbars_ready = false
+        rice_set_window_mode("windows", false)
+    end, { timeout = 400, type = "oneshot" })
+end
 
 if rice_window_mode == "windows" then
     rice_set_window_mode("windows", false)

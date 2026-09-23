@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# rice-minimize — minimizar como no Windows (botão da barra do modo Windows).
+#
+# O Hyprland não tem minimizar: a janela vai para a área escondida
+# special:minimized (fora do Super+Tab; volta pela dock ou pelo Alt+Tab).
+# Mover para lá, mesmo com silent = true (medido), deixa o FOCO na janela
+# escondida: o teclado continuava digitando nela. Então o foco passa para a
+# janela usada por último na área de trabalho atual, ou para nenhuma.
+#
+# Uso: rice-minimize [endereço]   (sem endereço: a janela ativa)
+
+addr="${1:-}"
+[ -n "$addr" ] || addr=$(hyprctl activewindow -j 2>/dev/null | jq -r '.address // empty')
+[ -n "$addr" ] || exit 0
+case "$addr" in 0x*) ;; *) addr="0x$addr" ;; esac
+
+ws=$(hyprctl activeworkspace -j 2>/dev/null | jq -r '.id')
+hyprctl dispatch "hl.dsp.window.move({ workspace = \"special:minimized\", window = \"address:$addr\" })" >/dev/null 2>&1
+
+# Próxima janela da área atual pela ordem de uso (focusHistoryID menor = mais recente).
+next=$(hyprctl clients -j 2>/dev/null | jq -r --arg a "$addr" --argjson ws "${ws:-0}" \
+    '[.[] | select(.mapped and .workspace.id == $ws and .address != $a)] | sort_by(.focusHistoryID) | .[0].address // empty')
+if [ -n "$next" ]; then
+    hyprctl dispatch "hl.dsp.focus({ window = \"address:$next\" })" >/dev/null 2>&1
+else
+    # Área vazia: foca a própria área, e o teclado sai da janela escondida.
+    hyprctl dispatch "hl.dsp.focus({ workspace = $ws })" >/dev/null 2>&1
+fi

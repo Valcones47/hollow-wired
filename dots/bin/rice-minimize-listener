@@ -36,9 +36,8 @@ def instance_sig():
 def minimize(addr):
     if not addr.startswith("0x"):
         addr = "0x" + addr
-    subprocess.run(["hyprctl", "dispatch",
-                    f'hl.dsp.window.move({{ workspace = "special:minimized", window = "address:{addr}" }})'],
-                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    # rice-minimize também tira o foco da janela escondida.
+    subprocess.run(["rice-minimize", addr], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 def listen(path):
