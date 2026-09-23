@@ -35,10 +35,10 @@ Scope {
 
     property string style: "wipe"
 
-    // Tempos calibrados para sincronização quadro a quadro:
-    // a cobertura varre a tela com o quadro 0 e a revelação é imediata assim
-    // que o renderizador sobe, para o vídeo começar direto sem salto de tempo.
-    property int coverMs: 650
+    // Tempos calibrados para animação fluida:
+    // a cobertura varre a tela a 60 FPS; a troca só é disparada com a tela
+    // coberta para o carregamento do Waywallen não engasgar a animação.
+    property int coverMs: 450
     property int hold: 4000
     property int revealMs: 0
 
@@ -388,10 +388,9 @@ Scope {
         // Revela o wallpaper novo, agora que o renderizador dele está no ar.
         function reveal(): void { fadeScope.reveal(); }
         // Quanto tempo o chamador deve esperar antes de aplicar a troca.
-        // O renderizador do Waywallen leva cerca de 800-850ms no total (spawn + Vulkan)
-        // para renderizar o quadro 0. Disparando logo no início (50ms), o renderizador
-        // entrega o quadro 0 quase simultaneamente ao término da onda de cobertura (650ms).
-        function coverDelay(): string { return "50"; }
+        // A troca só é enviada quando a tela está 100% coberta, para que o
+        // arranque pesado do Flatpak/Vulkan não roube quadros da animação da onda.
+        function coverDelay(): string { return String(fadeScope.coverMs); }
         // Troca o estilo sem reiniciar o shell (usado pelo painel e para teste).
         function setStyle(name: string): void { fadeScope.style = name; }
         function currentStyle(): string { return fadeScope.style; }
