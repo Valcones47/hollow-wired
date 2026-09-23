@@ -365,7 +365,8 @@ PanelWindow {
                 { key: "Super + Setas", action: Theme.t("binds.act_focus", "Mudar Foco entre Janelas") },
                 { key: "Super + 1..9", action: Theme.t("binds.act_workspace", "Mudar para Área de Trabalho (Workspace)") },
                 { key: "Super + Shift + 1..9", action: Theme.t("binds.act_movetoworkspace", "Mover Janela para Área de Trabalho") },
-                { key: "Super + A", action: Theme.t("binds.act_scratchpad", "Abrir Área Especial (Scratchpad)") }
+                { key: "Super + A", action: Theme.t("binds.act_scratchpad", "Abrir Área Especial (Scratchpad)") },
+                { key: "Super + D", action: Theme.t("binds.act_desktop", "Área de Trabalho Vazia mais Próxima (Show Desktop)") }
             ]
         },
         {

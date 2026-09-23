@@ -228,6 +228,7 @@ PanelWindow {
                                 { keys: ["Super", sheetWindow.wsVertical ? "← / →" : "↑ / ↓"], desc: Theme.t("cheatsheet.desc_focus", "Trocar o foco entre janelas") },
                                 { keys: ["Super", "Esc"], desc: Theme.t("cheatsheet.desc_taskmgr", "Gerenciador de tarefas") },
                                 { keys: ["Super", "'"], desc: Theme.t("cheatsheet.desc_dropterm", "Terminal drop-down suspenso") },
+                                { keys: ["Super", "D"], desc: Theme.t("cheatsheet.desc_desktop", "Área de trabalho vazia mais próxima / voltar") },
                                 { keys: ["Super", "Shift", "X"], desc: Theme.t("cheatsheet.desc_kill", "Encerrar janela travada (Kill)") },
                                 { keys: ["Super", "L"], desc: Theme.t("cheatsheet.desc_lock", "Bloquear sessão") },
                                 { keys: ["Super", "M"], desc: Theme.t("cheatsheet.desc_exit", "Sair do Hyprland") }

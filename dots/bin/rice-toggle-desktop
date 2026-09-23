@@ -1,0 +1,127 @@
+#!/usr/bin/env python3
+"""
+rice-toggle-desktop — Alterna para a workspace vazia mais próxima (Super + D estilo Win + D).
+
+Se pressionado a partir de uma workspace com janelas, localiza a workspace vazia mais
+próxima (em distância absoluta) e foca nela, salvando o ponto de origem.
+Se pressionado novamente a partir da workspace vazia de destino, retorna para a workspace
+anterior com aplicativos.
+"""
+
+import json
+import os
+import subprocess
+import sys
+
+RUN_DIR = os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
+STATE_FILE = os.path.join(RUN_DIR, "rice-toggle-desktop.json")
+
+
+def get_hypr_json(cmd: str):
+    try:
+        res = subprocess.run(["hyprctl", cmd, "-j"], capture_output=True, text=True, timeout=1.5)
+        return json.loads(res.stdout)
+    except Exception:
+        return None
+
+
+def focus_ws(ws_id: int):
+    subprocess.run(
+        ["hyprctl", "dispatch", f"hl.dsp.focus({{ workspace = {ws_id} }})"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+
+def main():
+    active = get_hypr_json("activeworkspace")
+    if not active:
+        sys.exit(0)
+
+    current_ws = active.get("id", 1)
+    current_windows = active.get("windows", 0)
+
+    workspaces = get_hypr_json("workspaces") or []
+    # Dicionário mapeando workspace_id -> quantidade de janelas
+    ws_map = {w["id"]: w.get("windows", 0) for w in workspaces if w["id"] > 0}
+
+    # Leitura do estado anterior
+    last_state = {}
+    if os.path.exists(STATE_FILE):
+        try:
+            with open(STATE_FILE, "r") as f:
+                last_state = json.load(f)
+        except Exception:
+            last_state = {}
+
+    last_occupied = last_state.get("last_occupied")
+    target_empty = last_state.get("target_empty")
+
+    # Caso 1: Estando em uma workspace vazia (sem janelas), alternar de volta
+    if current_windows == 0:
+        target_to_return = None
+        if last_occupied and last_occupied != current_ws:
+            # Se a workspace anterior ainda tem janelas, volta direto pra ela
+            if ws_map.get(last_occupied, 0) > 0:
+                target_to_return = last_occupied
+            else:
+                # Caso a anterior tenha sido esvaziada, procura a workspace com app mais próxima
+                occupied_with_apps = [wid for wid, wins in ws_map.items() if wins > 0 and wid > 0]
+                if occupied_with_apps:
+                    target_to_return = min(
+                        occupied_with_apps,
+                        key=lambda w: (abs(w - current_ws), 0 if w < current_ws else 1)
+                    )
+                else:
+                    target_to_return = last_occupied
+
+        elif last_occupied is None:
+            # Não havia estado salvo, mas a tela está vazia: foca a workspace com apps mais próxima
+            occupied_with_apps = [wid for wid, wins in ws_map.items() if wins > 0 and wid > 0]
+            if occupied_with_apps:
+                target_to_return = min(
+                    occupied_with_apps,
+                    key=lambda w: (abs(w - current_ws), 0 if w < current_ws else 1)
+                )
+
+        if target_to_return and target_to_return != current_ws:
+            try:
+                os.remove(STATE_FILE)
+            except OSError:
+                pass
+            focus_ws(target_to_return)
+            sys.exit(0)
+
+    # Caso 2: Workspace atual tem janelas (ou não há como retornar) -> Encontra a vazia mais próxima
+    occupied_ids = {wid for wid, wins in ws_map.items() if wins > 0}
+    empty_candidates = [i for i in range(1, 11) if i not in occupied_ids and i != current_ws]
+
+    if not empty_candidates:
+        # Se todas de 1 a 10 estiverem ocupadas, busca a primeira acima de 10
+        i = 11
+        while i in occupied_ids:
+            i += 1
+        empty_candidates = [i]
+
+    # Menor distância absoluta até a workspace atual.
+    # Desempate favorece ir para frente (i > current_ws).
+    best_empty = min(
+        empty_candidates,
+        key=lambda i: (abs(i - current_ws), 0 if i > current_ws else 1)
+    )
+
+    new_state = {
+        "last_occupied": current_ws,
+        "target_empty": best_empty
+    }
+    try:
+        with open(STATE_FILE, "w") as f:
+            json.dump(new_state, f)
+    except Exception:
+        pass
+
+    focus_ws(best_empty)
+
+
+if __name__ == "__main__":
+    main()

@@ -827,16 +827,19 @@ hl.bind("ALT + SHIFT + Tab", hl.dsp.global("quickshell:alttab-prev"))
 -- Visão geral das áreas de trabalho em carrossel (Visão de Tarefas do Windows).
 hl.bind(mainMod .. " + Tab", hl.dsp.global("quickshell:overview"))
 
+--------------------------------
+---- MOSTRAR DESKTOP / VAZIA --
+--------------------------------
+-- Super + D alterna para a workspace sem nada mais próxima (estilo Win + D).
+-- Apertar de novo estando na workspace vazia retorna para a workspace anterior com app.
+hl.bind(mainMod .. " + D", hl.dsp.exec_cmd("rice-toggle-desktop"))
+
 -----------------
 ---- MINIMIZAR --
 -----------------
--- Hyprland é tiling, não existe "minimizar" de verdade (não tem taskbar pra
--- restaurar depois). O equivalente é mandar a janela pro workspace especial
--- oculto (o mesmo "magic" do Super+A) e trazer de volta com Super+A.
-hl.bind(mainMod .. " + D", hl.dsp.window.move({ workspace = "special:magic" }))
--- O botão "minimizar" dos próprios apps (Firefox, Discord, apps GNOME...) só
--- manda um pedido que o Hyprland ignora. O rice-minimize-listener escuta esse
--- pedido no socket de eventos e faz o mesmo que o Super + D.
+-- O botão "minimizar" dos próprios apps (Firefox, Discord, apps GNOME...) manda um
+-- pedido que o Hyprland ignora nativamente. O rice-minimize-listener escuta esse
+-- pedido no socket de eventos e manda a janela para special:minimized.
 hl.on("hyprland.start", function() hl.exec_cmd("rice-minimize-listener") end)
 
 --------------------
