@@ -799,17 +799,23 @@ PanelWindow {
 
                         Image {
                             id: thumbImg
-                            // Imagem: a própria prévia ocupa a linha, sem o
-                            // "[[ binary data … ]]" do cliphist.
+                            // Imagem: miniatura quadrada no lugar do texto, sem o
+                            // "[[ binary data … ]]" do cliphist. (Esticada na
+                            // largura toda ficava uma faixa cortada da print.)
                             visible: status === Image.Ready
-                            Layout.fillWidth: true
+                            Layout.preferredWidth: clipWindow.rowH - 10
                             Layout.preferredHeight: clipWindow.rowH - 10
                             source: rowRect.thumb
-                            sourceSize.width: 720
+                            sourceSize.width: 2 * (clipWindow.rowH - 10)
+                            sourceSize.height: 2 * (clipWindow.rowH - 10)
                             fillMode: Image.PreserveAspectCrop
                             clip: true
                             asynchronous: true
                             cache: false
+                        }
+                        Item {
+                            visible: thumbImg.visible
+                            Layout.fillWidth: true
                         }
 
                         // Ícone (Texto vs Imagem)

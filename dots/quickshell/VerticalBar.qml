@@ -116,9 +116,67 @@ PanelWindow {
     PwObjectTracker { objects: [vbar.sink, vbar.source] }
 
     // Mídia: o primeiro player que estiver tocando, senão o primeiro que houver.
+    // Depois de um clique o player fica preso (mediaLock): senão, ao pausar, a
+    // barra podia pular para outro player e o segundo clique ia para ele.
     readonly property var player: {
         const ps = Mpris.players.values;
+        if (mediaLock && ps.indexOf(mediaLock) >= 0) return mediaLock;
         return ps.find(p => p.isPlaying) || (ps.length > 0 ? ps[0] : null);
+    }
+
+    // Estado mostrado. Alguns players (o Sonora, players web) levam até ~1,5 s para
+    // confirmar play/pause e às vezes mandam um estado atrasado pelo Mpris, o que
+    // deixava o ícone "pausado" com a música tocando. Após o clique vale o estado
+    // pedido; depois o playerctl diz o real (até 4 conferências) e o override sai
+    // quando o Mpris concordar.
+    property var mediaOverride: null
+    property var mediaLock: null
+    property int mediaSyncTries: 0
+    readonly property bool mediaPlaying: mediaOverride !== null ? mediaOverride
+        : (player !== null && player.isPlaying)
+
+    function mediaToggle() {
+        const pl = player;
+        if (!pl) return;
+        const want = !mediaPlaying;
+        mediaLock = pl;
+        mediaOverride = want;
+        if (want && pl.canPlay) pl.play();
+        else if (!want && pl.canPause) pl.pause();
+        else if (pl.canTogglePlaying) pl.togglePlaying();
+        mediaSyncTries = 0;
+        mediaSyncTimer.restart();
+    }
+    function mediaRelease() {
+        mediaSyncTimer.stop();
+        mediaOverride = null;
+        mediaLock = null;
+    }
+    Timer {
+        id: mediaSyncTimer
+        interval: 1200
+        onTriggered: {
+            if (!vbar.mediaLock || mediaSyncProc.running) return;
+            mediaSyncProc.command = ["playerctl", "-p",
+                String(vbar.mediaLock.dbusName).replace("org.mpris.MediaPlayer2.", ""), "status"];
+            mediaSyncProc.running = true;
+        }
+    }
+    Process {
+        id: mediaSyncProc
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const st = text.trim();
+                if (st === "Playing" || st === "Paused" || st === "Stopped")
+                    vbar.mediaOverride = st === "Playing";
+                vbar.mediaSyncTries++;
+                if (!vbar.mediaLock || vbar.mediaLock.isPlaying === vbar.mediaOverride
+                        || vbar.mediaSyncTries >= 4)
+                    vbar.mediaRelease();
+                else
+                    mediaSyncTimer.restart();
+            }
+        }
     }
 
     function fmtTime(secs) {
@@ -433,7 +491,7 @@ PanelWindow {
                         sourceSize: Qt.size(72, 72)
                         asynchronous: true
                         visible: status === Image.Ready
-                        opacity: vbar.player && vbar.player.isPlaying ? 1 : 0.55
+                        opacity: vbar.mediaPlaying ? 1 : 0.55
                     }
                     Text {
                         anchors.centerIn: parent
@@ -449,7 +507,7 @@ PanelWindow {
                         cursorShape: Qt.PointingHandCursor
                         onEntered: vbar.showPop("media", mediaBtn)
                         onExited: vbar.leavePop()
-                        onClicked: if (vbar.player && vbar.player.canTogglePlaying) vbar.player.togglePlaying()
+                        onClicked: vbar.mediaToggle()
                     }
                 }
 
@@ -750,7 +808,7 @@ PanelWindow {
                         Repeater {
                             model: [
                                 { icon: Theme.icons.prev, act: "prev" },
-                                { icon: vbar.player && vbar.player.isPlaying ? Theme.icons.pause : Theme.icons.play, act: "toggle" },
+                                { icon: vbar.mediaPlaying ? Theme.icons.pause : Theme.icons.play, act: "toggle" },
                                 { icon: Theme.icons.next, act: "next" }
                             ]
                             delegate: Rectangle {
@@ -775,9 +833,9 @@ PanelWindow {
                                     onClicked: {
                                         const pl = vbar.player;
                                         if (!pl) return;
-                                        if (mBtn.modelData.act === "prev" && pl.canGoPrevious) pl.previous();
-                                        else if (mBtn.modelData.act === "next" && pl.canGoNext) pl.next();
-                                        else if (mBtn.modelData.act === "toggle" && pl.canTogglePlaying) pl.togglePlaying();
+                                        if (mBtn.modelData.act === "prev" && pl.canGoPrevious) { vbar.mediaRelease(); pl.previous(); }
+                                        else if (mBtn.modelData.act === "next" && pl.canGoNext) { vbar.mediaRelease(); pl.next(); }
+                                        else if (mBtn.modelData.act === "toggle") vbar.mediaToggle();
                                     }
                                 }
                             }
