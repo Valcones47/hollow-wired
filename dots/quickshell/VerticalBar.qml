@@ -69,6 +69,31 @@ PanelWindow {
         vbar.pop = kind;
     }
     function leavePop() { popHide.restart(); }
+    onPopChanged: if (vbar.pop === "battery") { blurCheck.running = true; perfCheck.running = true; }
+
+    // Mesmos atalhos de desempenho do popup da bateria da barra de cima.
+    property bool blurEnabled: true
+    property bool perfModeEnabled: false
+    Process {
+        id: blurCheck
+        command: ["rice-blur-toggle", "status"]
+        stdout: StdioCollector { onStreamFinished: vbar.blurEnabled = text.trim() === "1" }
+    }
+    Process {
+        id: blurToggleProc
+        command: ["rice-blur-toggle"]
+        onExited: { blurCheck.running = true; perfCheck.running = true; }
+    }
+    Process {
+        id: perfCheck
+        command: ["rice-perf-mode", "status"]
+        stdout: StdioCollector { onStreamFinished: vbar.perfModeEnabled = text.trim() === "1" }
+    }
+    Process {
+        id: perfToggleProc
+        command: ["rice-perf-mode"]
+        onExited: { blurCheck.running = true; perfCheck.running = true; }
+    }
     Timer { id: popHide; interval: 280; onTriggered: if (!popBox.busy) vbar.pop = "" }
     Timer { id: showDelay; interval: 60; onTriggered: vbar.barHovered = true }
 
@@ -433,7 +458,9 @@ PanelWindow {
         id: popBox
         readonly property bool busy: outSlider.dragging || inSlider.dragging
         readonly property real gap: 10
-        width: Math.min(vbar.popMaxW, popCol.implicitWidth + 28)
+        // Largura fixa: medir pelo implicitWidth do ColumnLayout (que conta ~0
+        // para linhas com fillWidth) deixava o conteúdo vazar da caixa.
+        width: vbar.popMaxW - 30
         height: popCol.implicitHeight + 24
         x: vbar.onLeft ? vbar.stripW + gap - (vbar.pop !== "" ? 0 : 8)
                        : vbar.width - vbar.stripW - gap - width + (vbar.pop !== "" ? 0 : 8)
@@ -458,7 +485,7 @@ PanelWindow {
             anchors.top: parent.top
             anchors.margins: 12
             anchors.leftMargin: 14
-            width: vbar.popMaxW - 28
+            width: popBox.width - 28
             spacing: 6
 
             // ---- áudio ----
@@ -513,6 +540,38 @@ PanelWindow {
                     label: modelData.label
                     selected: PowerProfiles.profile === modelData.p
                     onActivated: PowerProfiles.profile = modelData.p
+                }
+            }
+
+            PopTitle { visible: vbar.pop === "battery"; text: Theme.t("topbar.optimizations", "Otimizações de GPU & Tela"); Layout.topMargin: 6 }
+            PopAction {
+                visible: vbar.pop === "battery"
+                Layout.fillWidth: true
+                icon: Theme.icons.gamepad
+                label: Theme.t("vbar.game_mode", "Modo jogo")
+                selected: GameMode.active
+                onActivated: GameMode.manual = !GameMode.manual
+            }
+            PopAction {
+                visible: vbar.pop === "battery"
+                Layout.fillWidth: true
+                icon: vbar.blurEnabled ? Theme.icons.blur : Theme.icons.blurOff
+                label: Theme.t("vbar.blur", "Desfoque")
+                selected: vbar.blurEnabled
+                onActivated: {
+                    vbar.blurEnabled = !vbar.blurEnabled;
+                    blurToggleProc.running = true;
+                }
+            }
+            PopAction {
+                visible: vbar.pop === "battery"
+                Layout.fillWidth: true
+                icon: Theme.icons.lightning
+                label: Theme.t("vbar.ultra_perf", "Ultra desempenho")
+                selected: vbar.perfModeEnabled
+                onActivated: {
+                    vbar.perfModeEnabled = !vbar.perfModeEnabled;
+                    perfToggleProc.running = true;
                 }
             }
 

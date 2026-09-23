@@ -14,6 +14,9 @@ import "."
 // o que mantém a tela viva sem refazer o layout de tudo a cada quadro.
 Item {
     id: rain
+    // Cor de destaque: o tema, a menos que quem usa fixe outra (a tela de
+    // boas-vindas usa sempre a mesma paleta, independente do wallpaper).
+    property color accent: Theme.primary
 
     // Planos a desenhar: 0 = fundo, 1 = meio, 2 = frente.
     property var planes: [0, 1]
@@ -25,6 +28,17 @@ Item {
     property real eyeX: width / 2
     property real eyeY: height / 2
     property real eyeRadius: 70
+    // Contorno do olho como elipse (meias larguras): o cabo encosta no ponto do
+    // contorno mais próximo da coluna, não no centro.
+    property real eyeHalfW: 76
+    property real eyeHalfH: 32
+    function eyeEdge(px, py) {
+        const a = Math.max(1, rain.eyeHalfW), b = Math.max(1, rain.eyeHalfH);
+        const th = Math.atan2((py - rain.eyeY) / b, (px - rain.eyeX) / a);
+        return Qt.point(rain.eyeX + a * Math.cos(th), rain.eyeY + b * Math.sin(th));
+    }
+    property real targetX: 0
+    property real targetY: 0
     // Cor base do ciclo (vem da pupila). As conexões variam em volta dela em
     // vez de repetirem sempre o mesmo azul.
     property color linkColor: "#8fd0d8"
@@ -153,7 +167,7 @@ Item {
                 lineHeight: 1.05
                 font.family: Theme.monoFamily
                 font.pixelSize: col.spec.size
-                color: Theme.primary
+                color: rain.accent
                 // Conectada, a coluna vira o cabo: o texto dela some e quem
                 // continua descendo são os glifos do GlyphCable, no mesmo lugar.
                 opacity: col.linked ? 0 : col.spec.alpha
@@ -168,7 +182,7 @@ Item {
                 text: rain.glyph()
                 font.family: Theme.monoFamily
                 font.pixelSize: col.spec.size
-                color: Theme.mix(Theme.primary, "#ffffff", 0.7)
+                color: Theme.mix(rain.accent, "#ffffff", 0.7)
                 opacity: col.linked ? 0 : Math.min(1, col.spec.alpha * 2.2)
             }
         }
@@ -189,6 +203,7 @@ Item {
     property real streamFade: 0
     readonly property real streamSpacing: 15 * 1.1
     readonly property real streamSpeed: 130   // px/s, perto da queda do plano da frente
+    readonly property bool touching: rain.linkLive && rain.headS >= link.pathLen
 
     Timer {
         running: rain.connects && rain.running && rain.columns.length > 0
@@ -204,17 +219,21 @@ Item {
                 const item = colRepeater.itemAt(i);
                 // Sempre antes de 60% do percurso, e com a ponta acima do
                 // olho: abaixo dele a curva teria que dar ré para subir.
-                if (item && item.p > 0.1 && item.p < 0.6
-                        && item.y + item.height < rain.eyeY - 40) { pick = i; break; }
+                if (!item || item.p <= 0.1 || item.p >= 0.6) continue;
+                const e = rain.eyeEdge(item.tipX, item.y + item.height);
+                if (item.y + item.height < e.y - 30) { pick = i; break; }
             }
             if (pick < 0) return;
             const src = colRepeater.itemAt(pick);
             const tip = src.y + src.height;
             // A curva começa acima do olho, tanto mais cedo quanto mais longe
             // na horizontal ele estiver — senão vira um cotovelo seco.
-            const dxE = Math.abs(rain.eyeX - src.tipX);
+            const edge = rain.eyeEdge(src.tipX, tip);
+            rain.targetX = edge.x;
+            rain.targetY = edge.y;
+            const dxE = Math.abs(edge.x - src.tipX);
             rain.linkX = src.tipX;
-            rain.linkY = Math.max(tip + 24, rain.eyeY - dxE * 0.85);
+            rain.linkY = Math.max(tip + 24, edge.y - dxE * 0.85);
             rain.activeCable = rain.cablePalette[Math.floor(Math.random() * rain.cablePalette.length)];
 
             // A frente do fluxo começa na ponta da coluna; o trecho reto vai
@@ -272,38 +291,22 @@ Item {
         stemTop: -rain.height
         x0: rain.linkX
         y0: rain.linkY
-        x1: rain.eyeX
-        y1: rain.eyeY
+        x1: rain.targetX
+        y1: rain.targetY
         count: rain.streamCount
         spacing: rain.streamSpacing
         solidCount: rain.streamSolid
         extraFade: rain.streamFade
         headS: rain.headS
         fontSize: 15
-        glyphColor: rain.activeCable
+        // Até encostar no olho continua sendo a coluna (cor e brilho dela); a
+        // cor do cabo só vem com o contato.
+        glyphColor: rain.touching ? rain.activeCable : rain.accent
+        opacity: rain.touching ? 1 : rain.planeSpec[2].alpha
+        Behavior on opacity { NumberAnimation { duration: 260 } }
         // Serpenteio só na curva (a onda zera nas pontas), proporcional ao
         // tamanho dela para uma curva curta não virar zigue-zague.
         amp: Math.min(20, link.curveLen * 0.07)
         waves: 1.2
-    }
-
-    // Clarão no ponto em que o cabo encosta no olho.
-    Rectangle {
-        // Só depois que a frente do fluxo chegou no olho.
-        visible: rain.linkLive && rain.headS >= link.pathLen
-        z: 5
-        width: 14
-        height: 14
-        radius: 7
-        x: rain.eyeX - width / 2
-        y: rain.eyeY - height / 2
-        color: rain.activeCable
-        opacity: 0.75
-        SequentialAnimation on scale {
-            running: rain.linkLive && rain.headS >= link.pathLen
-            loops: Animation.Infinite
-            NumberAnimation { to: 1.35; duration: 220 }
-            NumberAnimation { to: 0.85; duration: 260 }
-        }
     }
 }

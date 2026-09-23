@@ -7,6 +7,11 @@ import "."
 // configurações e da tela de boas-vindas, para a escolha não ser só texto.
 Rectangle {
     id: prev
+    // Cor de destaque: o tema, a menos que quem usa fixe outra (a tela de
+    // boas-vindas usa sempre a mesma paleta, independente do wallpaper).
+    property color accent: Theme.primary
+    property color accent2: Theme.secondary
+    property color surfaceColor: Theme.background
 
     // Peça apagada = existe, mas só aparece quando o mouse encosta na borda.
     property bool bar: true
@@ -17,7 +22,7 @@ Rectangle {
     property bool vertical: false
 
     radius: 8
-    color: Theme.withAlpha(Theme.background, 0.85)
+    color: Theme.withAlpha(prev.surfaceColor, 0.85)
     border.width: 1
     border.color: Theme.withAlpha(Theme.outline, 0.3)
     clip: true
@@ -41,7 +46,7 @@ Rectangle {
         width: prev.vertical ? Math.max(5, prev.width * 0.07) : prev.width - prev.pad * 2
         height: prev.vertical ? prev.height - prev.pad * 2 : Math.max(4, prev.height * 0.08)
         radius: Math.min(width, height) / 2
-        color: Theme.withAlpha(Theme.primary, prev.bar ? 0.6 : 0.18)
+        color: Theme.withAlpha(prev.accent, prev.bar ? 0.6 : 0.18)
     }
 
     // dock
@@ -51,7 +56,7 @@ Rectangle {
         y: prev.height - height - prev.pad
         width: prev.dockFull ? prev.width - prev.pad * 2 : prev.width * 0.42
         x: prev.dockFull ? prev.pad : (prev.width - width) / 2
-        color: Theme.withAlpha(Theme.secondary, prev.dock ? 0.6 : 0.18)
+        color: Theme.withAlpha(prev.accent2, prev.dock ? 0.6 : 0.18)
     }
 
     // central de ações
@@ -61,6 +66,6 @@ Rectangle {
         x: prev.width - width - prev.pad
         y: prev.height * 0.22
         height: prev.height * 0.56
-        color: Theme.withAlpha(Theme.primary, prev.side ? 0.45 : 0.14)
+        color: Theme.withAlpha(prev.accent, prev.side ? 0.45 : 0.14)
     }
 }

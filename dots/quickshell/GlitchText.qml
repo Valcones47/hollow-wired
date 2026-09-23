@@ -10,6 +10,9 @@ import "."
 // fora de registro, o que dá o ar de transmissão.
 Item {
     id: gt
+    // Cor de destaque: o tema, a menos que quem usa fixe outra (a tela de
+    // boas-vindas usa sempre a mesma paleta, independente do wallpaper).
+    property color accent: Theme.primary
 
     property var phrases: []
     property bool running: true
@@ -17,7 +20,7 @@ Item {
     property string display: gt.phrases.length > 0 ? gt.phrases[0] : ""
     property bool glitching: false
     property int fontSize: 14
-    property color baseColor: Theme.primary
+    property color baseColor: gt.accent
 
     implicitHeight: mainText.implicitHeight
     implicitWidth: mainText.implicitWidth

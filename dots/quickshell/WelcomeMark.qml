@@ -12,6 +12,9 @@ import "."
 // blocos de glitch são itens comuns, que a GPU move sem repintar nada.
 Item {
     id: mark
+    // Cor de destaque: o tema, a menos que quem usa fixe outra (a tela de
+    // boas-vindas usa sempre a mesma paleta, independente do wallpaper).
+    property color accent: Theme.primary
 
     // Desligado, fica parado e aberto (usado pequeno, ao lado do nome).
     property bool alive: true
@@ -161,7 +164,7 @@ Item {
                 target: Theme
                 function onPrimaryChanged() { eye.requestPaint(); }
             }
-            onPaint: mark.paintEye(getContext("2d"), width, height, Theme.primary, false)
+            onPaint: mark.paintEye(getContext("2d"), width, height, mark.accent, false)
         }
 
         // Íris: fica dentro do olho e acompanha o olhar.
@@ -179,7 +182,7 @@ Item {
                 anchors.fill: parent
                 radius: width / 2
                 color: mark.stateIndex === 0
-                    ? Theme.mix(Theme.primary, "#ffffff", 0.75)
+                    ? Theme.mix(mark.accent, "#ffffff", 0.75)
                     : Theme.mix(mark.stateColor, "#ffffff", 0.55)
                 Behavior on color { ColorAnimation { duration: 180 } }
             }
@@ -202,7 +205,7 @@ Item {
                             width: parent.width
                             height: Math.max(1, mark.unit * 0.011)
                             color: Theme.withAlpha(mark.stateIndex === 0
-                                ? Theme.mix(Theme.primary, "#ffffff", 0.6)
+                                ? Theme.mix(mark.accent, "#ffffff", 0.6)
                                 : mark.stateColor, 0.85)
                         }
                     }
@@ -220,7 +223,7 @@ Item {
                 height: mark.unit * (0.02 + Math.random() * 0.05)
                 x: mark.unit * (0.08 + Math.random() * 0.8) - width / 2
                 y: mark.unit * (0.1 + Math.random() * 0.75)
-                color: index % 3 === 0 ? "#39ff14" : (index % 3 === 1 ? "#00e5ff" : Theme.mix(Theme.primary, "#ffffff", 0.5))
+                color: index % 3 === 0 ? "#39ff14" : (index % 3 === 1 ? "#00e5ff" : Theme.mix(mark.accent, "#ffffff", 0.5))
                 opacity: 0.55 + Math.random() * 0.35
             }
         }

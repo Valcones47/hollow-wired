@@ -143,6 +143,7 @@ Item {
             font.family: Theme.monoFamily
             font.pixelSize: cable.fontSize
             color: cable.glyphColor
+            Behavior on color { ColorAnimation { duration: 260 } }
             // Some ao chegar na ponta: é o olho absorvendo o glifo.
             opacity: cable.stream
                 ? (bead.s < 0 || bead.s > cable.pathLen ? 0

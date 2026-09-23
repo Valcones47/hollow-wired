@@ -2383,7 +2383,7 @@ PanelWindow {
 
                             ColumnLayout {
                                 id: ffContentCol
-                                width: parent.width
+                                width: parent.width - 18   // faixa da barra de rolagem
                                 spacing: 16
 
                                 RowLayout {
@@ -2629,7 +2629,7 @@ PanelWindow {
 
                             ColumnLayout {
                                 id: kittyCol
-                                width: parent.width
+                                width: parent.width - 18   // faixa da barra de rolagem
                                 spacing: 16
 
                                 SectionHeader {
@@ -2782,7 +2782,7 @@ PanelWindow {
 
                             ColumnLayout {
                                 id: makoCol
-                                width: parent.width
+                                width: parent.width - 18   // faixa da barra de rolagem
                                 spacing: 16
 
                                 Rectangle {
@@ -2972,7 +2972,7 @@ PanelWindow {
 
                             ColumnLayout {
                                 id: displayCol
-                                width: parent.width
+                                width: parent.width - 18   // faixa da barra de rolagem
                                 spacing: 16
 
                                 // -------------------------------------------------- monitores
@@ -3389,7 +3389,7 @@ PanelWindow {
 
                             ColumnLayout {
                                 id: audioCol
-                                width: parent.width
+                                width: parent.width - 18   // faixa da barra de rolagem
                                 spacing: 16
 
                                 SectionHeader {
@@ -3636,7 +3636,7 @@ PanelWindow {
 
                             ColumnLayout {
                                 id: inputCol
-                                width: parent.width
+                                width: parent.width - 18   // faixa da barra de rolagem
                                 spacing: 16
 
                                 SectionHeader {
@@ -3970,7 +3970,7 @@ PanelWindow {
 
                             ColumnLayout {
                                 id: powerCol
-                                width: parent.width
+                                width: parent.width - 18   // faixa da barra de rolagem
                                 spacing: 16
 
                                 SectionHeader {
@@ -4231,7 +4231,7 @@ PanelWindow {
 
                             ColumnLayout {
                                 id: autoCol
-                                width: parent.width
+                                width: parent.width - 18   // faixa da barra de rolagem
                                 spacing: 16
 
                                 SectionHeader {
@@ -4495,7 +4495,7 @@ PanelWindow {
 
                             ColumnLayout {
                                 id: colorsCol
-                                width: parent.width
+                                width: parent.width - 18   // faixa da barra de rolagem
                                 spacing: 16
 
                                 SectionHeader {
@@ -5062,7 +5062,7 @@ PanelWindow {
 
                             ColumnLayout {
                                 id: effCol
-                                width: parent.width
+                                width: parent.width - 18   // faixa da barra de rolagem
                                 spacing: 16
 
                                 SectionHeader {
@@ -5520,7 +5520,7 @@ PanelWindow {
 
                             ColumnLayout {
                                 id: btCol
-                                width: parent.width
+                                width: parent.width - 18   // faixa da barra de rolagem
                                 spacing: 16
 
                                 RowLayout {
@@ -5752,7 +5752,7 @@ PanelWindow {
 
                             ColumnLayout {
                                 id: netCol
-                                width: parent.width
+                                width: parent.width - 18   // faixa da barra de rolagem
                                 spacing: 16
 
                                 RowLayout {
@@ -6068,7 +6068,7 @@ PanelWindow {
 
                             ColumnLayout {
                                 id: defCol
-                                width: parent.width
+                                width: parent.width - 18   // faixa da barra de rolagem
                                 spacing: 16
 
                                 SectionHeader {
@@ -6432,7 +6432,7 @@ PanelWindow {
 
                                                         ColumnLayout {
                                                             id: appListCol
-                                                            width: parent.width
+                                                            width: parent.width - 18   // faixa da barra de rolagem
                                                             spacing: 4
 
                                                             Repeater {
@@ -6545,7 +6545,7 @@ PanelWindow {
 
                             ColumnLayout {
                                 id: gamingCol
-                                width: parent.width
+                                width: parent.width - 18   // faixa da barra de rolagem
                                 spacing: 16
 
                                 SectionHeader {
@@ -6828,7 +6828,7 @@ PanelWindow {
 
                             ColumnLayout {
                                 id: storCol
-                                width: parent.width
+                                width: parent.width - 18   // faixa da barra de rolagem
                                 spacing: 16
 
                                 SectionHeader {
@@ -7187,7 +7187,7 @@ PanelWindow {
 
                             ColumnLayout {
                                 id: bindsCol
-                                width: parent.width
+                                width: parent.width - 18   // faixa da barra de rolagem
                                 spacing: 14
 
                                 RowLayout {
@@ -7547,7 +7547,7 @@ PanelWindow {
 
                             ColumnLayout {
                                 id: subBindsCol
-                                width: parent.width
+                                width: parent.width - 18   // faixa da barra de rolagem
                                 spacing: 14
 
                                 RowLayout {
@@ -8435,7 +8435,7 @@ PanelWindow {
 
                             ColumnLayout {
                                 id: sysCol
-                                width: parent.width
+                                width: parent.width - 18   // faixa da barra de rolagem
                                 spacing: 16
 
                                 SectionHeader {
@@ -8817,7 +8817,7 @@ PanelWindow {
 
                             ColumnLayout {
                                 id: appStoreCol
-                                width: parent.width
+                                width: parent.width - 18   // faixa da barra de rolagem
                                 spacing: 16
 
                                 // ------------------------------------------ atualizações
@@ -9185,7 +9185,7 @@ PanelWindow {
 
                             ColumnLayout {
                                 id: layoutCol
-                                width: parent.width
+                                width: parent.width - 18   // faixa da barra de rolagem
                                 spacing: 18
 
                                 SectionHeader {
@@ -9578,7 +9578,7 @@ PanelWindow {
 
                             ColumnLayout {
                                 id: modeCol
-                                width: parent.width
+                                width: parent.width - 18   // faixa da barra de rolagem
                                 spacing: 16
 
                                 SectionHeader {
@@ -9659,7 +9659,7 @@ PanelWindow {
 
                             ColumnLayout {
                                 id: shellCustomCol
-                                width: parent.width
+                                width: parent.width - 18   // faixa da barra de rolagem
                                 spacing: 18
 
                                 // 1. Cabeçalho e Seletor do Componente

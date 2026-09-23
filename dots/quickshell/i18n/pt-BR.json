@@ -1318,5 +1318,8 @@
   "wallust.adv_16cols": "Metade de baixo mais escura",
   "wallust.adv_16cols_sub": "As cores 0–7 saem apagadas e as 8–15 vivas, como num terminal clássico.",
   "wallust.adv_apply": "Aplicar e regenerar cores",
-  "wallust.adv_reset": "Voltar ao padrão do rice"
+  "wallust.adv_reset": "Voltar ao padrão do rice",
+  "vbar.game_mode": "Modo jogo",
+  "vbar.blur": "Desfoque",
+  "vbar.ultra_perf": "Ultra desempenho"
 }

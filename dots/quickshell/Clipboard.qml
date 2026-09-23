@@ -26,7 +26,22 @@ PanelWindow {
     property var favorites: []
     property var filteredFavorites: []
 
-    readonly property int rowH: 48
+    // Altura fixa para todas as linhas, com ou sem imagem: linha que muda de
+    // tamanho faz a lista "pular" ao rolar.
+    readonly property int rowH: 56
+    // Imagens do histórico ganham miniatura: o cliphist só guarda os bytes, então
+    // um script decodifica as imagens da lista numa pasta de cache (uma vez por
+    // item) e a linha mostra o arquivo de lá.
+    readonly property string thumbDir: Quickshell.env("HOME") + "/.cache/hollow-wired/clip-thumbs"
+    // Nomes das miniaturas que já existem no cache: a linha só aponta para o
+    // arquivo quando ele está pronto (um Image que falhou não tenta de novo).
+    property var thumbSet: ({})
+    function thumbFor(item) {
+        if (!item || !item.isImage) return "";
+        const m = /\b(png|jpe?g|gif|webp|bmp)\b/i.exec(item.content || "");
+        const name = item.id + "." + (m ? m[1].toLowerCase() : "png");
+        return clipWindow.thumbSet[name] ? "file://" + clipWindow.thumbDir + "/" + name : "";
+    }
     readonly property string favDir: Quickshell.env("HOME") + "/.local/share/hollow-wired/clipboard-favorites"
 
     // Só libera o save() depois que o arquivo de favoritos terminar de carregar
@@ -236,6 +251,28 @@ PanelWindow {
                 }
                 clipWindow.allItems = items;
                 clipWindow.updateFiltered();
+                thumbProc.running = true;
+            }
+        }
+    }
+
+    // Decodifica as imagens do histórico que ainda não têm miniatura. Roda
+    // depois da lista (os ids já estão lá) e avisa a lista ao terminar.
+    Process {
+        id: thumbProc
+        environment: ({ DIR: clipWindow.thumbDir })
+        command: ["bash", "-c",
+            "mkdir -p \"$DIR\"; find \"$DIR\" -type f -mtime +7 -delete 2>/dev/null; " +
+            "cliphist list | head -n 200 | grep -a $'^[0-9]*\\t\\[\\[ binary data' | head -n 60 | " +
+            "while IFS= read -r line; do id=${line%%$'\\t'*}; " +
+            "ext=$(printf '%s' \"$line\" | grep -aoiE '\\b(png|jpe?g|gif|webp|bmp)\\b' | head -1 | tr A-Z a-z); " +
+            "f=\"$DIR/$id.${ext:-png}\"; [ -s \"$f\" ] || printf '%s' \"$line\" | cliphist decode > \"$f\" 2>/dev/null; done; " +
+            "find \"$DIR\" -type f -size +0 -printf '%f\\n'"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const set = {};
+                for (const n of text.split("\n")) if (n) set[n] = true;
+                clipWindow.thumbSet = set;
             }
         }
     }
@@ -736,6 +773,11 @@ PanelWindow {
                     readonly property bool isImage: isFav ? modelData.kind === "image" : modelData.isImage
                     readonly property bool starred: isFav || clipWindow.isFavorited(modelData.content)
 
+                    // Favoritos de imagem já guardam o arquivo; no histórico vem do cache.
+                    readonly property string thumb: !isImage ? ""
+                        : isFav ? (modelData.file ? "file://" + modelData.file : "")
+                        : clipWindow.thumbFor(modelData)
+
                     width: clipList.width - (clipScroll.visible ? 16 : 8)
                     height: clipWindow.rowH
                     radius: 10
@@ -755,16 +797,33 @@ PanelWindow {
                         anchors.rightMargin: 8
                         spacing: 10
 
+                        Image {
+                            id: thumbImg
+                            // Imagem: a própria prévia ocupa a linha, sem o
+                            // "[[ binary data … ]]" do cliphist.
+                            visible: status === Image.Ready
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: clipWindow.rowH - 10
+                            source: rowRect.thumb
+                            sourceSize.width: 720
+                            fillMode: Image.PreserveAspectCrop
+                            clip: true
+                            asynchronous: true
+                            cache: false
+                        }
+
                         // Ícone (Texto vs Imagem)
                         Text {
+                            visible: !thumbImg.visible
                             text: rowRect.isImage ? Theme.icons.camera : Theme.icons.console
                             font.family: Theme.iconFontFamily
                             font.pixelSize: 16
                             color: rowRect.isImage ? Theme.accent1 : Theme.primary
                         }
 
-                        // Conteúdo
+                        // Conteúdo (some quando a imagem tem prévia)
                         Text {
+                            visible: !thumbImg.visible
                             Layout.fillWidth: true
                             text: rowRect.label
                             font.family: rowRect.isImage ? Theme.fontFamily : Theme.monoFamily

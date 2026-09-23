@@ -21,6 +21,18 @@ import "."
 PanelWindow {
     id: welcomeWindow
 
+    // Paleta fixa da tela de boas-vindas (a do wallpaper "Ultraviolence"):
+    // vermelho apagado sobre quase preto. Não segue o wallust de propósito — é
+    // a identidade do guia, igual em qualquer máquina e com qualquer wallpaper.
+    readonly property color uvPrimary: "#b55a65"
+    readonly property color uvSecondary: "#9f4f59"
+    readonly property color uvText: "#e6dbdc"
+    readonly property color uvSub: "#c1a2a5"
+    readonly property color uvOutline: "#6d373d"
+    readonly property color uvTile: "#1a0f10"
+    readonly property color uvTileHigh: "#261416"
+    readonly property color uvBg: "#070505"
+
     property bool open: false
     property bool checked: false
     property int page: 0
@@ -191,8 +203,8 @@ PanelWindow {
         Layout.fillWidth: true
         implicitHeight: 40
         radius: 12
-        color: nav.active ? Theme.withAlpha(Theme.primary, 0.20)
-             : (navArea.containsMouse ? Theme.withAlpha(Theme.outline, 0.18) : "transparent")
+        color: nav.active ? Theme.withAlpha(welcomeWindow.uvPrimary, 0.20)
+             : (navArea.containsMouse ? Theme.withAlpha(welcomeWindow.uvOutline, 0.18) : "transparent")
         Behavior on color { ColorAnimation { duration: 130 } }
 
         // Marca da página atual, como um marcador de livro na borda.
@@ -204,7 +216,7 @@ PanelWindow {
             width: 3
             height: 18
             radius: 1.5
-            color: Theme.primary
+            color: welcomeWindow.uvPrimary
         }
 
         Row {
@@ -218,7 +230,7 @@ PanelWindow {
                 text: nav.icon
                 font.family: Theme.iconFontFamily
                 font.pixelSize: 15
-                color: nav.active ? Theme.primary : Theme.subtext
+                color: nav.active ? welcomeWindow.uvPrimary : welcomeWindow.uvSub
             }
             Text {
                 anchors.verticalCenter: parent.verticalCenter
@@ -226,7 +238,7 @@ PanelWindow {
                 font.family: Theme.fontFamily
                 font.pixelSize: 13
                 font.weight: nav.active ? Font.DemiBold : Font.Normal
-                color: nav.active ? Theme.textColor : Theme.subtext
+                color: nav.active ? welcomeWindow.uvText : welcomeWindow.uvSub
             }
         }
 
@@ -250,7 +262,7 @@ PanelWindow {
             font.family: Theme.fontFamily
             font.pixelSize: 21
             font.weight: Font.Bold
-            color: Theme.textColor
+            color: welcomeWindow.uvText
         }
         Text {
             Layout.fillWidth: true
@@ -259,7 +271,7 @@ PanelWindow {
             wrapMode: Text.WordWrap
             font.family: Theme.fontFamily
             font.pixelSize: 13
-            color: Theme.subtext
+            color: welcomeWindow.uvSub
         }
     }
 
@@ -280,9 +292,9 @@ PanelWindow {
         Layout.fillWidth: true
         Layout.preferredHeight: Math.max(ccCol.implicitHeight + 26, cc.showPreview ? 96 : 0)
         radius: 14
-        color: cc.active ? Theme.withAlpha(Theme.primary, 0.14) : (ccArea.containsMouse ? Theme.tileHigh : Theme.tile)
+        color: cc.active ? Theme.withAlpha(welcomeWindow.uvPrimary, 0.14) : (ccArea.containsMouse ? welcomeWindow.uvTileHigh : welcomeWindow.uvTile)
         border.width: cc.active ? 2 : 1
-        border.color: cc.active ? Theme.primary : Theme.withAlpha(Theme.outline, 0.25)
+        border.color: cc.active ? welcomeWindow.uvPrimary : Theme.withAlpha(welcomeWindow.uvOutline, 0.25)
         Behavior on color { ColorAnimation { duration: 140 } }
 
         RowLayout {
@@ -291,6 +303,9 @@ PanelWindow {
             spacing: 14
 
             LayoutPreview {
+                accent: welcomeWindow.uvPrimary
+                accent2: welcomeWindow.uvSecondary
+                surfaceColor: welcomeWindow.uvBg
                 visible: cc.showPreview
                 Layout.preferredWidth: 118
                 Layout.preferredHeight: 68
@@ -312,7 +327,7 @@ PanelWindow {
                     font.family: Theme.fontFamily
                     font.pixelSize: 14
                     font.weight: Font.DemiBold
-                    color: Theme.textColor
+                    color: welcomeWindow.uvText
                 }
                 Text {
                     Layout.fillWidth: true
@@ -321,7 +336,7 @@ PanelWindow {
                     wrapMode: Text.WordWrap
                     font.family: Theme.fontFamily
                     font.pixelSize: 12
-                    color: Theme.subtext
+                    color: welcomeWindow.uvSub
                 }
             }
         }
@@ -356,8 +371,8 @@ PanelWindow {
         radius: 24
         // Mais escuro que o resto do shell: é o que dá a ela um ar de
         // "primeira tela", separada do desktop que está por baixo.
-        color: Theme.mix(Theme.background, "#000000", 0.35)
-        border.color: Theme.withAlpha(Theme.primary, 0.30)
+        color: Theme.mix(welcomeWindow.uvBg, "#000000", 0.35)
+        border.color: Theme.withAlpha(welcomeWindow.uvPrimary, 0.30)
         border.width: 1
         clip: true
 
@@ -393,7 +408,7 @@ PanelWindow {
                         Item {
                             Layout.preferredWidth: 34
                             Layout.preferredHeight: 34
-                            WelcomeMark { anchors.fill: parent; alive: false }
+                            WelcomeMark { accent: welcomeWindow.uvPrimary; anchors.fill: parent; alive: false }
                         }
 
                         ColumnLayout {
@@ -404,13 +419,13 @@ PanelWindow {
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 14
                                 font.weight: Font.Bold
-                                color: Theme.textColor
+                                color: welcomeWindow.uvText
                             }
                             Text {
                                 text: Theme.t("welcome.brand_sub", "guia de primeiros passos")
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 10
-                                color: Theme.subtext
+                                color: welcomeWindow.uvSub
                             }
                         }
                     }
@@ -434,7 +449,7 @@ PanelWindow {
                         wrapMode: Text.WordWrap
                         font.family: Theme.fontFamily
                         font.pixelSize: 11
-                        color: Theme.withAlpha(Theme.subtext, 0.85)
+                        color: Theme.withAlpha(welcomeWindow.uvSub, 0.85)
                     }
                 }
             }
@@ -460,7 +475,7 @@ PanelWindow {
                         text: Theme.icons.close
                         font.family: Theme.iconFontFamily
                         font.pixelSize: 15
-                        color: closeArea.containsMouse ? Theme.critical : Theme.subtext
+                        color: closeArea.containsMouse ? Theme.critical : welcomeWindow.uvSub
                     }
                     MouseArea {
                         id: closeArea
@@ -488,6 +503,7 @@ PanelWindow {
 
                     // Planos de trás: passam por baixo do olho.
                     WiredRain {
+                        accent: welcomeWindow.uvPrimary
                         anchors.fill: parent
                         z: 0
                         planes: [0, 1]
@@ -497,6 +513,7 @@ PanelWindow {
 
                     // Fiação exposta do cenário, em três tamanhos.
                     CutCable {
+                        accent: welcomeWindow.uvPrimary
                         x: 26
                         y: -8
                         z: 0
@@ -505,6 +522,7 @@ PanelWindow {
                         alive: heroPage.live
                     }
                     CutCable {
+                        accent: welcomeWindow.uvPrimary
                         x: parent.width - 96
                         y: -6
                         z: 0
@@ -513,6 +531,7 @@ PanelWindow {
                         alive: heroPage.live
                     }
                     CutCable {
+                        accent: welcomeWindow.uvPrimary
                         x: parent.width * 0.62
                         y: -4
                         z: 3
@@ -535,6 +554,7 @@ PanelWindow {
                         Layout.preferredWidth: 190
                         Layout.preferredHeight: 190
                         WelcomeMark {
+                            accent: welcomeWindow.uvPrimary
                             id: eyeMark
                             anchors.fill: parent
                             alive: heroPage.live
@@ -549,19 +569,20 @@ PanelWindow {
                         font.pixelSize: 34
                         font.weight: Font.Bold
                         font.letterSpacing: 1
-                        color: Theme.textColor
+                        color: welcomeWindow.uvText
                     }
                     // As frases do meio são as do símbolo (Lain / the Wired, de
                     // onde vem o nome do rice) e trocam sozinhas; a de baixo é a
                     // parte prática, que fica parada.
                     GlitchText {
+                        accent: welcomeWindow.uvPrimary
                         Layout.alignment: Qt.AlignHCenter
                         Layout.topMargin: 8
                         Layout.preferredWidth: 540
                         Layout.preferredHeight: 22
                         fontSize: 13
                         running: welcomeWindow.open && welcomeWindow.page === 0
-                        baseColor: Theme.withAlpha(Theme.primary, 0.9)
+                        baseColor: Theme.withAlpha(welcomeWindow.uvPrimary, 0.9)
                         phrases: [
                             Theme.t("welcome.motto_1", "Existe uma rede sob o vazio."),
                             Theme.t("welcome.motto_2", "Vazio por dentro. Conectado por fora."),
@@ -582,7 +603,7 @@ PanelWindow {
                         wrapMode: Text.WordWrap
                         font.family: Theme.fontFamily
                         font.pixelSize: 13
-                        color: Theme.subtext
+                        color: welcomeWindow.uvSub
                     }
 
                     Rectangle {
@@ -591,7 +612,7 @@ PanelWindow {
                         width: 210
                         height: 44
                         radius: 22
-                        color: heroArea.containsMouse ? Theme.primary : Theme.withAlpha(Theme.primary, 0.88)
+                        color: heroArea.containsMouse ? welcomeWindow.uvPrimary : Theme.withAlpha(welcomeWindow.uvPrimary, 0.88)
                         Behavior on color { ColorAnimation { duration: 130 } }
 
                         Text {
@@ -600,7 +621,7 @@ PanelWindow {
                             font.family: Theme.fontFamily
                             font.pixelSize: 13
                             font.weight: Font.Bold
-                            color: Theme.background
+                            color: welcomeWindow.uvBg
                         }
                         MouseArea {
                             id: heroArea
@@ -617,6 +638,7 @@ PanelWindow {
                     // Plano da frente: passa por cima do olho e é o que
                     // encosta o cabo elétrico nele.
                     WiredRain {
+                        accent: welcomeWindow.uvPrimary
                         anchors.fill: parent
                         z: 2
                         planes: [2]
@@ -624,7 +646,11 @@ PanelWindow {
                         running: heroPage.live
                         connects: true
                         eyeX: heroPage.eyeX
-                        eyeY: heroPage.eyeY
+                        // Centro do contorno do olho (um pouco acima do centro
+                        // da marca) e as meias larguras dele — ver WelcomeMark.paintEye.
+                        eyeY: heroPage.eyeY - markHolder.height * 0.08
+                        eyeHalfW: markHolder.width * 0.40
+                        eyeHalfH: markHolder.width * 0.17
                         linkColor: eyeMark.stateColor
                     }
                 }
@@ -736,7 +762,7 @@ PanelWindow {
                             contentItem: Rectangle {
                                 implicitWidth: 6
                                 radius: 3
-                                color: stepScroll.pressed ? Theme.primary : Theme.withAlpha(Theme.outline, 0.55)
+                                color: stepScroll.pressed ? welcomeWindow.uvPrimary : Theme.withAlpha(welcomeWindow.uvOutline, 0.55)
                             }
                         }
 
@@ -748,9 +774,9 @@ PanelWindow {
                             width: stepList.width - (stepScroll.visible ? 16 : 4)
                             height: 70
                             radius: 12
-                            color: Theme.tile
+                            color: welcomeWindow.uvTile
                             border.width: 1
-                            border.color: Theme.withAlpha(Theme.outline, 0.18)
+                            border.color: Theme.withAlpha(welcomeWindow.uvOutline, 0.18)
 
                             RowLayout {
                                 anchors.fill: parent
@@ -762,7 +788,7 @@ PanelWindow {
                                     text: stepCard.modelData.icon
                                     font.family: Theme.iconFontFamily
                                     font.pixelSize: 22
-                                    color: Theme.primary
+                                    color: welcomeWindow.uvPrimary
                                     Layout.preferredWidth: 26
                                 }
 
@@ -777,7 +803,7 @@ PanelWindow {
                                         font.family: Theme.fontFamily
                                         font.pixelSize: 13
                                         font.weight: Font.DemiBold
-                                        color: Theme.textColor
+                                        color: welcomeWindow.uvText
                                     }
                                     Text {
                                         Layout.fillWidth: true
@@ -787,7 +813,7 @@ PanelWindow {
                                         elide: Text.ElideRight
                                         font.family: Theme.fontFamily
                                         font.pixelSize: 12
-                                        color: Theme.subtext
+                                        color: welcomeWindow.uvSub
                                     }
                                 }
 
@@ -800,9 +826,9 @@ PanelWindow {
                                             height: 24
                                             width: keyText.implicitWidth + 16
                                             radius: 7
-                                            color: Theme.withAlpha(Theme.primary, 0.16)
+                                            color: Theme.withAlpha(welcomeWindow.uvPrimary, 0.16)
                                             border.width: 1
-                                            border.color: Theme.withAlpha(Theme.primary, 0.35)
+                                            border.color: Theme.withAlpha(welcomeWindow.uvPrimary, 0.35)
 
                                             Text {
                                                 id: keyText
@@ -811,7 +837,7 @@ PanelWindow {
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: 11
                                                 font.weight: Font.DemiBold
-                                                color: Theme.primary
+                                                color: welcomeWindow.uvPrimary
                                             }
                                         }
                                     }
@@ -839,9 +865,9 @@ PanelWindow {
                         Layout.fillWidth: true
                         Layout.preferredHeight: greeterCol.implicitHeight + 28
                         radius: 14
-                        color: Theme.tile
+                        color: welcomeWindow.uvTile
                         border.width: 1
-                        border.color: Theme.withAlpha(Theme.outline, 0.22)
+                        border.color: Theme.withAlpha(welcomeWindow.uvOutline, 0.22)
 
                         ColumnLayout {
                             id: greeterCol
@@ -857,16 +883,16 @@ PanelWindow {
                                 wrapMode: Text.WordWrap
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 12
-                                color: Theme.subtext
+                                color: welcomeWindow.uvSub
                             }
 
                             Rectangle {
                                 Layout.preferredWidth: 190
                                 Layout.preferredHeight: 38
                                 radius: 19
-                                color: greeterArea.containsMouse ? Theme.withAlpha(Theme.primary, 0.3) : Theme.withAlpha(Theme.primary, 0.18)
+                                color: greeterArea.containsMouse ? Theme.withAlpha(welcomeWindow.uvPrimary, 0.3) : Theme.withAlpha(welcomeWindow.uvPrimary, 0.18)
                                 border.width: 1
-                                border.color: Theme.withAlpha(Theme.primary, 0.45)
+                                border.color: Theme.withAlpha(welcomeWindow.uvPrimary, 0.45)
 
                                 Text {
                                     anchors.centerIn: parent
@@ -876,7 +902,7 @@ PanelWindow {
                                     font.family: Theme.fontFamily
                                     font.pixelSize: 12
                                     font.weight: Font.DemiBold
-                                    color: Theme.primary
+                                    color: welcomeWindow.uvPrimary
                                 }
                                 MouseArea {
                                     id: greeterArea
@@ -922,9 +948,9 @@ PanelWindow {
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: 40
                                 radius: 20
-                                color: actArea.containsMouse ? Theme.tileHigh : Theme.tile
+                                color: actArea.containsMouse ? welcomeWindow.uvTileHigh : welcomeWindow.uvTile
                                 border.width: 1
-                                border.color: Theme.withAlpha(Theme.outline, 0.22)
+                                border.color: Theme.withAlpha(welcomeWindow.uvOutline, 0.22)
                                 Behavior on color { ColorAnimation { duration: 130 } }
 
                                 Row {
@@ -936,14 +962,14 @@ PanelWindow {
                                         text: actBtn.modelData.icon
                                         font.family: Theme.iconFontFamily
                                         font.pixelSize: 14
-                                        color: Theme.primary
+                                        color: welcomeWindow.uvPrimary
                                     }
                                     Text {
                                         anchors.verticalCenter: parent.verticalCenter
                                         text: actBtn.modelData.label
                                         font.family: Theme.fontFamily
                                         font.pixelSize: 12
-                                        color: Theme.textColor
+                                        color: welcomeWindow.uvText
                                     }
                                 }
 
@@ -970,9 +996,9 @@ PanelWindow {
                         Layout.fillWidth: true
                         Layout.preferredHeight: tipsRow.implicitHeight + 26
                         radius: 14
-                        color: Theme.tile
+                        color: welcomeWindow.uvTile
                         border.width: 1
-                        border.color: Theme.withAlpha(Theme.outline, 0.22)
+                        border.color: Theme.withAlpha(welcomeWindow.uvOutline, 0.22)
 
                         RowLayout {
                             id: tipsRow
@@ -991,7 +1017,7 @@ PanelWindow {
                                     font.family: Theme.fontFamily
                                     font.pixelSize: 13
                                     font.weight: Font.DemiBold
-                                    color: Theme.textColor
+                                    color: welcomeWindow.uvText
                                 }
                                 Text {
                                     Layout.fillWidth: true
@@ -999,7 +1025,7 @@ PanelWindow {
                                     wrapMode: Text.WordWrap
                                     font.family: Theme.fontFamily
                                     font.pixelSize: 12
-                                    color: Theme.subtext
+                                    color: welcomeWindow.uvSub
                                 }
                             }
 
@@ -1007,13 +1033,13 @@ PanelWindow {
                                 implicitWidth: 43
                                 implicitHeight: 20
                                 radius: 10
-                                color: welcomeWindow.tipsOn ? Theme.primary : Theme.tileHigh
+                                color: welcomeWindow.tipsOn ? welcomeWindow.uvPrimary : welcomeWindow.uvTileHigh
 
                                 Rectangle {
                                     width: 14; height: 14; radius: 7
                                     anchors.verticalCenter: parent.verticalCenter
                                     x: welcomeWindow.tipsOn ? parent.width - width - 3 : 3
-                                    color: Theme.textColor
+                                    color: welcomeWindow.uvText
                                     Behavior on x { NumberAnimation { duration: 140 } }
                                 }
 
@@ -1045,16 +1071,16 @@ PanelWindow {
                         Layout.preferredWidth: 110
                         Layout.preferredHeight: 38
                         radius: 19
-                        color: prevArea.containsMouse ? Theme.tileHigh : "transparent"
+                        color: prevArea.containsMouse ? welcomeWindow.uvTileHigh : "transparent"
                         border.width: 1
-                        border.color: Theme.withAlpha(Theme.outline, 0.3)
+                        border.color: Theme.withAlpha(welcomeWindow.uvOutline, 0.3)
 
                         Text {
                             anchors.centerIn: parent
                             text: Theme.t("welcome.prev", "Voltar")
                             font.family: Theme.fontFamily
                             font.pixelSize: 12
-                            color: Theme.subtext
+                            color: welcomeWindow.uvSub
                         }
                         MouseArea {
                             id: prevArea
@@ -1079,7 +1105,7 @@ PanelWindow {
                                 width: welcomeWindow.page === index ? 18 : 7
                                 height: 7
                                 radius: 3.5
-                                color: welcomeWindow.page === index ? Theme.primary : Theme.withAlpha(Theme.subtext, 0.35)
+                                color: welcomeWindow.page === index ? welcomeWindow.uvPrimary : Theme.withAlpha(welcomeWindow.uvSub, 0.35)
                                 Behavior on width { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
                             }
                         }
@@ -1091,7 +1117,7 @@ PanelWindow {
                         Layout.preferredWidth: 150
                         Layout.preferredHeight: 38
                         radius: 19
-                        color: nextArea.containsMouse ? Theme.primary : Theme.withAlpha(Theme.primary, 0.85)
+                        color: nextArea.containsMouse ? welcomeWindow.uvPrimary : Theme.withAlpha(welcomeWindow.uvPrimary, 0.85)
                         Behavior on color { ColorAnimation { duration: 130 } }
 
                         Text {
@@ -1102,7 +1128,7 @@ PanelWindow {
                             font.family: Theme.fontFamily
                             font.pixelSize: 12
                             font.weight: Font.Bold
-                            color: Theme.background
+                            color: welcomeWindow.uvBg
                         }
                         MouseArea {
                             id: nextArea

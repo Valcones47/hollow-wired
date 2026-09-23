@@ -1318,5 +1318,8 @@
   "wallust.adv_16cols": "Darker lower half",
   "wallust.adv_16cols_sub": "Colors 0–7 come out dim and 8–15 bright, like a classic terminal.",
   "wallust.adv_apply": "Apply and regenerate colors",
-  "wallust.adv_reset": "Back to the rice default"
+  "wallust.adv_reset": "Back to the rice default",
+  "vbar.game_mode": "Game mode",
+  "vbar.blur": "Blur",
+  "vbar.ultra_perf": "Ultra performance"
 }

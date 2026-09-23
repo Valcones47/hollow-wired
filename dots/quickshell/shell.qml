@@ -254,7 +254,15 @@ ShellRoot {
         // barra (background alpha 0.85 + blur) e cantos invertidos em cima,
         // então parece que desce DE DENTRO da barra, como na Caelestia.
         anchors.top: true
-        margins.top: Theme.waybarHeight
+        margins.top: sideMode ? Theme.frameThickness + Theme.gap : Theme.waybarHeight
+        // Barra na lateral: o hub sai do lado dela, em vez de descer de cima
+        // (onde não tem barra nenhuma).
+        readonly property bool sideMode: ShellLayout.barEnabled && ShellLayout.barVertical
+        readonly property bool sideLeft: ShellLayout.barPosition === "left"
+        anchors.left: sideMode && sideLeft
+        anchors.right: sideMode && !sideLeft
+        margins.left: sideMode ? 52 + Theme.frameThickness + Theme.gap : 0
+        margins.right: sideMode ? 52 + Theme.frameThickness + Theme.gap : 0
 
         implicitWidth: Theme.panelWidth + Theme.radius * 2
         implicitHeight: Theme.panelHeight
@@ -286,14 +294,17 @@ ShellRoot {
             id: slide
             width: parent.width
             height: parent.height
-            y: hub.open ? 0 : -height
+            y: hub.sideMode || hub.open ? 0 : -height
+            x: !hub.sideMode || hub.open ? 0 : (hub.sideLeft ? -width : width)
             opacity: hub.open ? 1 : 0
             Behavior on y { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+            Behavior on x { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
             Behavior on opacity { NumberAnimation { duration: 200 } }
 
             // ---------- cantos invertidos (junção com a waybar) ----------
             Canvas {
                 id: cornerLeft
+                visible: !hub.sideMode
                 x: 0
                 width: Theme.radius
                 height: Theme.radius
@@ -313,6 +324,7 @@ ShellRoot {
             }
             Canvas {
                 id: cornerRight
+                visible: !hub.sideMode
                 x: parent.width - width
                 width: Theme.radius
                 height: Theme.radius
@@ -355,8 +367,8 @@ ShellRoot {
                 color: ShellCustomization.getBgColor("hub")
                 border.width: ShellCustomization.getBorderWidth("hub")
                 border.color: ShellCustomization.getBorderColor("hub")
-                topLeftRadius: 0
-                topRightRadius: 0
+                topLeftRadius: hub.sideMode ? Theme.radius : 0
+                topRightRadius: hub.sideMode ? Theme.radius : 0
                 bottomLeftRadius: Theme.radius
                 bottomRightRadius: Theme.radius
 

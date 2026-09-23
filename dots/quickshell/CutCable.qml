@@ -9,10 +9,13 @@ import "."
 // são todos a mesma coisa. A única animação é a faísca esporádica da ponta.
 Item {
     id: cable
+    // Cor de destaque: o tema, a menos que quem usa fixe outra (a tela de
+    // boas-vindas usa sempre a mesma paleta, independente do wallpaper).
+    property color accent: Theme.primary
 
     property real drop: 120
     property real sway: 30
-    property color cableColor: Theme.withAlpha(Theme.primary, 0.5)
+    property color cableColor: Theme.withAlpha(cable.accent, 0.5)
     property color sparkColor: "#ffd24a"
     property bool alive: true
     property real fontSize: 12
