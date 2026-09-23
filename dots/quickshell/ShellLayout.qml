@@ -83,25 +83,67 @@ QtObject {
         root.set("bar", "modules", next);
     }
 
-    // Ordem dos indicadores do lado direito da barra (arrastados no modo edição).
-    // Chaves que faltarem entram no fim, na ordem padrão.
-    // "control" é o bloco brilho/som/bateria que abre a central de controle.
-    readonly property var barOrderDefault: ["notifications", "network", "control"]
-    readonly property var barOrder: {
-        const saved = get("bar", "order", []);
-        const out = [];
-        for (const k of (Array.isArray(saved) ? saved : []))
-            if (root.barOrderDefault.includes(k) && !out.includes(k)) out.push(k);
-        for (const k of root.barOrderDefault) if (!out.includes(k)) out.push(k);
-        return out;
+    // Itens da barra principal: catálogo que o usuário monta no modo edição.
+    // Cada barra tem a sua lista (a de cima e a lateral são independentes), e a
+    // ordem da lista é a ordem na tela. Guardado em bar.items.{top,side}.
+    //   media    música tocando (na lateral fica no meio da barra)
+    //   tray     apps em segundo plano
+    //   control  bloco brilho/som/bateria → central de controle
+    readonly property var barCatalog: ["media", "tray", "updates", "notifications", "network", "control",
+        "night", "caffeine", "record", "screenshot", "clipboard", "gpu", "lock", "settings", "power"]
+    readonly property var barItemsDefault: ({
+        top: ["notifications", "network", "control"],
+        side: ["media", "tray", "notifications", "network", "control", "power"]
+    })
+    function barItemsFor(kind) {
+        const saved = (get("bar", "items", {}) || {})[kind];
+        if (Array.isArray(saved)) {
+            const out = [];
+            for (const k of saved) if (root.barCatalog.includes(k) && !out.includes(k)) out.push(k);
+            return out;
+        }
+        // Antes do catálogo, notificações e rede se escondiam por bar.modules.
+        return root.barItemsDefault[kind].filter(k => root.barModule(k));
     }
-    function setBarOrder(keys) {
-        root.set("bar", "order", keys.slice());
+    readonly property var barItemsTop: barItemsFor("top")
+    readonly property var barItemsSide: barItemsFor("side")
+    readonly property string barKind: barVertical ? "side" : "top"
+    readonly property var barItems: barVertical ? barItemsSide : barItemsTop
+    function barHas(key) { return root.barItems.includes(key); }
+    function setBarItems(list) {
+        const m = Object.assign({}, get("bar", "items", {}) || {});
+        m[root.barKind] = list.slice();
+        root.set("bar", "items", m);
+    }
+    function toggleBarItem(key) {
+        const list = root.barItems.slice();
+        const i = list.indexOf(key);
+        if (i >= 0) list.splice(i, 1);
+        else list.push(key);
+        root.setBarItems(list);
+    }
+
+    // Sidebar da direita (central de ações): liga/desliga por item, tudo ligado
+    // por padrão. Independente da barra (um item pode estar nas duas).
+    readonly property var sidebarCatalog: ["avatar", "update", "record", "night", "caffeine", "gpu",
+        "tray", "lock", "suspend", "logout", "reboot", "power"]
+    readonly property var sidebarItems: get("sidebar", "items", ({}))
+    function sidebarHas(key) {
+        const m = root.sidebarItems;
+        return !m || m[key] === undefined ? true : m[key] === true;
+    }
+    function toggleSidebarItem(key) {
+        const next = Object.assign({}, root.sidebarItems || {});
+        next[key] = !root.sidebarHas(key);
+        root.set("sidebar", "items", next);
     }
 
     // Modo edição (estilo KDE): não é gravado. Enquanto ligado, os módulos
     // escondidos aparecem apagados na barra e um clique liga/desliga cada um.
     property bool editing: false
+    // Abre a sidebar enquanto o modo edição mostra a lista dela (não gravado).
+    property bool sidebarPeek: false
+    onEditingChanged: if (!editing) sidebarPeek = false
     function showModule(name) {
         return root.barModule(name) || root.editing;
     }
@@ -163,8 +205,10 @@ QtObject {
     function applyPreset(name) {
         const p = root.presets[name];
         if (!p) return;
-        const next = { preset: name };
-        for (const k in p) next[k] = Object.assign({}, p[k]);
+        // O arranjo só troca os campos que ele define: itens escolhidos no modo
+        // edição (bar.items, sidebar.items) e módulos escondidos continuam.
+        const next = Object.assign({}, root.config, { preset: name });
+        for (const k in p) next[k] = Object.assign({}, root.config[k] || {}, p[k]);
         root.config = next;
         root.preset = name;
         root.save();

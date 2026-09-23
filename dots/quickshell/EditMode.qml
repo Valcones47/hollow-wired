@@ -41,7 +41,7 @@ PanelWindow {
     }
     Item { id: fullArea; anchors.fill: parent }
 
-    onVisibleChanged: if (visible) tab.forceActiveFocus()
+    onVisibleChanged: if (visible) { itemsSec.target = "bar"; tab.forceActiveFocus(); }
 
     // ---- escurece tudo, menos a barra (que é onde se clica) ----
     Rectangle {
@@ -186,7 +186,7 @@ PanelWindow {
                     }
                     Text {
                         Layout.fillWidth: true
-                        text: Theme.t("edit.hint", "Clique nos itens da barra para esconder ou mostrar; arraste para mudar a ordem. Arraste a alça para mudar a barra de borda. Esc sai.")
+                        text: Theme.t("edit.hint", "Escolha em Itens o que a barra e a central de ações mostram; arraste os itens na barra para mudar a ordem. Arraste a alça para mudar a barra de borda. Esc sai.")
                         wrapMode: Text.WordWrap
                         font.family: Theme.fontFamily
                         font.pixelSize: 11
@@ -358,6 +358,116 @@ PanelWindow {
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: ShellLayout.set(qo.modelData.g, qo.modelData.p, !qo.modelData.on)
+                        }
+                    }
+                }
+            }
+
+            // ---- itens: o que a barra e a sidebar mostram ----
+            ColumnLayout {
+                id: itemsSec
+                Layout.fillWidth: true
+                spacing: 8
+                // "bar" = barra principal (a de cima ou a lateral, cada uma com a
+                // sua lista); "side" = sidebar da direita, que fica aberta
+                // enquanto esta lista está à mostra.
+                property string target: "bar"
+                onTargetChanged: {
+                    ShellLayout.sidebarPeek = target === "side";
+                    // A sidebar abre na borda direita: tira a aba de cima dela.
+                    const room = Theme.frameThickness + Theme.sidebarWidth + 24;
+                    if (target === "side" && tab.x + tab.width > edit.width - room)
+                        tab.x = edit.width - room - tab.width;
+                }
+                Component.onDestruction: ShellLayout.sidebarPeek = false
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 8
+                    Text {
+                        Layout.fillWidth: true
+                        text: Theme.t("edit.items", "Itens")
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 12
+                        font.weight: Font.DemiBold
+                        color: Theme.textColor
+                    }
+                    Row {
+                        spacing: 2
+                        Repeater {
+                            model: [
+                                { k: "bar", label: ShellLayout.barVertical ? Theme.t("edit.target_side_bar", "Barra lateral") : Theme.t("edit.target_top_bar", "Barra de cima") },
+                                { k: "side", label: Theme.t("edit.target_sidebar", "Central de ações") }
+                            ]
+                            delegate: Rectangle {
+                                id: tg
+                                required property var modelData
+                                readonly property bool on: itemsSec.target === tg.modelData.k
+                                width: tgText.implicitWidth + 20
+                                height: 26
+                                radius: 8
+                                color: tg.on ? Theme.tileHigh : (tgArea.containsMouse ? Theme.withAlpha(Theme.tileHigh, 0.5) : "transparent")
+                                Text {
+                                    id: tgText
+                                    anchors.centerIn: parent
+                                    text: tg.modelData.label
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 11
+                                    color: tg.on ? Theme.textColor : Theme.subtext
+                                }
+                                MouseArea {
+                                    id: tgArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: itemsSec.target = tg.modelData.k
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Flow {
+                    Layout.fillWidth: true
+                    spacing: 6
+                    Repeater {
+                        model: itemsSec.target === "bar" ? ShellLayout.barCatalog : ShellLayout.sidebarCatalog
+                        delegate: Rectangle {
+                            id: chip
+                            required property string modelData
+                            readonly property bool on: itemsSec.target === "bar"
+                                ? ShellLayout.barItems.includes(chip.modelData) : ShellLayout.sidebarHas(chip.modelData)
+                            width: chipRow.implicitWidth + 20
+                            height: 30
+                            radius: 8
+                            color: chip.on ? Theme.tileHigh : (chipArea.containsMouse ? Theme.withAlpha(Theme.tileHigh, 0.5) : "transparent")
+                            border.width: chip.on ? 0 : 1
+                            border.color: Theme.withAlpha(Theme.outline, 0.25)
+                            Row {
+                                id: chipRow
+                                anchors.centerIn: parent
+                                spacing: 6
+                                Rectangle {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    width: 8; height: 8; radius: 4
+                                    color: chip.on ? Theme.primary : Theme.withAlpha(Theme.subtext, 0.5)
+                                }
+                                Text {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: Theme.t((itemsSec.target === "bar" ? "bar.item_" : "side.item_") + chip.modelData, chip.modelData)
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 12
+                                    color: chip.on ? Theme.textColor : Theme.subtext
+                                }
+                            }
+                            MouseArea {
+                                id: chipArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: itemsSec.target === "bar"
+                                    ? ShellLayout.toggleBarItem(chip.modelData) : ShellLayout.toggleSidebarItem(chip.modelData)
+                            }
                         }
                     }
                 }

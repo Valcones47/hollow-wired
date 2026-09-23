@@ -8,6 +8,8 @@ import Quickshell.Services.Pipewire
 import Quickshell.Services.UPower
 import Quickshell.Networking
 import Quickshell.Bluetooth
+import Quickshell.Services.SystemTray
+import Quickshell.Widgets
 import "."
 
 // Barra do topo (substitui a waybar). Mesma linguagem da sidebar: passar o
@@ -26,6 +28,9 @@ PanelWindow {
     signal visualConfigClicked()
     signal controlClicked()
     signal controlHovered(bool on)
+    // A sidebar (EnergySidebar): estados e ações dos itens do catálogo (updates,
+    // luz noturna, café, GPU) moram nela; ligada no shell.qml.
+    property var energy: null
     property bool recording: false
     signal stopRecording()
 
@@ -259,11 +264,15 @@ PanelWindow {
     component Module: Rectangle {
         id: mod
         required property string kind
-        // Chave do módulo em ShellLayout.barModules: no modo edição o clique
-        // liga/desliga o módulo em vez da ação normal.
+        // Chave do módulo. Itens do catálogo (ShellLayout.barCatalog) só se
+        // arrastam no modo edição; entram e saem pela aba do modo edição. Os
+        // outros (relógio) continuam ligando/desligando no clique.
         property string editKey: ""
         readonly property bool editable: ShellLayout.editing && mod.editKey !== ""
-        opacity: mod.editKey !== "" && !ShellLayout.barModule(mod.editKey) ? 0.35 : 1
+        readonly property bool inCatalog: ShellLayout.barCatalog.includes(mod.editKey)
+        // Deixa cliques chegarem aos filhos (ícones da bandeja) fora do modo edição.
+        property bool passClicks: false
+        opacity: mod.editKey !== "" && !mod.inCatalog && !ShellLayout.barModule(mod.editKey) ? 0.35 : 1
         border.width: mod.editable ? 1 : 0
         border.color: Theme.withAlpha(Theme.primary, 0.7)
         default property alias content: modRow.data
@@ -285,7 +294,7 @@ PanelWindow {
             spacing: 5
         }
         // Só os indicadores do lado direito mudam de ordem.
-        readonly property bool reorderable: mod.editable && ShellLayout.barOrderDefault.includes(mod.editKey)
+        readonly property bool reorderable: mod.editable && mod.inCatalog
         property bool dragging: false
         property real pressX: 0
         z: dragging ? 5 : 0
@@ -295,6 +304,7 @@ PanelWindow {
         MouseArea {
             id: modArea
             anchors.fill: parent
+            z: mod.passClicks && !mod.editable ? -1 : 0
             hoverEnabled: true
             preventStealing: true
             cursorShape: mod.dragging ? Qt.ClosedHandCursor : mod.reorderable ? Qt.OpenHandCursor : Qt.PointingHandCursor
@@ -313,7 +323,7 @@ PanelWindow {
                 const x = mapToItem(rightRow, mouse.x, 0).x;
                 if (!mod.dragging && Math.abs(x - mod.pressX) > 8) {
                     mod.dragging = true;
-                    bar.dragOrder = ShellLayout.barOrder.slice();
+                    bar.dragOrder = ShellLayout.barItems.slice();
                 }
                 if (mod.dragging) bar.dragModuleTo(mod.editKey, x);
             }
@@ -322,7 +332,7 @@ PanelWindow {
                 mod.dragging = false;
                 const order = bar.dragOrder;
                 bar.dragOrder = null;
-                ShellLayout.setBarOrder(order);
+                ShellLayout.setBarItems(order);
             }
             onCanceled: {
                 if (!mod.dragging) return;
@@ -332,7 +342,7 @@ PanelWindow {
             }
             onClicked: mouse => {
                 if (mod.editable) {
-                    if (mouse.button === Qt.LeftButton && !mod.dragging && Math.abs(mapToItem(rightRow, mouse.x, 0).x - mod.pressX) <= 8)
+                    if (!mod.inCatalog && mouse.button === Qt.LeftButton && !mod.dragging)
                         ShellLayout.setBarModule(mod.editKey, !ShellLayout.barModule(mod.editKey));
                     return;
                 }
@@ -353,11 +363,13 @@ PanelWindow {
     // Enquanto arrasta, dragOrder guarda a ordem ao vivo e só é gravada ao soltar.
     property var dragOrder: null
     function barModuleItems() {
-        return { notifications: notifMod, network: wifiMod, control: ctlMod };
+        return { notifications: notifMod, network: wifiMod, control: ctlMod, media: mediaMod, tray: trayMod,
+                 updates: updMod, night: nightMod, caffeine: cafMod, record: recMod, screenshot: shotMod,
+                 clipboard: clipMod, gpu: gpuMod, lock: lockMod, settings: setMod, power: powMod };
     }
     function applyBarOrder() {
         const items = bar.barModuleItems();
-        for (const k of (bar.dragOrder || ShellLayout.barOrder)) {
+        for (const k of (bar.dragOrder || ShellLayout.barItems)) {
             const it = items[k];
             if (!it) continue;
             it.parent = orderParking;
@@ -386,7 +398,7 @@ PanelWindow {
     }
     Connections {
         target: ShellLayout
-        function onBarOrderChanged() { if (!bar.dragOrder) bar.applyBarOrder(); }
+        function onBarItemsChanged() { if (!bar.dragOrder) bar.applyBarOrder(); }
     }
     Item { id: orderParking; visible: false }
 
@@ -673,7 +685,8 @@ PanelWindow {
 
                 Module {
                     kind: "record"
-                    visible: bar.recording
+                    // Com o item "Gravar" na barra, ele mesmo mostra a gravação.
+                    visible: bar.recording && !ShellLayout.barHas("record")
                     onClicked: bar.stopRecording()
                     BarIcon {
                         text: Theme.icons.record
@@ -698,7 +711,7 @@ PanelWindow {
                     id: notifMod
                     kind: ""
                     editKey: "notifications"
-                    visible: ShellLayout.showModule("notifications")
+                    visible: ShellLayout.barHas("notifications")
                     onClicked: bar.notifClicked()
                     onRightClicked: NotifService.toggleDnd()
 
@@ -733,7 +746,7 @@ PanelWindow {
                     // Desktop ligado só no cabo não tem placa Wi-Fi: mostrar um
                     // ícone de "Wi-Fi desligado" pra sempre só confundia.
                     editKey: "network"
-                    visible: bar.wifiDevice !== null && ShellLayout.showModule("network")
+                    visible: bar.wifiDevice !== null && ShellLayout.barHas("network")
                     BarIcon { text: bar.wifiIcon() }
                 }
 
@@ -744,7 +757,7 @@ PanelWindow {
                     id: ctlMod
                     kind: ""
                     editKey: "control"
-                    visible: ShellLayout.showModule("control")
+                    visible: ShellLayout.barHas("control")
                     onClicked: bar.controlClicked()
                     onHoverIn: bar.controlHovered(true)
                     onHoverOut: bar.controlHovered(false)
@@ -766,6 +779,193 @@ PanelWindow {
                         visible: bar.battery && bar.battery.isLaptopBattery
                         text: bar.battery ? Math.round(bar.battery.percentage * 100) + "%" : ""
                     }
+                }
+
+                // ---------- itens do catálogo (modo edição) ----------
+                Module {
+                    id: mediaMod
+                    kind: ""
+                    editKey: "media"
+                    visible: ShellLayout.barHas("media") && (MediaState.player !== null || ShellLayout.editing)
+                    onClicked: MediaState.toggle()
+                    onRightClicked: MediaState.next()
+                    // roda: volume do app que está tocando (MediaState)
+                    onWheel: d => MediaState.wheel(d)
+                    BarIcon {
+                        text: MediaState.playing ? Theme.icons.pause : Theme.icons.play
+                        font.pixelSize: 15
+                    }
+                    BarText {
+                        Layout.maximumWidth: 180
+                        elide: Text.ElideRight
+                        text: MediaState.player ? (MediaState.player.trackTitle || MediaState.player.identity || "")
+                            : Theme.t("bar.item_media", "Mídia")
+                    }
+                    BarText {
+                        visible: MediaState.wheelTarget >= 0
+                        text: Math.round(MediaState.shownVolume * 100) + "%"
+                        color: Theme.subtext
+                    }
+                }
+
+                Module {
+                    id: trayMod
+                    kind: ""
+                    editKey: "tray"
+                    passClicks: true
+                    visible: ShellLayout.barHas("tray") && (SystemTray.items.values.length > 0 || ShellLayout.editing)
+                    BarIcon {
+                        visible: SystemTray.items.values.length === 0
+                        text: Theme.icons.apps
+                        font.pixelSize: 15
+                    }
+                    Repeater {
+                        model: SystemTray.items
+                        delegate: Item {
+                            id: tIcon
+                            required property SystemTrayItem modelData
+                            implicitWidth: 20
+                            implicitHeight: 20
+                            IconImage {
+                                anchors.fill: parent
+                                source: tIcon.modelData.icon
+                                opacity: tIcon.modelData.status === Status.Passive ? 0.6 : 1
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                anchors.margins: -3
+                                cursorShape: Qt.PointingHandCursor
+                                acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+                                onClicked: mouse => {
+                                    const it = tIcon.modelData;
+                                    if (mouse.button === Qt.MiddleButton) it.secondaryActivate();
+                                    else if (mouse.button === Qt.RightButton || it.onlyMenu) {
+                                        const p = tIcon.mapToItem(null, 0, tIcon.height + 6);
+                                        it.display(bar, p.x, p.y);
+                                    } else it.activate();
+                                }
+                                onWheel: w => tIcon.modelData.scroll(w.angleDelta.y, false)
+                            }
+                        }
+                    }
+                }
+
+                Module {
+                    id: updMod
+                    kind: ""
+                    editKey: "updates"
+                    visible: ShellLayout.barHas("updates")
+                    onClicked: if (bar.energy) bar.energy.runUpdate()
+                    BarIcon {
+                        text: Theme.icons.update
+                        font.pixelSize: 15
+                        color: bar.energy && bar.energy.updateCount > 0 ? Theme.primary : Theme.textColor
+                    }
+                    BarText {
+                        visible: bar.energy && bar.energy.updateCount > 0
+                        text: bar.energy ? (bar.energy.updateCount > 99 ? "99+" : String(bar.energy.updateCount)) : ""
+                    }
+                }
+
+                Module {
+                    id: nightMod
+                    kind: ""
+                    editKey: "night"
+                    visible: ShellLayout.barHas("night")
+                    onClicked: if (bar.energy) bar.energy.toggleNight()
+                    BarIcon {
+                        text: Theme.icons.night
+                        font.pixelSize: 15
+                        color: bar.energy && bar.energy.nightLight ? Theme.primary : Theme.textColor
+                    }
+                }
+
+                Module {
+                    id: cafMod
+                    kind: ""
+                    editKey: "caffeine"
+                    visible: ShellLayout.barHas("caffeine")
+                    onClicked: if (bar.energy) bar.energy.toggleCaffeine()
+                    BarIcon {
+                        text: bar.energy && bar.energy.caffeine ? Theme.icons.coffee : Theme.icons.coffeeOff
+                        font.pixelSize: 15
+                        color: bar.energy && bar.energy.caffeine ? Theme.primary : Theme.textColor
+                    }
+                }
+
+                Module {
+                    id: recMod
+                    kind: ""
+                    editKey: "record"
+                    visible: ShellLayout.barHas("record")
+                    onClicked: {
+                        if (bar.recording) bar.stopRecording();
+                        else Quickshell.execDetached(["rice-record", "full"]);
+                    }
+                    BarIcon {
+                        text: Theme.icons.record
+                        font.pixelSize: 15
+                        color: bar.recording ? Theme.critical : Theme.textColor
+                    }
+                }
+
+                Module {
+                    id: shotMod
+                    kind: ""
+                    editKey: "screenshot"
+                    visible: ShellLayout.barHas("screenshot")
+                    onClicked: Quickshell.execDetached(["rice-screenshot", "region"])
+                    onRightClicked: Quickshell.execDetached(["rice-screenshot", "output"])
+                    BarIcon { text: Theme.icons.camera; font.pixelSize: 15 }
+                }
+
+                Module {
+                    id: clipMod
+                    kind: ""
+                    editKey: "clipboard"
+                    visible: ShellLayout.barHas("clipboard")
+                    onClicked: Quickshell.execDetached(["quickshell", "ipc", "call", "clipboard", "open"])
+                    BarIcon { text: Theme.icons.clipboard; font.pixelSize: 15 }
+                }
+
+                Module {
+                    id: gpuMod
+                    kind: ""
+                    editKey: "gpu"
+                    visible: ShellLayout.barHas("gpu")
+                    onClicked: Quickshell.execDetached(["quickshell", "ipc", "call", "sidebar", "toggle"])
+                    BarIcon {
+                        text: Theme.icons.gpu
+                        font.pixelSize: 15
+                        color: bar.energy && bar.energy.nvidiaState === "active" ? Theme.primary : Theme.subtext
+                    }
+                }
+
+                Module {
+                    id: lockMod
+                    kind: ""
+                    editKey: "lock"
+                    visible: ShellLayout.barHas("lock")
+                    onClicked: Quickshell.execDetached(["rice-session-action", "lock"])
+                    BarIcon { text: Theme.icons.lock; font.pixelSize: 15 }
+                }
+
+                Module {
+                    id: setMod
+                    kind: ""
+                    editKey: "settings"
+                    visible: ShellLayout.barHas("settings")
+                    onClicked: bar.visualConfigClicked()
+                    BarIcon { text: Theme.icons.tune; font.pixelSize: 15 }
+                }
+
+                Module {
+                    id: powMod
+                    kind: ""
+                    editKey: "power"
+                    visible: ShellLayout.barHas("power")
+                    onClicked: Quickshell.execDetached(["quickshell", "ipc", "call", "sidebar", "toggle"])
+                    BarIcon { text: Theme.icons.power; font.pixelSize: 15; color: Theme.secondary }
                 }
             }
         }

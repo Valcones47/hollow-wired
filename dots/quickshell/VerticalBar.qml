@@ -32,6 +32,8 @@ PanelWindow {
     signal visualConfigClicked()
     signal controlClicked()
     signal controlHovered(bool on)
+    // A sidebar (EnergySidebar): estados/ações dos itens do catálogo.
+    property var energy: null
 
     property bool launcherOpen: false
     readonly property bool onLeft: ShellLayout.barPosition === "left"
@@ -170,7 +172,8 @@ PanelWindow {
         property string popKind: ""
         property string editKey: ""
         readonly property bool editable: ShellLayout.editing && bb.editKey !== ""
-        opacity: bb.editKey !== "" && !ShellLayout.barModule(bb.editKey) ? 0.35 : 1
+        readonly property bool inCatalog: ShellLayout.barCatalog.includes(bb.editKey)
+        opacity: bb.editKey !== "" && !bb.inCatalog && !ShellLayout.barModule(bb.editKey) ? 0.35 : 1
         border.width: bb.editable ? 1 : 0
         border.color: Theme.withAlpha(Theme.primary, 0.7)
         signal activated()
@@ -213,9 +216,9 @@ PanelWindow {
             }
         }
 
-        // Indicadores mudam de ordem arrastando no modo edição (mesma ordem da
-        // barra de cima: ShellLayout.barOrder).
-        readonly property bool reorderable: bb.editable && ShellLayout.barOrderDefault.includes(bb.editKey)
+        // Itens do catálogo mudam de ordem arrastando no modo edição
+        // (ShellLayout.barItems da barra lateral); entram e saem pela aba.
+        readonly property bool reorderable: bb.editable && bb.inCatalog
         property bool dragging: false
         property real pressY: 0
         z: dragging ? 5 : 0
@@ -237,7 +240,7 @@ PanelWindow {
                 const y = mapToItem(mainCol, 0, mouse.y).y;
                 if (!bb.dragging && Math.abs(y - bb.pressY) > 8) {
                     bb.dragging = true;
-                    vbar.dragOrder = ShellLayout.barOrder.slice();
+                    vbar.dragOrder = ShellLayout.barItems.slice();
                 }
                 if (bb.dragging) vbar.dragModuleTo(bb.editKey, y);
             }
@@ -246,7 +249,7 @@ PanelWindow {
                 bb.dragging = false;
                 const order = vbar.dragOrder;
                 vbar.dragOrder = null;
-                ShellLayout.setBarOrder(order);
+                ShellLayout.setBarItems(order);
             }
             onCanceled: {
                 if (!bb.dragging) return;
@@ -256,7 +259,7 @@ PanelWindow {
             }
             onClicked: mouse => {
                 if (bb.editable) {
-                    if (mouse.button === Qt.LeftButton && Math.abs(mapToItem(mainCol, 0, mouse.y).y - bb.pressY) <= 8)
+                    if (!bb.inCatalog && mouse.button === Qt.LeftButton && Math.abs(mapToItem(mainCol, 0, mouse.y).y - bb.pressY) <= 8)
                         ShellLayout.setBarModule(bb.editKey, !ShellLayout.barModule(bb.editKey));
                     return;
                 }
@@ -267,18 +270,19 @@ PanelWindow {
     }
 
     // ================= ordem dos indicadores =================
-    // Como na TopBar: reparentar põe o item no fim da coluna, então os
-    // indicadores voltam na ordem salva e, depois deles, o separador e o botão
-    // de energia (que ficam sempre por último).
+    // Como na TopBar: reparentar põe o item no fim da coluna, então os itens
+    // voltam na ordem da lista, embaixo (depois do espaço flexível). A mídia não
+    // entra: ela fica sempre no meio da barra.
     property var dragOrder: null
     function barModuleItems() {
-        return { notifications: vNotif, network: vNet, control: vCtl };
+        return { notifications: vNotif, network: vNet, control: vCtl, tray: vTray, updates: vUpd,
+                 night: vNight, caffeine: vCaf, record: vRec, screenshot: vShot, clipboard: vClip,
+                 gpu: vGpu, lock: vLock, settings: vSet, power: vPower };
     }
     function applyBarOrder() {
         const items = vbar.barModuleItems();
         const seq = [];
-        for (const k of (vbar.dragOrder || ShellLayout.barOrder)) if (items[k]) seq.push(items[k]);
-        seq.push(vSep, vPower);
+        for (const k of (vbar.dragOrder || ShellLayout.barItems)) if (items[k]) seq.push(items[k]);
         for (const it of seq) {
             it.parent = orderParking;
             it.parent = mainCol;
@@ -304,7 +308,7 @@ PanelWindow {
     }
     Connections {
         target: ShellLayout
-        function onBarOrderChanged() { if (!vbar.dragOrder) vbar.applyBarOrder(); }
+        function onBarItemsChanged() { if (!vbar.dragOrder) vbar.applyBarOrder(); }
     }
     Item { id: orderParking; visible: false }
 
@@ -470,7 +474,7 @@ PanelWindow {
                 // ---- mídia: capa pequena no meio da barra, popup no hover ----
                 Rectangle {
                     id: mediaBtn
-                    visible: vbar.player !== null
+                    visible: ShellLayout.barHas("media") && vbar.player !== null
                     Layout.alignment: Qt.AlignHCenter
                     Layout.topMargin: 6
                     implicitWidth: 36
@@ -511,6 +515,37 @@ PanelWindow {
                 Item { Layout.fillHeight: true }
 
                 // ---- bandeja (apps em segundo plano) ----
+                ColumnLayout {
+                    id: vTray
+                    visible: ShellLayout.barHas("tray") && SystemTray.items.values.length > 0
+                    Layout.alignment: Qt.AlignHCenter
+                    spacing: 6
+                    // No modo edição a bandeja se arrasta como um item só.
+                    property bool dragging: false
+                    property real pressY: 0
+                    MouseArea {
+                        z: 10
+                        visible: ShellLayout.editing
+                        anchors.fill: parent
+                        preventStealing: true
+                        cursorShape: vTray.dragging ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+                        onPressed: mouse => vTray.pressY = mapToItem(mainCol, 0, mouse.y).y
+                        onPositionChanged: mouse => {
+                            const y = mapToItem(mainCol, 0, mouse.y).y;
+                            if (!vTray.dragging && Math.abs(y - vTray.pressY) > 8) {
+                                vTray.dragging = true;
+                                vbar.dragOrder = ShellLayout.barItems.slice();
+                            }
+                            if (vTray.dragging) vbar.dragModuleTo("tray", y);
+                        }
+                        onReleased: {
+                            if (!vTray.dragging) return;
+                            vTray.dragging = false;
+                            const order = vbar.dragOrder;
+                            vbar.dragOrder = null;
+                            ShellLayout.setBarItems(order);
+                        }
+                    }
                 Repeater {
                     model: SystemTray.items
                     delegate: Item {
@@ -550,19 +585,13 @@ PanelWindow {
                     }
                 }
 
-                Rectangle {
-                    visible: SystemTray.items.values.length > 0
-                    Layout.alignment: Qt.AlignHCenter
-                    Layout.preferredWidth: 20
-                    Layout.preferredHeight: 1
-                    color: Theme.withAlpha(Theme.outline, 0.35)
                 }
 
                 // ---- indicadores ----
                 BarButton {
                     id: vNotif
                     editKey: "notifications"
-                    visible: ShellLayout.showModule("notifications")
+                    visible: ShellLayout.barHas("notifications")
                     icon: NotifService.dnd ? Theme.icons.bellOff : Theme.icons.bell
                     iconColor: NotifService.dnd ? Theme.secondary
                         : (NotifService.unreadCount > 0 ? Theme.primary : Theme.textColor)
@@ -575,7 +604,7 @@ PanelWindow {
                 BarButton {
                     id: vNet
                     editKey: "network"
-                    visible: ShellLayout.showModule("network")
+                    visible: ShellLayout.barHas("network")
                     icon: vbar.wifiIcon()
                     popKind: "wifi"
                     iconColor: vbar.activeNetwork ? Theme.textColor : Theme.subtext
@@ -587,8 +616,7 @@ PanelWindow {
                 Rectangle {
                     id: vCtl
                     readonly property bool editable: ShellLayout.editing
-                    visible: ShellLayout.showModule("control")
-                    opacity: !ShellLayout.barModule("control") ? 0.35 : 1
+                    visible: ShellLayout.barHas("control")
                     Layout.alignment: Qt.AlignHCenter
                     implicitWidth: 36
                     implicitHeight: ctlCol.implicitHeight + 16
@@ -645,7 +673,7 @@ PanelWindow {
                             const y = mapToItem(mainCol, 0, mouse.y).y;
                             if (!vCtl.dragging && Math.abs(y - vCtl.pressY) > 8) {
                                 vCtl.dragging = true;
-                                vbar.dragOrder = ShellLayout.barOrder.slice();
+                                vbar.dragOrder = ShellLayout.barItems.slice();
                             }
                             if (vCtl.dragging) vbar.dragModuleTo("control", y);
                         }
@@ -654,14 +682,10 @@ PanelWindow {
                             vCtl.dragging = false;
                             const order = vbar.dragOrder;
                             vbar.dragOrder = null;
-                            ShellLayout.setBarOrder(order);
+                            ShellLayout.setBarItems(order);
                         }
                         onClicked: mouse => {
-                            if (vCtl.editable) {
-                                if (Math.abs(mapToItem(mainCol, 0, mouse.y).y - vCtl.pressY) <= 8)
-                                    ShellLayout.setBarModule("control", !ShellLayout.barModule("control"));
-                                return;
-                            }
+                            if (vCtl.editable) return;
                             vbar.controlClicked();
                         }
                         onWheel: w => {
@@ -672,16 +696,84 @@ PanelWindow {
                     }
                 }
 
-                Rectangle {
-                    id: vSep
-                    Layout.alignment: Qt.AlignHCenter
-                    Layout.preferredWidth: 20
-                    Layout.preferredHeight: 1
-                    color: Theme.withAlpha(Theme.outline, 0.35)
+                BarButton {
+                    id: vUpd
+                    editKey: "updates"
+                    visible: ShellLayout.barHas("updates")
+                    icon: Theme.icons.update
+                    iconColor: vbar.energy && vbar.energy.updateCount > 0 ? Theme.primary : Theme.textColor
+                    badge: vbar.energy && vbar.energy.updateCount > 0
+                        ? (vbar.energy.updateCount > 99 ? "99+" : String(vbar.energy.updateCount)) : ""
+                    onActivated: if (vbar.energy) vbar.energy.runUpdate()
                 }
-
+                BarButton {
+                    id: vNight
+                    editKey: "night"
+                    visible: ShellLayout.barHas("night")
+                    icon: Theme.icons.night
+                    iconColor: vbar.energy && vbar.energy.nightLight ? Theme.primary : Theme.textColor
+                    onActivated: if (vbar.energy) vbar.energy.toggleNight()
+                }
+                BarButton {
+                    id: vCaf
+                    editKey: "caffeine"
+                    visible: ShellLayout.barHas("caffeine")
+                    icon: vbar.energy && vbar.energy.caffeine ? Theme.icons.coffee : Theme.icons.coffeeOff
+                    iconColor: vbar.energy && vbar.energy.caffeine ? Theme.primary : Theme.textColor
+                    onActivated: if (vbar.energy) vbar.energy.toggleCaffeine()
+                }
+                BarButton {
+                    id: vRec
+                    editKey: "record"
+                    visible: ShellLayout.barHas("record")
+                    icon: Theme.icons.record
+                    iconColor: vbar.energy && vbar.energy.recording ? Theme.critical : Theme.textColor
+                    onActivated: {
+                        if (vbar.energy && vbar.energy.recording) vbar.energy.stopRecording();
+                        else Quickshell.execDetached(["rice-record", "full"]);
+                    }
+                }
+                BarButton {
+                    id: vShot
+                    editKey: "screenshot"
+                    visible: ShellLayout.barHas("screenshot")
+                    icon: Theme.icons.camera
+                    onActivated: Quickshell.execDetached(["rice-screenshot", "region"])
+                    onSecondary: Quickshell.execDetached(["rice-screenshot", "output"])
+                }
+                BarButton {
+                    id: vClip
+                    editKey: "clipboard"
+                    visible: ShellLayout.barHas("clipboard")
+                    icon: Theme.icons.clipboard
+                    onActivated: Quickshell.execDetached(["quickshell", "ipc", "call", "clipboard", "open"])
+                }
+                BarButton {
+                    id: vGpu
+                    editKey: "gpu"
+                    visible: ShellLayout.barHas("gpu")
+                    icon: Theme.icons.gpu
+                    iconColor: vbar.energy && vbar.energy.nvidiaState === "active" ? Theme.primary : Theme.subtext
+                    onActivated: Quickshell.execDetached(["quickshell", "ipc", "call", "sidebar", "toggle"])
+                }
+                BarButton {
+                    id: vLock
+                    editKey: "lock"
+                    visible: ShellLayout.barHas("lock")
+                    icon: Theme.icons.lock
+                    onActivated: Quickshell.execDetached(["rice-session-action", "lock"])
+                }
+                BarButton {
+                    id: vSet
+                    editKey: "settings"
+                    visible: ShellLayout.barHas("settings")
+                    icon: Theme.icons.tune
+                    onActivated: vbar.visualConfigClicked()
+                }
                 BarButton {
                     id: vPower
+                    editKey: "power"
+                    visible: ShellLayout.barHas("power")
                     icon: Theme.icons.power
                     iconColor: Theme.secondary
                     onActivated: Quickshell.execDetached(["quickshell", "ipc", "call", "sidebar", "toggle"])

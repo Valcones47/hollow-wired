@@ -52,7 +52,8 @@ PanelWindow {
     // chamando sidebar.open = false; com a barra fixa isso simplesmente não
     // tem efeito visual, então nenhuma delas precisou mudar.
     readonly property bool pinned: ShellLayout.sidebarEnabled && !ShellLayout.sidebarAutohide
-    readonly property bool effectiveOpen: sidebar.pinned ? !hasFullscreen : sidebar.open
+    // sidebarPeek: o modo edição abre a sidebar enquanto se escolhe o que ela mostra.
+    readonly property bool effectiveOpen: ShellLayout.sidebarPeek || (sidebar.pinned ? !hasFullscreen : sidebar.open)
 
     onHasFullscreenChanged: {
         if (hasFullscreen && !launcherOpen && open) {
@@ -183,6 +184,22 @@ PanelWindow {
         id: cachyUpdateProc
         command: ["kitty", "--class", "cachy-update", "--title", "cachy-update", "-e", "cachy-update"]
         onExited: sidebar.checkUpdates()
+    }
+
+    // Ações usadas também pelos itens das barras (catálogo do modo edição), para
+    // não duplicar a checagem de estado.
+    function toggleNight() { if (!nightToggle.running) nightToggle.running = true; }
+    function toggleCaffeine() { if (!caffeineToggle.running) caffeineToggle.running = true; }
+    function runUpdate() { if (!cachyUpdateProc.running) cachyUpdateProc.running = true; }
+    function stopRecording() { recStopProc.running = true; }
+    function refreshGpu() { if (!gpuStateProc.running) gpuStateProc.running = true; }
+    // GPU na barra: lê o estado da NVIDIA a cada 5 s só se o item estiver lá.
+    Timer {
+        interval: 5000
+        repeat: true
+        triggeredOnStart: true
+        running: ShellLayout.barHas("gpu")
+        onTriggered: sidebar.refreshGpu()
     }
 
     // ================= QoL: gravação, café, luz noturna, GPU, reboot, cache =================
@@ -316,6 +333,7 @@ PanelWindow {
         default property alias extra: btnBg.data
         signal activated()
 
+        visible: ShellLayout.sidebarHas(btn.kind)
         Layout.preferredWidth: Theme.sidebarButtonSize
         Layout.preferredHeight: Theme.sidebarButtonSize
         Layout.alignment: Qt.AlignHCenter
@@ -552,6 +570,7 @@ PanelWindow {
                 // avatar (~/.face)
                 Item {
                     id: avatarBtn
+                    visible: ShellLayout.sidebarHas("avatar")
                     Layout.preferredWidth: Theme.sidebarButtonSize
                     Layout.preferredHeight: Theme.sidebarButtonSize
                     Layout.alignment: Qt.AlignHCenter
@@ -632,7 +651,7 @@ PanelWindow {
                 SideButton {
                     id: recBtn
                     kind: "record"
-                    visible: sidebar.recording
+                    visible: sidebar.recording && ShellLayout.sidebarHas("record")
                     icon: Theme.icons.record
                     tint: Theme.critical
                     onActivated: recStopProc.running = true
@@ -660,7 +679,7 @@ PanelWindow {
                     onActivated: {}
                 }
 
-                Sep { visible: SystemTray.items.values.length > 0 }
+                Sep { visible: SystemTray.items.values.length > 0 && ShellLayout.sidebarHas("tray") }
 
                 // trays
                 Repeater {
@@ -669,6 +688,7 @@ PanelWindow {
                     delegate: Item {
                         id: trayBtn
                         required property SystemTrayItem modelData
+                        visible: ShellLayout.sidebarHas("tray")
                         Layout.preferredWidth: Theme.sidebarButtonSize
                         Layout.preferredHeight: Theme.sidebarButtonSize - 6
                         Layout.alignment: Qt.AlignHCenter

@@ -246,7 +246,7 @@ QtObject {
         trash: "\u{F09E7}", plus: "\u{F0415}", info: "\u{F02FD}", laptop: "\u{F0322}", chip: "\u{F061A}",
         packages: "\u{F03D6}", console: "\u{F018D}", translate: "\u{F05CA}", cursor: "\u{F01C0}", font: "\u{F06D6}",
         network: "\u{F0C9D}", batHealth: "\u{F120F}", restore: "\u{F099B}", alert: "\u{F002A}",
-        fileCompare: "\u{F08AA}", close: "\u{F0156}", verified: "\u{F0791}", camera: "\u{F0D5D}",
+        fileCompare: "\u{F08AA}", close: "\u{F0156}", verified: "\u{F0791}", camera: "\u{F0D5D}", clipboard: "\u{F014C}", apps: "\u{F003B}",
         gamepad: "\u{F0297}", pin: "\u{F0403}", pencil: "\u{F0CB6}",
         star: "\u{F04CE}", starOutline: "\u{F04D2}", content: "\u{F018F}", paste: "\u{F0192}", keyboard: "\u{F030C}",
         sleep: "\u{F0904}",

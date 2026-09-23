@@ -190,6 +190,7 @@ ShellRoot {
 
     TopBar {
         id: topbar
+        energy: sidebar
         launcherOpen: shellRoot.launcherOpen
         recording: sidebar.recording
         onClockClicked: hub.open = !hub.open
@@ -207,6 +208,7 @@ ShellRoot {
     // arranjo escolhe uma (ShellLayout.barVertical).
     VerticalBar {
         id: vbar
+        energy: sidebar
         launcherOpen: shellRoot.launcherOpen
         onClockClicked: hub.open = !hub.open
         onNotifClicked: {
