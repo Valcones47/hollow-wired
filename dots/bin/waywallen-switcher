@@ -730,6 +730,12 @@ class SwitcherWindow(Gtk.ApplicationWindow):
                 -1,
                 None,
             )
+            # Despausa o daemon imediatamente para que o novo wallpaper inicie
+            # e comece a rodar o vídeo normalmente no meio da transição.
+            try:
+                self.proxy.call_sync("Resume", None, Gio.DBusCallFlags.NONE, 200, None)
+            except Exception:
+                pass
         except GLib.Error as e:
             print(f"Falha ao aplicar wallpaper: {e}", file=sys.stderr)
             try:

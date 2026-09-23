@@ -296,7 +296,7 @@ Scope {
                     // Começa com a frente já encostando no canto superior
                     // direito, sem gastar o começo da animação fora da tela.
                     const near = Math.sqrt((cx - w) * (cx - w) + cy * cy) * 0.9;
-                    const R = near + p * (far + feather * 1.15 - near);
+                    const R = near + p * (far + feather * 1.45 - near);
 
                     function softDisc(x, y, r, solid) {
                         // Opaco até `solid` do raio, some até a borda. Com a
