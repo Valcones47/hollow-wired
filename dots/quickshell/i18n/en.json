@@ -1345,7 +1345,7 @@
   "layout.dock_pins_desc": "Arrows change the order, × unpins. To pin, right-click an open app in the dock or in the launcher.",
   "edit.handle": "Drag the bar",
   "edit.title": "Edit mode",
-  "edit.hint": "Click items on the bar to hide or show them. Drag the handle to move the bar to another edge. Esc exits.",
+  "edit.hint": "Click items on the bar to hide or show them; drag to reorder. Drag the handle to move the bar to another edge. Esc exits.",
   "edit.done": "Done",
   "edit.custom": "Custom",
   "edit.bar_autohide": "Bar only on hover",
@@ -1353,6 +1353,6 @@
   "edit.dock_autohide": "Dock only on hover",
   "edit.dock_full": "Edge-to-edge dock",
   "edit.side_on": "Action center",
-  "edit.widgets_hint": "Widgets: drag them around the desktop; use their edit bar to add or remove.",
+  "edit.widgets_hint": "Dock icons and widgets can be dragged too. Use the widgets' edit bar to add or remove them.",
   "dmenu.edit_mode": "Edit mode"
 }

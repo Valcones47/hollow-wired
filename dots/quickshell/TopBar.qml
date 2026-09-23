@@ -345,17 +345,50 @@ PanelWindow {
             anchors.centerIn: parent
             spacing: 5
         }
+        // Só os indicadores do lado direito mudam de ordem.
+        readonly property bool reorderable: mod.editable && ShellLayout.barOrderDefault.includes(mod.editKey)
+        property bool dragging: false
+        property real pressX: 0
+        z: dragging ? 5 : 0
+        scale: dragging ? 1.08 : 1
+        Behavior on scale { NumberAnimation { duration: 120 } }
+
         MouseArea {
             id: modArea
             anchors.fill: parent
             hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
+            preventStealing: true
+            cursorShape: mod.dragging ? Qt.ClosedHandCursor : mod.reorderable ? Qt.OpenHandCursor : Qt.PointingHandCursor
             acceptedButtons: Qt.LeftButton | Qt.RightButton
             onEntered: if (mod.kind !== "" && !mod.editable) bar.showPop(mod.kind, mod)
             onExited: bar.leavePop()
+            onPressed: mouse => mod.pressX = mapToItem(rightRow, mouse.x, 0).x
+            onPositionChanged: mouse => {
+                if (!pressed || !mod.reorderable) return;
+                const x = mapToItem(rightRow, mouse.x, 0).x;
+                if (!mod.dragging && Math.abs(x - mod.pressX) > 8) {
+                    mod.dragging = true;
+                    bar.dragOrder = ShellLayout.barOrder.slice();
+                }
+                if (mod.dragging) bar.dragModuleTo(mod.editKey, x);
+            }
+            onReleased: {
+                if (!mod.dragging) return;
+                mod.dragging = false;
+                const order = bar.dragOrder;
+                bar.dragOrder = null;
+                ShellLayout.setBarOrder(order);
+            }
+            onCanceled: {
+                if (!mod.dragging) return;
+                mod.dragging = false;
+                bar.dragOrder = null;
+                bar.applyBarOrder();
+            }
             onClicked: mouse => {
                 if (mod.editable) {
-                    ShellLayout.setBarModule(mod.editKey, !ShellLayout.barModule(mod.editKey));
+                    if (mouse.button === Qt.LeftButton && !mod.dragging && Math.abs(mapToItem(rightRow, mouse.x, 0).x - mod.pressX) <= 8)
+                        ShellLayout.setBarModule(mod.editKey, !ShellLayout.barModule(mod.editKey));
                     return;
                 }
                 if (mouse.button === Qt.RightButton) {
@@ -367,6 +400,51 @@ PanelWindow {
             onWheel: w => mod.wheel(w.angleDelta.y)
         }
     }
+
+    // ================= ordem dos indicadores =================
+    // Os módulos são declarados numa ordem fixa. Para aplicar a ordem salva, cada
+    // um sai e volta para o rightRow (reparentar põe o item no fim da lista de
+    // filhos, e o RowLayout segue essa lista). stackAfter() não existe no QML.
+    // Enquanto arrasta, dragOrder guarda a ordem ao vivo e só é gravada ao soltar.
+    property var dragOrder: null
+    function barModuleItems() {
+        return { notifications: notifMod, settings: visualConfigMod, network: wifiMod,
+                 bluetooth: btMod, audio: audioMod, brightness: brMod, battery: batMod };
+    }
+    function applyBarOrder() {
+        const items = bar.barModuleItems();
+        for (const k of (bar.dragOrder || ShellLayout.barOrder)) {
+            const it = items[k];
+            if (!it) continue;
+            it.parent = orderParking;
+            it.parent = rightRow;
+        }
+    }
+    // Troca só quando o ponteiro passa do meio do vizinho: com larguras
+    // diferentes, trocar ao encostar fazia os dois ficarem pulando.
+    function dragModuleTo(key, x) {
+        const items = bar.barModuleItems();
+        const order = bar.dragOrder;
+        const from = order.indexOf(key);
+        for (let i = 0; i < order.length; i++) {
+            const it = items[order[i]];
+            if (i === from || !it || !it.visible) continue;
+            const mid = it.x + it.width / 2;
+            if ((i > from && x > mid) || (i < from && x < mid)) {
+                const next = order.slice();
+                next.splice(from, 1);
+                next.splice(i, 0, key);
+                bar.dragOrder = next;
+                bar.applyBarOrder();
+                return;
+            }
+        }
+    }
+    Connections {
+        target: ShellLayout
+        function onBarOrderChanged() { if (!bar.dragOrder) bar.applyBarOrder(); }
+    }
+    Item { id: orderParking; visible: false }
 
     // ================= conteúdo =================
     Item {
@@ -636,6 +714,8 @@ PanelWindow {
 
             // ---------- direita ----------
             RowLayout {
+                id: rightRow
+                Component.onCompleted: bar.applyBarOrder()
                 anchors.right: parent.right
                 anchors.rightMargin: Theme.frameThickness + 6
                 anchors.verticalCenter: parent.verticalCenter

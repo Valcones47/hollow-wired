@@ -83,6 +83,21 @@ QtObject {
         root.set("bar", "modules", next);
     }
 
+    // Ordem dos indicadores do lado direito da barra (arrastados no modo edição).
+    // Chaves que faltarem entram no fim, na ordem padrão.
+    readonly property var barOrderDefault: ["notifications", "settings", "network", "bluetooth", "audio", "brightness", "battery"]
+    readonly property var barOrder: {
+        const saved = get("bar", "order", []);
+        const out = [];
+        for (const k of (Array.isArray(saved) ? saved : []))
+            if (root.barOrderDefault.includes(k) && !out.includes(k)) out.push(k);
+        for (const k of root.barOrderDefault) if (!out.includes(k)) out.push(k);
+        return out;
+    }
+    function setBarOrder(keys) {
+        root.set("bar", "order", keys.slice());
+    }
+
     // Modo edição (estilo KDE): não é gravado. Enquanto ligado, os módulos
     // escondidos aparecem apagados na barra e um clique liga/desliga cada um.
     property bool editing: false

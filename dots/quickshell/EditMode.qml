@@ -96,7 +96,9 @@ PanelWindow {
         radius: 16
         color: Theme.primary
         function home() {
-            handle.x = Qt.binding(() => edit.barTop ? (edit.width - handle.width) / 2
+            // Barra em cima: alça à esquerda, porque o centro do topo é da barra de
+            // ferramentas dos widgets.
+            handle.x = Qt.binding(() => edit.barTop ? Theme.frameThickness + 16
                 : edit.barLeft ? edit.stripW + 10 : edit.width - edit.stripW - 10 - handle.width);
             handle.y = Qt.binding(() => edit.barTop ? Theme.waybarHeight + 10 : (edit.height - handle.height) / 2);
         }
@@ -138,10 +140,12 @@ PanelWindow {
     // ---- aba flutuante ----
     Rectangle {
         id: tab
-        width: Math.min(640, edit.width - 80)
+        // Começa encostada à direita, no meio da altura, e se arrasta pelo
+        // cabeçalho: presa no centro, ela cobria onde a pessoa queria pôr widget.
+        width: Math.min(560, edit.width - 80)
         height: tabCol.implicitHeight + 32
-        x: (edit.width - width) / 2
-        y: Math.round(edit.height * 0.2)
+        x: edit.width - width - (edit.barRight ? edit.stripW : 0) - 24
+        y: Math.round((edit.height - height) / 2)
         radius: 16
         // Opaca: por cima de janelas, a surface translúcida deixava o texto de
         // trás aparecer.
@@ -160,8 +164,15 @@ PanelWindow {
             spacing: 14
 
             RowLayout {
+                id: tabHeader
                 Layout.fillWidth: true
                 spacing: 12
+                Text {
+                    Layout.alignment: Qt.AlignTop
+                    text: "⠿"
+                    font.pixelSize: 18
+                    color: Theme.subtext
+                }
                 ColumnLayout {
                     Layout.fillWidth: true
                     spacing: 2
@@ -175,7 +186,7 @@ PanelWindow {
                     }
                     Text {
                         Layout.fillWidth: true
-                        text: Theme.t("edit.hint", "Clique nos itens da barra para esconder ou mostrar. Arraste a alça para mudar a barra de borda. Esc sai.")
+                        text: Theme.t("edit.hint", "Clique nos itens da barra para esconder ou mostrar; arraste para mudar a ordem. Arraste a alça para mudar a barra de borda. Esc sai.")
                         wrapMode: Text.WordWrap
                         font.family: Theme.fontFamily
                         font.pixelSize: 11
@@ -354,7 +365,7 @@ PanelWindow {
 
             Text {
                 Layout.fillWidth: true
-                text: Theme.t("edit.widgets_hint", "Widgets: arraste pela área de trabalho; use a barra de edição deles para adicionar ou remover.")
+                text: Theme.t("edit.widgets_hint", "Ícones da dock e widgets também se arrastam. Use a barra de edição dos widgets para adicionar ou remover.")
                 wrapMode: Text.WordWrap
                 font.family: Theme.fontFamily
                 font.pixelSize: 11
@@ -362,14 +373,19 @@ PanelWindow {
             }
         }
 
-        // arrastar a própria aba pelo título
+        // arrastar a própria aba pelo cabeçalho (fica por baixo do botão Concluir)
         MouseArea {
+            z: -1
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
-            height: 14
-            cursorShape: Qt.SizeAllCursor
+            height: tabHeader.height + 16
+            cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
             drag.target: tab
+            drag.minimumX: 0
+            drag.maximumX: edit.width - tab.width
+            drag.minimumY: 0
+            drag.maximumY: edit.height - tab.height
         }
     }
 }

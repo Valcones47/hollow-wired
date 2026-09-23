@@ -124,14 +124,17 @@ PanelWindow {
         return ps.find(p => p.isPlaying) || (ps.length > 0 ? ps[0] : null);
     }
 
-    // Estado mostrado. Alguns players (o Sonora, players web) levam até ~1,5 s para
-    // confirmar play/pause e às vezes mandam um estado atrasado pelo Mpris, o que
-    // deixava o ícone "pausado" com a música tocando. Após o clique vale o estado
-    // pedido; depois o playerctl diz o real (até 4 conferências) e o override sai
-    // quando o Mpris concordar.
+    // Estado mostrado. O Mpris do Quickshell não é confiável com alguns players
+    // (o Sonora, players web): medido, ele ficou 5+ s dizendo "pausado" com a
+    // música tocando, mesmo sem clique, e cliques rápidos pioram (o player
+    // processa com ~1,5 s de atraso e manda estados velhos). Por isso a verdade é
+    // o `playerctl status`, consultado a cada 2 s enquanto a barra lateral está
+    // à mostra, a cada 0,5 s logo após um clique e sempre que o Mpris muda. Logo
+    // depois de um clique vale o estado pedido (a consulta ainda veria o velho).
     property var mediaOverride: null
     property var mediaLock: null
-    property int mediaSyncTries: 0
+    property int mediaFast: 0
+    property real mediaClickAt: 0
     readonly property bool mediaPlaying: mediaOverride !== null ? mediaOverride
         : (player !== null && player.isPlaying)
 
@@ -141,40 +144,47 @@ PanelWindow {
         const want = !mediaPlaying;
         mediaLock = pl;
         mediaOverride = want;
+        mediaClickAt = Date.now();
         if (want && pl.canPlay) pl.play();
         else if (!want && pl.canPause) pl.pause();
         else if (pl.canTogglePlaying) pl.togglePlaying();
-        mediaSyncTries = 0;
-        mediaSyncTimer.restart();
+        mediaFast = 10;
     }
     function mediaRelease() {
-        mediaSyncTimer.stop();
         mediaOverride = null;
         mediaLock = null;
+        mediaFast = 3;
+        mediaPoll();
+    }
+    function mediaPoll() {
+        const pl = vbar.player;
+        if (!pl || mediaSyncProc.running) return;
+        mediaSyncProc.command = ["playerctl", "-p",
+            String(pl.dbusName).replace("org.mpris.MediaPlayer2.", ""), "status"];
+        mediaSyncProc.running = true;
+    }
+    onPlayerChanged: if (!mediaLock) { mediaOverride = null; mediaPoll(); }
+    Connections {
+        target: vbar.player
+        function onIsPlayingChanged() { vbar.mediaPoll(); }
     }
     Timer {
-        id: mediaSyncTimer
-        interval: 1200
-        onTriggered: {
-            if (!vbar.mediaLock || mediaSyncProc.running) return;
-            mediaSyncProc.command = ["playerctl", "-p",
-                String(vbar.mediaLock.dbusName).replace("org.mpris.MediaPlayer2.", ""), "status"];
-            mediaSyncProc.running = true;
-        }
+        interval: vbar.mediaFast > 0 ? 500 : 2000
+        repeat: true
+        running: vbar.visible && vbar.player !== null
+        onTriggered: vbar.mediaPoll()
     }
     Process {
         id: mediaSyncProc
         stdout: StdioCollector {
             onStreamFinished: {
+                if (vbar.mediaFast > 0) vbar.mediaFast--;
+                else vbar.mediaLock = null;
+                // resposta de antes do player processar o clique: ignora
+                if (Date.now() - vbar.mediaClickAt < 1600) return;
                 const st = text.trim();
                 if (st === "Playing" || st === "Paused" || st === "Stopped")
                     vbar.mediaOverride = st === "Playing";
-                vbar.mediaSyncTries++;
-                if (!vbar.mediaLock || vbar.mediaLock.isPlaying === vbar.mediaOverride
-                        || vbar.mediaSyncTries >= 4)
-                    vbar.mediaRelease();
-                else
-                    mediaSyncTimer.restart();
             }
         }
     }
@@ -296,17 +306,51 @@ PanelWindow {
             }
         }
 
+        // Indicadores mudam de ordem arrastando no modo edição (mesma ordem da
+        // barra de cima: ShellLayout.barOrder).
+        readonly property bool reorderable: bb.editable && ShellLayout.barOrderDefault.includes(bb.editKey)
+        property bool dragging: false
+        property real pressY: 0
+        z: dragging ? 5 : 0
+        scale: dragging ? 1.1 : 1
+        Behavior on scale { NumberAnimation { duration: 120 } }
+
         MouseArea {
             id: bbArea
             anchors.fill: parent
             hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
+            preventStealing: true
+            cursorShape: bb.dragging ? Qt.ClosedHandCursor : bb.reorderable ? Qt.OpenHandCursor : Qt.PointingHandCursor
             acceptedButtons: Qt.LeftButton | Qt.RightButton
             onEntered: if (bb.popKind !== "" && !bb.editable) vbar.showPop(bb.popKind, bb)
             onExited: if (bb.popKind !== "") vbar.leavePop()
+            onPressed: mouse => bb.pressY = mapToItem(mainCol, 0, mouse.y).y
+            onPositionChanged: mouse => {
+                if (!pressed || !bb.reorderable) return;
+                const y = mapToItem(mainCol, 0, mouse.y).y;
+                if (!bb.dragging && Math.abs(y - bb.pressY) > 8) {
+                    bb.dragging = true;
+                    vbar.dragOrder = ShellLayout.barOrder.slice();
+                }
+                if (bb.dragging) vbar.dragModuleTo(bb.editKey, y);
+            }
+            onReleased: {
+                if (!bb.dragging) return;
+                bb.dragging = false;
+                const order = vbar.dragOrder;
+                vbar.dragOrder = null;
+                ShellLayout.setBarOrder(order);
+            }
+            onCanceled: {
+                if (!bb.dragging) return;
+                bb.dragging = false;
+                vbar.dragOrder = null;
+                vbar.applyBarOrder();
+            }
             onClicked: mouse => {
                 if (bb.editable) {
-                    ShellLayout.setBarModule(bb.editKey, !ShellLayout.barModule(bb.editKey));
+                    if (mouse.button === Qt.LeftButton && Math.abs(mapToItem(mainCol, 0, mouse.y).y - bb.pressY) <= 8)
+                        ShellLayout.setBarModule(bb.editKey, !ShellLayout.barModule(bb.editKey));
                     return;
                 }
                 mouse.button === Qt.RightButton ? bb.secondary() : bb.activated();
@@ -314,6 +358,49 @@ PanelWindow {
             onWheel: w => bb.wheel(w.angleDelta.y)
         }
     }
+
+    // ================= ordem dos indicadores =================
+    // Como na TopBar: reparentar põe o item no fim da coluna, então os
+    // indicadores voltam na ordem salva e, depois deles, o separador e o botão
+    // de energia (que ficam sempre por último).
+    property var dragOrder: null
+    function barModuleItems() {
+        return { notifications: vNotif, settings: vSettings, network: vNet,
+                 bluetooth: vBt, audio: vAudio, battery: vBat };
+    }
+    function applyBarOrder() {
+        const items = vbar.barModuleItems();
+        const seq = [];
+        for (const k of (vbar.dragOrder || ShellLayout.barOrder)) if (items[k]) seq.push(items[k]);
+        seq.push(vSep, vPower);
+        for (const it of seq) {
+            it.parent = orderParking;
+            it.parent = mainCol;
+        }
+    }
+    function dragModuleTo(key, y) {
+        const items = vbar.barModuleItems();
+        const order = vbar.dragOrder;
+        const from = order.indexOf(key);
+        for (let i = 0; i < order.length; i++) {
+            const it = items[order[i]];
+            if (i === from || !it || !it.visible) continue;
+            const mid = it.y + it.height / 2;
+            if ((i > from && y > mid) || (i < from && y < mid)) {
+                const next = order.slice();
+                next.splice(from, 1);
+                next.splice(i, 0, key);
+                vbar.dragOrder = next;
+                vbar.applyBarOrder();
+                return;
+            }
+        }
+    }
+    Connections {
+        target: ShellLayout
+        function onBarOrderChanged() { if (!vbar.dragOrder) vbar.applyBarOrder(); }
+    }
+    Item { id: orderParking; visible: false }
 
     // ================= conteúdo =================
     Item {
@@ -352,10 +439,12 @@ PanelWindow {
             }
 
             ColumnLayout {
+                id: mainCol
                 anchors.fill: parent
                 anchors.topMargin: 10
                 anchors.bottomMargin: 10
                 spacing: 6
+                Component.onCompleted: vbar.applyBarOrder()
 
                 // ---- launcher ----
                 BarButton {
@@ -563,6 +652,7 @@ PanelWindow {
 
                 // ---- indicadores ----
                 BarButton {
+                    id: vNotif
                     editKey: "notifications"
                     visible: ShellLayout.showModule("notifications")
                     icon: NotifService.dnd ? Theme.icons.bellOff : Theme.icons.bell
@@ -575,6 +665,7 @@ PanelWindow {
                 }
 
                 BarButton {
+                    id: vAudio
                     editKey: "audio"
                     visible: ShellLayout.showModule("audio")
                     icon: vbar.volIcon()
@@ -592,6 +683,7 @@ PanelWindow {
                 }
 
                 BarButton {
+                    id: vNet
                     editKey: "network"
                     visible: ShellLayout.showModule("network")
                     icon: vbar.wifiIcon()
@@ -601,6 +693,7 @@ PanelWindow {
                 }
 
                 BarButton {
+                    id: vBt
                     editKey: "bluetooth"
                     visible: vbar.btAdapter !== null && ShellLayout.showModule("bluetooth")
                     icon: !vbar.btAdapter || !vbar.btAdapter.enabled ? Theme.icons.btOff
@@ -611,6 +704,7 @@ PanelWindow {
                 }
 
                 BarButton {
+                    id: vBat
                     editKey: "battery"
                     visible: vbar.battery !== null && vbar.battery.isLaptopBattery && ShellLayout.showModule("battery")
                     icon: vbar.batIcon()
@@ -620,6 +714,7 @@ PanelWindow {
                 }
 
                 Rectangle {
+                    id: vSep
                     Layout.alignment: Qt.AlignHCenter
                     Layout.preferredWidth: 20
                     Layout.preferredHeight: 1
@@ -627,6 +722,7 @@ PanelWindow {
                 }
 
                 BarButton {
+                    id: vSettings
                     editKey: "settings"
                     visible: ShellLayout.showModule("settings")
                     icon: Theme.icons.tune
@@ -634,6 +730,7 @@ PanelWindow {
                 }
 
                 BarButton {
+                    id: vPower
                     icon: Theme.icons.power
                     iconColor: Theme.secondary
                     onActivated: Quickshell.execDetached(["quickshell", "ipc", "call", "sidebar", "toggle"])
