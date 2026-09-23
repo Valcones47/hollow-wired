@@ -92,7 +92,9 @@ QtObject {
     readonly property var barCatalog: ["media", "tray", "updates", "notifications", "network", "control",
         "night", "caffeine", "record", "screenshot", "clipboard", "gpu", "lock", "settings", "power"]
     readonly property var barItemsDefault: ({
-        top: ["notifications", "network", "control"],
+        // "media" em cima substitui o ícone fixo do equalizador que existia
+        // ao lado do relógio (o equalizador é uma aba do popup da mídia).
+        top: ["media", "notifications", "network", "control"],
         side: ["media", "tray", "notifications", "network", "control", "power"]
     })
     function barItemsFor(kind) {

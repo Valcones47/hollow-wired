@@ -1435,5 +1435,9 @@
   "perf.anim_full": "Full",
   "perf.shadows": "Window shadows",
   "perf.live": "Live preview in Super + Tab",
-  "perf.live_sub": "When off, windows show as a still snapshot."
+  "perf.live_sub": "When off, windows show as a still snapshot.",
+  "topbar.media_tab": "Media",
+  "topbar.eq_tab": "Equalizer",
+  "topbar.nothing_playing": "Nothing playing right now.",
+  "topbar.app_volume": "App volume"
 }

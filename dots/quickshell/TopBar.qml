@@ -100,6 +100,8 @@ PanelWindow {
 
     // ================= estado do popup =================
     property string pop: ""
+    // Aba do popup da mídia: "media" ou "eq".
+    property string mediaTab: "media"
     property real popAnchorX: 0
 
     Timer { id: popShow; interval: 110; property string kind; property Item anchor
@@ -632,32 +634,29 @@ PanelWindow {
             }
 
             // ---------- mídia: à esquerda do relógio (fora da ordem da direita) ----------
+            // Só ícone: nota musical com um player aberto (tocando ou pausado),
+            // equalizador sem nada. O hover abre o popup com a mídia, o volume do
+            // app e a aba do equalizador (que antes tinha um ícone próprio).
             Module {
                 id: mediaMod
                 anchors.right: clockMod.visible ? clockMod.left : parent.horizontalCenter
                 anchors.rightMargin: 6
                 anchors.verticalCenter: parent.verticalCenter
-                kind: ""
+                kind: "media"
                 editKey: "media"
-                visible: ShellLayout.barHas("media") && (MediaState.player !== null || ShellLayout.editing)
-                onClicked: MediaState.toggle()
-                onRightClicked: MediaState.next()
+                visible: ShellLayout.barHas("media")
+                onClicked: {
+                    if (MediaState.player) MediaState.toggle();
+                    else bar.showPopNow("media", mediaMod);
+                }
+                onRightClicked: if (MediaState.player) MediaState.next()
                 // roda: volume do app que está tocando (MediaState)
                 onWheel: d => MediaState.wheel(d)
+                onHoverIn: if (!MediaState.player) bar.mediaTab = "eq"
                 BarIcon {
-                    text: MediaState.playing ? Theme.icons.pause : Theme.icons.play
-                    font.pixelSize: 15
-                }
-                BarText {
-                    Layout.maximumWidth: 180
-                    elide: Text.ElideRight
-                    text: MediaState.player ? (MediaState.player.trackTitle || MediaState.player.identity || "")
-                        : Theme.t("bar.item_media", "Mídia")
-                }
-                BarText {
-                    visible: MediaState.wheelTarget >= 0
-                    text: Math.round(MediaState.shownVolume * 100) + "%"
-                    color: Theme.subtext
+                    text: MediaState.player ? Theme.icons.music : Theme.icons.equalizer
+                    color: MediaState.player && MediaState.playing ? Theme.primary
+                        : (!MediaState.player && EqService.enabled ? Theme.primary : Theme.textColor)
                 }
             }
 
@@ -686,19 +685,6 @@ PanelWindow {
             // Equalizador: ícone pequeno colado no relógio. Ele saiu da aba
             // Mídia do hub, que ficava apertada demais com ele dentro. Fica
             // colorido enquanto o equalizador está ligado.
-            Module {
-                id: eqMod
-                kind: "eq"
-                anchors.left: clockMod.right
-                anchors.leftMargin: 2
-                anchors.verticalCenter: parent.verticalCenter
-                onClicked: bar.showPopNow("eq", eqMod)
-                BarIcon {
-                    text: Theme.icons.music
-                    color: EqService.enabled ? Theme.primary : Theme.subtext
-                }
-            }
-
             // ---------- direita ----------
             RowLayout {
                 id: rightRow
@@ -1000,13 +986,13 @@ PanelWindow {
                 width: implicitWidth
                 height: implicitHeight
                 // Arrastando um slider: não fecha nem se o mouse escapar do popup.
-                readonly property bool busy: audioPop.dragging || EqService.dragging
+                readonly property bool busy: audioPop.dragging || EqService.dragging || mediaVolSlider.dragging
                 readonly property Item current: {
                     switch (bar.pop) {
                     case "audio": return audioPop;
                     case "wifi": return wifiPop;
                     case "record": return recordPop;
-                    case "eq": return eqPop;
+                    case "media": return mediaPop;
                     }
                     return null;
                 }
@@ -1014,16 +1000,170 @@ PanelWindow {
                     && Math.abs(root.popH - root.popTargetH) < 30 ? 1 : 0
                 Behavior on opacity { NumberAnimation { duration: Theme.ms(140) } }
 
-                // ---------- equalizador ----------
-                Item {
-                    id: eqPop
-                    visible: popContent.current === eqPop
+                // ---------- mídia + equalizador ----------
+                ColumnLayout {
+                    id: mediaPop
+                    visible: popContent.current === mediaPop
                     width: 440
-                    implicitWidth: 440
-                    implicitHeight: 270
-                    Equalizer {
-                        anchors.fill: parent
-                        compact: true
+                    spacing: 10
+
+                    Row {
+                        spacing: 2
+                        Repeater {
+                            model: [
+                                { k: "media", label: Theme.t("topbar.media_tab", "Mídia") },
+                                { k: "eq", label: Theme.t("topbar.eq_tab", "Equalizador") }
+                            ]
+                            delegate: Rectangle {
+                                id: mt
+                                required property var modelData
+                                readonly property bool on: bar.mediaTab === mt.modelData.k
+                                width: mtText.implicitWidth + 22
+                                height: 26
+                                radius: 8
+                                color: mt.on ? Theme.tileHigh : (mtArea.containsMouse ? Theme.withAlpha(Theme.tileHigh, 0.5) : "transparent")
+                                Text {
+                                    id: mtText
+                                    anchors.centerIn: parent
+                                    text: mt.modelData.label
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 12
+                                    font.weight: mt.on ? Font.DemiBold : Font.Normal
+                                    color: mt.on ? Theme.textColor : Theme.subtext
+                                }
+                                MouseArea {
+                                    id: mtArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: bar.mediaTab = mt.modelData.k
+                                }
+                            }
+                        }
+                    }
+
+                    // --- mídia ---
+                    PopText {
+                        visible: bar.mediaTab === "media" && !MediaState.player
+                        text: Theme.t("topbar.nothing_playing", "Nada tocando agora.")
+                    }
+                    RowLayout {
+                        visible: bar.mediaTab === "media" && MediaState.player !== null
+                        Layout.fillWidth: true
+                        spacing: 12
+                        Rectangle {
+                            implicitWidth: 72
+                            implicitHeight: 72
+                            radius: 12
+                            color: Theme.tileHigh
+                            clip: true
+                            Image {
+                                id: mediaArt
+                                anchors.fill: parent
+                                source: MediaState.player && MediaState.player.trackArtUrl ? MediaState.player.trackArtUrl : ""
+                                fillMode: Image.PreserveAspectCrop
+                                sourceSize: Qt.size(144, 144)
+                                asynchronous: true
+                                visible: status === Image.Ready
+                            }
+                            Text {
+                                anchors.centerIn: parent
+                                visible: !mediaArt.visible
+                                text: Theme.icons.album
+                                font.family: Theme.iconFontFamily
+                                font.pixelSize: 24
+                                color: Theme.subtext
+                            }
+                        }
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 2
+                            Text {
+                                Layout.fillWidth: true
+                                text: MediaState.player ? (MediaState.player.trackTitle || MediaState.player.identity || "") : ""
+                                elide: Text.ElideRight
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 14
+                                font.weight: Font.DemiBold
+                                color: Theme.textColor
+                            }
+                            Text {
+                                Layout.fillWidth: true
+                                text: MediaState.player ? (MediaState.player.trackArtist || "") : ""
+                                visible: text !== ""
+                                elide: Text.ElideRight
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 12
+                                color: Theme.subtext
+                            }
+                            Text {
+                                Layout.fillWidth: true
+                                text: MediaState.player ? (MediaState.player.identity || "") : ""
+                                elide: Text.ElideRight
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 10
+                                color: Theme.withAlpha(Theme.subtext, 0.7)
+                            }
+                            Row {
+                                Layout.topMargin: 4
+                                spacing: 4
+                                Repeater {
+                                    model: [
+                                        { icon: Theme.icons.prev, act: "prev" },
+                                        { icon: MediaState.playing ? Theme.icons.pause : Theme.icons.play, act: "toggle" },
+                                        { icon: Theme.icons.next, act: "next" }
+                                    ]
+                                    delegate: Rectangle {
+                                        id: mbtn
+                                        required property var modelData
+                                        width: 36
+                                        height: 30
+                                        radius: 9
+                                        color: mbtnArea.containsMouse ? Theme.tileHigh : Theme.withAlpha(Theme.tile, 0.6)
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: mbtn.modelData.icon
+                                            font.family: Theme.iconFontFamily
+                                            font.pixelSize: 17
+                                            color: Theme.textColor
+                                        }
+                                        MouseArea {
+                                            id: mbtnArea
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                if (mbtn.modelData.act === "prev") MediaState.previous();
+                                                else if (mbtn.modelData.act === "next") MediaState.next();
+                                                else MediaState.toggle();
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    PopSlider {
+                        id: mediaVolSlider
+                        visible: bar.mediaTab === "media" && MediaState.player !== null && MediaState.hasVolume
+                        Layout.fillWidth: true
+                        icon: MediaState.muted ? Theme.icons.volOff : Theme.icons.music
+                        label: Theme.t("topbar.app_volume", "Volume do app")
+                        value: MediaState.shownVolume
+                        dimmed: MediaState.muted
+                        onMoved: v => MediaState.setVolume(v)
+                        onIconClicked: MediaState.toggleMute()
+                    }
+
+                    // --- equalizador ---
+                    Item {
+                        visible: bar.mediaTab === "eq"
+                        Layout.fillWidth: true
+                        implicitHeight: 270
+                        Equalizer {
+                            anchors.fill: parent
+                            compact: true
+                        }
                     }
                 }
 
@@ -1181,11 +1321,16 @@ PanelWindow {
         }
     }
 
-    // IPC de teste: `qs ipc call bar popup <audio|wifi|eq>` / `hide`
+    // IPC de teste: `qs ipc call bar popup <audio|wifi|media|eq>` / `hide`
     IpcHandler {
         target: "bar"
         function popup(kind: string): void {
-            const m = { audio: ctlMod, wifi: wifiMod, eq: eqMod }[kind];
+            if (kind === "eq" || kind === "media") {
+                bar.mediaTab = kind === "eq" ? "eq" : "media";
+                bar.showPopNow("media", mediaMod);
+                return;
+            }
+            const m = { audio: ctlMod, wifi: wifiMod }[kind];
             if (m) bar.showPopNow(kind, m);
         }
         function hide(): void { bar.pop = ""; }

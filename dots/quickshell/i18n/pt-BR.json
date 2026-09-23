@@ -1435,5 +1435,9 @@
   "perf.anim_full": "Completa",
   "perf.shadows": "Sombras das janelas",
   "perf.live": "Prévia ao vivo no Super + Tab",
-  "perf.live_sub": "Desligada, as janelas aparecem como foto parada."
+  "perf.live_sub": "Desligada, as janelas aparecem como foto parada.",
+  "topbar.media_tab": "Mídia",
+  "topbar.eq_tab": "Equalizador",
+  "topbar.nothing_playing": "Nada tocando agora.",
+  "topbar.app_volume": "Volume do app"
 }
