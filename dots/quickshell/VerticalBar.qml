@@ -145,9 +145,12 @@ PanelWindow {
         mediaLock = pl;
         mediaOverride = want;
         mediaClickAt = Date.now();
-        if (want && pl.canPlay) pl.play();
-        else if (!want && pl.canPause) pl.pause();
-        else if (pl.canTogglePlaying) pl.togglePlaying();
+        // PlayPause no próprio player: ele inverte o estado *dele*. Mandar
+        // play()/pause() pelo que o ícone mostra falhava quando o ícone estava
+        // atrasado (pause para quem já estava pausado = nada acontece), e o
+        // togglePlaying() do Quickshell decide pelo isPlaying dele, que trava.
+        Quickshell.execDetached(["playerctl", "-p",
+            String(pl.dbusName).replace("org.mpris.MediaPlayer2.", ""), "play-pause"]);
         mediaFast = 10;
     }
     function mediaRelease() {
