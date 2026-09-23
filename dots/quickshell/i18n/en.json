@@ -1461,5 +1461,19 @@
   "vid.nothing": "Nothing to convert.",
   "vid.done": "Done: %1 of %2 converted (%3 MB → %4 MB).",
   "vid.error": "Failed: ",
-  "vid.restored": "%1 videos restored to the original."
+  "vid.restored": "%1 videos restored to the original.",
+  "s2v.title": "Scene to video",
+  "s2v.sub": "Records the active scene for 30 s and saves it as a looping 1080p video in your Waywallen video library. A video is much lighter than a scene on integrated graphics. The original scene stays.",
+  "s2v.warn1": "The scene loses its interactivity: reacting to sound, mouse and clock.",
+  "s2v.warn2": "The screen is busy for about 40 s: it switches to an empty workspace with no bar or dock. Switching workspace or opening/focusing an app cancels the recording.",
+  "s2v.warn3": "The loop is joined at the frame most similar to the start. Scenes that never repeat get a soft but noticeable seam.",
+  "s2v.st_prepare": "Preparing…",
+  "s2v.st_recording": "Recording…",
+  "s2v.st_processing": "Building the loop…",
+  "s2v.st_done": "Done: %1 s loop",
+  "s2v.st_soft": " (soft seam)",
+  "s2v.st_error": "It didn't work",
+  "s2v.st_idle": "Convert the active scene",
+  "s2v.busy": "In progress…",
+  "s2v.go": "Record scene to video"
 }

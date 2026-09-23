@@ -1,0 +1,338 @@
+#!/usr/bin/env python3
+"""rice-scene-to-video — grava a cena ativa do Wallpaper Engine como vídeo em loop.
+
+Por quê: um vídeo 1080p H.264 é decodificado pelo hardware da Intel; uma cena
+roda shaders o tempo todo. O preço (avisado no painel):
+  - perde a interatividade da cena (reação ao som, ao mouse, ao relógio);
+  - a tela fica ocupada ~40 s: vai para uma área de trabalho vazia, sem shell;
+  - cena que nunca se repete fica com uma emenda suave, mas perceptível.
+
+Como:
+  1. confere que o wallpaper ativo é uma cena (banco do Waywallen);
+  2. PRIVACIDADE: vai para uma área de trabalho nova e vazia e confere que não
+     há janela nenhuma à vista (nem fixada, nem área especial aberta) antes de
+     gravar. Um print do desktop já vazou janelas pessoais na tela de login
+     (ver rice-sddm-sync-wallpaper); aqui a regra é abortar na dúvida;
+  3. para o Quickshell (barra, dock, widgets, notificações) durante a gravação
+     e sobe de novo no fim, mesmo se algo falhar (finally);
+  4. grava 30 s com o gpu-screen-recorder, sem cursor. Se durante a gravação
+     trocar de área de trabalho, algum app ganhar foco ou abrir janela, para
+     na hora, apaga o que gravou e avisa o erro;
+  5. acha o ponto de emenda: compara quadros reduzidos (64x36, cinza, 10 fps)
+     do começo com os do fim e corta no mais parecido; um cross-fade de 0,6 s
+     esconde o que sobrar (o fim do vídeo termina exatamente no quadro com que
+     ele começa);
+  6. salva em 1080p H.264 na biblioteca de vídeos do Waywallen (a pasta de
+     verdade por trás do portal de documentos) e pede Rescan.
+
+Roda solto do shell (o painel morre junto com o Quickshell): o progresso vai
+para $XDG_RUNTIME_DIR/rice-scene-to-video.json, que o painel observa.
+
+Uso:
+  rice-scene-to-video            # grava a cena ativa
+  rice-scene-to-video status     # imprime o estado atual (JSON)
+"""
+
+import json
+import os
+import re
+import sqlite3
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+HOME = Path.home()
+RUN = Path(os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"))
+STATE = RUN / "rice-scene-to-video.json"
+CACHE = HOME / ".cache/hollow-wired/scene-to-video"
+WW_ROOT = HOME / ".var/app/org.waywallen.waywallen"
+WW_DB = WW_ROOT / "data/waywallen/waywallen-v2.db"
+WW_CFG = WW_ROOT / "config/waywallen/config.toml"
+
+RECORD_SECS = 30
+REF_T = 1.0          # quadro de referência do começo (pula o 1º segundo)
+MIN_LOOP = 8.0       # loop mínimo aceitável
+FADE = 0.6
+SAMPLE_FPS = 10
+
+
+def state(**kw):
+    kw["time"] = int(time.time())
+    tmp = STATE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(kw, ensure_ascii=False))
+    tmp.replace(STATE)
+
+
+def notify(title, body):
+    subprocess.run(["notify-send", "-a", "Wallpaper", "-i", "video-x-generic", title, body],
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def hypr(*args):
+    r = subprocess.run(["hyprctl", *args, "-j"], capture_output=True, text=True)
+    return json.loads(r.stdout or "null")
+
+
+def dispatch(lua):
+    subprocess.run(["hyprctl", "dispatch", lua], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def ww_bus(method):
+    subprocess.run(["busctl", "--user", "call", "org.waywallen.waywallen.Daemon",
+                    "/org/waywallen/waywallen/Daemon", "org.waywallen.waywallen.Daemon", method],
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
+
+
+def current_scene():
+    import tomllib
+    data = tomllib.loads(WW_CFG.read_text())
+    last = data.get("global", {}).get("last_wallpaper")
+    if not last:
+        for v in data.get("display", {}).values():
+            if isinstance(v, dict) and v.get("last_wallpaper"):
+                last = v["last_wallpaper"]
+                break
+    if not last:
+        return None
+    conn = sqlite3.connect(f"file:{WW_DB}?mode=ro", uri=True)
+    row = conn.execute("SELECT type, display_name FROM item WHERE id = ?", (str(last),)).fetchone()
+    conn.close()
+    if not row or row[0] != "scene":
+        return None
+    return row[1] or f"cena {last}"
+
+
+def video_library():
+    """Pasta real da biblioteca de vídeos do Waywallen (resolvendo o portal)."""
+    try:
+        conn = sqlite3.connect(f"file:{WW_DB}?mode=ro", uri=True)
+        rows = conn.execute("SELECT l.path FROM library l JOIN source_plugin sp ON sp.id = l.plugin_id "
+                            "WHERE sp.name = 'video'").fetchall()
+        conn.close()
+    except sqlite3.Error:
+        rows = []
+    docs = {}
+    try:
+        out = subprocess.run(["flatpak", "documents", "--columns=path,origin"],
+                             capture_output=True, text=True).stdout
+        for line in out.splitlines():
+            parts = line.split("\t")
+            if len(parts) == 2:
+                docs[parts[0]] = parts[1]
+    except OSError:
+        pass
+    for (p,) in rows:
+        host = docs.get(p, p)
+        if os.path.isdir(host) and os.access(host, os.W_OK):
+            return Path(host), True
+    # Sem biblioteca de vídeo: pasta padrão (o usuário adiciona no Waywallen).
+    try:
+        vids = subprocess.run(["xdg-user-dir", "VIDEOS"], capture_output=True, text=True).stdout.strip()
+    except OSError:
+        vids = ""
+    base = Path(vids) if vids and os.path.isdir(vids) else HOME / "Videos"
+    return base / "Wallpapers de cena", False
+
+
+def safe_name(name):
+    name = re.sub(r"[\\/:*?\"<>|\n\r\t]+", " ", name).strip()
+    return (name[:80] or "cena").strip()
+
+
+def qs_running():
+    return subprocess.run(["pgrep", "-x", "qs|quickshell"], stdout=subprocess.DEVNULL).returncode == 0
+
+
+def stop_shell():
+    subprocess.run(["pkill", "-x", "qs|quickshell"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    for _ in range(30):
+        if not qs_running():
+            return
+        time.sleep(0.1)
+    subprocess.run(["pkill", "-9", "-x", "qs|quickshell"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def start_shell():
+    if qs_running():
+        return
+    # Pelo compositor: processo filho deste script poderia morrer com ele.
+    dispatch('hl.dsp.exec_cmd("quickshell -d")')
+    for _ in range(50):
+        if qs_running():
+            return
+        time.sleep(0.1)
+
+
+def empty_workspace_check(ws_id):
+    """Só grava se a área ativa é a nova, sem janelas, sem nada fixado por cima."""
+    aw = hypr("activeworkspace") or {}
+    if aw.get("id") != ws_id or aw.get("windows", 1) != 0:
+        return "a área de trabalho não ficou vazia"
+    for c in hypr("clients") or []:
+        if c.get("pinned"):
+            return "há uma janela fixada em todas as áreas"
+    for m in hypr("monitors") or []:
+        if m.get("focused") and (m.get("specialWorkspace") or {}).get("name"):
+            return "há uma área especial aberta"
+    return ""
+
+
+def interrupted(ws_id):
+    """Durante a gravação: trocou de área, algum app ganhou foco ou abriu janela?"""
+    aw = hypr("activeworkspace") or {}
+    if aw.get("id") != ws_id:
+        return "a área de trabalho foi trocada"
+    if aw.get("windows", 0) != 0:
+        return "uma janela abriu na área da gravação"
+    win = hypr("activewindow") or {}
+    if win.get("address"):
+        return "um aplicativo entrou em foco (" + (win.get("class") or win.get("title") or "?") + ")"
+    return ""
+
+
+def sample_frames(path):
+    cmd = ["ffmpeg", "-v", "error", "-i", str(path), "-vf",
+           f"fps={SAMPLE_FPS},scale=64:36,format=gray", "-f", "rawvideo", "-"]
+    raw = subprocess.run(cmd, capture_output=True).stdout
+    size = 64 * 36
+    return [raw[i:i + size] for i in range(0, len(raw) - size + 1, size)]
+
+
+def mse(a, b):
+    return sum((x - y) * (x - y) for x, y in zip(a, b)) / len(a)
+
+
+def best_cut(frames):
+    """Índice do quadro do fim mais parecido com o começo (3 quadros seguidos)."""
+    ref = int(REF_T * SAMPLE_FPS)
+    lo = int((REF_T + MIN_LOOP) * SAMPLE_FPS)
+    best, best_i = None, None
+    for i in range(lo, len(frames) - 3):
+        d = sum(mse(frames[i + k], frames[ref + k]) for k in range(3)) / 3
+        if best is None or d < best:
+            best, best_i = d, i
+    return best_i, best
+
+
+def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "status":
+        print(STATE.read_text() if STATE.exists() else json.dumps({"state": "idle"}))
+        return 0
+
+    name = current_scene()
+    if not name:
+        state(state="error", msg="O wallpaper ativo não é uma cena do Wallpaper Engine.")
+        notify("Cena → vídeo", "O wallpaper ativo não é uma cena.")
+        return 1
+    out_dir, in_library = video_library()
+    out_dir.mkdir(parents=True, exist_ok=True)
+    CACHE.mkdir(parents=True, exist_ok=True)
+    raw = CACHE / "gravacao.mp4"
+    out = out_dir / f"{safe_name(name)} (cena).mp4"
+
+    mons = hypr("monitors") or []
+    mon = next((m for m in mons if m.get("focused")), mons[0] if mons else None)
+    if not mon:
+        state(state="error", msg="Nenhum monitor encontrado.")
+        return 1
+    orig_ws = (hypr("activeworkspace") or {}).get("id")
+    used = [w.get("id", 0) for w in (hypr("workspaces") or [])]
+    new_ws = max([i for i in used if i > 0] + [0]) + 1
+
+    state(state="prepare", name=name, secs=RECORD_SECS)
+    shell_stopped = False
+    try:
+        dispatch(f"hl.dsp.focus({{ workspace = {new_ws} }})")
+        time.sleep(0.6)
+        why = empty_workspace_check(new_ws)
+        if why:
+            raise RuntimeError(f"Gravação cancelada por privacidade: {why}.")
+        stop_shell()
+        shell_stopped = True
+        ww_bus("Resume")
+        time.sleep(1.5)
+        # Confere de novo logo antes de gravar (uma janela pode ter aberto).
+        why = empty_workspace_check(new_ws) or interrupted(new_ws)
+        if why:
+            raise RuntimeError(f"Gravação cancelada por privacidade: {why}.")
+        state(state="recording", name=name, secs=RECORD_SECS, started=int(time.time()))
+        fps = "60" if float(mon.get("refreshRate", 60)) >= 59 else "30"
+        rec = subprocess.Popen(["gpu-screen-recorder", "-w", mon["name"], "-f", fps, "-k", "h264",
+                                "-q", "very_high", "-cursor", "no", "-o", str(raw)],
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        t_end = time.time() + RECORD_SECS
+        while time.time() < t_end:
+            time.sleep(0.25)
+            if rec.poll() is not None:
+                raise RuntimeError("O gravador parou antes da hora.")
+            # Parou de ser uma tela só com o wallpaper: interrompe e apaga o
+            # que já foi gravado (pode ter pego a janela/área nova).
+            why = interrupted(new_ws)
+            if why:
+                rec.terminate()
+                try:
+                    rec.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    rec.kill()
+                raw.unlink(missing_ok=True)
+                raise RuntimeError(f"Gravação interrompida: {why}. Nada foi salvo.")
+        rec.send_signal(2)
+        rec.wait(timeout=20)
+    except Exception as e:
+        state(state="error", name=name, msg=str(e))
+        notify("Cena → vídeo", str(e))
+        return 1
+    finally:
+        if orig_ws is not None:
+            dispatch(f"hl.dsp.focus({{ workspace = {orig_ws} }})")
+        if shell_stopped:
+            start_shell()
+
+    # ---- loop sem pulo ----
+    state(state="processing", name=name)
+    try:
+        frames = sample_frames(raw)
+        if len(frames) < (REF_T + MIN_LOOP + 1) * SAMPLE_FPS:
+            raise RuntimeError("A gravação ficou curta demais.")
+        cut_i, score = best_cut(frames)
+        t_cut = cut_i / SAMPLE_FPS
+        length = t_cut - REF_T
+        fc = (f"[0:v]split[a][b];[a]trim=start={FADE},setpts=PTS-STARTPTS[m];"
+              f"[b]trim=end={FADE},setpts=PTS-STARTPTS[h];"
+              f"[m][h]xfade=transition=fade:duration={FADE}:offset={length - 2 * FADE:.3f},"
+              f"scale=1920:1080:force_original_aspect_ratio=decrease,scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p[v]")
+        tmp = out.with_name("tmp_" + out.name)
+        r = subprocess.run(["ffmpeg", "-y", "-v", "error", "-ss", f"{REF_T}", "-t", f"{length:.3f}",
+                            "-i", str(raw), "-filter_complex", fc, "-map", "[v]", "-an",
+                            "-c:v", "libx264", "-crf", "20", "-preset", "medium",
+                            "-maxrate", "6M", "-bufsize", "12M", "-movflags", "+faststart", str(tmp)],
+                           capture_output=True, text=True)
+        if r.returncode != 0 or not tmp.exists():
+            tmp.unlink(missing_ok=True)
+            raise RuntimeError("ffmpeg falhou: " + (r.stderr or "").strip()[-160:])
+        tmp.replace(out)
+    except Exception as e:
+        state(state="error", name=name, msg=str(e))
+        notify("Cena → vídeo", str(e))
+        return 1
+    finally:
+        raw.unlink(missing_ok=True)
+
+    # Emenda: < 60 de diferença média (0-255²) em 64x36 é quase invisível.
+    seam = "clean" if score < 60 else "soft"
+    try:
+        ww_bus("Rescan")
+    except Exception:
+        pass
+    state(state="done", name=name, path=str(out), loop=round(length - FADE, 1), seam=seam,
+          in_library=in_library)
+    msg = f"{out.name} · loop de {length - FADE:.1f} s" + ("" if seam == "clean" else " · emenda suave")
+    if not in_library:
+        msg += f" · adicione a pasta {out_dir} no Waywallen"
+    notify("Cena convertida em vídeo", msg)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

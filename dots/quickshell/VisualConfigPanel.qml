@@ -853,6 +853,18 @@ PanelWindow {
         onExited: { win.vidState = ""; win.vidRescan(); }
     }
 
+    // ---- cena → vídeo (rice-scene-to-video) ----
+    // O script roda solto e para o Quickshell durante a gravação (o painel some
+    // junto); o estado fica num arquivo que este FileView relê ao voltar.
+    property var s2v: ({ state: "idle" })
+    FileView {
+        path: Quickshell.env("XDG_RUNTIME_DIR") + "/rice-scene-to-video.json"
+        watchChanges: true
+        printErrors: false
+        onFileChanged: reload()
+        onLoaded: { try { win.s2v = JSON.parse(text()); } catch (e) {} }
+    }
+
     // ---- perfis de desempenho (rice-perf-profile) ----
     // perf = { profile, values: {blur_level, shadows, anim_windows, ...} }.
     // Um pedido por vez: `running = true` num processo rodando é ignorado, então
@@ -5304,6 +5316,60 @@ PanelWindow {
                                         }
                                     }
                                     Item { implicitHeight: 4; visible: win.vidScan && win.vidScan.videos.length > 0 }
+                                }
+
+                                SectionHeader {
+                                    title: Theme.t("s2v.title", "Cena em vídeo")
+                                    subtitle: Theme.t("s2v.sub", "Grava a cena ativa por 30 s e salva como vídeo em loop, 1080p, na sua biblioteca de vídeos do Waywallen. Vídeo pesa bem menos que cena na placa integrada. A cena original continua lá.")
+                                }
+                                OptionGroup {
+                                    ColumnLayout {
+                                        Layout.fillWidth: true
+                                        Layout.leftMargin: 16
+                                        Layout.rightMargin: 16
+                                        Layout.topMargin: 10
+                                        spacing: 4
+                                        Repeater {
+                                            model: [
+                                                Theme.t("s2v.warn1", "Perde a interatividade da cena: reação ao som, ao mouse e ao relógio."),
+                                                Theme.t("s2v.warn2", "A tela fica ocupada por uns 40 s: vai para uma área de trabalho vazia, sem barra nem dock. Trocar de área ou abrir/focar um app cancela a gravação."),
+                                                Theme.t("s2v.warn3", "O loop é emendado no quadro mais parecido com o começo. Cena que nunca se repete fica com uma emenda suave, mas perceptível.")
+                                            ]
+                                            delegate: Text {
+                                                required property string modelData
+                                                Layout.fillWidth: true
+                                                text: "•  " + modelData
+                                                wrapMode: Text.WordWrap
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: 11
+                                                color: Theme.withAlpha(Theme.subtext, 0.85)
+                                            }
+                                        }
+                                    }
+                                    OptionRow {
+                                        title: win.s2v.state === "prepare" ? Theme.t("s2v.st_prepare", "Preparando…")
+                                            : win.s2v.state === "recording" ? Theme.t("s2v.st_recording", "Gravando…")
+                                            : win.s2v.state === "processing" ? Theme.t("s2v.st_processing", "Montando o loop…")
+                                            : win.s2v.state === "done" ? Theme.t("s2v.st_done", "Pronto: loop de %1 s").replace("%1", win.s2v.loop)
+                                                + (win.s2v.seam === "clean" ? "" : Theme.t("s2v.st_soft", " (emenda suave)"))
+                                            : win.s2v.state === "error" ? Theme.t("s2v.st_error", "Não deu certo")
+                                            : Theme.t("s2v.st_idle", "Converter a cena ativa")
+                                        subtitle: win.s2v.state === "error" ? (win.s2v.msg || "")
+                                            : win.s2v.state === "done" ? (win.s2v.path || "").split("/").pop() : ""
+                                        ActionBtn {
+                                            primary: true
+                                            minWidth: 0
+                                            readonly property bool busy: ["prepare", "recording", "processing"].includes(win.s2v.state)
+                                                && (Date.now() / 1000 - (win.s2v.time || 0)) < 180
+                                            text: busy ? Theme.t("s2v.busy", "Em andamento…") : Theme.t("s2v.go", "Gravar cena em vídeo")
+                                            opacity: busy ? 0.6 : 1
+                                            onClicked: {
+                                                if (busy) return;
+                                                win.s2v = { state: "prepare", time: Date.now() / 1000 };
+                                                Quickshell.execDetached(["rice-scene-to-video"]);
+                                            }
+                                        }
+                                    }
                                 }
 
                                 SectionHeader {

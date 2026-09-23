@@ -1461,5 +1461,19 @@
   "vid.nothing": "Nada para converter.",
   "vid.done": "Pronto: %1 de %2 convertidos (%3 MB → %4 MB).",
   "vid.error": "Falhou: ",
-  "vid.restored": "%1 vídeos voltaram ao original."
+  "vid.restored": "%1 vídeos voltaram ao original.",
+  "s2v.title": "Cena em vídeo",
+  "s2v.sub": "Grava a cena ativa por 30 s e salva como vídeo em loop, 1080p, na sua biblioteca de vídeos do Waywallen. Vídeo pesa bem menos que cena na placa integrada. A cena original continua lá.",
+  "s2v.warn1": "Perde a interatividade da cena: reação ao som, ao mouse e ao relógio.",
+  "s2v.warn2": "A tela fica ocupada por uns 40 s: vai para uma área de trabalho vazia, sem barra nem dock. Trocar de área ou abrir/focar um app cancela a gravação.",
+  "s2v.warn3": "O loop é emendado no quadro mais parecido com o começo. Cena que nunca se repete fica com uma emenda suave, mas perceptível.",
+  "s2v.st_prepare": "Preparando…",
+  "s2v.st_recording": "Gravando…",
+  "s2v.st_processing": "Montando o loop…",
+  "s2v.st_done": "Pronto: loop de %1 s",
+  "s2v.st_soft": " (emenda suave)",
+  "s2v.st_error": "Não deu certo",
+  "s2v.st_idle": "Converter a cena ativa",
+  "s2v.busy": "Em andamento…",
+  "s2v.go": "Gravar cena em vídeo"
 }
