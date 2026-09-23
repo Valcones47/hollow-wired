@@ -29,8 +29,12 @@ Roda solto do shell (o painel morre junto com o Quickshell): o progresso vai
 para $XDG_RUNTIME_DIR/rice-scene-to-video.json, que o painel observa.
 
 Uso:
-  rice-scene-to-video            # grava a cena ativa
-  rice-scene-to-video status     # imprime o estado atual (JSON)
+  rice-scene-to-video                 # grava a cena ativa
+  rice-scene-to-video status          # imprime o estado atual (JSON)
+  rice-scene-to-video where           # pasta de destino (JSON: dir, in_library, custom)
+  rice-scene-to-video set-dir <pasta|default>
+      pasta escolhida pelo usuário (~/.config/hollow-wired/scene-to-video.json);
+      "default" volta para a biblioteca de vídeos do Waywallen
 """
 
 import json
@@ -49,6 +53,8 @@ CACHE = HOME / ".cache/hollow-wired/scene-to-video"
 WW_ROOT = HOME / ".var/app/org.waywallen.waywallen"
 WW_DB = WW_ROOT / "data/waywallen/waywallen-v2.db"
 WW_CFG = WW_ROOT / "config/waywallen/config.toml"
+
+PREFS = HOME / ".config/hollow-wired/scene-to-video.json"
 
 RECORD_SECS = 30
 REF_T = 1.0          # quadro de referência do começo (pula o 1º segundo)
@@ -103,8 +109,8 @@ def current_scene():
     return row[1] or f"cena {last}"
 
 
-def video_library():
-    """Pasta real da biblioteca de vídeos do Waywallen (resolvendo o portal)."""
+def library_dirs():
+    """Pastas reais das bibliotecas de vídeo do Waywallen (resolvendo o portal)."""
     try:
         conn = sqlite3.connect(f"file:{WW_DB}?mode=ro", uri=True)
         rows = conn.execute("SELECT l.path FROM library l JOIN source_plugin sp ON sp.id = l.plugin_id "
@@ -122,10 +128,34 @@ def video_library():
                 docs[parts[0]] = parts[1]
     except OSError:
         pass
-    for (p,) in rows:
-        host = docs.get(p, p)
-        if os.path.isdir(host) and os.access(host, os.W_OK):
-            return Path(host), True
+    return [Path(docs.get(p, p)) for (p,) in rows]
+
+
+def chosen_dir():
+    try:
+        d = json.loads(PREFS.read_text()).get("dir") or ""
+    except Exception:
+        d = ""
+    return Path(d).expanduser() if d else None
+
+
+def output_dir():
+    """(pasta, está numa biblioteca do Waywallen, foi escolhida pelo usuário)."""
+    libs = [l.resolve() for l in library_dirs() if l.is_dir()]
+    custom = chosen_dir()
+    if custom:
+        c = custom.resolve()
+        inside = any(c == l or l in c.parents for l in libs)
+        return custom, inside, True
+    d, lib = video_library()
+    return d, lib, False
+
+
+def video_library():
+    """Primeira biblioteca de vídeo gravável do Waywallen, ou a pasta padrão."""
+    for host in library_dirs():
+        if host.is_dir() and os.access(host, os.W_OK):
+            return host, True
     # Sem biblioteca de vídeo: pasta padrão (o usuário adiciona no Waywallen).
     try:
         vids = subprocess.run(["xdg-user-dir", "VIDEOS"], capture_output=True, text=True).stdout.strip()
@@ -219,13 +249,24 @@ def main():
     if len(sys.argv) > 1 and sys.argv[1] == "status":
         print(STATE.read_text() if STATE.exists() else json.dumps({"state": "idle"}))
         return 0
+    if len(sys.argv) > 1 and sys.argv[1] == "where":
+        d, lib, custom = output_dir()
+        print(json.dumps({"dir": str(d), "in_library": lib, "custom": custom}, ensure_ascii=False))
+        return 0
+    if len(sys.argv) > 2 and sys.argv[1] == "set-dir":
+        PREFS.parent.mkdir(parents=True, exist_ok=True)
+        val = "" if sys.argv[2] == "default" else str(Path(sys.argv[2]).expanduser())
+        tmp = PREFS.with_suffix(".tmp")
+        tmp.write_text(json.dumps({"dir": val}, ensure_ascii=False, indent=2) + "\n")
+        tmp.replace(PREFS)
+        return 0
 
     name = current_scene()
     if not name:
         state(state="error", msg="O wallpaper ativo não é uma cena do Wallpaper Engine.")
         notify("Cena → vídeo", "O wallpaper ativo não é uma cena.")
         return 1
-    out_dir, in_library = video_library()
+    out_dir, in_library, _ = output_dir()
     out_dir.mkdir(parents=True, exist_ok=True)
     CACHE.mkdir(parents=True, exist_ok=True)
     raw = CACHE / "gravacao.mp4"
@@ -329,7 +370,7 @@ def main():
           in_library=in_library)
     msg = f"{out.name} · loop de {length - FADE:.1f} s" + ("" if seam == "clean" else " · emenda suave")
     if not in_library:
-        msg += f" · adicione a pasta {out_dir} no Waywallen"
+        msg += f" · a pasta {out_dir} não é uma biblioteca do Waywallen: adicione-a lá para o vídeo aparecer no seletor"
     notify("Cena convertida em vídeo", msg)
     return 0
 

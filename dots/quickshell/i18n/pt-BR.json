@@ -1475,5 +1475,9 @@
   "s2v.st_error": "Não deu certo",
   "s2v.st_idle": "Converter a cena ativa",
   "s2v.busy": "Em andamento…",
-  "s2v.go": "Gravar cena em vídeo"
+  "s2v.go": "Gravar cena em vídeo",
+  "s2v.save_in": "Salvar em: ",
+  "s2v.in_lib": "Biblioteca de vídeos do Waywallen: o vídeo aparece no seletor.",
+  "s2v.not_lib": "Esta pasta não é uma biblioteca do Waywallen: adicione-a lá para o vídeo aparecer no seletor.",
+  "s2v.default": "Padrão"
 }

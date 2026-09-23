@@ -857,6 +857,29 @@ PanelWindow {
     // O script roda solto e para o Quickshell durante a gravação (o painel some
     // junto); o estado fica num arquivo que este FileView relê ao voltar.
     property var s2v: ({ state: "idle" })
+    // Pasta de destino: { dir, in_library, custom } (rice-scene-to-video where).
+    property var s2vWhere: ({ dir: "", in_library: true, custom: false })
+    Process {
+        id: s2vWhereProc
+        command: ["rice-scene-to-video", "where"]
+        stdout: StdioCollector { onStreamFinished: { try { win.s2vWhere = JSON.parse(text); } catch (e) {} } }
+    }
+    Process {
+        id: s2vPickProc
+        command: ["rice-wallpaper-optimize", "pick-folder"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const d = text.trim();
+                if (d === "") return;
+                s2vSetProc.command = ["rice-scene-to-video", "set-dir", d];
+                s2vSetProc.running = true;
+            }
+        }
+    }
+    Process {
+        id: s2vSetProc
+        onExited: s2vWhereProc.running = true
+    }
     FileView {
         path: Quickshell.env("XDG_RUNTIME_DIR") + "/rice-scene-to-video.json"
         watchChanges: true
@@ -1290,6 +1313,7 @@ PanelWindow {
         loadHyprPrefsProc.running = true;
         perfGetProc.running = true;
         vidPrefsProc.running = true;
+        s2vWhereProc.running = true;
         loadMonitorsProc.running = true;
         checkBacklightProc.running = true;
         checkTouchpadProc.running = true;
@@ -5346,6 +5370,32 @@ PanelWindow {
                                             }
                                         }
                                     }
+                                    RowDivider {}
+                                    OptionRow {
+                                        title: Theme.t("s2v.save_in", "Salvar em: ") + String(win.s2vWhere.dir || "").replace(Quickshell.env("HOME"), "~")
+                                        subtitle: win.s2vWhere.in_library
+                                            ? Theme.t("s2v.in_lib", "Biblioteca de vídeos do Waywallen: o vídeo aparece no seletor.")
+                                            : Theme.t("s2v.not_lib", "Esta pasta não é uma biblioteca do Waywallen: adicione-a lá para o vídeo aparecer no seletor.")
+                                        Row {
+                                            spacing: 8
+                                            ActionBtn {
+                                                visible: win.s2vWhere.custom === true
+                                                minWidth: 0
+                                                text: Theme.t("s2v.default", "Padrão")
+                                                onClicked: {
+                                                    s2vSetProc.command = ["rice-scene-to-video", "set-dir", "default"];
+                                                    s2vSetProc.running = true;
+                                                }
+                                            }
+                                            ActionBtn {
+                                                minWidth: 0
+                                                icon: Theme.icons.folder
+                                                text: Theme.t("vid.pick", "Escolher pasta")
+                                                onClicked: if (!s2vPickProc.running) s2vPickProc.running = true
+                                            }
+                                        }
+                                    }
+                                    RowDivider {}
                                     OptionRow {
                                         title: win.s2v.state === "prepare" ? Theme.t("s2v.st_prepare", "Preparando…")
                                             : win.s2v.state === "recording" ? Theme.t("s2v.st_recording", "Gravando…")
