@@ -398,7 +398,8 @@ PanelWindow {
                             model: [
                                 { k: "bar", label: ShellLayout.barVertical ? Theme.t("edit.target_side_bar", "Barra lateral") : Theme.t("edit.target_top_bar", "Barra de cima") },
                                 { k: "side", label: Theme.t("edit.target_sidebar", "Central de ações") }
-                            ]
+                            ].concat(ShellLayout.dockFullWidth
+                                ? [{ k: "dock", label: Theme.t("edit.target_dock", "Dock") }] : [])
                             delegate: Rectangle {
                                 id: tg
                                 required property var modelData
@@ -431,12 +432,14 @@ PanelWindow {
                     Layout.fillWidth: true
                     spacing: 6
                     Repeater {
-                        model: itemsSec.target === "bar" ? ShellLayout.barCatalog : ShellLayout.sidebarCatalog
+                        model: itemsSec.target === "bar" ? ShellLayout.barCatalog
+                            : itemsSec.target === "dock" ? ShellLayout.dockCatalog : ShellLayout.sidebarCatalog
                         delegate: Rectangle {
                             id: chip
                             required property string modelData
-                            readonly property bool on: itemsSec.target === "bar"
-                                ? ShellLayout.barItems.includes(chip.modelData) : ShellLayout.sidebarHas(chip.modelData)
+                            readonly property bool on: itemsSec.target === "bar" ? ShellLayout.barItems.includes(chip.modelData)
+                                : itemsSec.target === "dock" ? ShellLayout.dockItems.includes(chip.modelData)
+                                : ShellLayout.sidebarHas(chip.modelData)
                             width: chipRow.implicitWidth + 20
                             height: 30
                             radius: 8
@@ -465,8 +468,11 @@ PanelWindow {
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: itemsSec.target === "bar"
-                                    ? ShellLayout.toggleBarItem(chip.modelData) : ShellLayout.toggleSidebarItem(chip.modelData)
+                                onClicked: {
+                                    if (itemsSec.target === "bar") ShellLayout.toggleBarItem(chip.modelData);
+                                    else if (itemsSec.target === "dock") ShellLayout.toggleDockItem(chip.modelData);
+                                    else ShellLayout.toggleSidebarItem(chip.modelData);
+                                }
                             }
                         }
                     }

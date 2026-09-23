@@ -1495,5 +1495,12 @@
   "welcome.lock_desc": "Shows up when you lock and when the PC wakes from sleep. To leave, just type your password.",
   "welcome.lock_try": "Try it",
   "welcome.blur_title": "Blur behind windows",
-  "welcome.blur_desc": "Looks nice, but weighs on integrated graphics. Super + B turns it on and off anytime."
+  "welcome.blur_desc": "Looks nice, but weighs on integrated graphics. Super + B turns it on and off anytime.",
+  "dock.power": "Power",
+  "dock.lock": "Lock",
+  "dock.suspend": "Suspend",
+  "dock.logout": "Log out",
+  "dock.reboot": "Restart",
+  "dock.poweroff": "Shut down",
+  "edit.target_dock": "Dock"
 }

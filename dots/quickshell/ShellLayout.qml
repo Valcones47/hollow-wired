@@ -125,6 +125,27 @@ QtObject {
         root.setBarItems(list);
     }
 
+    // Lado direito da dock de ponta a ponta (como a área de notificação da
+    // barra de tarefas do Windows): o que a sidebar mostraria. Lista ordenada
+    // em dock.items; só aparece com dockFullWidth.
+    readonly property var dockCatalog: ["tray", "updates", "record", "night", "caffeine", "gpu", "lock", "power"]
+    readonly property var dockItemsDefault: ["tray", "updates", "night", "caffeine", "power"]
+    readonly property var dockItems: {
+        const saved = get("dock", "items", null);
+        if (!Array.isArray(saved)) return root.dockItemsDefault;
+        const out = [];
+        for (const k of saved) if (root.dockCatalog.includes(k) && !out.includes(k)) out.push(k);
+        return out;
+    }
+    function dockHas(key) { return root.dockFullWidth && root.dockItems.includes(key); }
+    function toggleDockItem(key) {
+        const list = root.dockItems.slice();
+        const i = list.indexOf(key);
+        if (i >= 0) list.splice(i, 1);
+        else list.push(key);
+        root.set("dock", "items", list);
+    }
+
     // Sidebar da direita (central de ações): liga/desliga por item, tudo ligado
     // por padrão. Independente da barra (um item pode estar nas duas).
     readonly property var sidebarCatalog: ["avatar", "update", "record", "night", "caffeine", "gpu",
@@ -187,10 +208,14 @@ QtObject {
             dock: { enabled: true, position: "bottom", autohide: true, fullWidth: false },
             sidebar: { enabled: true, position: "right", autohide: true }
         },
+        // Estilo Windows: barra de tarefas (dock de ponta a ponta sempre à
+        // mostra) com a "área de notificação" à direita — o que a sidebar
+        // mostraria vai para lá, então a sidebar fica desligada. A barra de
+        // cima continua (o Windows não tem, mas o usuário quis manter).
         taskbar: {
             bar: { enabled: true, position: "top", autohide: false, workspaceCount: 9, showTitle: true },
             dock: { enabled: true, position: "bottom", autohide: false, fullWidth: true },
-            sidebar: { enabled: true, position: "right", autohide: false }
+            sidebar: { enabled: false, position: "right", autohide: true }
         },
         sidebar: {
             bar: { enabled: true, position: "left", autohide: false, workspaceCount: 9, showTitle: false },

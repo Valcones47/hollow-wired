@@ -1495,5 +1495,12 @@
   "welcome.lock_desc": "Aparece ao bloquear e quando o PC volta da suspensão. Para sair, é só digitar a senha.",
   "welcome.lock_try": "Testar",
   "welcome.blur_title": "Desfoque atrás das janelas",
-  "welcome.blur_desc": "Fica bonito, mas pesa em placa integrada. Super + B liga e desliga a qualquer hora."
+  "welcome.blur_desc": "Fica bonito, mas pesa em placa integrada. Super + B liga e desliga a qualquer hora.",
+  "dock.power": "Energia",
+  "dock.lock": "Bloquear",
+  "dock.suspend": "Suspender",
+  "dock.logout": "Sair da sessão",
+  "dock.reboot": "Reiniciar",
+  "dock.poweroff": "Desligar",
+  "edit.target_dock": "Dock"
 }

@@ -5,6 +5,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Hyprland
 import Quickshell.Widgets
+import Quickshell.Services.SystemTray
 import "."
 
 // Dock inferior, mesma linguagem da sidebar/top bar: sai de dentro da
@@ -43,6 +44,9 @@ PanelWindow {
     // ================= visibilidade =================
     property bool hovered: false
     property bool launcherOpen: false
+    // A sidebar (EnergySidebar): estados/ações dos itens do lado direito
+    // (updates, luz noturna, café, gravação, GPU). Ligada no shell.qml.
+    property var energy: null
     readonly property bool hasFullscreen: (Hyprland.focusedWorkspace && Hyprland.focusedWorkspace.hasFullscreen) || false
     readonly property bool allowHover: !hasFullscreen || launcherOpen
     property bool gamesEdit: false
@@ -151,7 +155,7 @@ PanelWindow {
     }
 
     // ================= popup =================
-    property string pop: ""          // "" | app | games
+    property string pop: ""          // "" | app | games | power
     property var popItem: null
     property real popAnchorX: 0
     Timer { id: popHide; interval: 260; onTriggered: dock.pop = "" }
@@ -591,6 +595,160 @@ PanelWindow {
                     }
                 }
             }
+
+            // ---------- lado direito (dock de ponta a ponta) ----------
+            // A "área de notificação" do estilo Windows: bandeja de apps e os
+            // atalhos que ficariam na sidebar (ShellLayout.dockItems, escolhidos
+            // no modo edição). Só com a dock de ponta a ponta.
+            RowLayout {
+                id: rightRow
+                visible: ShellLayout.dockFullWidth && ShellLayout.dockItems.length > 0
+                anchors.right: parent.right
+                anchors.rightMargin: 14
+                y: dock.dockH - root.bodyH + (dock.dockH - height) / 2
+                spacing: 2
+                opacity: root.bodyH / dock.dockH
+
+                component TrayBtn: Rectangle {
+                    id: tb
+                    property string icon: ""
+                    property color tint: Theme.textColor
+                    property string badge: ""
+                    signal activated()
+                    implicitWidth: 38
+                    implicitHeight: 38
+                    radius: 10
+                    color: tbArea.containsMouse ? Theme.tileHigh : "transparent"
+                    Text {
+                        anchors.centerIn: parent
+                        text: tb.icon
+                        font.family: Theme.iconFontFamily
+                        font.pixelSize: 18
+                        color: tb.tint
+                    }
+                    Rectangle {
+                        visible: tb.badge !== ""
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        anchors.margins: 2
+                        width: Math.max(14, tbBadge.implicitWidth + 6)
+                        height: 14
+                        radius: 7
+                        color: Theme.primary
+                        Text {
+                            id: tbBadge
+                            anchors.centerIn: parent
+                            text: tb.badge
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 9
+                            font.weight: Font.Bold
+                            color: Theme.background
+                        }
+                    }
+                    MouseArea {
+                        id: tbArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: tb.activated()
+                    }
+                }
+
+                // bandeja de apps
+                Repeater {
+                    model: ShellLayout.dockHas("tray") ? SystemTray.items : []
+                    delegate: Item {
+                        id: trayIt
+                        required property SystemTrayItem modelData
+                        implicitWidth: 30
+                        implicitHeight: 38
+                        Rectangle {
+                            anchors.fill: parent
+                            anchors.margins: 2
+                            radius: 8
+                            color: trayItArea.containsMouse ? Theme.tileHigh : "transparent"
+                        }
+                        IconImage {
+                            anchors.centerIn: parent
+                            implicitSize: 18
+                            source: trayIt.modelData.icon
+                            opacity: trayIt.modelData.status === Status.Passive ? 0.6 : 1
+                        }
+                        MouseArea {
+                            id: trayItArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+                            onClicked: mouse => {
+                                const it = trayIt.modelData;
+                                if (mouse.button === Qt.MiddleButton) it.secondaryActivate();
+                                else if (mouse.button === Qt.RightButton || it.onlyMenu) {
+                                    // menu do próprio app, abrindo para cima
+                                    const p = trayIt.mapToItem(null, 0, 0);
+                                    it.display(dock, p.x, p.y - 8);
+                                } else it.activate();
+                            }
+                            onWheel: w => trayIt.modelData.scroll(w.angleDelta.y, false)
+                        }
+                    }
+                }
+                Rectangle {
+                    visible: ShellLayout.dockHas("tray") && SystemTray.items.values.length > 0
+                        && ShellLayout.dockItems.length > 1
+                    Layout.leftMargin: 4
+                    Layout.rightMargin: 4
+                    implicitWidth: 1
+                    implicitHeight: 26
+                    color: Theme.withAlpha(Theme.outline, 0.45)
+                }
+                TrayBtn {
+                    visible: ShellLayout.dockHas("updates")
+                    icon: Theme.icons.update
+                    tint: dock.energy && dock.energy.updateCount > 0 ? Theme.primary : Theme.textColor
+                    badge: dock.energy && dock.energy.updateCount > 0
+                        ? (dock.energy.updateCount > 99 ? "99+" : String(dock.energy.updateCount)) : ""
+                    onActivated: if (dock.energy) dock.energy.runUpdate()
+                }
+                TrayBtn {
+                    visible: ShellLayout.dockHas("record")
+                    icon: Theme.icons.record
+                    tint: dock.energy && dock.energy.recording ? Theme.critical : Theme.textColor
+                    onActivated: {
+                        if (dock.energy && dock.energy.recording) dock.energy.stopRecording();
+                        else Quickshell.execDetached(["rice-record", "full"]);
+                    }
+                }
+                TrayBtn {
+                    visible: ShellLayout.dockHas("night")
+                    icon: Theme.icons.night
+                    tint: dock.energy && dock.energy.nightLight ? Theme.primary : Theme.textColor
+                    onActivated: if (dock.energy) dock.energy.toggleNight()
+                }
+                TrayBtn {
+                    visible: ShellLayout.dockHas("caffeine")
+                    icon: dock.energy && dock.energy.caffeine ? Theme.icons.coffee : Theme.icons.coffeeOff
+                    tint: dock.energy && dock.energy.caffeine ? Theme.primary : Theme.textColor
+                    onActivated: if (dock.energy) dock.energy.toggleCaffeine()
+                }
+                TrayBtn {
+                    visible: ShellLayout.dockHas("gpu")
+                    icon: Theme.icons.gpu
+                    tint: dock.energy && dock.energy.nvidiaState === "active" ? Theme.primary : Theme.subtext
+                }
+                TrayBtn {
+                    visible: ShellLayout.dockHas("lock")
+                    icon: Theme.icons.lock
+                    onActivated: Quickshell.execDetached(["rice-session-action", "lock"])
+                }
+                TrayBtn {
+                    id: powerBtn
+                    visible: ShellLayout.dockHas("power")
+                    icon: Theme.icons.power
+                    tint: Theme.secondary
+                    onActivated: dock.pop === "power" ? dock.pop = "" : dock.showPop("power", null, powerBtn)
+                }
+            }
         }
 
         // ================= popup =================
@@ -614,7 +772,8 @@ PanelWindow {
                 implicitHeight: current ? current.implicitHeight : 0
                 width: implicitWidth
                 height: implicitHeight
-                readonly property Item current: dock.pop === "app" ? appPop : dock.pop === "games" ? gamesPop : null
+                readonly property Item current: dock.pop === "app" ? appPop : dock.pop === "games" ? gamesPop
+                    : dock.pop === "power" ? powerPop : null
                 opacity: root.popTargetW > 0 && Math.abs(root.popW - root.popTargetW) < 30
                     && Math.abs(root.popH - root.popTargetH) < 30 ? 1 : 0
                 Behavior on opacity { NumberAnimation { duration: Theme.ms(130) } }
@@ -705,6 +864,34 @@ PanelWindow {
                         selected: appPop.item && appPop.item.pinned
                         label: appPop.item && appPop.item.pinned ? Theme.t("launcher.unpin_dock", "Desafixar da dock") : Theme.t("launcher.pin_dock", "Fixar na dock")
                         onActivated: DockConfig.togglePin(appPop.item.key)
+                    }
+                }
+
+                // ---------- energia (botão da direita) ----------
+                ColumnLayout {
+                    id: powerPop
+                    visible: popContent.current === powerPop
+                    width: 220
+                    spacing: 4
+                    PopTitle { text: Theme.t("dock.power", "Energia") }
+                    Repeater {
+                        model: [
+                            { icon: Theme.icons.lock, label: Theme.t("dock.lock", "Bloquear"), act: "lock", confirm: false },
+                            { icon: Theme.icons.sleep, label: Theme.t("dock.suspend", "Suspender"), act: "suspend", confirm: false },
+                            { icon: Theme.icons.logout, label: Theme.t("dock.logout", "Sair da sessão"), act: "logout", confirm: true },
+                            { icon: Theme.icons.restart, label: Theme.t("dock.reboot", "Reiniciar"), act: "reboot", confirm: true },
+                            { icon: Theme.icons.power, label: Theme.t("dock.poweroff", "Desligar"), act: "poweroff", confirm: true }
+                        ]
+                        delegate: PopAction {
+                            required property var modelData
+                            icon: modelData.icon
+                            label: modelData.label
+                            needsConfirm: modelData.confirm
+                            onActivated: {
+                                dock.pop = "";
+                                Quickshell.execDetached(["rice-session-action", modelData.act]);
+                            }
+                        }
                     }
                 }
 

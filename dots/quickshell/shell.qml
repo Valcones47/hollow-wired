@@ -231,6 +231,7 @@ ShellRoot {
 
     Dock {
         id: dock
+        energy: sidebar
         launcherOpen: shellRoot.launcherOpen
     }
 
