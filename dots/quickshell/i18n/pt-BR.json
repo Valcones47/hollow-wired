@@ -186,8 +186,8 @@
   "settings.desc_store": "Atualizar & Instalar",
   "settings.cat_presets": "Perfis & Cópias de Segurança",
   "settings.desc_presets": "Estilos & Restauração",
-  "settings.cat_shell_custom": "Customização do Shell",
-  "settings.desc_shell_custom": "Hub, Barra & Dock",
+  "settings.cat_shell_custom": "Hub, barra e dock",
+  "settings.desc_shell_custom": "Estilo e apps fixados",
   "shell_custom.target_comp": "Componente Alvo",
   "shell_custom.hub": "Hub Central",
   "shell_custom.sidebar": "Barra Lateral",
@@ -1340,5 +1340,7 @@
   "header.title_20": "Organização da interface",
   "header.title_21": "Atalhos do teclado",
   "header.sub_20": "Onde ficam a barra, a dock e a central de ações.",
-  "header.sub_21": "Crie e troque atalhos."
+  "header.sub_21": "Crie e troque atalhos.",
+  "layout.dock_pins": "Apps fixados",
+  "layout.dock_pins_desc": "Setas mudam a ordem, × tira da dock. Para fixar, clique com o botão direito num app aberto na dock ou no launcher."
 }

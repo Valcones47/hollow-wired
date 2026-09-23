@@ -1600,6 +1600,15 @@ PanelWindow {
         }
     }
 
+    component OptionRowText: ColumnLayout {
+        property string title: ""
+        property string subtitle: ""
+        Layout.fillWidth: true
+        spacing: 2
+        Text { Layout.fillWidth: true; text: parent.title; font.family: Theme.fontFamily; font.pixelSize: 13; color: Theme.textColor }
+        Text { Layout.fillWidth: true; visible: parent.subtitle !== ""; text: parent.subtitle; wrapMode: Text.WordWrap; font.family: Theme.fontFamily; font.pixelSize: 11; color: Theme.withAlpha(Theme.subtext, 0.8) }
+    }
+
     // Toggle dentro de um OptionGroup (mesma chave do CfgToggle, com a linha).
     component OptionToggle: OptionRow {
         id: otg
@@ -2142,11 +2151,11 @@ PanelWindow {
                             // numa lista corrida, sem separação: achar "Rede" ou
                             // "Armazenamento" exigia ler a lista inteira.
                             readonly property var navItems: [
-                                { group: "look", tabIndex: 8, name: Theme.t("settings.cat_wallust", "Cores & Papel de Parede"), icon: Theme.icons.palette, desc: Theme.t("settings.desc_wallust", "Cores da tela toda"), keywords: "cores color colors wallust tema theme wallpaper papel de parede paleta palette dinamica accent visual fundo transicao transição transition onda wave varredura circulo fade" },
                                 { group: "look", tabIndex: 9, name: Theme.t("settings.cat_effects", "Efeitos & Janelas"), icon: Theme.icons.laptop, desc: Theme.t("settings.desc_effects", "Bordas & Animações"), keywords: "efeitos effects janelas windows blur desfoque bordas borders sombras shadows sddm animacoes animations transparência luz noturna curvas bezier curves velocidade" },
                                 { group: "custom", tabIndex: 20, name: Theme.t("settings.cat_layout", "Organização da Interface"), icon: Theme.icons.dashboard, desc: Theme.t("settings.desc_layout", "Onde fica cada barra"), keywords: "organizacao layout arranjo interface barra topbar dock sidebar lateral taskbar windows areas de trabalho workspaces hover esconder largura total posicao preset estilo" },
+                                { group: "custom", tabIndex: 8, name: Theme.t("settings.cat_wallust", "Cores & Papel de Parede"), icon: Theme.icons.palette, desc: Theme.t("settings.desc_wallust", "Cores da tela toda"), keywords: "cores color colors wallust tema theme wallpaper papel de parede paleta palette dinamica accent visual fundo transicao transição transition onda wave varredura circulo fade" },
                                 { group: "custom", tabIndex: 21, name: Theme.t("settings.cat_binds", "Atalhos do Teclado"), icon: Theme.icons.keyboard, desc: Theme.t("settings.desc_binds", "Criar e trocar atalhos"), keywords: "atalhos shortcuts teclas binds keybinds combinacao gravar programa abrir steam heroic jogos discord mute deafen microfone push to talk user-binds" },
-                                { group: "custom", tabIndex: 18, name: Theme.t("settings.cat_shell_custom", "Customização do Shell"), icon: Theme.icons.tune, desc: Theme.t("settings.desc_shell_custom", "Hub, Sidebar & Dock"), keywords: "shell quickshell customizacao dock topbar barra sidebar hub aparencia widgets glass solid glow borderless escala" },
+                                { group: "custom", tabIndex: 18, name: Theme.t("settings.cat_shell_custom", "Customização do Shell"), icon: Theme.icons.tune, desc: Theme.t("settings.desc_shell_custom", "Hub, Sidebar & Dock"), keywords: "fixados fixar pinned icones apps dock shell quickshell customizacao topbar barra sidebar hub aparencia widgets glass solid glow borderless escala" },
                                 { group: "look", tabIndex: 2, name: Theme.t("settings.cat_mako", "Notificações"), icon: Theme.icons.bell, desc: Theme.t("settings.desc_mako", "Posição & Estilo"), keywords: "mako notificacoes notifications som posicao borda alert toast banner avisos" },
                                 { group: "look", tabIndex: 1, name: Theme.t("settings.cat_kitty", "Kitty Terminal"), icon: Theme.icons.console, desc: Theme.t("settings.desc_kitty", "Fonte & Opacidade"), keywords: "kitty terminal console fonte font opacidade padding cursor audio blur som transparencia" },
                                 { group: "look", tabIndex: 0, name: Theme.t("settings.cat_fastfetch", "Fastfetch"), icon: Theme.icons.packages, desc: Theme.t("settings.desc_fastfetch", "Logo & Módulos"), keywords: "fastfetch neofetch logo distro terminal specs cpu ram hardware modelo" },
@@ -9481,6 +9490,77 @@ PanelWindow {
                                         title: Theme.t("layout.dock_full", "Ocupar a largura toda")
                                         checked: ShellLayout.dockFullWidth
                                         onToggled: nv => ShellLayout.set("dock", "fullWidth", nv)
+                                    }
+                                    RowDivider {}
+                                    // Apps fixados na dock: antes só dava para mexer com o botão
+                                    // direito na própria dock, e ninguém achava.
+                                    ColumnLayout {
+                                        Layout.fillWidth: true
+                                        Layout.margins: 16
+                                        Layout.topMargin: 11
+                                        spacing: 10
+                                        OptionRowText {
+                                            title: Theme.t("layout.dock_pins", "Apps fixados")
+                                            subtitle: Theme.t("layout.dock_pins_desc", "Setas mudam a ordem, × tira da dock. Para fixar, clique com o botão direito num app aberto na dock ou no launcher.")
+                                        }
+                                        Flow {
+                                            Layout.fillWidth: true
+                                            spacing: 6
+                                            Repeater {
+                                                model: DockConfig.pins
+                                                delegate: Rectangle {
+                                                    id: pinChip
+                                                    required property var modelData
+                                                    required property int index
+                                                    readonly property var entry: DesktopEntries.byId(pinChip.modelData) || DesktopEntries.heuristicLookup(pinChip.modelData)
+                                                    width: pinRow.implicitWidth + 16
+                                                    height: 34
+                                                    radius: 8
+                                                    color: Theme.tileHigh
+                                                    Row {
+                                                        id: pinRow
+                                                        anchors.centerIn: parent
+                                                        spacing: 6
+                                                        Text {
+                                                            anchors.verticalCenter: parent.verticalCenter
+                                                            visible: pinChip.index > 0
+                                                            text: "‹"
+                                                            font.pixelSize: 16
+                                                            color: pinLeft.containsMouse ? Theme.textColor : Theme.subtext
+                                                            MouseArea { id: pinLeft; anchors.fill: parent; anchors.margins: -4; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: DockConfig.movePin(pinChip.index, pinChip.index - 1) }
+                                                        }
+                                                        Image {
+                                                            anchors.verticalCenter: parent.verticalCenter
+                                                            width: 18; height: 18
+                                                            sourceSize: Qt.size(36, 36)
+                                                            source: Quickshell.iconPath(pinChip.entry ? pinChip.entry.icon : pinChip.modelData, "application-x-executable")
+                                                        }
+                                                        Text {
+                                                            anchors.verticalCenter: parent.verticalCenter
+                                                            text: pinChip.entry ? pinChip.entry.name : pinChip.modelData
+                                                            font.family: Theme.fontFamily
+                                                            font.pixelSize: 12
+                                                            color: Theme.textColor
+                                                        }
+                                                        Text {
+                                                            anchors.verticalCenter: parent.verticalCenter
+                                                            visible: pinChip.index < DockConfig.pins.length - 1
+                                                            text: "›"
+                                                            font.pixelSize: 16
+                                                            color: pinRight.containsMouse ? Theme.textColor : Theme.subtext
+                                                            MouseArea { id: pinRight; anchors.fill: parent; anchors.margins: -4; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: DockConfig.movePin(pinChip.index, pinChip.index + 1) }
+                                                        }
+                                                        Text {
+                                                            anchors.verticalCenter: parent.verticalCenter
+                                                            text: "×"
+                                                            font.pixelSize: 15
+                                                            color: pinX.containsMouse ? Theme.critical : Theme.subtext
+                                                            MouseArea { id: pinX; anchors.fill: parent; anchors.margins: -4; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: DockConfig.togglePin(pinChip.modelData) }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
                                 }
 

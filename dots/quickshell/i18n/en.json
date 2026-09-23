@@ -186,8 +186,8 @@
   "settings.desc_store": "Update & Install",
   "settings.cat_presets": "Profiles & Backups",
   "settings.desc_presets": "Styles & Restoration",
-  "settings.cat_shell_custom": "Shell Customization",
-  "settings.desc_shell_custom": "Hub, Bar & Dock",
+  "settings.cat_shell_custom": "Hub, bar & dock",
+  "settings.desc_shell_custom": "Style and pinned apps",
   "shell_custom.target_comp": "Target Component",
   "shell_custom.hub": "Central Hub",
   "shell_custom.sidebar": "Sidebar",
@@ -1340,5 +1340,7 @@
   "header.title_20": "Interface layout",
   "header.title_21": "Keyboard shortcuts",
   "header.sub_20": "Where the bar, dock and action center go.",
-  "header.sub_21": "Create and change shortcuts."
+  "header.sub_21": "Create and change shortcuts.",
+  "layout.dock_pins": "Pinned apps",
+  "layout.dock_pins_desc": "Arrows change the order, × unpins. To pin, right-click an open app in the dock or in the launcher."
 }
