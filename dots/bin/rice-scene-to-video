@@ -34,8 +34,11 @@ Uso:
   rice-scene-to-video status          # imprime o estado atual (JSON)
   rice-scene-to-video where           # pasta de destino (JSON: dir, in_library, custom)
   rice-scene-to-video set-quality <auto|full|compat>
-      full   = HEVC 4:4:4 (cor na resolução inteira; Intel de 11ª geração em
-               diante decodifica por hardware, as mais antigas usam a CPU)
+      full   = HEVC 4:2:0 em 4K, com cada pixel da gravação 1080p duplicado 2x2:
+               a cor (metade da resolução no 4:2:0) fica em 1920x1080, ou seja,
+               cor completa, e o Waywallen reduz para 1080p sem perda (média de
+               4 pixels iguais). 4:4:4 de verdade não serve: o player de vídeo
+               do Waywallen só aceita NV12 ("expected two NV12 planes")
       compat = H.264 4:2:0 (qualquer placa decodifica; a cor fica em metade da
                resolução e cena vermelha/escura perde nitidez)
       auto   = full em Intel de 11ª geração em diante, compat no resto
@@ -93,7 +96,7 @@ def dispatch(lua):
 
 def ww_bus(method):
     subprocess.run(["busctl", "--user", "call", "org.waywallen.waywallen.Daemon",
-                    "/org/waywallen/waywallen/Daemon", "org.waywallen.waywallen.Daemon", method],
+                    "/org/waywallen/waywallen/Daemon", "org.waywallen.waywallen.Daemon1", method],
                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5)
 
 
@@ -158,13 +161,13 @@ def chosen_dir():
 
 
 def auto_quality():
-    """HEVC 4:4:4 só onde o hardware decodifica: Intel de 11ª geração em diante."""
+    """HEVC 4K por hardware: Intel de 7ª geração em diante (e Core Ultra)."""
     try:
         cpu = next((l for l in open("/proc/cpuinfo") if l.startswith("model name")), "")
     except OSError:
         cpu = ""
     m = re.search(r"(\d+)th Gen Intel", cpu)
-    if (m and int(m.group(1)) >= 11) or "Core(TM) Ultra" in cpu or "Core Ultra" in cpu:
+    if (m and int(m.group(1)) >= 7) or "Core(TM) Ultra" in cpu or "Core Ultra" in cpu:
         return "full"
     return "compat"
 
@@ -404,10 +407,11 @@ def main():
               f"[b]trim=end={FADE},setpts=PTS-STARTPTS[h];"
               f"[m][h]xfade=transition=fade:duration={FADE}:offset={length - 2 * FADE:.3f},"
               f"scale=1920:1080:force_original_aspect_ratio=decrease,scale=trunc(iw/2)*2:trunc(ih/2)*2,"
-              f"format={'yuv444p' if q == 'full' else 'yuv420p'}[v]")
+              + ("scale=iw*2:ih*2:flags=neighbor," if q == "full" else "")
+              + "format=yuv420p[v]")
         if q == "full":
             enc = ["-c:v", "libx265", "-crf", "18", "-preset", "medium", "-tag:v", "hvc1",
-                   "-x265-params", "log-level=error"]
+                   "-profile:v", "main", "-x265-params", "log-level=error"]
         else:
             # Qualidade alta de propósito: com CRF 20 + teto de 6 Mbps a cena
             # (granulada, vermelho saturado) saiu com 2,7 Mbps. tune grain guarda

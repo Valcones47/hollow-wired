@@ -5374,7 +5374,7 @@ PanelWindow {
                                     OptionRow {
                                         title: Theme.t("s2v.quality", "Qualidade")
                                         subtitle: (win.s2vWhere.quality === "full"
-                                            ? Theme.t("s2v.q_full_desc", "Cor completa (HEVC 4:4:4): nítido como a cena. Intel de 11ª geração em diante decodifica pela placa; nas mais antigas usa a CPU.")
+                                            ? Theme.t("s2v.q_full_desc", "Cor completa (HEVC em 4K): cada pixel da gravação vira 2×2, então a cor fica inteira e o Waywallen reduz para 1080p sem perda. Arquivo maior; decodificado pela placa (Intel de 7ª geração em diante).")
                                             : Theme.t("s2v.q_compat_desc", "Compatível (H.264): qualquer placa decodifica, mas a cor fica em metade da resolução e cena vermelha ou escura perde nitidez."))
                                             + (win.s2vWhere.quality_setting === "auto" ? Theme.t("s2v.q_auto_note", " Escolhido automaticamente para este PC.") : "")
                                         Segmented {

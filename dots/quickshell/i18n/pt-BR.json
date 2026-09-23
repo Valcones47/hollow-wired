@@ -1481,7 +1481,7 @@
   "s2v.not_lib": "Esta pasta não é uma biblioteca do Waywallen: adicione-a lá para o vídeo aparecer no seletor.",
   "s2v.default": "Padrão",
   "s2v.quality": "Qualidade",
-  "s2v.q_full_desc": "Cor completa (HEVC 4:4:4): nítido como a cena. Intel de 11ª geração em diante decodifica pela placa; nas mais antigas usa a CPU.",
+  "s2v.q_full_desc": "Cor completa (HEVC em 4K): cada pixel da gravação vira 2×2, então a cor fica inteira e o Waywallen reduz para 1080p sem perda. Arquivo maior; decodificado pela placa (Intel de 7ª geração em diante).",
   "s2v.q_compat_desc": "Compatível (H.264): qualquer placa decodifica, mas a cor fica em metade da resolução e cena vermelha ou escura perde nitidez.",
   "s2v.q_auto_note": " Escolhido automaticamente para este PC.",
   "s2v.q_auto": "Automática",
