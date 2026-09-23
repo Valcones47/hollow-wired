@@ -117,11 +117,9 @@ Scope {
         from: 0
         to: 1
         duration: fadeScope.coverMs
-        // Na onda a mancha sai devagar da borda e desacelera no fim, sem o
-        // arranque do ease do CSS (que cobria 70% da tela no primeiro terço).
-        // Os outros estilos seguem a curva do swww (0.25,0.1,0.25,1.0), que
-        // arranca rápido e assenta devagar.
-        onFinished: if (fadeScope.revealQueued) fadeScope.reveal()
+        // Ao término da animação, a camada se retira imediatamente para o vídeo
+        // aparecer na tela sem nenhuma pausa estática.
+        onFinished: fadeScope.reveal()
         easing.type: Easing.Bezier
         easing.bezierCurve: fadeScope.style === "wave" ? [0.4, 0.0, 0.25, 1.0, 1.0, 1.0]
                                                        : [0.25, 0.1, 0.25, 1.0, 1.0, 1.0]
