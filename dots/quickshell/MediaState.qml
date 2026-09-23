@@ -123,6 +123,27 @@ Singleton {
         return h > 0 ? h + ":" + (m < 10 ? "0" : "") + m + ":" + ss : m + ":" + ss;
     }
 
+    // ---------- nível do som (disco da barra) ----------
+    // Um cava leve (cava-bar.conf, 8 faixas) só enquanto algo toca e alguém
+    // mostra o disco (levelWanted, ligado pela TopBar). level = média 0..1.
+    property bool levelWanted: false
+    property real level: 0
+    property Process levelProc: Process {
+        running: root.levelWanted && root.player !== null && root.playing
+        command: ["cava", "-p", Quickshell.env("HOME") + "/.config/quickshell/cava-bar.conf"]
+        stdout: SplitParser {
+            splitMarker: "\n"
+            onRead: line => {
+                const parts = line.split(";").filter(x => x.length > 0).map(Number);
+                if (parts.length === 0) return;
+                let sum = 0;
+                for (const v of parts) sum += v;
+                root.level = Math.max(0, Math.min(1, sum / parts.length / 100));
+            }
+        }
+        onRunningChanged: if (!running) root.level = 0
+    }
+
     // ---------- volume do app ----------
     function matches(n) {
         if (root.key === "") return false;

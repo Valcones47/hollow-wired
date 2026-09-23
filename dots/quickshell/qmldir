@@ -36,6 +36,7 @@ Welcome 1.0 Welcome.qml
 EditMode 1.0 EditMode.qml
 ControlCenter 1.0 ControlCenter.qml
 singleton MediaState 1.0 MediaState.qml
+MediaDisc 1.0 MediaDisc.qml
 WelcomeMark 1.0 WelcomeMark.qml
 GlitchText 1.0 GlitchText.qml
 WiredRain 1.0 WiredRain.qml

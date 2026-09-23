@@ -633,6 +633,13 @@ PanelWindow {
                 }
             }
 
+            // O cava leve do disco só roda com o disco à mostra.
+            Binding {
+                target: MediaState
+                property: "levelWanted"
+                value: mediaMod.visible && bar.visible
+            }
+
             // ---------- mídia: à esquerda do relógio (fora da ordem da direita) ----------
             // Só ícone: nota musical com um player aberto (tocando ou pausado),
             // equalizador sem nada. O hover abre o popup com a mídia, o volume do
@@ -653,10 +660,16 @@ PanelWindow {
                 // roda: volume do app que está tocando (MediaState)
                 onWheel: d => MediaState.wheel(d)
                 onHoverIn: if (!MediaState.player) bar.mediaTab = "eq"
+                // Com player (tocando ou pausado): o disco com a capa, girando e
+                // ondulando com o som. Sem nada: o ícone do equalizador.
+                MediaDisc {
+                    visible: MediaState.player !== null
+                    size: 22
+                }
                 BarIcon {
-                    text: MediaState.player ? Theme.icons.music : Theme.icons.equalizer
-                    color: MediaState.player && MediaState.playing ? Theme.primary
-                        : (!MediaState.player && EqService.enabled ? Theme.primary : Theme.textColor)
+                    visible: MediaState.player === null
+                    text: Theme.icons.equalizer
+                    color: EqService.enabled ? Theme.primary : Theme.textColor
                 }
             }
 
