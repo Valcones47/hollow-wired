@@ -35,11 +35,12 @@ Scope {
 
     property string style: "wipe"
 
-    // Tempos calibrados para transição contínua sem pausa perceptível:
-    // a cobertura varre a tela e a revelação ocorre em fluxo contínuo.
-    property int coverMs: 550
+    // Tempos calibrados para sincronização quadro a quadro:
+    // a cobertura varre a tela com o quadro 0 e a revelação é imediata assim
+    // que o renderizador sobe, para o vídeo começar direto sem salto de tempo.
+    property int coverMs: 500
     property int hold: 4000
-    property int revealMs: 320
+    property int revealMs: 0
 
     property string source: ""
     property bool covering: false
@@ -387,13 +388,11 @@ Scope {
         // Revela o wallpaper novo, agora que o renderizador dele está no ar.
         function reveal(): void { fadeScope.reveal(); }
         // Quanto tempo o chamador deve esperar antes de aplicar a troca.
-        // A troca começa logo no início da animação (~25%), não quando a tela
-        // já está coberta: o wallpaper novo leva perto de 1s para começar a
-        // rodar, e esperar a cobertura terminar deixava esse segundo inteiro
-        // depois da transição, com a imagem parada. Assim o carregamento
-        // acontece enquanto a onda ainda está andando. O pedaço ainda
-        // descoberto mostra o último quadro do antigo, que o compositor mantém.
-        function coverDelay(): string { return String(Math.round(fadeScope.coverMs * 0.25)); }
+        // O renderizador do Waywallen leva ~240-260ms para subir e desenhar
+        // o primeiro quadro. Disparando em ~45% do coverMs (ex: ~225ms em 500ms),
+        // o novo renderizador entrega seu quadro 0 exatamente quando a onda
+        // termina de cobrir a tela, eliminando o adiantamento de quadros por baixo.
+        function coverDelay(): string { return String(Math.round(fadeScope.coverMs * 0.45)); }
         // Troca o estilo sem reiniciar o shell (usado pelo painel e para teste).
         function setStyle(name: string): void { fadeScope.style = name; }
         function currentStyle(): string { return fadeScope.style; }

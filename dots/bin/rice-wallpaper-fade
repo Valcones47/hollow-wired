@@ -120,23 +120,21 @@ case "${1:-}" in
                 fi
             done
             [ -n "$pid" ] && break
-            sleep 0.12
+            sleep 0.03
         done
 
         if [ -n "$pid" ]; then
-            # Aguarda uma fração mínima para o primeiro quadro de vídeo decodificar (50–100ms)
-            sleep 0.08
             trace "renderizador pronto e ativo: $target"
         else
             trace "renderizador novo NÃO apareceu em 8s: $target"
         fi
 
-        # Paleta nova aplicada antes de revelar (limite de 3s: um wallust
-        # travado não pode segurar a tela coberta).
+        # Paleta nova aplicada antes de revelar (limite curto: o cálculo já
+        # costuma estar em cache e leva <40ms; não pode atrasar a revelação).
         if [ -n "$wallust_pid" ]; then
-            for _ in $(seq 1 30); do
+            for _ in $(seq 1 15); do
                 kill -0 "$wallust_pid" 2>/dev/null || break
-                sleep 0.1
+                sleep 0.02
             done
         fi
 
