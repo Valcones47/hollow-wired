@@ -5372,6 +5372,26 @@ PanelWindow {
                                     }
                                     RowDivider {}
                                     OptionRow {
+                                        title: Theme.t("s2v.quality", "Qualidade")
+                                        subtitle: (win.s2vWhere.quality === "full"
+                                            ? Theme.t("s2v.q_full_desc", "Cor completa (HEVC 4:4:4): nítido como a cena. Intel de 11ª geração em diante decodifica pela placa; nas mais antigas usa a CPU.")
+                                            : Theme.t("s2v.q_compat_desc", "Compatível (H.264): qualquer placa decodifica, mas a cor fica em metade da resolução e cena vermelha ou escura perde nitidez."))
+                                            + (win.s2vWhere.quality_setting === "auto" ? Theme.t("s2v.q_auto_note", " Escolhido automaticamente para este PC.") : "")
+                                        Segmented {
+                                            options: [
+                                                { value: "auto", label: Theme.t("s2v.q_auto", "Automática") },
+                                                { value: "full", label: Theme.t("s2v.q_full", "Cor completa") },
+                                                { value: "compat", label: Theme.t("s2v.q_compat", "Compatível") }
+                                            ]
+                                            current: win.s2vWhere.quality_setting || "auto"
+                                            onPicked: v => {
+                                                s2vSetProc.command = ["rice-scene-to-video", "set-quality", v];
+                                                s2vSetProc.running = true;
+                                            }
+                                        }
+                                    }
+                                    RowDivider {}
+                                    OptionRow {
                                         title: Theme.t("s2v.save_in", "Salvar em: ") + String(win.s2vWhere.dir || "").replace(Quickshell.env("HOME"), "~")
                                         subtitle: win.s2vWhere.in_library
                                             ? Theme.t("s2v.in_lib", "Biblioteca de vídeos do Waywallen: o vídeo aparece no seletor.")

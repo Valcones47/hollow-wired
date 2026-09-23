@@ -1479,5 +1479,12 @@
   "s2v.save_in": "Save to: ",
   "s2v.in_lib": "Waywallen video library: the video shows up in the picker.",
   "s2v.not_lib": "This folder isn't a Waywallen library: add it there for the video to show up in the picker.",
-  "s2v.default": "Default"
+  "s2v.default": "Default",
+  "s2v.quality": "Quality",
+  "s2v.q_full_desc": "Full color (HEVC 4:4:4): as sharp as the scene. Intel 11th gen and newer decode it on the GPU; older ones use the CPU.",
+  "s2v.q_compat_desc": "Compatible (H.264): any GPU decodes it, but color is stored at half resolution and red or dark scenes lose sharpness.",
+  "s2v.q_auto_note": " Picked automatically for this PC.",
+  "s2v.q_auto": "Automatic",
+  "s2v.q_full": "Full color",
+  "s2v.q_compat": "Compatible"
 }

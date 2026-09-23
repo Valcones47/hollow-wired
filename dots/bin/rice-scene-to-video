@@ -15,7 +15,8 @@ Como:
      (ver rice-sddm-sync-wallpaper); aqui a regra é abortar na dúvida;
   3. para o Quickshell (barra, dock, widgets, notificações) durante a gravação
      e sobe de novo no fim, mesmo se algo falhar (finally);
-  4. grava 30 s com o gpu-screen-recorder, sem cursor. Se durante a gravação
+  4. grava 30 s, sem cursor, em RGB quase sem perdas (wf-recorder + libx264rgb;
+     o gpu-screen-recorder só grava 4:2:0) no fps da cena. Se durante a gravação
      trocar de área de trabalho, algum app ganhar foco ou abrir janela, para
      na hora, apaga o que gravou e avisa o erro;
   5. acha o ponto de emenda: compara quadros reduzidos (64x36, cinza, 10 fps)
@@ -32,6 +33,12 @@ Uso:
   rice-scene-to-video                 # grava a cena ativa
   rice-scene-to-video status          # imprime o estado atual (JSON)
   rice-scene-to-video where           # pasta de destino (JSON: dir, in_library, custom)
+  rice-scene-to-video set-quality <auto|full|compat>
+      full   = HEVC 4:4:4 (cor na resolução inteira; Intel de 11ª geração em
+               diante decodifica por hardware, as mais antigas usam a CPU)
+      compat = H.264 4:2:0 (qualquer placa decodifica; a cor fica em metade da
+               resolução e cena vermelha/escura perde nitidez)
+      auto   = full em Intel de 11ª geração em diante, compat no resto
   rice-scene-to-video set-dir <pasta|default>
       pasta escolhida pelo usuário (~/.config/hollow-wired/scene-to-video.json);
       "default" volta para a biblioteca de vídeos do Waywallen
@@ -131,12 +138,50 @@ def library_dirs():
     return [Path(docs.get(p, p)) for (p,) in rows]
 
 
-def chosen_dir():
+def prefs():
     try:
-        d = json.loads(PREFS.read_text()).get("dir") or ""
+        return json.loads(PREFS.read_text())
     except Exception:
-        d = ""
+        return {}
+
+
+def save_prefs(d):
+    PREFS.parent.mkdir(parents=True, exist_ok=True)
+    tmp = PREFS.with_suffix(".tmp")
+    tmp.write_text(json.dumps(d, ensure_ascii=False, indent=2) + "\n")
+    tmp.replace(PREFS)
+
+
+def chosen_dir():
+    d = prefs().get("dir") or ""
     return Path(d).expanduser() if d else None
+
+
+def auto_quality():
+    """HEVC 4:4:4 só onde o hardware decodifica: Intel de 11ª geração em diante."""
+    try:
+        cpu = next((l for l in open("/proc/cpuinfo") if l.startswith("model name")), "")
+    except OSError:
+        cpu = ""
+    m = re.search(r"(\d+)th Gen Intel", cpu)
+    if (m and int(m.group(1)) >= 11) or "Core(TM) Ultra" in cpu or "Core Ultra" in cpu:
+        return "full"
+    return "compat"
+
+
+def quality():
+    q = prefs().get("quality") or "auto"
+    return (auto_quality() if q == "auto" else q), q
+
+
+def scene_fps():
+    """fps em que o Waywallen renderiza a cena: gravar mais que isso só repete quadros."""
+    try:
+        import tomllib
+        data = tomllib.loads(WW_CFG.read_text())
+        return max(10, min(144, int(data.get("plugin", {}).get("wescene-renderer", {}).get("fps", 30))))
+    except Exception:
+        return 30
 
 
 def output_dir():
@@ -251,14 +296,20 @@ def main():
         return 0
     if len(sys.argv) > 1 and sys.argv[1] == "where":
         d, lib, custom = output_dir()
-        print(json.dumps({"dir": str(d), "in_library": lib, "custom": custom}, ensure_ascii=False))
+        q, q_set = quality()
+        print(json.dumps({"dir": str(d), "in_library": lib, "custom": custom,
+                          "quality": q, "quality_setting": q_set, "quality_auto": auto_quality()},
+                         ensure_ascii=False))
         return 0
     if len(sys.argv) > 2 and sys.argv[1] == "set-dir":
-        PREFS.parent.mkdir(parents=True, exist_ok=True)
-        val = "" if sys.argv[2] == "default" else str(Path(sys.argv[2]).expanduser())
-        tmp = PREFS.with_suffix(".tmp")
-        tmp.write_text(json.dumps({"dir": val}, ensure_ascii=False, indent=2) + "\n")
-        tmp.replace(PREFS)
+        d = prefs()
+        d["dir"] = "" if sys.argv[2] == "default" else str(Path(sys.argv[2]).expanduser())
+        save_prefs(d)
+        return 0
+    if len(sys.argv) > 2 and sys.argv[1] == "set-quality" and sys.argv[2] in ("auto", "full", "compat"):
+        d = prefs()
+        d["quality"] = sys.argv[2]
+        save_prefs(d)
         return 0
 
     name = current_scene()
@@ -269,7 +320,9 @@ def main():
     out_dir, in_library, _ = output_dir()
     out_dir.mkdir(parents=True, exist_ok=True)
     CACHE.mkdir(parents=True, exist_ok=True)
-    raw = CACHE / "gravacao.mp4"
+    raw = CACHE / "gravacao.mkv"
+    q, _ = quality()
+    fps = scene_fps()
     out = out_dir / f"{safe_name(name)} (cena).mp4"
 
     mons = hypr("monitors") or []
@@ -298,10 +351,18 @@ def main():
         if why:
             raise RuntimeError(f"Gravação cancelada por privacidade: {why}.")
         state(state="recording", name=name, secs=RECORD_SECS, started=int(time.time()))
-        fps = "60" if float(mon.get("refreshRate", 60)) >= 59 else "30"
-        rec = subprocess.Popen(["gpu-screen-recorder", "-w", mon["name"], "-f", fps, "-k", "h264",
-                                "-q", "ultra", "-cursor", "no", "-o", str(raw)],
-                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        # Gravação sem perder cor: RGB quase sem perdas (libx264rgb) pelo
+        # wf-recorder. O gpu-screen-recorder só grava 4:2:0 (cor em metade da
+        # resolução), e numa cena vermelha e preta o detalhe está na cor: o
+        # resultado "parecia 720p" mesmo com bitrate alto. -D pede quadros
+        # continuamente (sem depender de dano), no fps em que a cena é renderizada.
+        if subprocess.run(["which", "wf-recorder"], stdout=subprocess.DEVNULL).returncode == 0:
+            cmd = ["wf-recorder", "-o", mon["name"], "-D", "-r", str(fps), "-c", "libx264rgb",
+                   "-p", "preset=ultrafast", "-p", "crf=4", "-f", str(raw)]
+        else:
+            cmd = ["gpu-screen-recorder", "-w", mon["name"], "-f", str(fps), "-k", "h264",
+                   "-q", "ultra", "-cursor", "no", "-o", str(raw)]
+        rec = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         t_end = time.time() + RECORD_SECS
         while time.time() < t_end:
             time.sleep(0.25)
@@ -342,16 +403,21 @@ def main():
         fc = (f"[0:v]split[a][b];[a]trim=start={FADE},setpts=PTS-STARTPTS[m];"
               f"[b]trim=end={FADE},setpts=PTS-STARTPTS[h];"
               f"[m][h]xfade=transition=fade:duration={FADE}:offset={length - 2 * FADE:.3f},"
-              f"scale=1920:1080:force_original_aspect_ratio=decrease,scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p[v]")
+              f"scale=1920:1080:force_original_aspect_ratio=decrease,scale=trunc(iw/2)*2:trunc(ih/2)*2,"
+              f"format={'yuv444p' if q == 'full' else 'yuv420p'}[v]")
+        if q == "full":
+            enc = ["-c:v", "libx265", "-crf", "18", "-preset", "medium", "-tag:v", "hvc1",
+                   "-x265-params", "log-level=error"]
+        else:
+            # Qualidade alta de propósito: com CRF 20 + teto de 6 Mbps a cena
+            # (granulada, vermelho saturado) saiu com 2,7 Mbps. tune grain guarda
+            # a textura; o teto de 20 Mbps ainda é leve para o decodificador.
+            enc = ["-c:v", "libx264", "-crf", "16", "-preset", "slow", "-tune", "grain",
+                   "-maxrate", "20M", "-bufsize", "40M"]
         tmp = out.with_name("tmp_" + out.name)
         r = subprocess.run(["ffmpeg", "-y", "-v", "error", "-ss", f"{REF_T}", "-t", f"{length:.3f}",
                             "-i", str(raw), "-filter_complex", fc, "-map", "[v]", "-an",
-                            # Qualidade alta de propósito: com CRF 20 + teto de 6 Mbps a
-                            # cena (granulada, vermelho saturado) saiu com 2,7 Mbps e
-                            # "parecendo 720p" (usuário). tune grain guarda a textura;
-                            # o teto de 20 Mbps ainda é leve para o decodificador da Intel.
-                            "-c:v", "libx264", "-crf", "16", "-preset", "slow", "-tune", "grain",
-                            "-maxrate", "20M", "-bufsize", "40M", "-movflags", "+faststart", str(tmp)],
+                            *enc, "-movflags", "+faststart", str(tmp)],
                            capture_output=True, text=True)
         if r.returncode != 0 or not tmp.exists():
             tmp.unlink(missing_ok=True)
@@ -371,7 +437,7 @@ def main():
     except Exception:
         pass
     state(state="done", name=name, path=str(out), loop=round(length - FADE, 1), seam=seam,
-          in_library=in_library)
+          in_library=in_library, quality=q)
     msg = f"{out.name} · loop de {length - FADE:.1f} s" + ("" if seam == "clean" else " · emenda suave")
     if not in_library:
         msg += f" · a pasta {out_dir} não é uma biblioteca do Waywallen: adicione-a lá para o vídeo aparecer no seletor"
