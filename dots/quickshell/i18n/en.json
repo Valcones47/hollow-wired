@@ -1490,11 +1490,10 @@
   "frames.where": "Which wallpapers",
   "frames.src_all": "All in Waywallen",
   "welcome.nav_footer_short": "Shows this guide again whenever you want.",
-  "welcome.window_hint_title": "Golden tip for Windows users",
-  "welcome.window_hint_desc": "Super + Shift + V toggles floating and tiled mode. Super + left click drags any window.",
-  "welcome.lock_mockup_title": "Lock screen preview",
-  "welcome.lock_test_btn": "Test lock screen (Super + L)",
-  "welcome.effects_title": "Glass, transparency and blur",
-  "welcome.effects_desc": "Windows and terminal feature hardware-accelerated dynamic blur over your active wallpaper.",
-  "welcome.effects_toggle_blur": "Toggle blur live (Super + B)"
+  "welcome.window_hint": "Super + Shift + V floats or tiles the current window. Holding Super, you can drag any window with the left button.",
+  "welcome.lock_title": "Lock screen",
+  "welcome.lock_desc": "Shows up when you lock and when the PC wakes from sleep. To leave, just type your password.",
+  "welcome.lock_try": "Try it",
+  "welcome.blur_title": "Blur behind windows",
+  "welcome.blur_desc": "Looks nice, but weighs on integrated graphics. Super + B turns it on and off anytime."
 }
