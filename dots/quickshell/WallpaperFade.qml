@@ -84,12 +84,12 @@ Scope {
 
     property bool revealQueued: false
 
-    function reveal() {
+    function reveal(force = false) {
         if (!fadeScope.covering && !fadeScope.pendingCover)
             return;
-        // Se a animação de cobertura ainda estiver correndo, enfileira
-        // para revelar imediatamente no término da onda sem congelamento.
-        if (coverAnim.running) {
+        // Se a chamada veio externamente enquanto a onda ainda corre, aguarda;
+        // se veio do onFinished (force=true), revela imediatamente.
+        if (!force && coverAnim.running) {
             fadeScope.revealQueued = true;
             return;
         }
@@ -119,7 +119,7 @@ Scope {
         duration: fadeScope.coverMs
         // Ao término da animação, a camada se retira imediatamente para o vídeo
         // aparecer na tela sem nenhuma pausa estática.
-        onFinished: fadeScope.reveal()
+        onFinished: fadeScope.reveal(true)
         easing.type: Easing.Bezier
         easing.bezierCurve: fadeScope.style === "wave" ? [0.4, 0.0, 0.25, 1.0, 1.0, 1.0]
                                                        : [0.25, 0.1, 0.25, 1.0, 1.0, 1.0]
