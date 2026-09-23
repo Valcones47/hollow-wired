@@ -106,7 +106,8 @@ Legacy tools like Waybar, Rofi, SwayOSD, and Wofi are completely omitted. Every 
 ### Architecture & GPU Orchestration
 - **Mesa iGPU Compositor**: Hyprland and Quickshell run on the integrated Intel GPU to eliminate inter-GPU copy overhead and maintain rock-solid frametimes at 144Hz.
 - **On-Demand NVIDIA dGPU (`prime-run`)**: Heavy 3D applications and games invoke the dedicated NVIDIA RTX GPU on demand.
-- **Hardware Screen Recording (`Recording.qml`)**: Integrated recording studio leveraging NVENC hardware acceleration (`h264_nvenc`) with independent system audio and microphone capture via PipeWire.
+- **Hardware Screen Recording (`Recording.qml`, `rice-record`)**: records with **gpu-screen-recorder**, which grabs frames straight from the GPU that drives the display and encodes them there (VAAPI on Intel/AMD, NVENC on NVIDIA) — about 5% of one CPU core at 1080p60 on an integrated GPU. Desktop audio and microphone are mixed by the recorder itself (AAC). `wf-recorder` stays as the fallback when gpu-screen-recorder is missing.
+- **Advanced palette controls**: the Colours tab can pin **accent 1 and accent 2 to any colour** (instead of the two the theme picks from the palette), and an "Advanced wallust" section changes how the palette is extracted — algorithm (kmeans / salience / ansi), image sampling backend, dark or light, extra saturation, colour separation, contrast check. The choices live in `~/.config/hollow-wired/wallust.json` and are merged into a cached copy of `wallust.toml` on every run, so updating the rice never resets them.
 - **Safe Coexistence**: Completely isolated configuration paths. Runs cleanly alongside KDE Plasma or GNOME without conflicting with existing desktop environments.
 
 ---

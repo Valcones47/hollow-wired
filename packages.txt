@@ -21,7 +21,8 @@ pipewire-alsa
 wireplumber
 
 # Captura, Gravação & Área de Transferência
-wf-recorder
+gpu-screen-recorder   # Gravação na própria GPU (rice-record); leve até em placa integrada
+wf-recorder           # Reserva do rice-record quando o gpu-screen-recorder falta
 grim
 slurp
 swappy

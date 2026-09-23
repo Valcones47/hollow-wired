@@ -102,7 +102,7 @@ do_stop() {
             kill -INT "$pid" 2>/dev/null || true
             # Aguarda o ffmpeg/wf-recorder finalizar o arquivo mp4
             local i=0
-            while kill -0 "$pid" 2>/dev/null && [ "$i" -lt 30 ]; do
+            while kill -0 "$pid" 2>/dev/null && [ "$i" -lt 60 ]; do
                 sleep 0.1
                 i=$((i + 1))
             done
@@ -213,6 +213,63 @@ do_select_geom() {
     slurp 2>/dev/null || true
 }
 
+# Formato do geom que chega do painel/slurp: "X,Y WxH". O gpu-screen-recorder
+# quer "WxH+X+Y".
+geom_to_gsr() {
+    local g="$1" xy wh
+    xy="${g%% *}"; wh="${g##* }"
+    echo "${wh}+${xy%%,*}+${xy##*,}"
+}
+
+start_gsr() {
+    local mode="$1" geom="$2" audio_desktop="$3" audio_mic="$4" fps="${5:-60}"
+    # AAC em vez do Opus padrão: MP4 com Opus não abre em todo lugar (prévia
+    # do WhatsApp, alguns editores).
+    local args=(-f "$fps" -cursor yes -k auto -ac aac)
+
+    if [ "$mode" = "region" ] || [ "$mode" = "window" ]; then
+        if [ -z "$geom" ]; then
+            geom=$(slurp) || exit 1
+        fi
+        args+=(-w region -region "$(geom_to_gsr "$geom")")
+    else
+        local mon
+        mon=$(hyprctl monitors -j 2>/dev/null | jq -r '.[] | select(.focused) | .name' | head -1)
+        args+=(-w "${mon:-screen}")
+    fi
+
+    # Áudio: o gpu-screen-recorder mistura sozinho com "a|b" — não precisa do
+    # sink nulo + loopbacks que o caminho do wf-recorder monta.
+    local active_sink active_mic audio=""
+    active_sink=$(get_active_sink)
+    active_mic=$(get_active_mic)
+    if [ "$audio_desktop" = "1" ]; then
+        audio="${active_sink:+${active_sink}.monitor}"
+        [ -n "$audio" ] || audio="default_output"
+    fi
+    if [ "$audio_mic" = "1" ]; then
+        audio="${audio:+$audio|}${active_mic:-default_input}"
+    fi
+    [ -n "$audio" ] && args+=(-a "$audio")
+
+    local outfile
+    outfile="$DIR/$(date +%Y-%m-%d_%H-%M-%S).mp4"
+    args+=(-o "$outfile")
+
+    gpu-screen-recorder "${args[@]}" >/dev/null 2>&1 &
+    local rec_pid=$!
+    echo "$rec_pid" > "$PIDFILE"
+
+    jq -n --argjson t "$(date +%s)" --arg f "$outfile" --arg m "$mode" \
+        --argjson d "$([ "$audio_desktop" = "1" ] && echo true || echo false)" \
+        --argjson a "$([ "$audio_mic" = "1" ] && echo true || echo false)" \
+        '{start_time: $t, file: $f, mode: $m, backend: "gpu-screen-recorder",
+          audio_desktop: $d, audio_mic: $a, audio_mods: {sink: "", l1: "", l2: ""}}' > "$INFOFILE"
+
+    notify-send -a "Gravação" -i media-record -t 2500 "Gravando tela…" "Modo: $mode | Clique em Parar no Hub ou use Super+Shift+R" 2>/dev/null || true
+    printf '{"status": "started", "pid": %s, "file": "%s"}\n' "$rec_pid" "$outfile"
+}
+
 do_start() {
     # Se já estiver gravando, para
     if [ -f "$PIDFILE" ]; then
@@ -246,6 +303,16 @@ do_start() {
             *) shift ;;
         esac
     done
+
+    # gpu-screen-recorder quando existe: captura direto da placa que desenha a
+    # tela (KMS) e codifica nela, sem copiar quadro pela memória — é o que
+    # tirava o lag do wf-recorder. Medido aqui: ~5% de CPU a 60 fps em 1080p.
+    # --codec explícito (h264_vaapi etc.) é opção do ffmpeg: fica no wf-recorder.
+    if command -v gpu-screen-recorder >/dev/null 2>&1 && [ "$codec" = "auto" ] \
+        && [ "${RICE_RECORDER:-}" != "wf-recorder" ]; then
+        start_gsr "$mode" "$geom" "$audio_desktop" "$audio_mic" "$fps"
+        return 0
+    fi
 
     local wf_args=()
 
