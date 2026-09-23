@@ -15,8 +15,10 @@
 #                            e fotografar a tela.
 #
 # Uso:
-#   rice-wallpaper-previews status          # o que já existe, em JSON
-#   rice-wallpaper-previews videos          # extrai os quadros dos vídeos
+#   rice-wallpaper-previews status [pasta]  # o que já existe, em JSON
+#   rice-wallpaper-previews videos [pasta]  # extrai os quadros dos vídeos
+#       sem pasta: todos os itens do Waywallen (Wallpaper Engine e pastas comuns);
+#       com pasta: todos os vídeos dessa pasta e das subpastas (escolhida no painel)
 #   rice-wallpaper-previews scenes          # fotografa as cenas (invasivo)
 #   rice-wallpaper-previews all             # os dois
 #
@@ -169,6 +171,36 @@ wait_renderer() {
 
 # ------------------------------------------------------------------ comandos
 
+# Vídeos de uma pasta escolhida (com subpastas; sem backups nem temporários).
+dir_videos() {
+    find "$1" -maxdepth 4 -type f \( -iname '*.mp4' -o -iname '*.webm' -o -iname '*.mkv' -o -iname '*.mov' \) \
+        ! -name 'tmp_*' ! -name '*.original' -print0 2>/dev/null
+}
+
+cmd_status_dir() {
+    local videos=0 v_ok=0 f out
+    while IFS= read -r -d '' f; do
+        videos=$((videos + 1))
+        out=$(rice-wallpaper-frame --cached-only "$f" 2>/dev/null)
+        case "$out" in "$CACHE"/*) v_ok=$((v_ok + 1)) ;; esac
+    done < <(dir_videos "$1")
+    printf '{"total":%d,"videos":%d,"videos_prontos":%d,"cenas":0,"cenas_prontas":0,"dir":true}\n' \
+        "$videos" "$videos" "$v_ok"
+}
+
+cmd_videos_dir() {
+    have ffmpeg || { note "[-] ffmpeg não encontrado."; return 1; }
+    local n=0 f
+    while IFS= read -r -d '' f; do
+        note "  extraindo: $(basename "$f")"
+        rice-wallpaper-frame "$f" >/dev/null 2>&1 && n=$((n + 1))
+    done < <(dir_videos "$1")
+    precompute_all_palettes
+    note "[✓] $n quadro(s) de vídeo prontos."
+    notify-send -a "Wallpapers" -i image-x-generic -t 4000 \
+        "Quadros dos vídeos" "$n vídeo(s) da pasta escolhida em resolução real." >/dev/null 2>&1 || true
+}
+
 cmd_status() {
     local total=0 videos=0 cenas=0 v_ok=0 c_ok=0
     while IFS=$'\t' read -r id dir kind name; do
@@ -301,12 +333,20 @@ for i in range(1, 11):
 }
 
 case "${1:-status}" in
-    status)  cmd_status ;;
-    videos)  cmd_videos ;;
+    # Origem escolhida no painel: "waywallen" (todos os itens) ou "custom" (pasta).
+    prefs-get)
+        f="$HOME/.config/hollow-wired/wallpaper-frames.json"
+        if [ -f "$f" ]; then cat "$f"; else echo '{"source":"waywallen","dir":""}'; fi ;;
+    prefs-set)
+        f="$HOME/.config/hollow-wired/wallpaper-frames.json"
+        mkdir -p "$(dirname "$f")"
+        jq -n --arg s "${2:-waywallen}" --arg d "${3:-}" '{source: $s, dir: $d}' > "$f.tmp" && mv -f "$f.tmp" "$f" ;;
+    status)  if [ -n "${2:-}" ]; then cmd_status_dir "$2"; else cmd_status; fi ;;
+    videos)  if [ -n "${2:-}" ]; then cmd_videos_dir "$2"; else cmd_videos; fi ;;
     scenes)  cmd_scenes ;;
     all)     cmd_videos; cmd_scenes ;;
     *)
-        echo "uso: rice-wallpaper-previews [status|videos|scenes|all]" >&2
+        echo "uso: rice-wallpaper-previews [status [pasta]|videos [pasta]|scenes|all|prefs-get|prefs-set <waywallen|custom> [pasta]]" >&2
         exit 2
         ;;
 esac

@@ -80,7 +80,28 @@ fi
 [ -n "$video" ] || { emit_fallback; exit 0; }
 
 mkdir -p "$CACHE"
-key=$(printf '%s' "$video" | sha256sum | cut -c1-32)
+
+# Chave do cache = caminho do vídeo. O Waywallen (Flatpak) enxerga as pastas
+# comuns pelo portal de documentos (/run/user/<uid>/doc/<id>/...), e é por esse
+# caminho que o seletor pede o quadro na transição. Quem extrai pela pasta real
+# (painel, "pasta escolhida") chegaria com outro caminho, outra chave, e o
+# quadro nunca seria achado. Então um caminho real dentro de uma pasta
+# exportada vira o caminho do portal antes de virar chave. O mapa vem de
+# `flatpak documents` e fica guardado por 10 min (a consulta leva ~50 ms).
+map="$CACHE/doc-map.tsv"
+if [ -z "$(find "$map" -mmin -10 2>/dev/null)" ] && command -v flatpak >/dev/null 2>&1; then
+    flatpak documents --columns=path,origin 2>/dev/null > "$map.tmp" && mv -f "$map.tmp" "$map"
+fi
+keypath="$video"
+if [ -f "$map" ]; then
+    while IFS=$'\t' read -r portal host; do
+        [ -n "$host" ] || continue
+        case "$video" in
+            "$host"/*) keypath="$portal/${video#"$host"/}"; break ;;
+        esac
+    done < "$map"
+fi
+key=$(printf '%s' "$keypath" | sha256sum | cut -c1-32)
 # JPEG, não PNG: o PNG do mesmo quadro sai com 1 a 4 MB e demora para o QML
 # decodificar bem na hora em que a transição precisa desenhar. Em JPEG de
 # qualidade alta o arquivo fica na casa das centenas de KB e a diferença não

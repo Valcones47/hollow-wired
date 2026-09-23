@@ -577,9 +577,42 @@ PanelWindow {
     // Processos de Leitura
     // Quantas previews em alta resolução já existem. Alimenta os rótulos dos
     // botões de gerar/fotografar.
+    // Origem dos quadros: todos os itens do Waywallen ou uma pasta escolhida
+    // (~/.config/hollow-wired/wallpaper-frames.json, via rice-wallpaper-previews).
+    property string framesSource: "waywallen"
+    property string framesDir: ""
+    readonly property var framesArgs: framesSource === "custom" && framesDir !== "" ? [framesDir] : []
+    onFramesArgsChanged: previewStatusProc.running = true
+    Process {
+        id: framesPrefsProc
+        command: ["rice-wallpaper-previews", "prefs-get"]
+        running: true
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const d = JSON.parse(text);
+                    win.framesSource = d.source === "custom" ? "custom" : "waywallen";
+                    win.framesDir = d.dir || "";
+                } catch (e) {}
+            }
+        }
+    }
+    Process {
+        id: framesPickProc
+        command: ["rice-wallpaper-optimize", "pick-folder"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const d = text.trim();
+                if (d === "") return;
+                win.framesDir = d;
+                win.framesSource = "custom";
+                Quickshell.execDetached(["rice-wallpaper-previews", "prefs-set", "custom", d]);
+            }
+        }
+    }
     Process {
         id: previewStatusProc
-        command: ["rice-wallpaper-previews", "status"]
+        command: ["rice-wallpaper-previews", "status"].concat(win.framesArgs)
         running: true
         stdout: StdioCollector {
             onStreamFinished: {
@@ -5447,6 +5480,36 @@ PanelWindow {
                                     subtitle: Theme.t("wallust.section_previews_sub", "O Wallpaper Engine guarda só um ícone quadrado de cada papel de parede. Estas imagens são usadas na transição e para gerar as cores.")
                                 }
 
+                                OptionGroup {
+                                    OptionRow {
+                                        title: Theme.t("frames.where", "Quais wallpapers")
+                                        Segmented {
+                                            options: [
+                                                { value: "waywallen", label: Theme.t("frames.src_all", "Todos do Waywallen") },
+                                                { value: "custom", label: Theme.t("vid.src_custom", "Pasta escolhida") }
+                                            ]
+                                            current: win.framesSource
+                                            onPicked: v => {
+                                                win.framesSource = v;
+                                                Quickshell.execDetached(["rice-wallpaper-previews", "prefs-set", v, win.framesDir]);
+                                                if (v === "custom" && win.framesDir === "" && !framesPickProc.running)
+                                                    framesPickProc.running = true;
+                                            }
+                                        }
+                                    }
+                                    RowDivider { visible: win.framesSource === "custom" }
+                                    OptionRow {
+                                        visible: win.framesSource === "custom"
+                                        title: win.framesDir !== "" ? String(win.framesDir).replace(Quickshell.env("HOME"), "~") : Theme.t("vid.no_dir", "Nenhuma pasta escolhida")
+                                        subtitle: Theme.t("vid.subfolders", "Procura também nas subpastas.")
+                                        ActionBtn {
+                                            icon: Theme.icons.folder
+                                            text: Theme.t("vid.pick", "Escolher pasta")
+                                            onClicked: if (!framesPickProc.running) framesPickProc.running = true
+                                        }
+                                    }
+                                }
+
                                 Text {
                                     Layout.fillWidth: true
                                     text: {
@@ -5454,9 +5517,9 @@ PanelWindow {
                                         if (!st || st.total === undefined)
                                             return Theme.t("wallust.previews_loading", "Verificando...");
                                         return Theme.t("wallust.previews_count", "Vídeos: ")
-                                             + st.videos_prontos + "/" + st.videos + "   "
-                                             + Theme.t("wallust.previews_scenes", "Cenas: ")
-                                             + st.cenas_prontas + "/" + st.cenas;
+                                             + st.videos_prontos + "/" + st.videos
+                                             + (st.dir ? "" : "   " + Theme.t("wallust.previews_scenes", "Cenas: ")
+                                                + st.cenas_prontas + "/" + st.cenas);
                                     }
                                     font.family: Theme.fontFamily
                                     font.pixelSize: 12
@@ -5471,13 +5534,15 @@ PanelWindow {
                                         icon: Theme.icons.packages
                                         text: Theme.t("wallust.previews_videos_btn", "Extrair Quadro dos Wallpapers de Vídeo")
                                         onClicked: {
-                                            Quickshell.execDetached(["rice-wallpaper-previews", "videos"]);
+                                            Quickshell.execDetached(["rice-wallpaper-previews", "videos"].concat(win.framesArgs));
                                             win.showToast(Theme.t("toast.previews_videos", "Extraindo os quadros em segundo plano..."));
                                             previewRecheck.restart();
                                         }
                                     }
 
                                     ActionBtn {
+                                        // Cenas só existem nos itens do Waywallen (Wallpaper Engine).
+                                        visible: win.framesSource !== "custom"
                                         icon: Theme.icons.monitor
                                         text: Theme.t("wallust.previews_scenes_btn", "Fotografar os Wallpapers Animados")
                                         onClicked: {

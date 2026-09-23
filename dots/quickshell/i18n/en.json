@@ -1486,5 +1486,7 @@
   "s2v.q_auto_note": " Picked automatically for this PC.",
   "s2v.q_auto": "Automatic",
   "s2v.q_full": "Full color",
-  "s2v.q_compat": "Compatible"
+  "s2v.q_compat": "Compatible",
+  "frames.where": "Which wallpapers",
+  "frames.src_all": "All in Waywallen"
 }
