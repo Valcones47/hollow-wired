@@ -37,6 +37,39 @@ PanelWindow {
     property bool checked: false
     property int page: 0
 
+    // Micro-glitch temático do Wired na transição entre páginas
+    property bool glitchActive: false
+    property real glitchOffset: 0
+    property int glitchTick: 0
+
+    Timer {
+        id: pageGlitchTimer
+        interval: 32
+        repeat: true
+        onTriggered: {
+            welcomeWindow.glitchTick++;
+            if (welcomeWindow.glitchTick === 1) {
+                welcomeWindow.glitchOffset = -3.0;
+            } else if (welcomeWindow.glitchTick === 2) {
+                welcomeWindow.glitchOffset = 2.0;
+            } else if (welcomeWindow.glitchTick === 3) {
+                welcomeWindow.glitchOffset = -0.8;
+            } else {
+                welcomeWindow.glitchOffset = 0;
+                welcomeWindow.glitchActive = false;
+                pageGlitchTimer.stop();
+            }
+        }
+    }
+
+    onPageChanged: {
+        if (welcomeWindow.open) {
+            welcomeWindow.glitchTick = 0;
+            welcomeWindow.glitchActive = true;
+            pageGlitchTimer.restart();
+        }
+    }
+
     // Cada passo é um "e no Windows era assim" → "aqui é assim".
     readonly property var steps: [
         {
@@ -280,8 +313,9 @@ PanelWindow {
         property string title: ""
         property string desc: ""
         property bool active: false
-        // Sem preview, o cartão vira só texto (é o caso do estilo das janelas).
         property bool showPreview: false
+        property string previewType: "layout" // "layout" ou "window"
+        property string windowModeType: ""    // "windows" ou "hyprland"
         property bool pvBar: true
         property bool pvDock: true
         property bool pvDockFull: false
@@ -302,11 +336,12 @@ PanelWindow {
             anchors.margins: 14
             spacing: 14
 
+            // Miniatura de arranjo da interface (LayoutPreview)
             LayoutPreview {
                 accent: welcomeWindow.uvPrimary
                 accent2: welcomeWindow.uvSecondary
-                surfaceColor: welcomeWindow.uvBg
-                visible: cc.showPreview
+                surfaceColor: welcomeWindow.uvTileHigh
+                visible: cc.showPreview && cc.previewType === "layout"
                 Layout.preferredWidth: 118
                 Layout.preferredHeight: 68
                 bar: cc.pvBar
@@ -314,6 +349,129 @@ PanelWindow {
                 dockFull: cc.pvDockFull
                 side: cc.pvSide
                 vertical: cc.pvVertical
+            }
+
+            // Miniatura vetorial dos modos de janela (Hyprland tiling vs Windows flutuante)
+            Rectangle {
+                visible: cc.showPreview && cc.previewType === "window"
+                Layout.preferredWidth: 118
+                Layout.preferredHeight: 68
+                radius: 8
+                color: welcomeWindow.uvTileHigh
+                border.width: 1
+                border.color: Theme.withAlpha(welcomeWindow.uvOutline, 0.45)
+                clip: true
+
+                // Ilustração Tiling (Hyprland): duas janelas lado a lado dividindo a tela
+                Item {
+                    anchors.fill: parent
+                    visible: cc.windowModeType === "hyprland"
+
+                    Rectangle {
+                        x: 6; y: 6
+                        width: 50; height: 56
+                        radius: 4
+                        color: Theme.withAlpha(welcomeWindow.uvPrimary, 0.22)
+                        border.width: 1.5
+                        border.color: welcomeWindow.uvPrimary
+
+                        Rectangle {
+                            anchors.top: parent.top
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            height: 10
+                            color: Theme.withAlpha(welcomeWindow.uvPrimary, 0.3)
+                            radius: 3
+                            Row {
+                                anchors.left: parent.left; anchors.leftMargin: 4
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 3
+                                Rectangle { width: 4; height: 4; radius: 2; color: welcomeWindow.uvPrimary }
+                                Rectangle { width: 4; height: 4; radius: 2; color: Theme.withAlpha(welcomeWindow.uvPrimary, 0.6) }
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        x: 62; y: 6
+                        width: 50; height: 56
+                        radius: 4
+                        color: Theme.withAlpha(welcomeWindow.uvOutline, 0.12)
+                        border.width: 1
+                        border.color: Theme.withAlpha(welcomeWindow.uvOutline, 0.3)
+
+                        Rectangle {
+                            anchors.top: parent.top
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            height: 10
+                            color: Theme.withAlpha(welcomeWindow.uvOutline, 0.2)
+                            radius: 3
+                            Row {
+                                anchors.left: parent.left; anchors.leftMargin: 4
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 3
+                                Rectangle { width: 4; height: 4; radius: 2; color: welcomeWindow.uvSub }
+                            }
+                        }
+                    }
+                }
+
+                // Ilustração Floating (Windows): janelas sobrepostas soltas
+                Item {
+                    anchors.fill: parent
+                    visible: cc.windowModeType === "windows"
+
+                    // Janela traseira
+                    Rectangle {
+                        x: 10; y: 8
+                        width: 65; height: 42
+                        radius: 4
+                        color: Theme.withAlpha(welcomeWindow.uvOutline, 0.18)
+                        border.width: 1
+                        border.color: Theme.withAlpha(welcomeWindow.uvOutline, 0.35)
+
+                        Rectangle {
+                            anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right
+                            height: 10
+                            color: Theme.withAlpha(welcomeWindow.uvOutline, 0.25)
+                            radius: 3
+                            Row {
+                                anchors.right: parent.right; anchors.rightMargin: 4
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 2
+                                Rectangle { width: 3; height: 3; radius: 1.5; color: welcomeWindow.uvSub }
+                                Rectangle { width: 3; height: 3; radius: 1.5; color: welcomeWindow.uvSub }
+                                Rectangle { width: 3; height: 3; radius: 1.5; color: "#ff5f56" }
+                            }
+                        }
+                    }
+
+                    // Janela frontal (ativa, com sombra e destaque)
+                    Rectangle {
+                        x: 36; y: 18
+                        width: 72; height: 44
+                        radius: 4
+                        color: Theme.withAlpha(welcomeWindow.uvTile, 0.95)
+                        border.width: 1.5
+                        border.color: welcomeWindow.uvPrimary
+
+                        Rectangle {
+                            anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right
+                            height: 11
+                            color: Theme.withAlpha(welcomeWindow.uvPrimary, 0.28)
+                            radius: 3
+                            Row {
+                                anchors.right: parent.right; anchors.rightMargin: 4
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 2
+                                Rectangle { width: 3; height: 3; radius: 1.5; color: welcomeWindow.uvPrimary }
+                                Rectangle { width: 3; height: 3; radius: 1.5; color: welcomeWindow.uvPrimary }
+                                Rectangle { width: 3; height: 3; radius: 1.5; color: "#ff5f56" }
+                            }
+                        }
+                    }
+                }
             }
 
             ColumnLayout {
@@ -443,28 +601,99 @@ PanelWindow {
 
                     Item { Layout.fillHeight: true }
 
-                    Text {
+                    ColumnLayout {
                         Layout.fillWidth: true
-                        text: Theme.t("welcome.nav_footer", "Super + F1 mostra tudo isso de novo, quando quiser.")
-                        wrapMode: Text.WordWrap
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 11
-                        color: Theme.withAlpha(welcomeWindow.uvSub, 0.85)
+                        spacing: 6
+
+                        Row {
+                            spacing: 4
+                            Rectangle {
+                                width: 44
+                                height: 22
+                                radius: 6
+                                color: welcomeWindow.uvTileHigh
+                                border.width: 1
+                                border.color: Theme.withAlpha(welcomeWindow.uvOutline, 0.45)
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "Super"
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 11
+                                    font.weight: Font.DemiBold
+                                    color: welcomeWindow.uvPrimary
+                                }
+                            }
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: "+"
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 11
+                                font.weight: Font.Bold
+                                color: welcomeWindow.uvSub
+                            }
+                            Rectangle {
+                                width: 28
+                                height: 22
+                                radius: 6
+                                color: welcomeWindow.uvTileHigh
+                                border.width: 1
+                                border.color: Theme.withAlpha(welcomeWindow.uvOutline, 0.45)
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "F1"
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 11
+                                    font.weight: Font.DemiBold
+                                    color: welcomeWindow.uvPrimary
+                                }
+                            }
+                        }
+
+                        Text {
+                            Layout.fillWidth: true
+                            text: Theme.t("welcome.nav_footer_short", "Mostra este guia de novo, quando quiser.")
+                            wrapMode: Text.WordWrap
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 11
+                            color: Theme.withAlpha(welcomeWindow.uvSub, 0.85)
+                        }
                     }
                 }
             }
 
             // ------------------------------------------------ conteúdo
             Item {
+                id: pageContentContainer
                 Layout.fillWidth: true
                 Layout.fillHeight: true
+                transform: Translate { x: welcomeWindow.glitchOffset }
+
+                // Overlay de micro-glitch temático do Wired na troca de abas
+                Rectangle {
+                    anchors.fill: parent
+                    z: 15
+                    visible: welcomeWindow.glitchActive
+                    color: "transparent"
+
+                    Rectangle {
+                        anchors.fill: parent
+                        color: Theme.withAlpha(welcomeWindow.uvPrimary, 0.04)
+                    }
+
+                    Rectangle {
+                        y: (welcomeWindow.page * 90 + welcomeWindow.glitchTick * 50) % Math.max(1, parent.height)
+                        width: parent.width
+                        height: 2
+                        color: Theme.withAlpha(welcomeWindow.uvPrimary, 0.45)
+                    }
+                }
 
                 // Botão fechar, sempre no canto de cima.
                 Rectangle {
                     anchors.right: parent.right
                     anchors.top: parent.top
                     anchors.margins: 14
-                    z: 5
+                    z: 20
                     width: 32
                     height: 32
                     radius: 16
@@ -729,10 +958,67 @@ PanelWindow {
                             required property var modelData
                             title: modelData.label
                             desc: modelData.desc
+                            showPreview: true
+                            previewType: "window"
+                            windowModeType: modelData.mode
                             active: welcomeWindow.windowMode === modelData.mode
                             onPicked: {
                                 welcomeWindow.windowMode = modelData.mode;
                                 Quickshell.execDetached(["rice-window-mode", modelData.mode]);
+                            }
+                        }
+                    }
+
+                    // Cartão de dica essencial para quem migra do Windows
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: hintCol.implicitHeight + 24
+                        radius: 14
+                        color: welcomeWindow.uvTile
+                        border.width: 1
+                        border.color: Theme.withAlpha(welcomeWindow.uvOutline, 0.25)
+
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.margins: 14
+                            spacing: 14
+
+                            Rectangle {
+                                width: 36
+                                height: 36
+                                radius: 18
+                                color: Theme.withAlpha(welcomeWindow.uvPrimary, 0.15)
+                                border.width: 1
+                                border.color: Theme.withAlpha(welcomeWindow.uvPrimary, 0.35)
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: Theme.icons.info || "ℹ"
+                                    font.family: Theme.iconFontFamily
+                                    font.pixelSize: 16
+                                    color: welcomeWindow.uvPrimary
+                                }
+                            }
+
+                            ColumnLayout {
+                                id: hintCol
+                                Layout.fillWidth: true
+                                spacing: 3
+                                Text {
+                                    text: Theme.t("welcome.window_hint_title", "Dica de ouro para quem vem do Windows")
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 13
+                                    font.weight: Font.DemiBold
+                                    color: welcomeWindow.uvText
+                                }
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: Theme.t("welcome.window_hint_desc", "Super + Shift + V alterna a janela atual entre flutuante e dividida. Super + botão esquerdo arrasta.")
+                                    wrapMode: Text.WordWrap
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 11
+                                    color: welcomeWindow.uvSub
+                                }
                             }
                         }
                     }
@@ -927,6 +1213,134 @@ PanelWindow {
                         }
                     }
 
+                    // Mockup estilizado da tela de bloqueio e login do hollow-wired
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 230
+                        radius: 16
+                        color: welcomeWindow.uvTile
+                        border.width: 1
+                        border.color: Theme.withAlpha(welcomeWindow.uvOutline, 0.25)
+                        clip: true
+
+                        Rectangle {
+                            anchors.fill: parent
+                            color: Theme.withAlpha(welcomeWindow.uvBg, 0.75)
+
+                            ColumnLayout {
+                                anchors.centerIn: parent
+                                spacing: 14
+
+                                // Relógio minimalista
+                                ColumnLayout {
+                                    Layout.alignment: Qt.AlignHCenter
+                                    spacing: 0
+                                    Text {
+                                        Layout.alignment: Qt.AlignHCenter
+                                        text: Qt.formatDateTime(new Date(), "hh:mm")
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 40
+                                        font.weight: Font.Light
+                                        font.letterSpacing: 2
+                                        color: welcomeWindow.uvText
+                                    }
+                                    Text {
+                                        Layout.alignment: Qt.AlignHCenter
+                                        text: Qt.formatDateTime(new Date(), "dddd, d 'de' MMMM")
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 11
+                                        color: welcomeWindow.uvSub
+                                    }
+                                }
+
+                                // Card de login estilizado
+                                RowLayout {
+                                    Layout.alignment: Qt.AlignHCenter
+                                    spacing: 10
+
+                                    Rectangle {
+                                        width: 32
+                                        height: 32
+                                        radius: 16
+                                        color: welcomeWindow.uvTileHigh
+                                        border.width: 1
+                                        border.color: welcomeWindow.uvPrimary
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: "👤"
+                                            font.pixelSize: 14
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        width: 160
+                                        height: 32
+                                        radius: 16
+                                        color: welcomeWindow.uvTileHigh
+                                        border.width: 1
+                                        border.color: Theme.withAlpha(welcomeWindow.uvPrimary, 0.5)
+
+                                        Row {
+                                            anchors.centerIn: parent
+                                            spacing: 6
+                                            Repeater {
+                                                model: 5
+                                                Rectangle {
+                                                    width: 6; height: 6; radius: 3
+                                                    color: welcomeWindow.uvPrimary
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Botão de teste ao vivo da tela de bloqueio
+                                Rectangle {
+                                    Layout.alignment: Qt.AlignHCenter
+                                    Layout.preferredWidth: 250
+                                    Layout.preferredHeight: 32
+                                    radius: 16
+                                    color: testLockArea.containsMouse ? Theme.withAlpha(welcomeWindow.uvPrimary, 0.25) : Theme.withAlpha(welcomeWindow.uvPrimary, 0.12)
+                                    border.width: 1
+                                    border.color: Theme.withAlpha(welcomeWindow.uvPrimary, 0.45)
+                                    Behavior on color { ColorAnimation { duration: 120 } }
+
+                                    Row {
+                                        anchors.centerIn: parent
+                                        spacing: 8
+                                        Text {
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            text: Theme.icons.lock || "🔒"
+                                            font.family: Theme.iconFontFamily
+                                            font.pixelSize: 13
+                                            color: welcomeWindow.uvPrimary
+                                        }
+                                        Text {
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            text: Theme.t("welcome.lock_test_btn", "Testar tela de bloqueio (Super + L)")
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: 11
+                                            font.weight: Font.DemiBold
+                                            color: welcomeWindow.uvText
+                                        }
+                                    }
+
+                                    MouseArea {
+                                        id: testLockArea
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            welcomeWindow.open = false;
+                                            Quickshell.execDetached(["rice-lock"]);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     Item { Layout.fillHeight: true }
                 }
 
@@ -1070,6 +1484,154 @@ PanelWindow {
                         }
                     }
 
+                    // Painel demonstrador de Efeitos Visuais (Blur & Transparência)
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 180
+                        radius: 16
+                        color: welcomeWindow.uvTile
+                        border.width: 1
+                        border.color: Theme.withAlpha(welcomeWindow.uvOutline, 0.25)
+                        clip: true
+
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.margins: 18
+                            spacing: 20
+
+                            // Miniatura interativa de janela transparente com blur
+                            Rectangle {
+                                Layout.preferredWidth: 200
+                                Layout.fillHeight: true
+                                radius: 12
+                                color: Theme.withAlpha(welcomeWindow.uvTileHigh, 0.75)
+                                border.width: 1
+                                border.color: Theme.withAlpha(welcomeWindow.uvPrimary, 0.45)
+
+                                ColumnLayout {
+                                    anchors.fill: parent
+                                    anchors.margins: 10
+                                    spacing: 6
+
+                                    // Barra de título da mini-janela
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        Row {
+                                            spacing: 4
+                                            Rectangle { width: 7; height: 7; radius: 3.5; color: "#ff5f56" }
+                                            Rectangle { width: 7; height: 7; radius: 3.5; color: "#ffbd2e" }
+                                            Rectangle { width: 7; height: 7; radius: 3.5; color: "#27c93f" }
+                                        }
+                                        Item { Layout.fillWidth: true }
+                                        Text {
+                                            text: "kitty ~ /wired"
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: 9
+                                            color: welcomeWindow.uvSub
+                                        }
+                                    }
+
+                                    // Conteúdo simulado com linhas do fastfetch
+                                    Rectangle {
+                                        Layout.fillWidth: true
+                                        Layout.fillHeight: true
+                                        radius: 6
+                                        color: Theme.withAlpha("#000000", 0.35)
+
+                                        Column {
+                                            anchors.fill: parent
+                                            anchors.margins: 8
+                                            spacing: 3
+                                            Text {
+                                                text: "$ fastfetch"
+                                                font.family: "monospace"
+                                                font.pixelSize: 9
+                                                font.weight: Font.DemiBold
+                                                color: welcomeWindow.uvPrimary
+                                            }
+                                            Text {
+                                                text: "OS: CachyOS x86_64"
+                                                font.family: "monospace"
+                                                font.pixelSize: 8
+                                                color: welcomeWindow.uvText
+                                            }
+                                            Text {
+                                                text: "WM: Hyprland (Wired)"
+                                                font.family: "monospace"
+                                                font.pixelSize: 8
+                                                color: welcomeWindow.uvSub
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Explicação e botão de teste ao vivo
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+                                spacing: 8
+
+                                Text {
+                                    text: Theme.t("welcome.effects_title", "Vidro, transparência e desfoque")
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 14
+                                    font.weight: Font.DemiBold
+                                    color: welcomeWindow.uvText
+                                }
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: Theme.t("welcome.effects_desc", "As janelas e o terminal usam desfoque dinâmico (blur) acelerado por hardware sobre o seu wallpaper.")
+                                    wrapMode: Text.WordWrap
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 12
+                                    color: welcomeWindow.uvSub
+                                }
+
+                                Item { Layout.fillHeight: true }
+
+                                Rectangle {
+                                    Layout.preferredHeight: 34
+                                    Layout.preferredWidth: 260
+                                    radius: 17
+                                    color: blurBtnArea.containsMouse ? Theme.withAlpha(welcomeWindow.uvPrimary, 0.25) : Theme.withAlpha(welcomeWindow.uvPrimary, 0.12)
+                                    border.width: 1
+                                    border.color: Theme.withAlpha(welcomeWindow.uvPrimary, 0.45)
+                                    Behavior on color { ColorAnimation { duration: 120 } }
+
+                                    Row {
+                                        anchors.centerIn: parent
+                                        spacing: 8
+                                        Text {
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            text: Theme.icons.sun || "✨"
+                                            font.family: Theme.iconFontFamily
+                                            font.pixelSize: 13
+                                            color: welcomeWindow.uvPrimary
+                                        }
+                                        Text {
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            text: Theme.t("welcome.effects_toggle_blur", "Alternar desfoque ao vivo (Super + B)")
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: 11
+                                            font.weight: Font.DemiBold
+                                            color: welcomeWindow.uvText
+                                        }
+                                    }
+
+                                    MouseArea {
+                                        id: blurBtnArea
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: Quickshell.execDetached(["rice-blur-toggle"])
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     Item { Layout.fillHeight: true }
                 }
 
@@ -1169,6 +1731,7 @@ PanelWindow {
         function open(): void { welcomeWindow.open = true; }
         function hide(): void { welcomeWindow.open = false; }
         function toggle(): void { welcomeWindow.open = !welcomeWindow.open; }
+        function page(p: int): void { welcomeWindow.page = p; }
         // Faz a tela voltar a aparecer no próximo login (útil pra testar).
         function reset(): void { doneFile.setText(""); welcomeWindow.open = true; }
     }

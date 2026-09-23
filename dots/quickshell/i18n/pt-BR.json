@@ -1488,5 +1488,13 @@
   "s2v.q_full": "Cor completa",
   "s2v.q_compat": "Compatível",
   "frames.where": "Quais wallpapers",
-  "frames.src_all": "Todos do Waywallen"
+  "frames.src_all": "Todos do Waywallen",
+  "welcome.nav_footer_short": "Mostra este guia de novo, quando quiser.",
+  "welcome.window_hint_title": "Dica de ouro para quem vem do Windows",
+  "welcome.window_hint_desc": "Super + Shift + V alterna a janela atual entre flutuante e dividida. Super + botão esquerdo arrasta.",
+  "welcome.lock_mockup_title": "Prévia da tela de bloqueio",
+  "welcome.lock_test_btn": "Testar tela de bloqueio (Super + L)",
+  "welcome.effects_title": "Vidro, transparência e desfoque",
+  "welcome.effects_desc": "As janelas e o terminal usam desfoque dinâmico (blur) acelerado por hardware sobre o seu wallpaper.",
+  "welcome.effects_toggle_blur": "Alternar desfoque ao vivo (Super + B)"
 }
