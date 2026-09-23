@@ -134,7 +134,11 @@ apply_wallpaper() {
 
     # Paleta do sistema a partir da nova imagem.
     if have wallust; then
-        wallust run "$img" >/dev/null 2>&1 || true
+        if have rice-wallust-config; then
+            rice-wallust-config run "$img" || true
+        else
+            wallust run "$img" >/dev/null 2>&1 || true
+        fi
     fi
     # Fundo da tela de login.
     if have rice-sddm-sync-wallpaper; then

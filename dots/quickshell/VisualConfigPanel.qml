@@ -482,6 +482,26 @@ PanelWindow {
     property real dimStrength: 0.2
     property string blurQuality: "padrao"
     property bool blurAdvanced: false
+    // Wallust avançado (rice-wallust-config): escolhas do usuário e o padrão do rice.
+    property bool wallustAdvanced: false
+    property var wallustPrefs: ({})
+    property var wallustDefaults: ({})
+    function wallustValue(key, fallback) {
+        if (win.wallustPrefs[key] !== undefined) return win.wallustPrefs[key];
+        if (win.wallustDefaults[key] !== undefined) return win.wallustDefaults[key];
+        return fallback;
+    }
+    // Arrastar um slider manda vários valores; grava só o último.
+    property var wallustPending: ({})
+    function setWallust(key, value) {
+        const p = Object.assign({}, win.wallustPrefs);
+        p[key] = value;
+        win.wallustPrefs = p;
+        const q = Object.assign({}, win.wallustPending);
+        q[key] = value;
+        win.wallustPending = q;
+        wallustSaveTimer.restart();
+    }
     property int blurSize: 3
     property int blurPasses: 1
     property real blurVibrancy: 0.20
@@ -1135,6 +1155,7 @@ PanelWindow {
         loadBrightnessProc.running = true;
         loadWallustColorsProc.running = true;
         loadColorOverridesProc.running = true;
+        loadWallustCfgProc.running = true;
         loadAppBindsProc.running = true;
         loadSysBindsProc.running = true;
         loadTipsProc.running = true;
@@ -4492,8 +4513,14 @@ PanelWindow {
                                             { key: "foreground", label: Theme.t("wallust.fg", "Texto"), hex: win.wallustColors.foreground || "#C2A6A5" },
                                             // As duas que a interface está realmente usando como
                                             // destaque (o tema escolhe as mais vivas da paleta).
-                                            { key: Theme.primaryKey, label: Theme.t("wallust.accent1", "Destaque 1 (em uso)"), hex: String(Theme.primary) },
-                                            { key: Theme.secondaryKey, label: Theme.secondaryKey === ""
+                                            // Chaves "accent1/2" são livres: qualquer cor, sem
+                                            // depender de qual cor da paleta o tema escolheu.
+                                            { key: "accent1", label: Theme.accentOverride1 !== ""
+                                                    ? Theme.t("wallust.accent1_manual", "Destaque 1 (escolhido)")
+                                                    : Theme.t("wallust.accent1", "Destaque 1 (em uso)"), hex: String(Theme.primary) },
+                                            { key: "accent2", label: Theme.accentOverride2 !== ""
+                                                    ? Theme.t("wallust.accent2_manual", "Destaque 2 (escolhido)")
+                                                    : Theme.secondaryKey === ""
                                                     ? Theme.t("wallust.accent2_auto", "Destaque 2 (criado pelo tema)")
                                                     : Theme.t("wallust.accent2", "Destaque 2 (em uso)"), hex: String(Theme.secondary) }
                                         ]
@@ -4558,10 +4585,6 @@ PanelWindow {
                                                     if (mouse.button === Qt.RightButton) {
                                                         Quickshell.execDetached(["wl-copy", colorCard.modelData.hex]);
                                                         win.showToast(Theme.t("toast.copied", "Copiado: ") + colorCard.modelData.hex);
-                                                    } else if (colorCard.modelData.key === "") {
-                                                        // Destaque criado pelo tema: não existe cor da
-                                                        // paleta por trás dele para editar.
-                                                        win.showToast(Theme.t("wallust.accent2_auto_toast", "Esse destaque é criado a partir do outro. Mude o Destaque 1 ou o papel de parede."));
                                                     } else {
                                                         win.openColorPicker(colorCard.modelData.key, colorCard.modelData.label, colorCard.modelData.hex);
                                                     }
@@ -4655,6 +4678,152 @@ PanelWindow {
                                         setColorProc.running = true;
                                         win.showToast(next ? Theme.t("toast.colors_auto_on", "As cores vão acompanhar o wallpaper")
                                                            : Theme.t("toast.colors_auto_off", "Paleta travada: trocar o wallpaper não muda mais as cores"));
+                                    }
+                                }
+
+                                CfgToggle {
+                                    title: Theme.t("wallust.adv_title", "Wallust avançado")
+                                    subtitle: Theme.t("wallust.adv_sub", "Como a paleta é extraída do papel de parede: algoritmo, leitura da imagem, saturação e contraste.")
+                                    checked: win.wallustAdvanced
+                                    onToggled: nv => win.wallustAdvanced = nv
+                                }
+
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 12
+                                    visible: win.wallustAdvanced
+
+                                    Repeater {
+                                        model: [
+                                            { key: "palette", title: Theme.t("wallust.adv_palette", "Algoritmo da paleta"), opts: [
+                                                { v: "kmeans", n: Theme.t("wallust.pal_kmeans", "Fiel à imagem"), d: "kmeans" },
+                                                { v: "salience", n: Theme.t("wallust.pal_salience", "Cores marcantes"), d: "salience" },
+                                                { v: "ansi", n: Theme.t("wallust.pal_ansi", "Estilo terminal"), d: "ansi" } ] },
+                                            { key: "backend", title: Theme.t("wallust.adv_backend", "Leitura da imagem"), opts: [
+                                                { v: "full", n: Theme.t("wallust.be_full", "Completa"), d: "full" },
+                                                { v: "resized", n: Theme.t("wallust.be_resized", "Reduzida"), d: "resized" },
+                                                { v: "fastresize", n: Theme.t("wallust.be_fast", "Rápida"), d: "fastresize" },
+                                                { v: "thumb", n: Theme.t("wallust.be_thumb", "Miniatura"), d: "thumb" },
+                                                { v: "wal", n: "pywal", d: "wal" } ] },
+                                            { key: "style", title: Theme.t("wallust.adv_style", "Tom geral"), opts: [
+                                                { v: "dark", n: Theme.t("wallust.style_dark", "Escuro"), d: "dark" },
+                                                { v: "light", n: Theme.t("wallust.style_light", "Claro"), d: "light" } ] }
+                                        ]
+                                        delegate: ColumnLayout {
+                                            id: wGroup
+                                            required property var modelData
+                                            Layout.fillWidth: true
+                                            spacing: 6
+                                            Text {
+                                                Layout.alignment: Qt.AlignLeft
+                                                text: wGroup.modelData.title
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: 13
+                                                color: Theme.textColor
+                                            }
+                                            Flow {
+                                                Layout.fillWidth: true
+                                                spacing: 8
+                                                Repeater {
+                                                    model: wGroup.modelData.opts
+                                                    delegate: Rectangle {
+                                                        id: wChip
+                                                        required property var modelData
+                                                        readonly property bool active: win.wallustValue(wGroup.modelData.key, "") === wChip.modelData.v
+                                                        width: wChipCol.implicitWidth + 28
+                                                        height: 46
+                                                        radius: 10
+                                                        color: active ? Theme.withAlpha(Theme.primary, 0.22) : (wChipArea.containsMouse ? Theme.tileHigh : Theme.tile)
+                                                        border.width: active ? 1.5 : 1
+                                                        border.color: active ? Theme.primary : Theme.withAlpha(Theme.outline, 0.15)
+                                                        ColumnLayout {
+                                                            id: wChipCol
+                                                            anchors.centerIn: parent
+                                                            spacing: 0
+                                                            Text {
+                                                                Layout.alignment: Qt.AlignHCenter
+                                                                text: wChip.modelData.n
+                                                                font.family: Theme.fontFamily
+                                                                font.pixelSize: 12
+                                                                font.weight: wChip.active ? Font.DemiBold : Font.Normal
+                                                                color: Theme.textColor
+                                                            }
+                                                            Text {
+                                                                Layout.alignment: Qt.AlignHCenter
+                                                                text: wChip.modelData.d
+                                                                font.family: Theme.monoFamily
+                                                                font.pixelSize: 10
+                                                                color: Theme.subtext
+                                                            }
+                                                        }
+                                                        MouseArea {
+                                                            id: wChipArea
+                                                            anchors.fill: parent
+                                                            hoverEnabled: true
+                                                            cursorShape: Qt.PointingHandCursor
+                                                            onClicked: win.setWallust(wGroup.modelData.key, wChip.modelData.v)
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    CfgSlider {
+                                        title: Theme.t("wallust.adv_saturation", "Saturação extra (0 = não mexe)")
+                                        minVal: 0
+                                        maxVal: 100
+                                        unit: "%"
+                                        value: win.wallustValue("saturation", 0)
+                                        onChanged: v => win.setWallust("saturation", Math.round(v))
+                                    }
+                                    CfgSlider {
+                                        title: Theme.t("wallust.adv_threshold", "Separação entre cores (0 = padrão)")
+                                        minVal: 0
+                                        maxVal: 100
+                                        value: win.wallustValue("threshold", 0)
+                                        onChanged: v => win.setWallust("threshold", Math.round(v))
+                                    }
+                                    CfgToggle {
+                                        title: Theme.t("wallust.adv_contrast", "Garantir contraste")
+                                        subtitle: Theme.t("wallust.adv_contrast_sub", "Ajusta as cores para continuarem legíveis sobre o fundo.")
+                                        checked: win.wallustValue("check_contrast", true)
+                                        onToggled: nv => win.setWallust("check_contrast", nv)
+                                    }
+                                    CfgToggle {
+                                        title: Theme.t("wallust.adv_16cols", "Metade de baixo mais escura")
+                                        subtitle: Theme.t("wallust.adv_16cols_sub", "As cores 0–7 saem apagadas e as 8–15 vivas, como num terminal clássico.")
+                                        checked: win.wallustValue("use16cols", true)
+                                        onToggled: nv => win.setWallust("use16cols", nv)
+                                    }
+
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 12
+                                        ActionBtn {
+                                            icon: Theme.icons.palette
+                                            primary: true
+                                            text: Theme.t("wallust.adv_apply", "Aplicar e regenerar cores")
+                                            onClicked: {
+                                                wallustSaveTimer.stop();
+                                                wallustSaveTimer.triggered();
+                                                Quickshell.execDetached(["sh", "-c", "sleep 0.4; exec rice-wallust-refresh --force"]);
+                                                refreshColorsTimer.restart();
+                                                win.showToast(Theme.t("toast.wallust_refresh", "Regenerando cores do Wallust..."));
+                                            }
+                                        }
+                                        ActionBtn {
+                                            icon: Theme.icons.restore
+                                            visible: Object.keys(win.wallustPrefs).length > 0
+                                            text: Theme.t("wallust.adv_reset", "Voltar ao padrão do rice")
+                                            onClicked: {
+                                                wallustSaveTimer.stop();
+                                                win.wallustPending = ({});
+                                                win.wallustPrefs = ({});
+                                                Quickshell.execDetached(["rice-wallust-config", "reset"]);
+                                            }
+                                        }
+                                        Item { Layout.fillWidth: true }
                                     }
                                 }
 
@@ -10276,6 +10445,34 @@ PanelWindow {
                     win.colorOverrides = d.overrides || ({});
                     win.colorsFollowWallpaper = (d.auto !== undefined) ? d.auto : true;
                 } catch (e) {}
+            }
+        }
+    }
+
+    Process {
+        id: loadWallustCfgProc
+        command: ["rice-wallust-config", "get"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const d = JSON.parse(text);
+                    win.wallustPrefs = d.prefs || ({});
+                    win.wallustDefaults = d.defaults || ({});
+                } catch (e) {}
+            }
+        }
+    }
+
+    Timer {
+        id: wallustSaveTimer
+        interval: 350
+        onTriggered: {
+            const q = win.wallustPending;
+            win.wallustPending = ({});
+            for (const k in q) {
+                const v = q[k];
+                Quickshell.execDetached(["rice-wallust-config", "set", k,
+                    typeof v === "boolean" ? (v ? "1" : "0") : String(v)]);
             }
         }
     }

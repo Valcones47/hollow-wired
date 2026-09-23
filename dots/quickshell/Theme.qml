@@ -145,8 +145,13 @@ QtObject {
         }
         return _accentPool[root._idx2];
     }
-    readonly property color primary: _vivid(_pick1, 0.38, 0.46, 0.62)
-    readonly property color tertiary: _vivid(_pick2, 0.34, 0.52, 0.68)
+    // Destaques escolhidos à mão no painel (rice-colors set accent1/accent2,
+    // guardados no color-overrides.json): valem exatamente como escolhidos,
+    // sem o ajuste de vivacidade, e vencem a escolha automática.
+    property string accentOverride1: ""
+    property string accentOverride2: ""
+    readonly property color primary: accentOverride1 !== "" ? accentOverride1 : _vivid(_pick1, 0.38, 0.46, 0.62)
+    readonly property color tertiary: accentOverride2 !== "" ? accentOverride2 : _vivid(_pick2, 0.34, 0.52, 0.68)
     readonly property color primaryOld: color10
     // Usado em vários lugares mas nunca tinha sido definido: virava
     // `undefined` e o QML desenhava preto (o medidor da GPU nos widgets).
@@ -284,6 +289,25 @@ QtObject {
         onLoadFailed: (error) => {
             console.log("Theme: colors-quickshell.json ausente (usando paleta padrão dark):", error);
         }
+    }
+
+    property FileView accentOverrideFile: FileView {
+        path: Quickshell.env("HOME") + "/.config/hypr/color-overrides.json"
+        watchChanges: true
+        printErrors: false
+        onFileChanged: reload()
+        onLoaded: {
+            try {
+                const d = JSON.parse(text()) || {};
+                const ok = v => typeof v === "string" && /^#[0-9a-fA-F]{6}$/.test(v) ? v : "";
+                root.accentOverride1 = ok(d.accent1);
+                root.accentOverride2 = ok(d.accent2);
+            } catch (e) {
+                root.accentOverride1 = "";
+                root.accentOverride2 = "";
+            }
+        }
+        onLoadFailed: { root.accentOverride1 = ""; root.accentOverride2 = ""; }
     }
 
     property FileView waywallenWatcher: FileView {

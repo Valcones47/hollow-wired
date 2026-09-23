@@ -99,7 +99,11 @@ case "${1:-}" in
 
         wallust_pid=""
         if [ -n "$colors" ] && [ -f "$colors" ] && command -v wallust >/dev/null 2>&1; then
-            nice -n 10 wallust run "$colors" >/dev/null 2>&1 &
+            if command -v rice-wallust-config >/dev/null 2>&1; then
+                nice -n 10 rice-wallust-config run "$colors" >/dev/null 2>&1 &
+            else
+                nice -n 10 wallust run "$colors" >/dev/null 2>&1 &
+            fi
             wallust_pid=$!
         fi
 

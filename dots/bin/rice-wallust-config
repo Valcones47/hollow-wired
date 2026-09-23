@@ -1,0 +1,203 @@
+#!/usr/bin/env python3
+"""rice-wallust-config — ajustes avançados de como o wallust gera a paleta.
+
+As escolhas ficam em ~/.config/hollow-wired/wallust.json (estado do usuário).
+O ~/.config/wallust/wallust.toml NÃO é editado: o rice-update o substitui pela
+versão do repositório. Em vez disso, `build` escreve uma cópia efetiva em
+~/.cache/wallust/wallust-effective.toml (o toml do rice + as escolhas), e o
+rice-wallust-refresh roda o wallust com ela.
+
+Uso:
+    rice-wallust-config get              # JSON: escolhas, padrões e opções
+    rice-wallust-config set <chave> <v>  # grava uma escolha
+    rice-wallust-config unset <chave>    # volta ao padrão do rice
+    rice-wallust-config reset            # apaga todas as escolhas
+    rice-wallust-config build            # escreve a config efetiva e imprime o caminho
+    rice-wallust-config run <imagem>     # roda o wallust com a config efetiva
+"""
+import json
+import os
+import re
+import subprocess
+import sys
+
+HOME = os.path.expanduser("~")
+PREFS = os.path.join(HOME, ".config/hollow-wired/wallust.json")
+TOML = os.path.join(HOME, ".config/wallust/wallust.toml")
+EFFECTIVE = os.path.join(HOME, ".cache/wallust/wallust-effective.toml")
+
+# chave -> (tipo, opções ou faixa)
+SPEC = {
+    "backend": ("choice", ["full", "resized", "wal", "thumb", "fastresize"]),
+    "palette": ("choice", ["kmeans", "salience", "ansi"]),
+    "style": ("choice", ["dark", "light"]),
+    "saturation": ("int", (0, 100)),      # 0 = não mexe na saturação
+    "threshold": ("int", (0, 100)),       # 0 = padrão do wallust
+    "check_contrast": ("bool", None),
+    "use16cols": ("bool", None),
+}
+
+
+def load(path):
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def save(data):
+    os.makedirs(os.path.dirname(PREFS), exist_ok=True)
+    tmp = PREFS + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+    os.replace(tmp, PREFS)
+
+
+def parse(key, raw):
+    kind, opt = SPEC[key]
+    if kind == "choice":
+        return raw if raw in opt else None
+    if kind == "int":
+        try:
+            v = int(raw)
+        except ValueError:
+            return None
+        return v if opt[0] <= v <= opt[1] else None
+    if kind == "bool":
+        low = str(raw).lower()
+        if low in ("1", "true", "on", "sim"):
+            return True
+        if low in ("0", "false", "off", "nao", "não"):
+            return False
+    return None
+
+
+def toml_defaults(text):
+    """Valores que o toml do rice já define (para o painel mostrar o padrão)."""
+    out = {}
+    for key in SPEC:
+        m = re.search(r'^%s\s*=\s*(.+?)\s*$' % key, text, re.MULTILINE)
+        if not m:
+            continue
+        val = m.group(1).strip().strip('"\'')
+        kind = SPEC[key][0]
+        if kind == "bool":
+            out[key] = val == "true"
+        elif kind == "int":
+            try:
+                out[key] = int(val)
+            except ValueError:
+                pass
+        else:
+            out[key] = val
+    return out
+
+
+def fmt(key, value):
+    kind = SPEC[key][0]
+    if kind == "bool":
+        return "true" if value else "false"
+    if kind == "int":
+        return str(value)
+    return '"%s"' % value
+
+
+def build():
+    try:
+        with open(TOML, encoding="utf-8") as f:
+            text = f.read()
+    except OSError:
+        text = ""
+    prefs = {k: v for k, v in load(PREFS).items() if k in SPEC}
+    if "palette" in prefs:
+        # O bloco do salience (sampling/intensity) só vale para ele.
+        text = re.sub(r'^salience\s*=.*$\n?', '', text, flags=re.MULTILINE)
+    for key, value in prefs.items():
+        # 0 em saturação/limiar = "deixa o wallust decidir": remove a chave.
+        remove = SPEC[key][0] == "int" and value == 0
+        line = "%s = %s" % (key, fmt(key, value))
+        pat = re.compile(r'^%s\s*=.*$\n?' % key, re.MULTILINE)
+        if remove:
+            text = pat.sub('', text)
+        elif pat.search(text):
+            text = pat.sub(line + "\n", text, count=1)
+        else:
+            # Chaves soltas precisam vir antes da primeira tabela [..].
+            m = re.search(r'^\[', text, re.MULTILINE)
+            pos = m.start() if m else len(text)
+            text = text[:pos] + line + "\n" + text[pos:]
+    os.makedirs(os.path.dirname(EFFECTIVE), exist_ok=True)
+    with open(EFFECTIVE, "w", encoding="utf-8") as f:
+        f.write(text)
+    return EFFECTIVE
+
+
+def main():
+    args = sys.argv[1:]
+    cmd = args[0] if args else "get"
+
+    if cmd == "get":
+        try:
+            with open(TOML, encoding="utf-8") as f:
+                defaults = toml_defaults(f.read())
+        except OSError:
+            defaults = {}
+        prefs = {k: v for k, v in load(PREFS).items() if k in SPEC}
+        print(json.dumps({
+            "prefs": prefs,
+            "defaults": defaults,
+            "options": {k: v[1] for k, v in SPEC.items() if v[0] == "choice"},
+        }, ensure_ascii=False))
+        return 0
+
+    if cmd == "set" and len(args) >= 3:
+        key = args[1]
+        if key not in SPEC:
+            print("chave desconhecida: %s" % key, file=sys.stderr)
+            return 2
+        value = parse(key, args[2])
+        if value is None:
+            print("valor inválido para %s: %s" % (key, args[2]), file=sys.stderr)
+            return 2
+        prefs = load(PREFS)
+        prefs[key] = value
+        save(prefs)
+        print("OK")
+        return 0
+
+    if cmd == "unset" and len(args) >= 2:
+        prefs = load(PREFS)
+        prefs.pop(args[1], None)
+        save(prefs)
+        print("OK")
+        return 0
+
+    if cmd == "reset":
+        save({})
+        print("OK")
+        return 0
+
+    if cmd == "build":
+        print(build())
+        return 0
+
+    if cmd == "run" and len(args) >= 2:
+        # Todo lugar que gera a paleta passa por aqui, para as escolhas valerem
+        # também na troca de wallpaper, não só no botão "Regenerar".
+        cfg = build()
+        tpl = os.path.join(HOME, ".config/wallust/templates")
+        rc = subprocess.run(["wallust", "run", "-C", cfg, "--templates-dir", tpl] + args[1:],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode
+        if rc != 0:
+            rc = subprocess.run(["wallust", "run"] + args[1:],
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode
+        return rc
+
+    print(__doc__)
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

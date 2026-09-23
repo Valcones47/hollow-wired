@@ -94,7 +94,14 @@ if [ -n "$preview" ] && [ -f "$preview" ] && command -v rice-wallpaper-frame >/d
 fi
 
 if [ -n "$preview" ] && [ -f "$preview" ]; then
-    wallust run "$preview" >/dev/null 2>&1
+    # Ajustes avançados do painel (rice-wallust-config): o toml do rice mais as
+    # escolhas do usuário, numa cópia no cache — o wallust.toml em si é
+    # substituído a cada rice-update e não guarda escolha nenhuma.
+    if command -v rice-wallust-config >/dev/null 2>&1; then
+        rice-wallust-config run "$preview" || true
+    else
+        wallust run "$preview" >/dev/null 2>&1
+    fi
     # A paleta recém-extraída vira a "base". Em seguida o rice-colors regrava os
     # mesmos arquivos aplicando as cores que o usuário trocou à mão no painel —
     # sem isso, cada troca de wallpaper apagaria as escolhas dele.

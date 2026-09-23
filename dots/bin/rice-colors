@@ -14,6 +14,7 @@ só a base.
 Uso:
     rice-colors get                    # JSON: base, overrides e paleta efetiva
     rice-colors set color4 '#ff0055'   # troca uma cor
+    rice-colors set accent2 '#ffb300'  # destaque livre da interface (accent1/accent2)
     rice-colors unset color4           # volta a usar a cor do wallpaper
     rice-colors reset                  # remove todas as trocas
     rice-colors snapshot               # guarda a paleta atual como base
@@ -55,6 +56,11 @@ FALLBACK = {
     "color8": "#475569", "color9": "#fb7185", "color10": "#ff2a85", "color11": "#ef4444",
     "color12": "#60a5fa", "color13": "#e879f9", "color14": "#22d3ee", "color15": "#f8fafc",
 }
+
+# Destaques da interface escolhidos à mão. Não são cores da paleta: só o
+# Quickshell (Theme.qml) lê, direto do color-overrides.json, então trocar um
+# deles não regenera os templates.
+ACCENT_KEYS = ["accent1", "accent2"]
 
 HEX_RE = re.compile(r'^#?[0-9a-fA-F]{6}$')
 
@@ -310,7 +316,7 @@ def main():
     if cmd == "get":
         print(json.dumps({
             "base": base_palette(),
-            "overrides": {k: v for k, v in load_json(OVERRIDES).items() if k in KEYS},
+            "overrides": {k: v for k, v in load_json(OVERRIDES).items() if k in KEYS or k in ACCENT_KEYS},
             "effective": effective(),
             "keys": KEYS,
             "auto": auto_enabled(),
@@ -343,7 +349,7 @@ def main():
             print("Uso: rice-colors set <chave> <#RRGGBB>", file=sys.stderr)
             return 2
         key, value = args[1], norm(args[2])
-        if key not in KEYS:
+        if key not in KEYS and key not in ACCENT_KEYS:
             print("chave desconhecida: %s" % key, file=sys.stderr)
             return 2
         if not value:
@@ -352,6 +358,9 @@ def main():
         ov = load_json(OVERRIDES)
         ov[key] = value
         save_json(OVERRIDES, ov)
+        if key in ACCENT_KEYS:
+            print("OK")
+            return 0
         return apply(quiet=True) or (print("OK") or 0)
 
     if cmd == "unset":
@@ -360,6 +369,9 @@ def main():
         ov = load_json(OVERRIDES)
         ov.pop(args[1], None)
         save_json(OVERRIDES, ov)
+        if args[1] in ACCENT_KEYS:
+            print("OK")
+            return 0
         return apply(quiet=True) or (print("OK") or 0)
 
     if cmd == "reset":
