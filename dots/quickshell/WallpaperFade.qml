@@ -35,25 +35,11 @@ Scope {
 
     property string style: "wipe"
 
-    // Tempos. O que manda na sensação de "travou" é o coverMs: ele é tempo
-    // morto entre o clique e a troca começar de verdade, porque quem troca
-    // espera a tela estar coberta antes de mandar o comando. Era 1300 e, com o
-    // ~1s que o backend leva por conta própria, o wallpaper só mudava 3s
-    // depois do clique.
-    property int coverMs: 900
-
-    // `hold` deixou de ser o caminho normal e virou só o limite: quem revela é
-    // o `reveal()`, chamado assim que o renderizador novo aparece de verdade.
-    // Antes era um tempo fixo de 1200ms, e quando o backend demorava mais que
-    // isso a camada começava a sumir com o wallpaper antigo ainda na tela — os
-    // dois apareciam ao mesmo tempo, meio transparentes.
-    // Com a espera pelo renderizador assentar e pela paleta nova (ver
-    // rice-wallpaper-fade), o caminho normal leva de 1,5 a 4s depois de cobrir.
-    property int hold: 9000
-    // Mais lento que a entrada de propósito: a saída é quando o olho está
-    // procurando o wallpaper novo, e qualquer tranco do renderizador que ainda
-    // sobrar fica diluído num esmaecer longo.
-    property int revealMs: 500
+    // Tempos calibrados: transição ágil e revelação suave assim que o novo
+    // renderizador estiver pronto.
+    property int coverMs: 700
+    property int hold: 6000
+    property int revealMs: 400
 
     property string source: ""
     property bool covering: false
@@ -75,12 +61,7 @@ Scope {
     property bool pendingCover: false
 
     // Duração da animação de opacidade. É definida ANTES de mexer em
-    // `covering`, de propósito: um `Behavior` avalia as próprias propriedades
-    // com o valor que elas tinham antes da mudança que o disparou, então
-    // amarrar a duração a `covering` dentro dele não funciona — medindo, a
-    // imagem subia de 0 a 1 em 450ms uniformemente pela tela, por cima da
-    // varredura, e era isso que aparecia como "meio transparente junto com o
-    // wallpaper antigo".
+    // `covering`, de propósito.
     property int opDuration: 0
 
     function cover(path) {
@@ -104,8 +85,6 @@ Scope {
         // imagem aos poucos é a máscara.
         fadeScope.opDuration = fadeScope.masked ? 0 : fadeScope.coverMs;
         fadeScope.covering = true;
-        fadeScope.drift = 0;
-        driftAnim.restart();
         // Sem o restart explícito, cobrir duas vezes seguidas deixaria a
         // animação de máscara parada no valor anterior.
         if (fadeScope.masked)
@@ -122,9 +101,6 @@ Scope {
 
     // Revela o wallpaper novo. Chamado quando o renderizador novo já está no ar
     // (ver rice-wallpaper-fade --reveal-when-ready).
-    // Pedido de revelação que chegou com a animação de entrada ainda
-    // correndo (a troca começa cedo e o wallpaper novo pode ficar pronto
-    // antes da onda terminar). Revela quando ela acabar.
     property bool revealQueued: false
 
     function reveal() {
@@ -138,10 +114,6 @@ Scope {
         fadeScope.pendingCover = false;
         fadeScope.opDuration = fadeScope.revealMs;
         fadeScope.covering = false;
-        // Volta ao enquadramento real enquanto some: sem isso a imagem ampliada
-        // "pulava" para o wallpaper vivo no fim.
-        driftAnim.stop();
-        driftBack.restart();
         holdTimer.stop();
     }
 
@@ -150,35 +122,9 @@ Scope {
         fadeScope.pendingCover = false;
         fadeScope.covering = false;
         coverAnim.stop();
-        driftAnim.stop();
         decodeGuard.stop();
         holdTimer.stop();
         safetyTimer.stop();
-    }
-
-    // Depois de coberta, a imagem se aproxima devagar enquanto o waywallen sobe o
-    // renderizador novo (2–3 s em que não há o que fazer). Parada, ela parecia
-    // travamento; em movimento, parece parte da transição.
-    property real drift: 0
-    SequentialAnimation {
-        id: driftAnim
-        PauseAnimation { duration: fadeScope.masked ? fadeScope.coverMs : 0 }
-        NumberAnimation {
-            target: fadeScope
-            property: "drift"
-            to: 1
-            duration: 9000
-            easing.type: Easing.OutSine
-        }
-    }
-
-    NumberAnimation {
-        id: driftBack
-        target: fadeScope
-        property: "drift"
-        to: 0
-        duration: fadeScope.revealMs
-        easing.type: Easing.OutCubic
     }
 
     NumberAnimation {
@@ -419,7 +365,6 @@ Scope {
                 anchors.fill: parent
                 source: fadeScope.source
                 fillMode: Image.PreserveAspectCrop
-                scale: 1 + 0.06 * fadeScope.drift
                 // Quando a origem é um preview de cena (scene.pkg) a imagem é
                 // pequena e quadrada; sem isso a ampliação fica serrilhada.
                 smooth: true

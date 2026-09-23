@@ -124,31 +124,23 @@ case "${1:-}" in
         done
 
         if [ -n "$pid" ]; then
-            # Cena (scene.pkg) carrega mais coisa que vídeo.
-            # Mínimo curto: a imagem parada na tela por muito tempo parece
-            # travamento. Com 0,9s/1,4s aqui a tela ficava ~5s congelada no
-            # total. Se o renderizador ainda estiver carregando, a amostragem
-            # de CPU abaixo segura mais.
-            min_ms=400
-            grep -qa "wescene" "/proc/$pid/cmdline" 2>/dev/null && min_ms=800
-            max_ms=4000
+            # Cena (scene.pkg) carrega mais coisas que vídeo simples.
+            min_ms=150
+            grep -qa "wescene" "/proc/$pid/cmdline" 2>/dev/null && min_ms=400
+            max_ms=2500
             tick=$(getconf CLK_TCK 2>/dev/null || echo 100)
             cpu_ticks() { awk '{print $14 + $15}' "/proc/$1/stat" 2>/dev/null; }
             start_ms=$(date +%s%3N)
             prev=$(cpu_ticks "$pid"); last_pct=999; calm=0
             while :; do
-                sleep 0.2
+                sleep 0.1
                 now_ms=$(date +%s%3N)
                 el=$(( now_ms - start_ms ))
                 cur=$(cpu_ticks "$pid")
                 [ -z "$cur" ] && break                       # processo sumiu
-                # % de um núcleo nos últimos 200ms
-                pct=$(( (cur - prev) * 100 * 5 / tick ))
+                # % de um núcleo nos últimos 100ms
+                pct=$(( (cur - prev) * 100 * 10 / tick ))
                 prev=$cur
-                # "Assentou": duas amostras seguidas abaixo de 60%, ou quase
-                # iguais abaixo de 90% (o decode de vídeo em regime tem custo
-                # constante). Um núcleo cravado em 100% é carregamento, mesmo
-                # estável — no teste com um processo ocupado isso passava.
                 diff=$(( pct > last_pct ? pct - last_pct : last_pct - pct ))
                 if [ "$pct" -lt 60 ] || { [ "$pct" -lt 90 ] && [ "$diff" -le $(( pct / 5 + 5 )) ]; }; then
                     calm=$(( calm + 1 ))
@@ -156,7 +148,7 @@ case "${1:-}" in
                     calm=0
                 fi
                 last_pct=$pct
-                if [ "$el" -ge "$min_ms" ] && [ "$calm" -ge 2 ]; then
+                if [ "$el" -ge "$min_ms" ] && [ "$calm" -ge 1 ]; then
                     break
                 fi
                 [ "$el" -ge "$max_ms" ] && break
@@ -166,22 +158,13 @@ case "${1:-}" in
             trace "renderizador novo NÃO apareceu em 8s: $target"
         fi
 
-        # Paleta nova aplicada antes de revelar (limite de 4s: um wallust
+        # Paleta nova aplicada antes de revelar (limite de 3s: um wallust
         # travado não pode segurar a tela coberta).
         if [ -n "$wallust_pid" ]; then
-            waited=0
-            for _ in $(seq 1 40); do
+            for _ in $(seq 1 30); do
                 kill -0 "$wallust_pid" 2>/dev/null || break
                 sleep 0.1
-                waited=$(( waited + 1 ))
             done
-            # Só espera o shell redesenhar quando o wallust demorou de fato
-            # (paleta nova de verdade). Com a paleta em cache ele termina em
-            # milissegundos e não há o que esperar.
-            if [ "$waited" -gt 2 ]; then
-                sleep 0.2
-                trace "paleta nova aplicada antes de revelar (${waited}00ms)"
-            fi
         fi
 
         qs_call reveal >/dev/null 2>&1 || true
