@@ -16,8 +16,37 @@ current() {
     [ "$m" = "windows" ] && echo windows || echo hyprland
 }
 
+# Botões próprios dos apps GTK/Firefox/Chrome (a barra deles). No modo Windows
+# ficam escondidos, porque a barra do rice (hyprbars) aparece nesses apps e os
+# botões deles não funcionam direito: o minimizar é descartado pelo Hyprland e
+# o maximizar chega com estado errado. O valor anterior é guardado e volta no
+# modo Hyprland. O GTK 3 lê o settings.ini ao iniciar: vale para apps abertos
+# depois da troca.
+PREV="${XDG_CONFIG_HOME:-$HOME/.config}/hollow-wired/button-layout.prev"
+set_button_layout() {
+    local layout="$1" f
+    command -v gsettings >/dev/null 2>&1 && gsettings set org.gnome.desktop.wm.preferences button-layout "$layout" 2>/dev/null
+    for f in "${XDG_CONFIG_HOME:-$HOME/.config}/gtk-3.0/settings.ini" "${XDG_CONFIG_HOME:-$HOME/.config}/gtk-4.0/settings.ini"; do
+        [ -f "$f" ] && grep -q '^gtk-decoration-layout=' "$f" && sed -i "s|^gtk-decoration-layout=.*|gtk-decoration-layout=$layout|" "$f"
+    done
+}
+buttons_for_mode() {
+    if [ "$1" = windows ]; then
+        if [ ! -f "$PREV" ]; then
+            mkdir -p "$(dirname "$PREV")"
+            cur=$(gsettings get org.gnome.desktop.wm.preferences button-layout 2>/dev/null | tr -d "'")
+            printf '%s\n' "${cur:-icon:minimize,maximize,close}" > "$PREV"
+        fi
+        set_button_layout ":"
+    elif [ -f "$PREV" ]; then
+        set_button_layout "$(cat "$PREV")"
+        rm -f "$PREV"
+    fi
+}
+
 apply() {
     local mode="$1"
+    buttons_for_mode "$mode"
     mkdir -p "$(dirname "$FILE")"
     printf '%s\n' "$mode" > "$FILE"
     if [ -n "$HYPRLAND_INSTANCE_SIGNATURE" ]; then

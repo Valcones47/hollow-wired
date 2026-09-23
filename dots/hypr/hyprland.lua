@@ -893,9 +893,14 @@ local keepAsIs = { dropterm = true }
 local hyprbarsLib = "/usr/lib/libhyprbars.so"
 -- Recomeça a cada leitura do config: o reload apaga os botões do plugin.
 rice_hyprbars_ready = false
-local ownTitlebar = "^(zen|firefox|librewolf|floorp|chromium|google-chrome|brave-browser|vivaldi-stable|microsoft-edge|"
-    .. "com.anthropic.Claude|discord|vesktop|youtube-music-desktop-app|spotify|code|code-oss|Code|steam|"
-    .. "org.gnome..*|dropterm|xdg-desktop-portal-gtk)$"
+-- Só os apps Electron que desenham os próprios botões à mão ficam sem a barra
+-- do rice. Navegadores e apps GTK/GNOME ganham a barra: no modo Windows o
+-- rice-window-mode esconde os botões próprios deles (button-layout vazio), e
+-- os botões deles não funcionavam direito — o minimizar é descartado pelo
+-- Hyprland (medido: nenhum evento) e o maximizar chega com estado errado (o
+-- app abre achando que já está maximizado).
+local ownTitlebar = "^(com.anthropic.Claude|discord|vesktop|youtube-music-desktop-app|spotify|code|code-oss|Code|steam|"
+    .. "dropterm|xdg-desktop-portal-gtk)$"
 
 local function hex(c, alpha)
     c = tostring(c or ""):gsub("#", "")
@@ -949,7 +954,9 @@ local function hyprbars_setup()
     })
     hl.plugin.hyprbars.add_button({
         bg_color = hex(wallust.wallust_accent1 or fg), fg_color = hex(bg), size = 16, icon = "󰖰",
-        action = [[hyprctl dispatch 'hl.dsp.window.move({ workspace = "special:magic" })']],
+        -- Área escondida própria (não a do Super+A): a janela volta clicando
+        -- no ícone dela na dock (DockConfig.focusWindow).
+        action = [[hyprctl dispatch 'hl.dsp.window.move({ workspace = "special:minimized" })']],
     })
     -- Com o plugin carregado a regra passa a existir.
     rice_nobar_rule = hl.window_rule({

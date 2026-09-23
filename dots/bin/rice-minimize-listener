@@ -4,8 +4,10 @@
 O Hyprland não tem minimizar: quando um app pede (o botão da barra própria do
 Firefox, Discord, apps GNOME...), ele só avisa no socket de eventos
 ("minimized>>ENDEREÇO,1") e a janela continua onde estava. Aqui esse aviso vira
-o mesmo que o Super + D: a janela vai para a área escondida (special:magic),
-de onde volta com Super + A.
+o mesmo que o botão minimizar da barra do rice: a janela vai para a área
+escondida special:minimized e volta clicando no ícone dela na dock.
+Obs.: medido com GTK4, o pedido de minimizar dos apps nem chega como evento;
+este ouvinte cobre os apps/clients que mandam.
 
 Uma instância só (trava em $XDG_RUNTIME_DIR). Sobe no hyprland.start.
 """
@@ -35,7 +37,7 @@ def minimize(addr):
     if not addr.startswith("0x"):
         addr = "0x" + addr
     subprocess.run(["hyprctl", "dispatch",
-                    f'hl.dsp.window.move({{ workspace = "special:magic", window = "address:{addr}" }})'],
+                    f'hl.dsp.window.move({{ workspace = "special:minimized", window = "address:{addr}" }})'],
                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 

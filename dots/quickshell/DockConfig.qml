@@ -190,6 +190,13 @@ QtObject {
         const h = Hyprland.toplevels.values.find(x => x.wayland === t);
         if (!h) { t.activate(); return; }
         const addr = String(h.address).startsWith("0x") ? h.address : "0x" + h.address;
+        // Janela minimizada (special:minimized, botão minimizar do modo
+        // Windows): volta para a área de trabalho atual antes do foco, como
+        // clicar no ícone da barra de tarefas no Windows.
+        if (h.workspace && h.workspace.name === "special:minimized") {
+            const ws = Hyprland.focusedWorkspace ? Hyprland.focusedWorkspace.id : 1;
+            Hyprland.dispatch("hl.dsp.window.move({ workspace = " + ws + ", window = \"address:" + addr + "\" })");
+        }
         Hyprland.dispatch("hl.dsp.focus({ window = \"address:" + addr + "\" })");
     }
 
