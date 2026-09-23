@@ -659,6 +659,9 @@ PanelWindow {
                 ColumnLayout {
                     anchors.fill: parent
                     anchors.margins: 34
+                    // Espaço do rodapé (Voltar / bolinhas / Continuar), que fica
+                    // por cima da página: sem isso o fim da lista passava por baixo.
+                    anchors.bottomMargin: 34 + 38 + 18
                     visible: welcomeWindow.page === 1
                     spacing: 14
 
@@ -704,6 +707,9 @@ PanelWindow {
                 ColumnLayout {
                     anchors.fill: parent
                     anchors.margins: 34
+                    // Espaço do rodapé (Voltar / bolinhas / Continuar), que fica
+                    // por cima da página: sem isso o fim da lista passava por baixo.
+                    anchors.bottomMargin: 34 + 38 + 18
                     visible: welcomeWindow.page === 2
                     spacing: 14
 
@@ -738,6 +744,9 @@ PanelWindow {
                 ColumnLayout {
                     anchors.fill: parent
                     anchors.margins: 34
+                    // Espaço do rodapé (Voltar / bolinhas / Continuar), que fica
+                    // por cima da página: sem isso o fim da lista passava por baixo.
+                    anchors.bottomMargin: 34 + 38 + 18
                     visible: welcomeWindow.page === 3
                     spacing: 12
 
@@ -851,6 +860,9 @@ PanelWindow {
                 ColumnLayout {
                     anchors.fill: parent
                     anchors.margins: 34
+                    // Espaço do rodapé (Voltar / bolinhas / Continuar), que fica
+                    // por cima da página: sem isso o fim da lista passava por baixo.
+                    anchors.bottomMargin: 34 + 38 + 18
                     visible: welcomeWindow.page === 4
                     spacing: 14
 
@@ -922,6 +934,9 @@ PanelWindow {
                 ColumnLayout {
                     anchors.fill: parent
                     anchors.margins: 34
+                    // Espaço do rodapé (Voltar / bolinhas / Continuar), que fica
+                    // por cima da página: sem isso o fim da lista passava por baixo.
+                    anchors.bottomMargin: 34 + 38 + 18
                     visible: welcomeWindow.page === 5
                     spacing: 14
 
