@@ -300,7 +300,7 @@ def main():
         state(state="recording", name=name, secs=RECORD_SECS, started=int(time.time()))
         fps = "60" if float(mon.get("refreshRate", 60)) >= 59 else "30"
         rec = subprocess.Popen(["gpu-screen-recorder", "-w", mon["name"], "-f", fps, "-k", "h264",
-                                "-q", "very_high", "-cursor", "no", "-o", str(raw)],
+                                "-q", "ultra", "-cursor", "no", "-o", str(raw)],
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         t_end = time.time() + RECORD_SECS
         while time.time() < t_end:
@@ -346,8 +346,12 @@ def main():
         tmp = out.with_name("tmp_" + out.name)
         r = subprocess.run(["ffmpeg", "-y", "-v", "error", "-ss", f"{REF_T}", "-t", f"{length:.3f}",
                             "-i", str(raw), "-filter_complex", fc, "-map", "[v]", "-an",
-                            "-c:v", "libx264", "-crf", "20", "-preset", "medium",
-                            "-maxrate", "6M", "-bufsize", "12M", "-movflags", "+faststart", str(tmp)],
+                            # Qualidade alta de propósito: com CRF 20 + teto de 6 Mbps a
+                            # cena (granulada, vermelho saturado) saiu com 2,7 Mbps e
+                            # "parecendo 720p" (usuário). tune grain guarda a textura;
+                            # o teto de 20 Mbps ainda é leve para o decodificador da Intel.
+                            "-c:v", "libx264", "-crf", "16", "-preset", "slow", "-tune", "grain",
+                            "-maxrate", "20M", "-bufsize", "40M", "-movflags", "+faststart", str(tmp)],
                            capture_output=True, text=True)
         if r.returncode != 0 or not tmp.exists():
             tmp.unlink(missing_ok=True)
