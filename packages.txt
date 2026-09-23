@@ -4,6 +4,7 @@
 # nos repositórios oficiais são instalados pelo AUR (yay/paru).
 # Compositor & Shell
 hyprland
+hyprland-plugin-hyprbars   # (AUR) Barra com minimizar/maximizar/fechar no modo de janelas estilo Windows
 aquamarine
 quickshell
 kitty
