@@ -104,6 +104,8 @@ Scope {
         // imagem aos poucos é a máscara.
         fadeScope.opDuration = fadeScope.masked ? 0 : fadeScope.coverMs;
         fadeScope.covering = true;
+        fadeScope.drift = 0;
+        driftAnim.restart();
         // Sem o restart explícito, cobrir duas vezes seguidas deixaria a
         // animação de máscara parada no valor anterior.
         if (fadeScope.masked)
@@ -136,6 +138,10 @@ Scope {
         fadeScope.pendingCover = false;
         fadeScope.opDuration = fadeScope.revealMs;
         fadeScope.covering = false;
+        // Volta ao enquadramento real enquanto some: sem isso a imagem ampliada
+        // "pulava" para o wallpaper vivo no fim.
+        driftAnim.stop();
+        driftBack.restart();
         holdTimer.stop();
     }
 
@@ -144,9 +150,35 @@ Scope {
         fadeScope.pendingCover = false;
         fadeScope.covering = false;
         coverAnim.stop();
+        driftAnim.stop();
         decodeGuard.stop();
         holdTimer.stop();
         safetyTimer.stop();
+    }
+
+    // Depois de coberta, a imagem se aproxima devagar enquanto o waywallen sobe o
+    // renderizador novo (2–3 s em que não há o que fazer). Parada, ela parecia
+    // travamento; em movimento, parece parte da transição.
+    property real drift: 0
+    SequentialAnimation {
+        id: driftAnim
+        PauseAnimation { duration: fadeScope.masked ? fadeScope.coverMs : 0 }
+        NumberAnimation {
+            target: fadeScope
+            property: "drift"
+            to: 1
+            duration: 9000
+            easing.type: Easing.OutSine
+        }
+    }
+
+    NumberAnimation {
+        id: driftBack
+        target: fadeScope
+        property: "drift"
+        to: 0
+        duration: fadeScope.revealMs
+        easing.type: Easing.OutCubic
     }
 
     NumberAnimation {
@@ -387,6 +419,7 @@ Scope {
                 anchors.fill: parent
                 source: fadeScope.source
                 fillMode: Image.PreserveAspectCrop
+                scale: 1 + 0.06 * fadeScope.drift
                 // Quando a origem é um preview de cena (scene.pkg) a imagem é
                 // pequena e quadrada; sem isso a ampliação fica serrilhada.
                 smooth: true
