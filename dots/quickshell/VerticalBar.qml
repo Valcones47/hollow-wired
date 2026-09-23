@@ -30,6 +30,8 @@ PanelWindow {
     signal clockClicked()
     signal notifClicked()
     signal visualConfigClicked()
+    signal controlClicked()
+    signal controlHovered(bool on)
 
     property bool launcherOpen: false
     readonly property bool onLeft: ShellLayout.barPosition === "left"
@@ -74,31 +76,6 @@ PanelWindow {
         vbar.pop = kind;
     }
     function leavePop() { popHide.restart(); }
-    onPopChanged: if (vbar.pop === "battery") { blurCheck.running = true; perfCheck.running = true; }
-
-    // Mesmos atalhos de desempenho do popup da bateria da barra de cima.
-    property bool blurEnabled: true
-    property bool perfModeEnabled: false
-    Process {
-        id: blurCheck
-        command: ["rice-blur-toggle", "status"]
-        stdout: StdioCollector { onStreamFinished: vbar.blurEnabled = text.trim() === "1" }
-    }
-    Process {
-        id: blurToggleProc
-        command: ["rice-blur-toggle"]
-        onExited: { blurCheck.running = true; perfCheck.running = true; }
-    }
-    Process {
-        id: perfCheck
-        command: ["rice-perf-mode", "status"]
-        stdout: StdioCollector { onStreamFinished: vbar.perfModeEnabled = text.trim() === "1" }
-    }
-    Process {
-        id: perfToggleProc
-        command: ["rice-perf-mode"]
-        onExited: { blurCheck.running = true; perfCheck.running = true; }
-    }
     Timer { id: popHide; interval: 280; onTriggered: if (!popBox.busy) vbar.pop = "" }
     Timer { id: showDelay; interval: 60; onTriggered: vbar.barHovered = true }
 
@@ -222,9 +199,9 @@ PanelWindow {
         return s > 0.75 ? Theme.icons.wifi4 : s > 0.5 ? Theme.icons.wifi3 : s > 0.25 ? Theme.icons.wifi2 : Theme.icons.wifi1;
     }
 
-    readonly property var btAdapter: Bluetooth.defaultAdapter
-    readonly property int btConnected: vbar.btAdapter
-        ? vbar.btAdapter.devices.values.filter(d => d.connected).length : 0
+    // Só para decidir se o bloco da central mostra o ícone de brilho.
+    FileView { id: brMax; path: "/sys/class/backlight/intel_backlight/max_brightness"; blockLoading: true; printErrors: false }
+    readonly property bool hasBacklight: brMax.text().trim() !== ""
 
     // Áreas de trabalho: mesma regra da barra de cima (ver TopBar.wsModel).
     readonly property var wsModel: {
@@ -368,8 +345,7 @@ PanelWindow {
     // de energia (que ficam sempre por último).
     property var dragOrder: null
     function barModuleItems() {
-        return { notifications: vNotif, settings: vSettings, network: vNet,
-                 bluetooth: vBt, audio: vAudio, battery: vBat };
+        return { notifications: vNotif, network: vNet, control: vCtl };
     }
     function applyBarOrder() {
         const items = vbar.barModuleItems();
@@ -668,24 +644,6 @@ PanelWindow {
                 }
 
                 BarButton {
-                    id: vAudio
-                    editKey: "audio"
-                    visible: ShellLayout.showModule("audio")
-                    icon: vbar.volIcon()
-                    popKind: "audio"
-                    iconColor: (vbar.sink && vbar.sink.audio && vbar.sink.audio.muted) ? Theme.subtext : Theme.textColor
-                    onActivated: {
-                        if (vbar.sink && vbar.sink.audio) vbar.sink.audio.muted = !vbar.sink.audio.muted;
-                    }
-                    onSecondary: Quickshell.execDetached(["quickshell", "ipc", "call", "visualconfig", "tab", "4"])
-                    onWheel: delta => {
-                        if (!vbar.sink || !vbar.sink.audio) return;
-                        const step = delta > 0 ? 0.02 : -0.02;
-                        vbar.sink.audio.volume = Math.max(0, Math.min(1, vbar.sink.audio.volume + step));
-                    }
-                }
-
-                BarButton {
                     id: vNet
                     editKey: "network"
                     visible: ShellLayout.showModule("network")
@@ -695,25 +653,94 @@ PanelWindow {
                     onActivated: Quickshell.execDetached(["quickshell", "ipc", "call", "visualconfig", "tab", "11"])
                 }
 
-                BarButton {
-                    id: vBt
-                    editKey: "bluetooth"
-                    visible: vbar.btAdapter !== null && ShellLayout.showModule("bluetooth")
-                    icon: !vbar.btAdapter || !vbar.btAdapter.enabled ? Theme.icons.btOff
-                        : (vbar.btConnected > 0 ? Theme.icons.btConnected : Theme.icons.bt)
-                    iconColor: vbar.btConnected > 0 ? Theme.primary : Theme.textColor
-                    popKind: "bt"
-                    onActivated: Quickshell.execDetached(["quickshell", "ipc", "call", "visualconfig", "tab", "10"])
-                }
+                // Brilho, som e bateria num bloco só: o clique abre a central de
+                // controle; a roda muda o volume.
+                Rectangle {
+                    id: vCtl
+                    readonly property bool editable: ShellLayout.editing
+                    visible: ShellLayout.showModule("control")
+                    opacity: !ShellLayout.barModule("control") ? 0.35 : 1
+                    Layout.alignment: Qt.AlignHCenter
+                    implicitWidth: 36
+                    implicitHeight: ctlCol.implicitHeight + 16
+                    radius: 12
+                    color: ctlArea.containsMouse || vCtl.dragging ? Theme.tileHigh : Theme.withAlpha(Theme.tile, 0.6)
+                    border.width: vCtl.editable ? 1 : 0
+                    border.color: Theme.withAlpha(Theme.primary, 0.7)
+                    Behavior on color { ColorAnimation { duration: 130 } }
+                    property bool dragging: false
+                    property real pressY: 0
+                    z: dragging ? 5 : 0
+                    scale: dragging ? 1.1 : 1
+                    Behavior on scale { NumberAnimation { duration: 120 } }
 
-                BarButton {
-                    id: vBat
-                    editKey: "battery"
-                    visible: vbar.battery !== null && vbar.battery.isLaptopBattery && ShellLayout.showModule("battery")
-                    icon: vbar.batIcon()
-                    popKind: "battery"
-                    iconColor: vbar.battery && vbar.battery.percentage < 0.15 ? Theme.critical : Theme.textColor
-                    onActivated: Quickshell.execDetached(["quickshell", "ipc", "call", "visualconfig", "tab", "6"])
+                    ColumnLayout {
+                        id: ctlCol
+                        anchors.centerIn: parent
+                        spacing: 8
+                        Text {
+                            Layout.alignment: Qt.AlignHCenter
+                            visible: vbar.hasBacklight
+                            text: Theme.icons.brightness
+                            font.family: Theme.iconFontFamily
+                            font.pixelSize: 16
+                            color: Theme.textColor
+                        }
+                        Text {
+                            Layout.alignment: Qt.AlignHCenter
+                            text: vbar.volIcon()
+                            font.family: Theme.iconFontFamily
+                            font.pixelSize: 17
+                            color: (vbar.sink && vbar.sink.audio && vbar.sink.audio.muted) ? Theme.subtext : Theme.textColor
+                        }
+                        Text {
+                            Layout.alignment: Qt.AlignHCenter
+                            visible: vbar.battery !== null && vbar.battery.isLaptopBattery
+                            text: vbar.batIcon()
+                            font.family: Theme.iconFontFamily
+                            font.pixelSize: 17
+                            color: vbar.battery && vbar.battery.percentage < 0.15 ? Theme.critical : Theme.textColor
+                        }
+                    }
+                    MouseArea {
+                        id: ctlArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        preventStealing: true
+                        cursorShape: vCtl.dragging ? Qt.ClosedHandCursor : vCtl.editable ? Qt.OpenHandCursor : Qt.PointingHandCursor
+                        onEntered: if (!vCtl.editable) vbar.controlHovered(true)
+                        onExited: vbar.controlHovered(false)
+                        onPressed: mouse => vCtl.pressY = mapToItem(mainCol, 0, mouse.y).y
+                        onPositionChanged: mouse => {
+                            if (!pressed || !vCtl.editable) return;
+                            const y = mapToItem(mainCol, 0, mouse.y).y;
+                            if (!vCtl.dragging && Math.abs(y - vCtl.pressY) > 8) {
+                                vCtl.dragging = true;
+                                vbar.dragOrder = ShellLayout.barOrder.slice();
+                            }
+                            if (vCtl.dragging) vbar.dragModuleTo("control", y);
+                        }
+                        onReleased: {
+                            if (!vCtl.dragging) return;
+                            vCtl.dragging = false;
+                            const order = vbar.dragOrder;
+                            vbar.dragOrder = null;
+                            ShellLayout.setBarOrder(order);
+                        }
+                        onClicked: mouse => {
+                            if (vCtl.editable) {
+                                if (Math.abs(mapToItem(mainCol, 0, mouse.y).y - vCtl.pressY) <= 8)
+                                    ShellLayout.setBarModule("control", !ShellLayout.barModule("control"));
+                                return;
+                            }
+                            vbar.controlClicked();
+                        }
+                        onWheel: w => {
+                            if (!vbar.sink || !vbar.sink.audio) return;
+                            const step = w.angleDelta.y > 0 ? 0.02 : -0.02;
+                            vbar.sink.audio.volume = Math.max(0, Math.min(1, vbar.sink.audio.volume + step));
+                        }
+                    }
                 }
 
                 Rectangle {
@@ -722,14 +749,6 @@ PanelWindow {
                     Layout.preferredWidth: 20
                     Layout.preferredHeight: 1
                     color: Theme.withAlpha(Theme.outline, 0.35)
-                }
-
-                BarButton {
-                    id: vSettings
-                    editKey: "settings"
-                    visible: ShellLayout.showModule("settings")
-                    icon: Theme.icons.tune
-                    onActivated: vbar.visualConfigClicked()
                 }
 
                 BarButton {
@@ -745,7 +764,7 @@ PanelWindow {
     // ================= popup lateral =================
     Rectangle {
         id: popBox
-        readonly property bool busy: outSlider.dragging || inSlider.dragging
+        readonly property bool busy: false
         readonly property real gap: 10
         // Largura fixa: medir pelo implicitWidth do ColumnLayout (que conta ~0
         // para linhas com fillWidth) deixava o conteúdo vazar da caixa.
@@ -776,93 +795,6 @@ PanelWindow {
             anchors.leftMargin: 14
             width: popBox.width - 28
             spacing: 6
-
-            // ---- áudio ----
-            PopTitle { visible: vbar.pop === "audio"; text: Theme.t("topbar.output", "Saída") }
-            PopSlider {
-                id: outSlider
-                visible: vbar.pop === "audio"
-                Layout.fillWidth: true
-                icon: vbar.volIcon()
-                value: vbar.sink && vbar.sink.audio ? vbar.sink.audio.volume : 0
-                dimmed: vbar.sink && vbar.sink.audio ? vbar.sink.audio.muted : true
-                onMoved: v => { if (vbar.sink && vbar.sink.audio) vbar.sink.audio.volume = v; }
-                onIconClicked: if (vbar.sink && vbar.sink.audio) vbar.sink.audio.muted = !vbar.sink.audio.muted
-            }
-            PopTitle { visible: vbar.pop === "audio"; text: Theme.t("topbar.microphone", "Microfone"); Layout.topMargin: 4 }
-            PopSlider {
-                id: inSlider
-                visible: vbar.pop === "audio"
-                Layout.fillWidth: true
-                icon: vbar.source && vbar.source.audio && vbar.source.audio.muted ? Theme.icons.micOff : Theme.icons.mic
-                value: vbar.source && vbar.source.audio ? vbar.source.audio.volume : 0
-                dimmed: vbar.source && vbar.source.audio ? vbar.source.audio.muted : true
-                onMoved: v => { if (vbar.source && vbar.source.audio) vbar.source.audio.volume = v; }
-                onIconClicked: if (vbar.source && vbar.source.audio) vbar.source.audio.muted = !vbar.source.audio.muted
-            }
-
-            // ---- bateria ----
-            PopTitle {
-                visible: vbar.pop === "battery"
-                text: !vbar.battery ? "" : Math.round(vbar.battery.percentage * 100) + "% · " + (
-                    vbar.battery.state === UPowerDeviceState.Charging ? Theme.t("vbar.charging", "carregando")
-                    : vbar.battery.state === UPowerDeviceState.FullyCharged ? Theme.t("vbar.charged", "carregada")
-                    : Theme.t("vbar.on_battery", "na bateria"))
-            }
-            PopText {
-                visible: vbar.pop === "battery" && text !== ""
-                text: !vbar.battery ? "" : vbar.battery.state === UPowerDeviceState.Charging
-                    ? (vbar.fmtTime(vbar.battery.timeToFull) ? Theme.t("vbar.full_in", "Cheia em") + " " + vbar.fmtTime(vbar.battery.timeToFull) : "")
-                    : (vbar.fmtTime(vbar.battery.timeToEmpty) ? Theme.t("vbar.remaining", "Resta") + " " + vbar.fmtTime(vbar.battery.timeToEmpty) : "")
-            }
-            PopTitle { visible: vbar.pop === "battery"; text: Theme.t("topbar.power_profile", "Perfil de energia"); Layout.topMargin: 6 }
-            Repeater {
-                model: vbar.pop === "battery" ? [
-                    { p: PowerProfile.PowerSaver, icon: Theme.icons.saver, label: Theme.t("sidebar.power_saver", "Economia") },
-                    { p: PowerProfile.Balanced, icon: Theme.icons.balanced, label: Theme.t("sidebar.power_balanced", "Equilíbrio") },
-                    { p: PowerProfile.Performance, icon: Theme.icons.perf, label: Theme.t("sidebar.power_perf", "Desempenho") }
-                ] : []
-                delegate: PopAction {
-                    required property var modelData
-                    Layout.fillWidth: true
-                    icon: modelData.icon
-                    label: modelData.label
-                    selected: PowerProfiles.profile === modelData.p
-                    onActivated: PowerProfiles.profile = modelData.p
-                }
-            }
-
-            PopTitle { visible: vbar.pop === "battery"; text: Theme.t("topbar.optimizations", "Otimizações de GPU & Tela"); Layout.topMargin: 6 }
-            PopAction {
-                visible: vbar.pop === "battery"
-                Layout.fillWidth: true
-                icon: Theme.icons.gamepad
-                label: Theme.t("vbar.game_mode", "Modo jogo")
-                selected: GameMode.active
-                onActivated: GameMode.manual = !GameMode.manual
-            }
-            PopAction {
-                visible: vbar.pop === "battery"
-                Layout.fillWidth: true
-                icon: vbar.blurEnabled ? Theme.icons.blur : Theme.icons.blurOff
-                label: Theme.t("vbar.blur", "Desfoque")
-                selected: vbar.blurEnabled
-                onActivated: {
-                    vbar.blurEnabled = !vbar.blurEnabled;
-                    blurToggleProc.running = true;
-                }
-            }
-            PopAction {
-                visible: vbar.pop === "battery"
-                Layout.fillWidth: true
-                icon: Theme.icons.lightning
-                label: Theme.t("vbar.ultra_perf", "Ultra desempenho")
-                selected: vbar.perfModeEnabled
-                onActivated: {
-                    vbar.perfModeEnabled = !vbar.perfModeEnabled;
-                    perfToggleProc.running = true;
-                }
-            }
 
             // ---- mídia ----
             RowLayout {
@@ -964,26 +896,8 @@ PanelWindow {
                 text: vbar.activeNetwork ? Theme.t("vbar.signal", "Sinal") + " " + Math.round(vbar.activeNetwork.signalStrength * 100) + "%" : ""
             }
 
-            // ---- bluetooth ----
-            PopTitle {
-                visible: vbar.pop === "bt"
-                text: !vbar.btAdapter ? Theme.t("topbar.no_bt_adapter", "Sem adaptador")
-                    : vbar.btAdapter.enabled ? "Bluetooth" : Theme.t("topbar.bt_off", "Bluetooth desligado")
-            }
-            Repeater {
-                model: vbar.pop === "bt" && vbar.btAdapter ? vbar.btAdapter.devices.values.filter(d => d.connected) : []
-                delegate: PopText {
-                    required property var modelData
-                    text: "• " + (modelData.name || modelData.address)
-                }
-            }
             PopText {
-                visible: vbar.pop === "bt" && vbar.btAdapter !== null && vbar.btAdapter.enabled && vbar.btConnected === 0
-                text: Theme.t("vbar.no_bt_devices", "Nenhum aparelho conectado")
-            }
-
-            PopText {
-                visible: vbar.pop === "wifi" || vbar.pop === "bt" || vbar.pop === "battery"
+                visible: vbar.pop === "wifi"
                 Layout.topMargin: 4
                 text: Theme.t("vbar.click_hint", "Clique no ícone para mais opções")
                 font.pixelSize: 10

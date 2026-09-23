@@ -24,6 +24,8 @@ PanelWindow {
     signal clockClicked()
     signal notifClicked()
     signal visualConfigClicked()
+    signal controlClicked()
+    signal controlHovered(bool on)
     property bool recording: false
     signal stopRecording()
 
@@ -94,12 +96,6 @@ PanelWindow {
     // ================= estado do popup =================
     property string pop: ""
     property real popAnchorX: 0
-    onPopChanged: {
-        if (pop === "battery") {
-            if (!blurCheck.running) blurCheck.running = true;
-            if (!perfCheck.running) perfCheck.running = true;
-        }
-    }
 
     Timer { id: popShow; interval: 110; property string kind; property Item anchor
         onTriggered: bar.showPopNow(kind, anchor) }
@@ -219,14 +215,6 @@ PanelWindow {
 
     // --- bateria ---
     readonly property var battery: UPower.displayDevice
-    property int batteryCycles: 0
-    FileView { id: cycles; path: "/sys/class/power_supply/BAT1/cycle_count"; blockLoading: true
-        onLoaded: bar.batteryCycles = parseInt(text()) || 0 }
-    // Saúde: o UPower não expõe nesse notebook, mas o kernel tem a
-    // capacidade atual (charge_full) e a de fábrica (charge_full_design).
-    FileView { id: chFull; path: "/sys/class/power_supply/BAT1/charge_full"; blockLoading: true }
-    FileView { id: chDesign; path: "/sys/class/power_supply/BAT1/charge_full_design"; blockLoading: true }
-    readonly property real batteryHealth: (parseFloat(chFull.text()) || 0) / (parseFloat(chDesign.text()) || 1)
     function batIcon() {
         if (!battery || !battery.isLaptopBattery) return Theme.icons.bat;
         if (battery.state === UPowerDeviceState.Charging || battery.state === UPowerDeviceState.FullyCharged)
@@ -254,57 +242,6 @@ PanelWindow {
 
     // --- bluetooth ---
     readonly property var btAdapter: Bluetooth.defaultAdapter
-    readonly property var btDevices: btAdapter ? btAdapter.devices.values.slice().sort((a, b) =>
-        (b.connected - a.connected) || (b.paired - a.paired) || a.name.localeCompare(b.name)) : []
-    readonly property int btConnected: btDevices.filter(d => d.connected).length
-
-    // --- otimizações / modos de desempenho ---
-    property bool blurEnabled: true
-    Process {
-        id: blurCheck
-        command: ["rice-blur-toggle", "status"]
-        stdout: StdioCollector {
-            onStreamFinished: bar.blurEnabled = text.trim() === "1"
-        }
-    }
-    Process {
-        id: blurToggleProc
-        command: ["rice-blur-toggle"]
-        onExited: {
-            blurRecheck.restart();
-            perfRecheck.restart();
-        }
-    }
-    Timer { id: blurRecheck; interval: 300; onTriggered: blurCheck.running = true }
-
-    property bool perfModeEnabled: false
-    Process {
-        id: perfCheck
-        command: ["rice-perf-mode", "status"]
-        stdout: StdioCollector {
-            onStreamFinished: bar.perfModeEnabled = text.trim() === "1"
-        }
-    }
-    Process {
-        id: perfToggleProc
-        command: ["rice-perf-mode"]
-        onExited: {
-            perfRecheck.restart();
-            blurRecheck.restart();
-        }
-    }
-    Timer { id: perfRecheck; interval: 300; onTriggered: perfCheck.running = true }
-
-    Timer {
-        interval: 3000
-        running: true
-        repeat: true
-        triggeredOnStart: true
-        onTriggered: {
-            if (!blurCheck.running) blurCheck.running = true;
-            if (!perfCheck.running) perfCheck.running = true;
-        }
-    }
 
     // ================= componentes =================
     component BarText: Text {
@@ -331,6 +268,8 @@ PanelWindow {
         border.color: Theme.withAlpha(Theme.primary, 0.7)
         default property alias content: modRow.data
         signal clicked()
+        signal hoverIn()
+        signal hoverOut()
         signal rightClicked()
         signal wheel(int delta)
 
@@ -360,8 +299,14 @@ PanelWindow {
             preventStealing: true
             cursorShape: mod.dragging ? Qt.ClosedHandCursor : mod.reorderable ? Qt.OpenHandCursor : Qt.PointingHandCursor
             acceptedButtons: Qt.LeftButton | Qt.RightButton
-            onEntered: if (mod.kind !== "" && !mod.editable) bar.showPop(mod.kind, mod)
-            onExited: bar.leavePop()
+            onEntered: {
+                if (mod.kind !== "" && !mod.editable) bar.showPop(mod.kind, mod);
+                if (!mod.editable) mod.hoverIn();
+            }
+            onExited: {
+                bar.leavePop();
+                mod.hoverOut();
+            }
             onPressed: mouse => mod.pressX = mapToItem(rightRow, mouse.x, 0).x
             onPositionChanged: mouse => {
                 if (!pressed || !mod.reorderable) return;
@@ -408,8 +353,7 @@ PanelWindow {
     // Enquanto arrasta, dragOrder guarda a ordem ao vivo e só é gravada ao soltar.
     property var dragOrder: null
     function barModuleItems() {
-        return { notifications: notifMod, settings: visualConfigMod, network: wifiMod,
-                 bluetooth: btMod, audio: audioMod, brightness: brMod, battery: batMod };
+        return { notifications: notifMod, network: wifiMod, control: ctlMod };
     }
     function applyBarOrder() {
         const items = bar.barModuleItems();
@@ -784,20 +728,6 @@ PanelWindow {
                 }
 
                 Module {
-                    id: visualConfigMod
-                    kind: ""
-                    editKey: "settings"
-                    visible: ShellLayout.showModule("settings")
-                    onClicked: bar.visualConfigClicked()
-
-                    BarIcon {
-                        text: Theme.icons.tune
-                        color: Theme.textColor
-                        font.pixelSize: 15
-                    }
-                }
-
-                Module {
                     id: wifiMod
                     kind: "wifi"
                     // Desktop ligado só no cabo não tem placa Wi-Fi: mostrar um
@@ -807,56 +737,34 @@ PanelWindow {
                     BarIcon { text: bar.wifiIcon() }
                 }
 
+                // Brilho, som e bateria num bloco só: o clique abre a central
+                // de controle (Bluetooth e Configurações moram lá). A roda
+                // continua mudando o volume.
                 Module {
-                    id: btMod
-                    kind: "bt"
-                    // Idem para máquinas sem adaptador Bluetooth.
-                    editKey: "bluetooth"
-                    visible: bar.btAdapter !== null && ShellLayout.showModule("bluetooth")
-                    BarIcon {
-                        text: !bar.btAdapter || !bar.btAdapter.enabled ? Theme.icons.btOff
-                            : bar.btConnected > 0 ? Theme.icons.btConnected : Theme.icons.bt
-                        color: bar.btConnected > 0 ? Theme.primary : Theme.textColor
-                    }
-                }
-
-                Module {
-                    id: audioMod
-                    kind: "audio"
-                    editKey: "audio"
-                    visible: ShellLayout.showModule("audio")
-                    onClicked: if (bar.sink) bar.sink.audio.muted = !bar.sink.audio.muted
+                    id: ctlMod
+                    kind: ""
+                    editKey: "control"
+                    visible: ShellLayout.showModule("control")
+                    onClicked: bar.controlClicked()
+                    onHoverIn: bar.controlHovered(true)
+                    onHoverOut: bar.controlHovered(false)
                     onWheel: d => bar.wheelVolume(d)
+                    BarIcon {
+                        visible: brMax.text().trim() !== ""
+                        text: Theme.icons.brightness
+                        font.pixelSize: 15
+                    }
                     BarIcon { text: bar.volIcon(bar.sink) }
                     BarText { text: bar.sink && bar.sink.audio ? Math.round((bar.volTarget >= 0 ? bar.volTarget : bar.sink.audio.volume) * 100) + "%" : "--" }
-                }
-
-                Module {
-                    id: brMod
-                    kind: "brightness"
-                    editKey: "brightness"
-                    visible: ShellLayout.showModule("brightness")
-                    onWheel: d => bar.wheelBrightness(d)
-                    BarIcon { text: Theme.icons.brightness }
-                    BarText { text: Math.round(bar.brightness * 100) + "%" }
-                }
-
-                Module {
-                    id: batMod
-                    kind: "battery"
-                    editKey: "battery"
-                    visible: bar.battery && bar.battery.isLaptopBattery && ShellLayout.showModule("battery")
                     BarIcon {
+                        visible: bar.battery && bar.battery.isLaptopBattery
                         text: bar.batIcon()
                         color: bar.battery && bar.battery.percentage <= 0.15 && bar.battery.state !== UPowerDeviceState.Charging
                             ? Theme.critical : Theme.textColor
                     }
-                    BarText { text: bar.battery ? Math.round(bar.battery.percentage * 100) + "%" : "" }
-                    BarIcon {
-                        font.pixelSize: 14
-                        color: Theme.primary
-                        text: PowerProfiles.profile === PowerProfile.Performance ? Theme.icons.perf
-                            : PowerProfiles.profile === PowerProfile.PowerSaver ? Theme.icons.saver : Theme.icons.balanced
+                    BarText {
+                        visible: bar.battery && bar.battery.isLaptopBattery
+                        text: bar.battery ? Math.round(bar.battery.percentage * 100) + "%" : ""
                     }
                 }
             }
@@ -887,14 +795,11 @@ PanelWindow {
                 width: implicitWidth
                 height: implicitHeight
                 // Arrastando um slider: não fecha nem se o mouse escapar do popup.
-                readonly property bool busy: audioPop.dragging || brightnessPop.dragging || EqService.dragging
+                readonly property bool busy: audioPop.dragging || EqService.dragging
                 readonly property Item current: {
                     switch (bar.pop) {
                     case "audio": return audioPop;
-                    case "brightness": return brightnessPop;
-                    case "battery": return batteryPop;
                     case "wifi": return wifiPop;
-                    case "bt": return btPop;
                     case "record": return recordPop;
                     case "eq": return eqPop;
                     }
@@ -991,221 +896,6 @@ PanelWindow {
                     }
                 }
 
-                // ---------- brilho ----------
-                ColumnLayout {
-                    id: brightnessPop
-                    visible: popContent.current === brightnessPop
-                    width: 280
-                    spacing: 6
-                    readonly property bool dragging: brSlider.dragging
-                    PopTitle { text: Theme.t("topbar.brightness", "Brilho da tela") }
-                    PopSlider {
-                        id: brSlider
-                        icon: Theme.icons.brightness
-                        value: bar.brightness
-                        onMoved: v => bar.setBrightness(v)
-                    }
-                }
-
-                // ---------- bateria ----------
-                ColumnLayout {
-                    id: batteryPop
-                    visible: popContent.current === batteryPop
-                    width: 290
-                    spacing: 4
-                    PopTitle {
-                        text: !bar.battery ? "" : Math.round(bar.battery.percentage * 100) + "% · " + (
-                            bar.battery.state === UPowerDeviceState.Charging ? "carregando"
-                            : bar.battery.state === UPowerDeviceState.FullyCharged ? "carregada"
-                            : bar.battery.state === UPowerDeviceState.PendingCharge ? "na tomada, sem carregar" : "na bateria")
-                    }
-                    PopText {
-                        visible: text !== ""
-                        text: !bar.battery ? "" : bar.battery.state === UPowerDeviceState.Charging
-                            ? (bar.fmtTime(bar.battery.timeToFull) ? "Cheia em " + bar.fmtTime(bar.battery.timeToFull) : "")
-                            : (bar.fmtTime(bar.battery.timeToEmpty) ? "Resta " + bar.fmtTime(bar.battery.timeToEmpty) : "")
-                    }
-                    PopText {
-                        visible: text !== ""
-                        text: [
-                            bar.batteryHealth > 0 ? "Saúde " + Math.round(bar.batteryHealth * 100) + "%" : "",
-                            bar.batteryCycles > 0 ? bar.batteryCycles + " ciclos de carga" : ""
-                        ].filter(t => t !== "").join(" · ")
-                    }
-                    PopText {
-                        visible: bar.battery && Math.abs(bar.battery.changeRate) > 0.1
-                        text: bar.battery ? "Consumo " + Math.abs(bar.battery.changeRate).toFixed(1) + " W" : ""
-                    }
-
-                    PopTitle { text: Theme.t("topbar.power_profile", "Perfil de energia"); Layout.topMargin: 8 }
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 6
-                        Repeater {
-                            model: [
-                                { p: PowerProfile.PowerSaver, icon: Theme.icons.saver, label: Theme.t("sidebar.power_saver", "Economia") },
-                                { p: PowerProfile.Balanced, icon: Theme.icons.balanced, label: Theme.t("sidebar.power_balanced", "Equilíbrio") },
-                                { p: PowerProfile.Performance, icon: Theme.icons.perf, label: Theme.t("sidebar.power_perf", "Desempenho") }
-                            ]
-                            delegate: Rectangle {
-                                id: prof
-                                required property var modelData
-                                readonly property bool active: PowerProfiles.profile === modelData.p
-                                Layout.fillWidth: true
-                                implicitHeight: 54
-                                radius: 12
-                                color: active ? Theme.primary : profArea.containsMouse ? Theme.tileHigh : Theme.tile
-                                Behavior on color { ColorAnimation { duration: 140 } }
-                                ColumnLayout {
-                                    anchors.centerIn: parent
-                                    spacing: 0
-                                    Text {
-                                        Layout.alignment: Qt.AlignHCenter
-                                        text: prof.modelData.icon
-                                        font.family: Theme.iconFontFamily
-                                        font.pixelSize: 18
-                                        color: prof.active ? Theme.background : Theme.textColor
-                                    }
-                                    Text {
-                                        Layout.alignment: Qt.AlignHCenter
-                                        text: prof.modelData.label
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: 10
-                                        color: prof.active ? Theme.background : Theme.subtext
-                                    }
-                                }
-                                MouseArea {
-                                    id: profArea
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: PowerProfiles.profile = prof.modelData.p
-                                }
-                            }
-                        }
-                    }
-
-                    PopTitle { text: Theme.t("topbar.optimizations", "Otimizações de GPU & Tela"); Layout.topMargin: 8 }
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 6
-
-                        // Modo Jogo
-                        Rectangle {
-                            id: gameTile
-                            readonly property bool active: GameMode.active
-                            Layout.fillWidth: true
-                            implicitHeight: 54
-                            radius: 12
-                            color: active ? Theme.primary : gameArea.containsMouse ? Theme.tileHigh : Theme.tile
-                            Behavior on color { ColorAnimation { duration: 140 } }
-                            ColumnLayout {
-                                anchors.centerIn: parent
-                                spacing: 0
-                                Text {
-                                    Layout.alignment: Qt.AlignHCenter
-                                    text: Theme.icons.gamepad
-                                    font.family: Theme.iconFontFamily
-                                    font.pixelSize: 18
-                                    color: gameTile.active ? Theme.background : Theme.textColor
-                                }
-                                Text {
-                                    Layout.alignment: Qt.AlignHCenter
-                                    text: gameTile.active ? (Theme.t("sidebar.game_mode", "Modo Jogo") + ": On") : Theme.t("sidebar.game_mode", "Modo Jogo")
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: 10
-                                    color: gameTile.active ? Theme.background : Theme.subtext
-                                }
-                            }
-                            MouseArea {
-                                id: gameArea
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: GameMode.manual = !GameMode.manual
-                            }
-                        }
-
-                        // Toggle de Blur
-                        Rectangle {
-                            id: blurTile
-                            readonly property bool active: bar.blurEnabled
-                            Layout.fillWidth: true
-                            implicitHeight: 54
-                            radius: 12
-                            color: active ? Theme.primary : blurArea.containsMouse ? Theme.tileHigh : Theme.tile
-                            Behavior on color { ColorAnimation { duration: 140 } }
-                            ColumnLayout {
-                                anchors.centerIn: parent
-                                spacing: 0
-                                Text {
-                                    Layout.alignment: Qt.AlignHCenter
-                                    text: bar.blurEnabled ? Theme.icons.blur : Theme.icons.blurOff
-                                    font.family: Theme.iconFontFamily
-                                    font.pixelSize: 18
-                                    color: blurTile.active ? Theme.background : Theme.textColor
-                                }
-                                Text {
-                                    Layout.alignment: Qt.AlignHCenter
-                                    text: bar.blurEnabled ? "Blur: On" : "Blur: Off"
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: 10
-                                    color: blurTile.active ? Theme.background : Theme.subtext
-                                }
-                            }
-                            MouseArea {
-                                id: blurArea
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: {
-                                    bar.blurEnabled = !bar.blurEnabled;
-                                    blurToggleProc.running = true;
-                                }
-                            }
-                        }
-
-                        // Toggle de Super Desempenho
-                        Rectangle {
-                            id: perfTile
-                            readonly property bool active: bar.perfModeEnabled
-                            Layout.fillWidth: true
-                            implicitHeight: 54
-                            radius: 12
-                            color: active ? Theme.primary : perfArea.containsMouse ? Theme.tileHigh : Theme.tile
-                            Behavior on color { ColorAnimation { duration: 140 } }
-                            ColumnLayout {
-                                anchors.centerIn: parent
-                                spacing: 0
-                                Text {
-                                    Layout.alignment: Qt.AlignHCenter
-                                    text: Theme.icons.lightning
-                                    font.family: Theme.iconFontFamily
-                                    font.pixelSize: 18
-                                    color: perfTile.active ? Theme.background : Theme.textColor
-                                }
-                                Text {
-                                    Layout.alignment: Qt.AlignHCenter
-                                    text: perfTile.active ? "Ultra: On" : "Ultra Perf"
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: 10
-                                    color: perfTile.active ? Theme.background : Theme.subtext
-                                }
-                            }
-                            MouseArea {
-                                id: perfArea
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: {
-                                    bar.perfModeEnabled = !bar.perfModeEnabled;
-                                    perfToggleProc.running = true;
-                                }
-                            }
-                        }
-                    }
-                }
-
                 // ---------- wifi ----------
                 ColumnLayout {
                     id: wifiPop
@@ -1282,81 +972,15 @@ PanelWindow {
                     }
                 }
 
-                // ---------- bluetooth ----------
-                ColumnLayout {
-                    id: btPop
-                    visible: popContent.current === btPop
-                    width: 290
-                    spacing: 4
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        PopTitle {
-                            Layout.fillWidth: true
-                            text: !bar.btAdapter ? Theme.t("topbar.no_bt_adapter", "Sem adaptador") : bar.btAdapter.enabled ? "Bluetooth" : Theme.t("topbar.bt_off", "Bluetooth desligado")
-                        }
-                        Rectangle {
-                            visible: bar.btAdapter !== null
-                            implicitWidth: 40
-                            implicitHeight: 22
-                            radius: 11
-                            color: bar.btAdapter && bar.btAdapter.enabled ? Theme.primary : Theme.tileHigh
-                            Rectangle {
-                                width: 16; height: 16; radius: 8
-                                anchors.verticalCenter: parent.verticalCenter
-                                x: bar.btAdapter && bar.btAdapter.enabled ? parent.width - width - 3 : 3
-                                color: Theme.textColor
-                                Behavior on x { NumberAnimation { duration: 140 } }
-                            }
-                            MouseArea {
-                                anchors.fill: parent
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: bar.btAdapter.enabled = !bar.btAdapter.enabled
-                            }
-                        }
-                    }
-
-                    PopText {
-                        visible: bar.btAdapter && bar.btAdapter.enabled && bar.btDevices.length === 0
-                        text: Theme.t("topbar.no_devices", "Nenhum dispositivo")
-                    }
-
-                    Repeater {
-                        model: bar.btAdapter && bar.btAdapter.enabled ? bar.btDevices.filter(d => d.paired || d.connected || bar.btAdapter.discovering).slice(0, 8) : []
-                        delegate: PopAction {
-                            required property var modelData
-                            icon: modelData.connected ? Theme.icons.btConnected : Theme.icons.bt
-                            label: modelData.name || modelData.address
-                            detail: modelData.pairing ? "pareando..." : modelData.connected
-                                ? (modelData.batteryAvailable ? Math.round(modelData.battery * 100) + "%" : "conectado")
-                                : modelData.paired ? "" : "novo"
-                            selected: modelData.connected
-                            onActivated: {
-                                if (modelData.connected) modelData.disconnect();
-                                else if (modelData.paired) modelData.connect();
-                                else modelData.pair();
-                            }
-                        }
-                    }
-
-                    PopAction {
-                        visible: bar.btAdapter && bar.btAdapter.enabled
-                        Layout.topMargin: 6
-                        icon: Theme.icons.magnify
-                        label: bar.btAdapter && bar.btAdapter.discovering ? "Procurando... (clique para parar)" : "Procurar dispositivos"
-                        selected: bar.btAdapter && bar.btAdapter.discovering
-                        onActivated: bar.btAdapter.discovering = !bar.btAdapter.discovering
-                    }
-                }
             }
         }
     }
 
-    // IPC de teste: `qs ipc call bar popup <audio|brightness|battery|wifi|bt>` / `hide`
+    // IPC de teste: `qs ipc call bar popup <audio|wifi|eq>` / `hide`
     IpcHandler {
         target: "bar"
         function popup(kind: string): void {
-            const m = { audio: audioMod, brightness: brMod, battery: batMod, wifi: wifiMod, bt: btMod, eq: eqMod }[kind];
+            const m = { audio: ctlMod, wifi: wifiMod, eq: eqMod }[kind];
             if (m) bar.showPopNow(kind, m);
         }
         function hide(): void { bar.pop = ""; }

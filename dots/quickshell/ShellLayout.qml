@@ -85,7 +85,8 @@ QtObject {
 
     // Ordem dos indicadores do lado direito da barra (arrastados no modo edição).
     // Chaves que faltarem entram no fim, na ordem padrão.
-    readonly property var barOrderDefault: ["notifications", "settings", "network", "bluetooth", "audio", "brightness", "battery"]
+    // "control" é o bloco brilho/som/bateria que abre a central de controle.
+    readonly property var barOrderDefault: ["notifications", "network", "control"]
     readonly property var barOrder: {
         const saved = get("bar", "order", []);
         const out = [];

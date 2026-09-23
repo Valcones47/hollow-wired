@@ -198,6 +198,8 @@ ShellRoot {
             hub.open = true;
         }
         onVisualConfigClicked: visualConfig.open = !visualConfig.open
+        onControlClicked: controlCenter.clickToggle()
+        onControlHovered: on => on ? controlCenter.hoverEnter() : controlCenter.hoverLeave()
         onStopRecording: Quickshell.execDetached(["rice-record", "stop"])
     }
 
@@ -212,6 +214,8 @@ ShellRoot {
             hub.open = true;
         }
         onVisualConfigClicked: visualConfig.open = !visualConfig.open
+        onControlClicked: controlCenter.clickToggle()
+        onControlHovered: on => on ? controlCenter.hoverEnter() : controlCenter.hoverLeave()
     }
 
     EnergySidebar {
@@ -244,6 +248,10 @@ ShellRoot {
     Clipboard {}
     Welcome {}
     EditMode {}
+    ControlCenter {
+        id: controlCenter
+        onSettingsRequested: visualConfig.open = true
+    }
 
     PanelWindow {
         id: hub
