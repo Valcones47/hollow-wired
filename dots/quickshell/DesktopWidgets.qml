@@ -26,6 +26,12 @@ PanelWindow {
     WlrLayershell.layer: WlrLayer.Bottom
     WlrLayershell.keyboardFocus: editMode ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
 
+    // Espaço ocupado pela barra quando ela está na lateral: esta camada ignora
+    // as zonas exclusivas (cobre a tela toda), então sem isso um widget em
+    // x≈0 ficava por baixo da barra. Só afeta a exibição; a posição salva não muda.
+    readonly property real insetL: ShellLayout.barEnabled && ShellLayout.barPosition === "left" && !ShellLayout.barAutohide ? 52 + Theme.frameThickness : 0
+    readonly property real insetR: ShellLayout.barEnabled && ShellLayout.barPosition === "right" && !ShellLayout.barAutohide ? 52 + Theme.frameThickness : 0
+
     property bool editMode: false
     property bool snapToGrid: true
     readonly property int gridSize: 20
@@ -394,7 +400,7 @@ PanelWindow {
                 readonly property real sScale: modelData.scale || 1.0
                 readonly property bool isSelected: dwWindow.editMode && dwWindow.selectedWidgetId === modelData.id
 
-                x: modelData.x || 100
+                x: Math.max(dwWindow.insetL + 10, Math.min(modelData.x || 100, dwWindow.width - dwWindow.insetR - width - 10))
                 y: modelData.y || 100
                 // Entrada escalonada: cada widget surge um instante depois do
                 // anterior, subindo e crescendo levemente.
@@ -461,8 +467,8 @@ PanelWindow {
                     anchors.fill: parent
                     enabled: dwWindow.editMode
                     drag.target: widgetContainer
-                    drag.minimumX: 10
-                    drag.maximumX: dwWindow.width - widgetContainer.width - 10
+                    drag.minimumX: dwWindow.insetL + 10
+                    drag.maximumX: dwWindow.width - dwWindow.insetR - widgetContainer.width - 10
                     drag.minimumY: Theme.waybarHeight + 6
                     drag.maximumY: dwWindow.height - widgetContainer.height - 10
                     cursorShape: dwWindow.editMode ? Qt.SizeAllCursor : Qt.ArrowCursor

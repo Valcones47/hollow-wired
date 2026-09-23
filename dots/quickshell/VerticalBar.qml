@@ -17,9 +17,8 @@ import "."
 // É um componente à parte, e não um modo dentro do TopBar.qml, de propósito: a
 // barra de cima desenha os popups num Canvas com cantos invertidos preso à
 // borda de baixo dela, e virar aquilo de lado significaria refazer o desenho
-// inteiro. Aqui os módulos abrem direto o lugar que já resolve o assunto (o
-// hub, o painel, a central de ações), o que numa barra estreita é mais direto
-// do que um popup pendurado.
+// inteiro. Aqui o clique abre o lugar que resolve o assunto (hub, painel,
+// central de ações) e o hover abre um popup simples ao lado da barra.
 //
 // Só existe quando o arranjo pede barra vertical (ShellLayout).
 PanelWindow {
@@ -45,7 +44,11 @@ PanelWindow {
         left: vbar.onLeft
         right: !vbar.onLeft
     }
-    implicitWidth: vbar.barW + Theme.frameThickness
+    // A janela é mais larga que a barra para caber o popup lateral; a zona
+    // exclusiva continua sendo só a barra e a máscara deixa o resto clicável.
+    readonly property int stripW: vbar.barW + Theme.frameThickness
+    readonly property int popMaxW: 330
+    implicitWidth: vbar.stripW + 10 + vbar.popMaxW
     exclusiveZone: ShellLayout.barAutohide ? 0 : vbar.barW + Theme.frameThickness
 
     WlrLayershell.namespace: "quickshell-vbar"
@@ -54,20 +57,39 @@ PanelWindow {
 
     // ---- esconder no hover ----
     property bool barHovered: false
-    readonly property bool shown: !ShellLayout.barAutohide || barHovered
+    readonly property bool shown: !ShellLayout.barAutohide || barHovered || vbar.pop !== ""
     Timer { id: hideDelay; interval: 400; onTriggered: vbar.barHovered = false }
+
+    // ---- popup do hover ----
+    property string pop: ""
+    property real popAnchorY: 0
+    function showPop(kind, item) {
+        popHide.stop();
+        vbar.popAnchorY = item.mapToItem(null, 0, item.height / 2).y;
+        vbar.pop = kind;
+    }
+    function leavePop() { popHide.restart(); }
+    Timer { id: popHide; interval: 280; onTriggered: if (!popBox.busy) vbar.pop = "" }
     Timer { id: showDelay; interval: 60; onTriggered: vbar.barHovered = true }
 
     mask: Region {
-        x: vbar.onLeft ? 0 : (vbar.shown ? 0 : vbar.width - 4)
+        x: vbar.onLeft ? 0 : (vbar.shown ? vbar.width - vbar.stripW : vbar.width - 4)
         y: 0
-        width: vbar.shown ? vbar.width : 4
+        width: vbar.shown ? vbar.stripW : 4
         height: vbar.height
+        Region { item: vbar.pop !== "" ? popBox : null }
     }
 
     // ================= dados =================
     readonly property PwNode sink: Pipewire.defaultAudioSink
-    PwObjectTracker { objects: [vbar.sink] }
+    readonly property PwNode source: Pipewire.defaultAudioSource
+    PwObjectTracker { objects: [vbar.sink, vbar.source] }
+
+    function fmtTime(secs) {
+        if (!secs || secs <= 0) return "";
+        const h = Math.floor(secs / 3600), m = Math.floor(secs % 3600 / 60);
+        return h > 0 ? h + "h " + m + "min" : m + " min";
+    }
 
     function volIcon() {
         const n = vbar.sink;
@@ -134,6 +156,7 @@ PanelWindow {
         property string icon: ""
         property color iconColor: Theme.textColor
         property string badge: ""
+        property string popKind: ""
         signal activated()
         signal secondary()
         signal wheel(real delta)
@@ -180,6 +203,8 @@ PanelWindow {
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
             acceptedButtons: Qt.LeftButton | Qt.RightButton
+            onEntered: if (bb.popKind !== "") vbar.showPop(bb.popKind, bb)
+            onExited: if (bb.popKind !== "") vbar.leavePop()
             onClicked: mouse => mouse.button === Qt.RightButton ? bb.secondary() : bb.activated()
             onWheel: w => bb.wheel(w.angleDelta.y)
         }
@@ -187,9 +212,10 @@ PanelWindow {
 
     // ================= conteúdo =================
     Item {
-        anchors.fill: parent
+        width: vbar.stripW
+        height: parent.height
         // Sai pela lateral quando está escondida.
-        x: vbar.shown ? 0 : (vbar.onLeft ? -vbar.barW : vbar.barW)
+        x: (vbar.onLeft ? 0 : parent.width - width) + (vbar.shown ? 0 : (vbar.onLeft ? -vbar.barW : vbar.barW))
         Behavior on x { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
 
         HoverHandler {
@@ -342,6 +368,7 @@ PanelWindow {
                 BarButton {
                     visible: ShellLayout.barModule("audio")
                     icon: vbar.volIcon()
+                    popKind: "audio"
                     iconColor: (vbar.sink && vbar.sink.audio && vbar.sink.audio.muted) ? Theme.subtext : Theme.textColor
                     onActivated: {
                         if (vbar.sink && vbar.sink.audio) vbar.sink.audio.muted = !vbar.sink.audio.muted;
@@ -357,6 +384,7 @@ PanelWindow {
                 BarButton {
                     visible: ShellLayout.barModule("network")
                     icon: vbar.wifiIcon()
+                    popKind: "wifi"
                     iconColor: vbar.activeNetwork ? Theme.textColor : Theme.subtext
                     onActivated: Quickshell.execDetached(["quickshell", "ipc", "call", "visualconfig", "tab", "11"])
                 }
@@ -366,12 +394,14 @@ PanelWindow {
                     icon: !vbar.btAdapter || !vbar.btAdapter.enabled ? Theme.icons.btOff
                         : (vbar.btConnected > 0 ? Theme.icons.btConnected : Theme.icons.bt)
                     iconColor: vbar.btConnected > 0 ? Theme.primary : Theme.textColor
+                    popKind: "bt"
                     onActivated: Quickshell.execDetached(["quickshell", "ipc", "call", "visualconfig", "tab", "10"])
                 }
 
                 BarButton {
                     visible: vbar.battery !== null && vbar.battery.isLaptopBattery && ShellLayout.barModule("battery")
                     icon: vbar.batIcon()
+                    popKind: "battery"
                     iconColor: vbar.battery && vbar.battery.percentage < 0.15 ? Theme.critical : Theme.textColor
                     onActivated: Quickshell.execDetached(["quickshell", "ipc", "call", "visualconfig", "tab", "6"])
                 }
@@ -394,6 +424,133 @@ PanelWindow {
                     iconColor: Theme.secondary
                     onActivated: Quickshell.execDetached(["quickshell", "ipc", "call", "sidebar", "toggle"])
                 }
+            }
+        }
+    }
+
+    // ================= popup lateral =================
+    Rectangle {
+        id: popBox
+        readonly property bool busy: outSlider.dragging || inSlider.dragging
+        readonly property real gap: 10
+        width: Math.min(vbar.popMaxW, popCol.implicitWidth + 28)
+        height: popCol.implicitHeight + 24
+        x: vbar.onLeft ? vbar.stripW + gap - (vbar.pop !== "" ? 0 : 8)
+                       : vbar.width - vbar.stripW - gap - width + (vbar.pop !== "" ? 0 : 8)
+        y: Math.max(10, Math.min(vbar.height - height - 10, vbar.popAnchorY - height / 2))
+        radius: Theme.frameRadius
+        color: Theme.surface
+        border.color: Theme.withAlpha(Theme.outline, 0.35)
+        border.width: 1
+        opacity: vbar.pop !== "" ? 1 : 0
+        visible: opacity > 0
+        Behavior on opacity { NumberAnimation { duration: 150 } }
+        Behavior on x { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+        Behavior on y { enabled: popBox.opacity > 0.5; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+
+        HoverHandler {
+            onHoveredChanged: hovered ? popHide.stop() : vbar.leavePop()
+        }
+
+        ColumnLayout {
+            id: popCol
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.margins: 12
+            anchors.leftMargin: 14
+            width: vbar.popMaxW - 28
+            spacing: 6
+
+            // ---- áudio ----
+            PopTitle { visible: vbar.pop === "audio"; text: Theme.t("topbar.output", "Saída") }
+            PopSlider {
+                id: outSlider
+                visible: vbar.pop === "audio"
+                Layout.fillWidth: true
+                icon: vbar.volIcon()
+                value: vbar.sink && vbar.sink.audio ? vbar.sink.audio.volume : 0
+                dimmed: vbar.sink && vbar.sink.audio ? vbar.sink.audio.muted : true
+                onMoved: v => { if (vbar.sink && vbar.sink.audio) vbar.sink.audio.volume = v; }
+                onIconClicked: if (vbar.sink && vbar.sink.audio) vbar.sink.audio.muted = !vbar.sink.audio.muted
+            }
+            PopTitle { visible: vbar.pop === "audio"; text: Theme.t("topbar.microphone", "Microfone"); Layout.topMargin: 4 }
+            PopSlider {
+                id: inSlider
+                visible: vbar.pop === "audio"
+                Layout.fillWidth: true
+                icon: vbar.source && vbar.source.audio && vbar.source.audio.muted ? Theme.icons.micOff : Theme.icons.mic
+                value: vbar.source && vbar.source.audio ? vbar.source.audio.volume : 0
+                dimmed: vbar.source && vbar.source.audio ? vbar.source.audio.muted : true
+                onMoved: v => { if (vbar.source && vbar.source.audio) vbar.source.audio.volume = v; }
+                onIconClicked: if (vbar.source && vbar.source.audio) vbar.source.audio.muted = !vbar.source.audio.muted
+            }
+
+            // ---- bateria ----
+            PopTitle {
+                visible: vbar.pop === "battery"
+                text: !vbar.battery ? "" : Math.round(vbar.battery.percentage * 100) + "% · " + (
+                    vbar.battery.state === UPowerDeviceState.Charging ? Theme.t("vbar.charging", "carregando")
+                    : vbar.battery.state === UPowerDeviceState.FullyCharged ? Theme.t("vbar.charged", "carregada")
+                    : Theme.t("vbar.on_battery", "na bateria"))
+            }
+            PopText {
+                visible: vbar.pop === "battery" && text !== ""
+                text: !vbar.battery ? "" : vbar.battery.state === UPowerDeviceState.Charging
+                    ? (vbar.fmtTime(vbar.battery.timeToFull) ? Theme.t("vbar.full_in", "Cheia em") + " " + vbar.fmtTime(vbar.battery.timeToFull) : "")
+                    : (vbar.fmtTime(vbar.battery.timeToEmpty) ? Theme.t("vbar.remaining", "Resta") + " " + vbar.fmtTime(vbar.battery.timeToEmpty) : "")
+            }
+            PopTitle { visible: vbar.pop === "battery"; text: Theme.t("topbar.power_profile", "Perfil de energia"); Layout.topMargin: 6 }
+            Repeater {
+                model: vbar.pop === "battery" ? [
+                    { p: PowerProfile.PowerSaver, icon: Theme.icons.saver, label: Theme.t("sidebar.power_saver", "Economia") },
+                    { p: PowerProfile.Balanced, icon: Theme.icons.balanced, label: Theme.t("sidebar.power_balanced", "Equilíbrio") },
+                    { p: PowerProfile.Performance, icon: Theme.icons.perf, label: Theme.t("sidebar.power_perf", "Desempenho") }
+                ] : []
+                delegate: PopAction {
+                    required property var modelData
+                    Layout.fillWidth: true
+                    icon: modelData.icon
+                    label: modelData.label
+                    selected: PowerProfiles.profile === modelData.p
+                    onActivated: PowerProfiles.profile = modelData.p
+                }
+            }
+
+            // ---- rede ----
+            PopTitle {
+                visible: vbar.pop === "wifi"
+                text: !Networking.wifiEnabled ? Theme.t("topbar.wifi_off", "Wi-Fi desligado")
+                    : vbar.activeNetwork ? vbar.activeNetwork.name : Theme.t("vbar.no_network", "Sem conexão")
+            }
+            PopText {
+                visible: vbar.pop === "wifi" && vbar.activeNetwork !== null
+                text: vbar.activeNetwork ? Theme.t("vbar.signal", "Sinal") + " " + Math.round(vbar.activeNetwork.signalStrength * 100) + "%" : ""
+            }
+
+            // ---- bluetooth ----
+            PopTitle {
+                visible: vbar.pop === "bt"
+                text: !vbar.btAdapter ? Theme.t("topbar.no_bt_adapter", "Sem adaptador")
+                    : vbar.btAdapter.enabled ? "Bluetooth" : Theme.t("topbar.bt_off", "Bluetooth desligado")
+            }
+            Repeater {
+                model: vbar.pop === "bt" && vbar.btAdapter ? vbar.btAdapter.devices.values.filter(d => d.connected) : []
+                delegate: PopText {
+                    required property var modelData
+                    text: "• " + (modelData.name || modelData.address)
+                }
+            }
+            PopText {
+                visible: vbar.pop === "bt" && vbar.btAdapter !== null && vbar.btAdapter.enabled && vbar.btConnected === 0
+                text: Theme.t("vbar.no_bt_devices", "Nenhum aparelho conectado")
+            }
+
+            PopText {
+                visible: vbar.pop === "wifi" || vbar.pop === "bt" || vbar.pop === "battery"
+                Layout.topMargin: 4
+                text: Theme.t("vbar.click_hint", "Clique no ícone para mais opções")
+                font.pixelSize: 10
+                opacity: 0.8
             }
         }
     }

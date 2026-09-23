@@ -401,7 +401,11 @@ PanelWindow {
                                     id: shot
                                     anchors.fill: parent
                                     captureSource: mini.modelData.top ? mini.modelData.top.wayland : null
-                                    live: ov.open && card.ad < 1.5
+                                    // Só o cartão do meio fica ao vivo; os vizinhos
+                                    // capturam um quadro e param. Antes eram até três
+                                    // áreas de trabalho recopiando todas as janelas a
+                                    // cada quadro, o que travava a GPU integrada.
+                                    live: ov.open && card.centered
                                     paintCursor: false
                                 }
                                 IconImage {

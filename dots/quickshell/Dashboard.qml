@@ -241,7 +241,9 @@ Item {
                 // 116 antes: cabia só ícone e temperatura. Subiu para acomodar
                 // a sensação/umidade/vento/sol e a previsão dos próximos dias,
                 // que já vinham na mesma resposta e eram descartadas.
-                Layout.preferredHeight: 152
+                // Cresce com o conteúdo: com outra fonte ou escala (máquina de
+                // outra pessoa) os 152 fixos cortavam a previsão dos dias.
+                Layout.preferredHeight: Math.max(152, weatherCol.implicitHeight + 24)
                 spacing: Theme.gap + 2
 
                 Tile {
@@ -249,6 +251,7 @@ Item {
                     Layout.fillHeight: true
 
                     ColumnLayout {
+                        id: weatherCol
                         anchors.fill: parent
                         anchors.margins: 12
                         spacing: 8
