@@ -107,6 +107,61 @@ window.switcher {
 
 
 FRAME_HELPER = os.path.expanduser("~/.local/bin/rice-wallpaper-frame")
+DAEMON_LOGS = os.path.join(FLATPAK_ROOT, ".local/state/waywallen/logs/daemon")
+
+
+def measure_boot_times(days=3):
+    """Tempo de subida medido de cada wallpaper, em ms (mediana), pelo log do daemon.
+
+    Cada troca deixa no log "start cause=explicit-..." (pedido recebido) e, com o
+    renderizador novo já entregando buffers, "task 'apply/<id>' ... completed".
+    Medido em 2026-09-23: vídeos 250-400 ms, cenas 470-730 ms. Valores acima de
+    5 s ficam de fora (troca feita com o shell parado, gravação de cena etc.).
+    Devolve ({id: ms}, {"video"|"scene": ms}).
+    """
+    import re
+    from datetime import datetime
+    try:
+        files = sorted(f for f in os.listdir(DAEMON_LOGS) if re.match(r"waywallen\.\d{4}-\d{2}-\d{2}\.log$", f))[-days:]
+    except OSError:
+        return {}, {}
+    per_id, per_kind = {}, {}
+    rx_done = re.compile(r"task 'apply/(\d+)'.*completed")
+    rx_kind = re.compile(r"spawned renderer \S+ \((\w+)\)")
+    for name in files:
+        start = kind = None
+        try:
+            fh = open(os.path.join(DAEMON_LOGS, name), errors="replace")
+        except OSError:
+            continue
+        with fh:
+            for line in fh:
+                if "start cause=explicit" in line:
+                    start, kind = line[:26], None
+                elif start is None:
+                    continue
+                elif "spawned renderer" in line:
+                    m = rx_kind.search(line)
+                    kind = m.group(1) if m else None
+                else:
+                    m = rx_done.search(line)
+                    if not m:
+                        continue
+                    try:
+                        ms = (datetime.fromisoformat(line[:26]) - datetime.fromisoformat(start)).total_seconds() * 1000
+                    except ValueError:
+                        ms = -1
+                    if 0 < ms < 5000:
+                        per_id.setdefault(m.group(1), []).append(ms)
+                        if kind:
+                            per_kind.setdefault(kind, []).append(ms)
+                    start = None
+
+    def median(v):
+        v = sorted(v)
+        return v[len(v) // 2]
+    return ({k: median(v) for k, v in per_id.items()},
+            {k: median(v) for k, v in per_kind.items()})
 
 
 def cached_still(wp):
@@ -433,6 +488,8 @@ class SwitcherWindow(Gtk.ApplicationWindow):
         self.apply_appear()
         self.request_thumbnails()
         self.prefetch_stills()
+        self._boot_ids, self._boot_kinds = {}, {}
+        self.pool.submit(self._load_boot_times)
         self.schedule_gif()
         self.ensure_ticking()
 
@@ -659,10 +716,42 @@ class SwitcherWindow(Gtk.ApplicationWindow):
             else:
                 self._apply_now(wallpaper)
         else:
-            # Modo live: dispara a troca com antecedência mínima (~25ms para a
-            # janela de cobertura mapear no compositor), permitindo que o vídeo
-            # novo inicialize no meio da transição e já esteja em execução ao final.
-            GLib.timeout_add(25, self._apply_now, wallpaper)
+            # Modo live: a troca é disparada para o 1º quadro do wallpaper novo
+            # chegar junto com o fim da onda, usando o tempo de subida MEDIDO
+            # deste wallpaper (log do daemon; ver measure_boot_times). Antes era
+            # sempre 25 ms depois do início: um vídeo (~300 ms) aparecia no meio
+            # da onda, e uma cena (~700 ms) ou onda curta deixava a tela parada
+            # esperando. 40 ms de folga para o quadro chegar à tela depois de o
+            # daemon dar a troca por concluída.
+            wave = 800
+            try:
+                with open(prefs_path, "r", encoding="utf-8") as f:
+                    wave = int(json.load(f).get("wallpaper_transition_ms", 800))
+            except Exception:
+                pass
+            boot = self._boot_ms(wallpaper)
+            at = int(max(25, min(wave, wave - boot - 40)))
+            try:
+                import time
+                with open("/tmp/rice-wallfade.log", "a", encoding="utf-8") as lf:
+                    lf.write(time.strftime("%H:%M:%S") + f" live: subida ≈{boot:.0f} ms, troca aos {at} ms da onda de {wave} ms\n")
+            except OSError:
+                pass
+            GLib.timeout_add(at, self._apply_now, wallpaper)
+
+    def _load_boot_times(self):
+        self._boot_ids, self._boot_kinds = measure_boot_times()
+
+    def _boot_ms(self, wallpaper):
+        """Quanto este wallpaper leva para entregar o 1º quadro depois do ApplyById."""
+        wid = str(wallpaper.get("id"))
+        if wid in self._boot_ids:
+            return self._boot_ids[wid]
+        kind = wallpaper.get("kind")
+        if kind in ("video", "image"):
+            return self._boot_kinds.get("video", 350)
+        # Item do Wallpaper Engine sem histórico: pode ser vídeo ou cena.
+        return self._boot_kinds.get("scene", 700)
 
     # Quadros em resolução real, por id de wallpaper. Preenchido em segundo
     # plano (ver prefetch_stills): extrair na hora do clique custava de 0,3 a
@@ -722,6 +811,10 @@ class SwitcherWindow(Gtk.ApplicationWindow):
 
     def _apply_now(self, wallpaper):
         self.applying = False
+        # Instante do pedido: o rice-wallpaper-fade espera o "apply ... completed"
+        # do daemon posterior a ele (o ApplyById pode só devolver depois disso).
+        import time
+        self._apply_t0 = time.time()
         try:
             self.proxy.call_sync(
                 "ApplyById",
@@ -769,6 +862,7 @@ class SwitcherWindow(Gtk.ApplicationWindow):
             cmd = [fader, "--reveal-when-ready", wallpaper["target"]]
             if still:
                 cmd += ["--colors", still]
+            cmd += ["--since", "%.3f" % getattr(self, "_apply_t0", 0)]
             subprocess.Popen(
                 cmd,
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,

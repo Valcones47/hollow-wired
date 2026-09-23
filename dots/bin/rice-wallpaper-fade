@@ -76,25 +76,32 @@ case "${1:-}" in
     --reveal-when-ready)
         # Tira a camada quando o wallpaper novo estiver de fato no ar E assentado.
         #
-        #   rice-wallpaper-fade --reveal-when-ready <pasta do item> [--colors <imagem>]
+        #   rice-wallpaper-fade --reveal-when-ready <pasta do item> [--colors <imagem>] [--since <epoch do ApplyById>]
         #
         # O waywallen sobe um processo por wallpaper —
         # `waywallen-video-renderer --path <arquivo>` para vídeo e
         # `waywallen-wescene-renderer --path <scene.pkg>` para cena — com o
         # caminho do item na linha de comando. A presença dele é o primeiro sinal.
         #
-        # Só a presença não basta: o processo aparece e passa ainda um ou dois
-        # segundos carregando texturas e shaders, com quadros engasgando. Antes
-        # a camada saía 0,45s depois de ele aparecer, e esse carregamento ficava
-        # à vista como "microlag depois da transição". Agora ela espera o uso
-        # de CPU do renderizador baixar e estabilizar.
+        # Só a presença não basta: o processo ainda negocia buffers com o
+        # daemon. Depois dele, espera o "task 'apply/<id>' completed" do log do
+        # daemon posterior ao ApplyById (--since, passado pelo seletor), que é
+        # quando o renderizador passa a entregar quadros.
         #
         # Com --colors, a paleta nova (wallust) também é gerada aqui, com a tela
         # ainda coberta: recolorir o shell inteiro redesenha todas as superfícies,
         # e fazer isso com o wallpaper novo já à vista era o segundo tranco.
         target="${2:-}"
         colors=""
-        [ "${3:-}" = "--colors" ] && colors="${4:-}"
+        since=""
+        shift 2 2>/dev/null || shift $#
+        while [ $# -gt 0 ]; do
+            case "$1" in
+                --colors) colors="${2:-}"; shift 2 ;;
+                --since)  since="${2:-}"; shift 2 ;;
+                *) shift ;;
+            esac
+        done
         [ -n "$target" ] || { qs_call reveal >/dev/null 2>&1; exit 0; }
 
         wallust_pid=""
@@ -107,6 +114,8 @@ case "${1:-}" in
             wallust_pid=$!
         fi
 
+        # Início da espera = instante do ApplyById, quando o seletor informa.
+        wait_start=${since:-$(date +%s.%N)}
         deadline=$(( $(date +%s) + 8 ))
         pid=""
         while [ "$(date +%s)" -lt "$deadline" ]; do
@@ -124,7 +133,46 @@ case "${1:-}" in
         done
 
         if [ -n "$pid" ]; then
-            trace "renderizador pronto e ativo: $target"
+            # O processo existir não quer dizer que já há quadro: ele ainda
+            # negocia buffers com o daemon. O sinal de "entregando quadros" é o
+            # "task 'apply/<id>' ... completed" do log do daemon, depois do
+            # início desta espera (medido: 250-400 ms em vídeo, até ~730 ms em
+            # cena). Até 2 s; sem ele, segue assim mesmo.
+            if python3 - "$wait_start" <<'PY'
+import os, sys, time, glob
+from datetime import datetime, timezone
+start = float(sys.argv[1])
+logs = sorted(glob.glob(os.path.expanduser(
+    "~/.var/app/org.waywallen.waywallen/.local/state/waywallen/logs/daemon/waywallen.*-*-*.log")))
+if not logs:
+    sys.exit(1)
+path = logs[-1]
+deadline = time.time() + 2.0
+while time.time() < deadline:
+    try:
+        with open(path, "rb") as f:
+            f.seek(max(0, os.path.getsize(path) - 20000))
+            tail = f.read().decode("utf-8", "replace").splitlines()
+    except OSError:
+        tail = []
+    for line in reversed(tail):
+        if "task 'apply/" in line and "completed" in line:
+            try:
+                ts = datetime.fromisoformat(line[:26]).replace(tzinfo=timezone.utc).timestamp()
+            except ValueError:
+                continue
+            if ts >= start - 0.05:
+                time.sleep(0.04)   # o quadro chegar à tela
+                sys.exit(0)
+            break
+    time.sleep(0.02)
+sys.exit(1)
+PY
+            then
+                trace "renderizador pronto (quadro entregue): $target"
+            else
+                trace "renderizador no ar, mas sem aviso de quadro em 2 s: $target"
+            fi
         else
             trace "renderizador novo NÃO apareceu em 8s: $target"
         fi

@@ -39,7 +39,8 @@ Scope {
     // a cobertura varre a tela a 60 FPS; a troca só é disparada com a tela
     // coberta para o carregamento do Waywallen não engasgar a animação.
     property int coverMs: 450
-    property int hold: 4000
+    // Limite de espera pelo wallpaper novo depois da onda (ver holdTimer).
+    property int hold: 2500
     property int revealMs: 0
 
     property string source: ""
@@ -117,9 +118,14 @@ Scope {
         from: 0
         to: 1
         duration: fadeScope.coverMs
-        // Ao término da animação, a camada se retira imediatamente para o vídeo
-        // aparecer na tela sem nenhuma pausa estática.
-        onFinished: fadeScope.reveal(true)
+        // No fim da onda a camada só sai se o wallpaper novo já avisou que está
+        // no ar (reveal() chamado durante a onda = revealQueued). Sair sempre, na
+        // hora, era o motivo de só 800 ms funcionar: onda curta mostrava o
+        // wallpaper antigo parado até o novo subir (a "piscada"). Sem o aviso, a
+        // camada espera o reveal() de fora (rice-wallpaper-fade) ou o holdTimer.
+        // O outro lado (o novo subindo no meio da onda) é resolvido pelo
+        // waywallen-switcher, que dispara a troca pelo tempo de subida medido.
+        onFinished: if (fadeScope.revealQueued) fadeScope.reveal(true)
         easing.type: Easing.InOutQuad
     }
 
