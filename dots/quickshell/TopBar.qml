@@ -664,7 +664,7 @@ PanelWindow {
                 // ondulando com o som. Sem nada: o ícone do equalizador.
                 MediaDisc {
                     visible: MediaState.player !== null
-                    size: 22
+                    size: 28
                 }
                 BarIcon {
                     visible: MediaState.player === null
