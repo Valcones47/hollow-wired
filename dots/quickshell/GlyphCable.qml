@@ -50,6 +50,58 @@ Item {
              + cable.sag * Math.sin(t * Math.PI);
     }
 
+    // ---- modo coluna (stream) ----
+    // Usado pela conexão com o olho: um trecho reto vertical (a coluna que
+    // continua caindo) de stemTop até (x0, y0), e dali uma curva que sai na
+    // vertical e chega no olho. Os glifos andam juntos, espaçados como numa
+    // coluna, empurrados por headS (posição do glifo da frente no caminho,
+    // em pixels); passando do fim do caminho, somem — o olho os absorve.
+    property bool stream: false
+    property real stemTop: y0
+    property real headS: 0
+    property real spacing: fontSize * 1.1
+    // Glifos a partir deste índice ficam acima da coluna original: aparecem
+    // com `extraFade` em vez de surgir do nada no meio da tela.
+    property int solidCount: 0
+    property real extraFade: 1
+    readonly property real stemLen: Math.max(0, y0 - stemTop)
+    // Curva: Bézier quadrática com o controle em (x0, y1) — desce reto e vira
+    // para o olho. Tabela de comprimento de arco para os glifos ficarem
+    // igualmente espaçados (a Bézier anda mais rápido perto do canto).
+    readonly property var lut: {
+        if (!cable.stream) return [0];
+        const out = [0];
+        let px0 = cable.x0, py0 = cable.y0, acc = 0;
+        for (let i = 1; i <= 32; i++) {
+            const u = i / 32, a = 1 - u;
+            const qx = a * a * cable.x0 + 2 * a * u * cable.x0 + u * u * cable.x1;
+            const qy = a * a * cable.y0 + 2 * a * u * cable.y1 + u * u * cable.y1;
+            acc += Math.sqrt((qx - px0) * (qx - px0) + (qy - py0) * (qy - py0));
+            out.push(acc);
+            px0 = qx; py0 = qy;
+        }
+        return out;
+    }
+    readonly property real curveLen: Math.max(1, cable.lut[cable.lut.length - 1])
+    readonly property real pathLen: cable.stemLen + cable.curveLen
+
+    // Ponto do caminho a `s` pixels do começo.
+    function pointAt(s) {
+        if (s <= cable.stemLen)
+            return Qt.point(cable.x0, cable.stemTop + s);
+        const target = s - cable.stemLen;
+        const L = cable.lut;
+        let i = 1;
+        while (i < L.length - 1 && L[i] < target) i++;
+        const seg = Math.max(1e-6, L[i] - L[i - 1]);
+        const u = Math.min(1, ((i - 1) + (target - L[i - 1]) / seg) / (L.length - 1));
+        const a = 1 - u;
+        const qx = a * a * cable.x0 + 2 * a * u * cable.x0 + u * u * cable.x1;
+        const qy = a * a * cable.y0 + 2 * a * u * cable.y1 + u * u * cable.y1;
+        const w = cable.amp * cable.wave(u);
+        return Qt.point(qx + cable.nx * w, qy + cable.ny * w);
+    }
+
     SequentialAnimation on phase {
         running: cable.visible
         loops: Animation.Infinite
@@ -78,8 +130,13 @@ Item {
                 return v - Math.floor(v);
             }
 
-            x: cable.px(bead.t) - width / 2
-            y: cable.py(bead.t) - height / 2
+            readonly property real s: cable.headS - bead.index * cable.spacing
+            // Glifo ainda fora do caminho ou já absorvido: não calcula nada.
+            readonly property bool onPath: bead.s >= 0 && bead.s <= cable.pathLen
+            readonly property point sp: cable.stream && bead.onPath ? cable.pointAt(bead.s) : Qt.point(-100, -100)
+
+            x: (cable.stream ? bead.sp.x : cable.px(bead.t)) - width / 2
+            y: (cable.stream ? bead.sp.y : cable.py(bead.t)) - height / 2
             text: bead.glyph
             property string glyph: cable.alphabet.charAt(Math.floor(Math.random() * cable.alphabet.length))
 
@@ -87,14 +144,18 @@ Item {
             font.pixelSize: cable.fontSize
             color: cable.glyphColor
             // Some ao chegar na ponta: é o olho absorvendo o glifo.
-            opacity: cable.flowing
+            opacity: cable.stream
+                ? (bead.s < 0 || bead.s > cable.pathLen ? 0
+                   : Math.min(1, (cable.pathLen - bead.s) / 36)
+                     * (bead.index >= cable.solidCount ? cable.extraFade : 1))
+                : cable.flowing
                 ? (bead.t > 1 - cable.headFade ? (1 - bead.t) / cable.headFade
                    : (bead.t < 0.06 ? bead.t / 0.06 : 1))
                 : 1
 
             Timer {
-                running: cable.visible
-                interval: 260 + Math.random() * 500
+                running: cable.visible && (!cable.stream || bead.onPath)
+                interval: (cable.stream ? 520 : 260) + Math.random() * 500
                 repeat: true
                 onTriggered: bead.glyph = cable.alphabet.charAt(Math.floor(Math.random() * cable.alphabet.length))
             }

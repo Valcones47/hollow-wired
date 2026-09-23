@@ -121,7 +121,12 @@ Item {
             // y continua sendo um binding (que acompanha a altura do texto,
             // que muda quando os glifos são sorteados de novo).
             property real prog: 0
-            y: -height + col.prog * (rain.height + height)
+            // Deslocamento somado ao progresso: ao ser absorvida pelo olho, a
+            // coluna volta a nascer lá em cima em vez de reaparecer onde estava.
+            property real shift: 0
+            readonly property real p: (col.prog + col.shift) - Math.floor(col.prog + col.shift)
+            y: -height + col.p * (rain.height + height)
+            onLinkedChanged: if (!col.linked) col.shift = 1 - (col.prog - Math.floor(col.prog))
 
             // Ponto onde o cabo encosta: a ponta de baixo da coluna.
             readonly property real tipX: x + width / 2
@@ -138,9 +143,6 @@ Item {
                     duration: col.modelData.dur
                     loops: Animation.Infinite
                 }
-                // Pausa em vez de parar: ao soltar, a coluna continua de onde
-                // estava em vez de pular para o topo.
-                paused: col.linked
             }
 
             Text {
@@ -152,8 +154,8 @@ Item {
                 font.family: Theme.monoFamily
                 font.pixelSize: col.spec.size
                 color: Theme.primary
-                // Conectada, a coluna vira o cabo: ela some e quem ocupa o
-                // caminho são os glifos escorrendo para o olho.
+                // Conectada, a coluna vira o cabo: o texto dela some e quem
+                // continua descendo são os glifos do GlyphCable, no mesmo lugar.
                 opacity: col.linked ? 0 : col.spec.alpha
                 Behavior on opacity { NumberAnimation { duration: 180 } }
                 Behavior on color { ColorAnimation { duration: 180 } }
@@ -173,19 +175,20 @@ Item {
     }
 
     // ---------------- conexão elétrica ----------------
+    // A coluna escolhida não congela nem some: ela continua caindo na mesma
+    // linha, e na altura do olho faz a curva e entra nele. Os glifos andam
+    // juntos (como a coluna andava) e são absorvidos um a um, por ~7 s, até a
+    // coluna inteira ter entrado. Aí ela renasce no topo como outra qualquer.
     property int linkedIndex: -1
     property real linkX: 0
-    property real linkY: 0
-    property bool linkLive: false     // true = cabo preso; false = soltando
-    property real whip: 0             // oscilação do cabo ao desconectar
-    property real idleWave: 0         // respiração do cabo enquanto preso
-
-    SequentialAnimation on idleWave {
-        running: rain.linkLive
-        loops: Animation.Infinite
-        NumberAnimation { to: 0.07; duration: 900; easing.type: Easing.InOutSine }
-        NumberAnimation { to: -0.07; duration: 900; easing.type: Easing.InOutSine }
-    }
+    property real linkY: 0            // onde o trecho reto vira curva
+    property bool linkLive: false
+    property real headS: 0            // posição do glifo da frente no caminho
+    property int streamCount: 0
+    property int streamSolid: 0
+    property real streamFade: 0
+    readonly property real streamSpacing: 15 * 1.1
+    readonly property real streamSpeed: 130   // px/s, perto da queda do plano da frente
 
     Timer {
         running: rain.connects && rain.running && rain.columns.length > 0
@@ -199,72 +202,95 @@ Item {
             for (let t = 0; t < 10; t++) {
                 const i = Math.floor(Math.random() * rain.columns.length);
                 const item = colRepeater.itemAt(i);
-                // Sempre antes de 60% do percurso: mais embaixo o cabo sairia
-                // de fora da tela.
-                if (item && item.prog > 0.1 && item.prog < 0.6) { pick = i; break; }
+                // Sempre antes de 60% do percurso, e com a ponta acima do
+                // olho: abaixo dele a curva teria que dar ré para subir.
+                if (item && item.p > 0.1 && item.p < 0.6
+                        && item.y + item.height < rain.eyeY - 40) { pick = i; break; }
             }
             if (pick < 0) return;
             const src = colRepeater.itemAt(pick);
+            const tip = src.y + src.height;
+            // A curva começa acima do olho, tanto mais cedo quanto mais longe
+            // na horizontal ele estiver — senão vira um cotovelo seco.
+            const dxE = Math.abs(rain.eyeX - src.tipX);
             rain.linkX = src.tipX;
-            rain.linkY = src.y + src.height * 0.35;
+            rain.linkY = Math.max(tip + 24, rain.eyeY - dxE * 0.85);
             rain.activeCable = rain.cablePalette[Math.floor(Math.random() * rain.cablePalette.length)];
+
+            // A frente do fluxo começa na ponta da coluna; o trecho reto vai
+            // do alto da tela até a curva.
+            const stemTop = -rain.height;
+            const head0 = tip - stemTop;
+            const L = (rain.linkY - stemTop) + link.curveLen;
+            const sp = rain.streamSpacing;
+            // Quantos glifos: os da coluna mais o que couber para a absorção
+            // durar ~7 s. Com teto, pelo custo de cada glifo.
+            const colGlyphs = Math.max(1, Math.round(src.height / sp));
+            const n = Math.max(colGlyphs, Math.min(36,
+                Math.round((head0 + rain.streamSpeed * 7 - L) / sp) + 1));
+            rain.streamSolid = colGlyphs;
+            rain.streamCount = n;
+            rain.headS = head0;
+            streamAnim.from = head0;
+            streamAnim.to = L + (n - 1) * sp + 4;
+            streamAnim.duration = Math.max(1500, (streamAnim.to - head0) / rain.streamSpeed * 1000);
             rain.linkedIndex = pick;
             rain.linkLive = true;
-            rain.whip = 0;
-            holdLink.interval = 2600 + Math.random() * 2000;
-            holdLink.restart();
+            rain.streamFade = 0;
+            fadeIn.restart();
+            streamAnim.restart();
             interval = 5000 + Math.random() * 6000;
         }
     }
 
-    Timer {
-        id: holdLink
-        onTriggered: {
+    NumberAnimation {
+        id: streamAnim
+        target: rain
+        property: "headS"
+        onFinished: {
             rain.linkLive = false;
-            release.restart();
+            rain.linkedIndex = -1;
+            rain.streamCount = 0;
         }
     }
-
-    // Física do cabo soltando: em vez de simular uma corda (caro e sem ganho
-    // visível nesse tamanho), o ponto de controle da curva oscila com
-    // amplitude decrescente — o olho lê como chicote e custa quase nada.
-    SequentialAnimation {
-        id: release
-        NumberAnimation { target: rain; property: "whip"; to: 1.0;  duration: 110; easing.type: Easing.OutQuad }
-        NumberAnimation { target: rain; property: "whip"; to: -0.62; duration: 150; easing.type: Easing.InOutQuad }
-        NumberAnimation { target: rain; property: "whip"; to: 0.34;  duration: 140; easing.type: Easing.InOutQuad }
-        NumberAnimation { target: rain; property: "whip"; to: -0.16; duration: 130; easing.type: Easing.InOutQuad }
-        NumberAnimation { target: rain; property: "whip"; to: 0;     duration: 160; easing.type: Easing.OutQuad }
-        ScriptAction { script: rain.linkedIndex = -1 }
+    NumberAnimation {
+        id: fadeIn
+        target: rain
+        property: "streamFade"
+        to: 1
+        duration: 900
     }
 
     // O cabo é feito dos mesmos glifos da chuva, escorrendo para dentro do
-    // olho: preso, a coluna some e vira este caminho.
+    // olho: a coluna conectada vira este caminho.
     GlyphCable {
         id: link
         anchors.fill: parent
         visible: rain.linkedIndex >= 0
         z: 4
+        stream: true
+        stemTop: -rain.height
         x0: rain.linkX
         y0: rain.linkY
         x1: rain.eyeX
         y1: rain.eyeY
-        // Densidade pela distância, senão um cabo longo fica ralo e um curto
-        // vira um borrão de glifos.
-        count: Math.max(10, Math.min(26, Math.round(link.len / 20)))
-        fontSize: 13
+        count: rain.streamCount
+        spacing: rain.streamSpacing
+        solidCount: rain.streamSolid
+        extraFade: rain.streamFade
+        headS: rain.headS
+        fontSize: 15
         glyphColor: rain.activeCable
-        // Solto, a ondulação cresce e vira chicote; preso, é só um serpenteio.
-        amp: 22 + 46 * Math.abs(rain.whip)
-        waves: 1.5
-        flowing: rain.linkLive
-        opacity: rain.linkLive ? 1 : 0.75
-        Behavior on opacity { NumberAnimation { duration: 220 } }
+        // Serpenteio só na curva (a onda zera nas pontas), proporcional ao
+        // tamanho dela para uma curva curta não virar zigue-zague.
+        amp: Math.min(20, link.curveLen * 0.07)
+        waves: 1.2
     }
 
     // Clarão no ponto em que o cabo encosta no olho.
     Rectangle {
-        visible: rain.linkedIndex >= 0 && rain.linkLive
+        // Só depois que a frente do fluxo chegou no olho.
+        visible: rain.linkLive && rain.headS >= link.pathLen
         z: 5
         width: 14
         height: 14
@@ -274,7 +300,7 @@ Item {
         color: rain.activeCable
         opacity: 0.75
         SequentialAnimation on scale {
-            running: rain.linkedIndex >= 0 && rain.linkLive
+            running: rain.linkLive && rain.headS >= link.pathLen
             loops: Animation.Infinite
             NumberAnimation { to: 1.35; duration: 220 }
             NumberAnimation { to: 0.85; duration: 260 }

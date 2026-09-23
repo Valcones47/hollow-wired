@@ -250,6 +250,61 @@ Item {
         ctx.quadraticCurveTo(cx, cy + u * 0.34 * open, cx - halfW, tipY);
         ctx.stroke();
 
+        // ---- detalhe de cima: dobra da pálpebra e raios ----
+        // Tudo segue a curva da pálpebra de cima (a mesma Bézier), afastado
+        // pela normal: quando ela fecha, a dobra e os raios achatam junto.
+        const topCy = cy - u * 0.34 * open;
+        const lidPt = t => {
+            const a = 1 - t;
+            const x = a * a * (cx - halfW) + 2 * a * t * cx + t * t * (cx + halfW);
+            const y = a * a * tipY + 2 * a * t * topCy + t * t * tipY;
+            // derivada -> normal apontando para fora (para cima)
+            const dx = 2 * a * halfW + 2 * t * halfW;
+            const dy = 2 * a * (topCy - tipY) + 2 * t * (tipY - topCy);
+            const l = Math.max(1e-6, Math.sqrt(dx * dx + dy * dy));
+            return { x: x, y: y, nx: dy / l, ny: -dx / l };
+        };
+        const base = u * (thin ? 0.035 : 0.055);
+
+        // dobra: traço fino paralelo, sem encostar nas pontas
+        const crease = u * 0.075;
+        ctx.lineWidth = base * 0.45;
+        ctx.globalAlpha = 0.75;
+        ctx.beginPath();
+        for (let i = 0; i <= 20; i++) {
+            const q = lidPt(0.16 + 0.68 * i / 20);
+            const X = q.x + q.nx * crease, Y = q.y + q.ny * crease;
+            if (i === 0) ctx.moveTo(X, Y); else ctx.lineTo(X, Y);
+        }
+        ctx.stroke();
+
+        // raios saindo da dobra: o do meio mais longo, alternando longo/curto
+        ctx.lineWidth = base * 0.38;
+        const rays = [0.24, 0.33, 0.42, 0.5, 0.58, 0.67, 0.76];
+        for (let r = 0; r < rays.length; r++) {
+            const q = lidPt(rays[r]);
+            const mid = r === 3;
+            const len = u * (mid ? 0.1 : (r % 2 === 1 ? 0.065 : 0.045)) * (0.35 + 0.65 * open);
+            const start = crease + u * 0.03;
+            ctx.globalAlpha = mid ? 0.9 : 0.6;
+            ctx.beginPath();
+            ctx.moveTo(q.x + q.nx * start, q.y + q.ny * start);
+            ctx.lineTo(q.x + q.nx * (start + len), q.y + q.ny * (start + len));
+            ctx.stroke();
+        }
+
+        // marcas nas pontas do olho, como mira de instrumento
+        ctx.lineWidth = base * 0.45;
+        ctx.globalAlpha = 0.7;
+        for (const side of [-1, 1]) {
+            ctx.beginPath();
+            ctx.moveTo(cx + side * (halfW + u * 0.035), tipY);
+            ctx.lineTo(cx + side * (halfW + u * 0.085), tipY);
+            ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+        ctx.lineWidth = base;
+
         // haste que desce do olho
         const stemTop = cy + u * 0.14;
         const stemBottom = cy + u * 0.34;
