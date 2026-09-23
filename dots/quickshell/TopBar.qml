@@ -294,7 +294,8 @@ PanelWindow {
             spacing: 5
         }
         // Só os indicadores do lado direito mudam de ordem.
-        readonly property bool reorderable: mod.editable && mod.inCatalog
+        // A mídia fica fixa à esquerda do relógio: não entra na ordem.
+        readonly property bool reorderable: mod.editable && mod.inCatalog && mod.editKey !== "media"
         property bool dragging: false
         property real pressX: 0
         z: dragging ? 5 : 0
@@ -363,7 +364,7 @@ PanelWindow {
     // Enquanto arrasta, dragOrder guarda a ordem ao vivo e só é gravada ao soltar.
     property var dragOrder: null
     function barModuleItems() {
-        return { notifications: notifMod, network: wifiMod, control: ctlMod, media: mediaMod, tray: trayMod,
+        return { notifications: notifMod, network: wifiMod, control: ctlMod, tray: trayMod,
                  updates: updMod, night: nightMod, caffeine: cafMod, record: recMod, screenshot: shotMod,
                  clipboard: clipMod, gpu: gpuMod, lock: lockMod, settings: setMod, power: powMod };
     }
@@ -630,6 +631,36 @@ PanelWindow {
                 }
             }
 
+            // ---------- mídia: à esquerda do relógio (fora da ordem da direita) ----------
+            Module {
+                id: mediaMod
+                anchors.right: clockMod.visible ? clockMod.left : parent.horizontalCenter
+                anchors.rightMargin: 6
+                anchors.verticalCenter: parent.verticalCenter
+                kind: ""
+                editKey: "media"
+                visible: ShellLayout.barHas("media") && (MediaState.player !== null || ShellLayout.editing)
+                onClicked: MediaState.toggle()
+                onRightClicked: MediaState.next()
+                // roda: volume do app que está tocando (MediaState)
+                onWheel: d => MediaState.wheel(d)
+                BarIcon {
+                    text: MediaState.playing ? Theme.icons.pause : Theme.icons.play
+                    font.pixelSize: 15
+                }
+                BarText {
+                    Layout.maximumWidth: 180
+                    elide: Text.ElideRight
+                    text: MediaState.player ? (MediaState.player.trackTitle || MediaState.player.identity || "")
+                        : Theme.t("bar.item_media", "Mídia")
+                }
+                BarText {
+                    visible: MediaState.wheelTarget >= 0
+                    text: Math.round(MediaState.shownVolume * 100) + "%"
+                    color: Theme.subtext
+                }
+            }
+
             // ---------- centro: relógio ----------
             Module {
                 id: clockMod
@@ -782,32 +813,6 @@ PanelWindow {
                 }
 
                 // ---------- itens do catálogo (modo edição) ----------
-                Module {
-                    id: mediaMod
-                    kind: ""
-                    editKey: "media"
-                    visible: ShellLayout.barHas("media") && (MediaState.player !== null || ShellLayout.editing)
-                    onClicked: MediaState.toggle()
-                    onRightClicked: MediaState.next()
-                    // roda: volume do app que está tocando (MediaState)
-                    onWheel: d => MediaState.wheel(d)
-                    BarIcon {
-                        text: MediaState.playing ? Theme.icons.pause : Theme.icons.play
-                        font.pixelSize: 15
-                    }
-                    BarText {
-                        Layout.maximumWidth: 180
-                        elide: Text.ElideRight
-                        text: MediaState.player ? (MediaState.player.trackTitle || MediaState.player.identity || "")
-                            : Theme.t("bar.item_media", "Mídia")
-                    }
-                    BarText {
-                        visible: MediaState.wheelTarget >= 0
-                        text: Math.round(MediaState.shownVolume * 100) + "%"
-                        color: Theme.subtext
-                    }
-                }
-
                 Module {
                     id: trayMod
                     kind: ""
