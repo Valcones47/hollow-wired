@@ -10169,12 +10169,12 @@ PanelWindow {
                                     ModeCard {
                                         Layout.alignment: Qt.AlignTop
                                         mode: "windows"
-                                        title: Theme.t("mode.windows_title", "Estilo Windows")
+                                        title: Theme.t("mode.windows_title", "Estilo Windows (experimental)")
                                         desc: Theme.t("mode.windows_desc", "Cada programa abre numa janela solta no meio da tela, por cima das outras, como você já conhece.")
                                         points: [
                                             Theme.t("mode.windows_p1", "Arraste a janela pela barra de cima do próprio programa ou segurando Super"),
                                             Theme.t("mode.windows_p2", "Redimensione puxando a borda da janela"),
-                                            Theme.t("mode.windows_p3", "O botão de maximizar dos programas funciona")
+                                            Theme.t("mode.windows_p3", "Experimental: minimizar e maximizar ainda falham em alguns programas")
                                         ]
                                     }
                                     ModeCard {

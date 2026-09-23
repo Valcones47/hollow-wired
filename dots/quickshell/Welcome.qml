@@ -902,13 +902,13 @@ PanelWindow {
 
                     PageTitle {
                         title: Theme.t("welcome.mode_title", "Como as janelas devem abrir?")
-                        subtitle: Theme.t("welcome.mode_sub", "O jeito do Hyprland é dividir a tela sozinho. Se isso for estranho no começo, comece pelo estilo Windows.")
+                        subtitle: Theme.t("welcome.mode_sub", "O jeito do Hyprland é dividir a tela sozinho. O estilo Windows ainda é experimental.")
                     }
 
                     Repeater {
                         model: [
-                            { mode: "windows", label: Theme.t("welcome.mode_windows", "Estilo Windows"),
-                              desc: Theme.t("welcome.mode_windows_desc", "Soltas no meio da tela, como no Windows.") },
+                            { mode: "windows", label: Theme.t("welcome.mode_windows", "Estilo Windows (experimental)"),
+                              desc: Theme.t("welcome.mode_windows_desc", "Soltas no meio da tela, como no Windows. Minimizar e maximizar ainda falham em alguns apps.") },
                             { mode: "hyprland", label: Theme.t("welcome.mode_hyprland", "Estilo Hyprland"),
                               desc: Theme.t("welcome.mode_hyprland_desc", "Lado a lado, dividindo a tela sozinhas.") }
                         ]
