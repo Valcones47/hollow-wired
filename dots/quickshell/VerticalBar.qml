@@ -193,6 +193,11 @@ PanelWindow {
         property color iconColor: Theme.textColor
         property string badge: ""
         property string popKind: ""
+        property string editKey: ""
+        readonly property bool editable: ShellLayout.editing && bb.editKey !== ""
+        opacity: bb.editKey !== "" && !ShellLayout.barModule(bb.editKey) ? 0.35 : 1
+        border.width: bb.editable ? 1 : 0
+        border.color: Theme.withAlpha(Theme.primary, 0.7)
         signal activated()
         signal secondary()
         signal wheel(real delta)
@@ -239,9 +244,15 @@ PanelWindow {
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
             acceptedButtons: Qt.LeftButton | Qt.RightButton
-            onEntered: if (bb.popKind !== "") vbar.showPop(bb.popKind, bb)
+            onEntered: if (bb.popKind !== "" && !bb.editable) vbar.showPop(bb.popKind, bb)
             onExited: if (bb.popKind !== "") vbar.leavePop()
-            onClicked: mouse => mouse.button === Qt.RightButton ? bb.secondary() : bb.activated()
+            onClicked: mouse => {
+                if (bb.editable) {
+                    ShellLayout.setBarModule(bb.editKey, !ShellLayout.barModule(bb.editKey));
+                    return;
+                }
+                mouse.button === Qt.RightButton ? bb.secondary() : bb.activated();
+            }
             onWheel: w => bb.wheel(w.angleDelta.y)
         }
     }
@@ -274,6 +285,13 @@ PanelWindow {
             bottomRightRadius: vbar.onLeft ? Theme.frameRadius : 0
             topLeftRadius: vbar.onLeft ? 0 : Theme.frameRadius
             bottomLeftRadius: vbar.onLeft ? 0 : Theme.frameRadius
+
+            // Botão direito no fundo da barra: modo edição (como no KDE).
+            MouseArea {
+                anchors.fill: parent
+                acceptedButtons: Qt.RightButton
+                onClicked: ShellLayout.editing = !ShellLayout.editing
+            }
 
             ColumnLayout {
                 anchors.fill: parent
@@ -334,7 +352,10 @@ PanelWindow {
 
                 // ---- relógio ----
                 Rectangle {
-                    visible: ShellLayout.barModule("clock")
+                    visible: ShellLayout.showModule("clock")
+                    opacity: ShellLayout.barModule("clock") ? 1 : 0.35
+                    border.width: ShellLayout.editing ? 1 : 0
+                    border.color: Theme.withAlpha(Theme.primary, 0.7)
                     Layout.alignment: Qt.AlignHCenter
                     implicitWidth: 40
                     implicitHeight: clockCol.implicitHeight + 12
@@ -383,7 +404,13 @@ PanelWindow {
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: vbar.clockClicked()
+                        onClicked: {
+                            if (ShellLayout.editing) {
+                                ShellLayout.setBarModule("clock", !ShellLayout.barModule("clock"));
+                                return;
+                            }
+                            vbar.clockClicked();
+                        }
                     }
                 }
 
@@ -478,7 +505,8 @@ PanelWindow {
 
                 // ---- indicadores ----
                 BarButton {
-                    visible: ShellLayout.barModule("notifications")
+                    editKey: "notifications"
+                    visible: ShellLayout.showModule("notifications")
                     icon: NotifService.dnd ? Theme.icons.bellOff : Theme.icons.bell
                     iconColor: NotifService.dnd ? Theme.secondary
                         : (NotifService.unreadCount > 0 ? Theme.primary : Theme.textColor)
@@ -489,7 +517,8 @@ PanelWindow {
                 }
 
                 BarButton {
-                    visible: ShellLayout.barModule("audio")
+                    editKey: "audio"
+                    visible: ShellLayout.showModule("audio")
                     icon: vbar.volIcon()
                     popKind: "audio"
                     iconColor: (vbar.sink && vbar.sink.audio && vbar.sink.audio.muted) ? Theme.subtext : Theme.textColor
@@ -505,7 +534,8 @@ PanelWindow {
                 }
 
                 BarButton {
-                    visible: ShellLayout.barModule("network")
+                    editKey: "network"
+                    visible: ShellLayout.showModule("network")
                     icon: vbar.wifiIcon()
                     popKind: "wifi"
                     iconColor: vbar.activeNetwork ? Theme.textColor : Theme.subtext
@@ -513,7 +543,8 @@ PanelWindow {
                 }
 
                 BarButton {
-                    visible: vbar.btAdapter !== null && ShellLayout.barModule("bluetooth")
+                    editKey: "bluetooth"
+                    visible: vbar.btAdapter !== null && ShellLayout.showModule("bluetooth")
                     icon: !vbar.btAdapter || !vbar.btAdapter.enabled ? Theme.icons.btOff
                         : (vbar.btConnected > 0 ? Theme.icons.btConnected : Theme.icons.bt)
                     iconColor: vbar.btConnected > 0 ? Theme.primary : Theme.textColor
@@ -522,7 +553,8 @@ PanelWindow {
                 }
 
                 BarButton {
-                    visible: vbar.battery !== null && vbar.battery.isLaptopBattery && ShellLayout.barModule("battery")
+                    editKey: "battery"
+                    visible: vbar.battery !== null && vbar.battery.isLaptopBattery && ShellLayout.showModule("battery")
                     icon: vbar.batIcon()
                     popKind: "battery"
                     iconColor: vbar.battery && vbar.battery.percentage < 0.15 ? Theme.critical : Theme.textColor
@@ -537,7 +569,8 @@ PanelWindow {
                 }
 
                 BarButton {
-                    visible: ShellLayout.barModule("settings")
+                    editKey: "settings"
+                    visible: ShellLayout.showModule("settings")
                     icon: Theme.icons.tune
                     onActivated: vbar.visualConfigClicked()
                 }

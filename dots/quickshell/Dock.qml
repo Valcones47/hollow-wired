@@ -54,7 +54,7 @@ PanelWindow {
     // do Windows — nesse caso ela também reserva espaço para as janelas.
     readonly property bool pinned: ShellLayout.dockEnabled && !ShellLayout.dockAutohide
     readonly property bool shown: ShellLayout.dockEnabled
-        && (pinned ? !hasFullscreen : (allowHover && (hovered || pop !== "" || dragFrom >= 0)))
+        && (ShellLayout.editing || pinned ? !hasFullscreen : (allowHover && (hovered || pop !== "" || dragFrom >= 0)))
     onPopChanged: if (pop !== "games") gamesEdit = false
 
     Timer { id: hideDelay; interval: 450; onTriggered: dock.hovered = false }

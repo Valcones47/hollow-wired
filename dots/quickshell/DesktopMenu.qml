@@ -67,6 +67,8 @@ PanelWindow {
           action: () => Quickshell.execDetached(["quickshell", "ipc", "call", "visualconfig", "tab", "3"]) },
         { icon: Theme.icons.console, label: Theme.t("dmenu.terminal", "Terminal"), keys: "Super + Q", enabled: true,
           action: () => Quickshell.execDetached(["kitty"]) },
+        { icon: Theme.icons.tune, label: Theme.t("dmenu.edit_mode", "Modo edição"), keys: "", enabled: true,
+          action: () => { ShellLayout.editing = true; } },
         { icon: Theme.icons.tune, label: Theme.t("dmenu.layout", "Personalizar a interface"), keys: "", enabled: true,
           action: () => Quickshell.execDetached(["quickshell", "ipc", "call", "visualconfig", "tab", "20"]) },
         { icon: Theme.icons.palette, label: Theme.t("dmenu.wallpaper", "Trocar wallpaper"), keys: "",

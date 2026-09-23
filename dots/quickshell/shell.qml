@@ -243,6 +243,7 @@ ShellRoot {
     Cheatsheet {}
     Clipboard {}
     Welcome {}
+    EditMode {}
 
     PanelWindow {
         id: hub

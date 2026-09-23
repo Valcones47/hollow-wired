@@ -33,6 +33,11 @@ PanelWindow {
     readonly property real insetR: ShellLayout.barEnabled && ShellLayout.barPosition === "right" && !ShellLayout.barAutohide ? 52 + Theme.frameThickness : 0
 
     property bool editMode: false
+    // O modo edição geral (ShellLayout.editing) liga e desliga o dos widgets.
+    Connections {
+        target: ShellLayout
+        function onEditingChanged() { dwWindow.editMode = ShellLayout.editing; }
+    }
     property bool snapToGrid: true
     readonly property int gridSize: 20
 

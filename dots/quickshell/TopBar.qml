@@ -322,6 +322,13 @@ PanelWindow {
     component Module: Rectangle {
         id: mod
         required property string kind
+        // Chave do módulo em ShellLayout.barModules: no modo edição o clique
+        // liga/desliga o módulo em vez da ação normal.
+        property string editKey: ""
+        readonly property bool editable: ShellLayout.editing && mod.editKey !== ""
+        opacity: mod.editKey !== "" && !ShellLayout.barModule(mod.editKey) ? 0.35 : 1
+        border.width: mod.editable ? 1 : 0
+        border.color: Theme.withAlpha(Theme.primary, 0.7)
         default property alias content: modRow.data
         signal clicked()
         signal rightClicked()
@@ -344,9 +351,13 @@ PanelWindow {
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
             acceptedButtons: Qt.LeftButton | Qt.RightButton
-            onEntered: if (mod.kind !== "") bar.showPop(mod.kind, mod)
+            onEntered: if (mod.kind !== "" && !mod.editable) bar.showPop(mod.kind, mod)
             onExited: bar.leavePop()
             onClicked: mouse => {
+                if (mod.editable) {
+                    ShellLayout.setBarModule(mod.editKey, !ShellLayout.barModule(mod.editKey));
+                    return;
+                }
                 if (mouse.button === Qt.RightButton) {
                     mod.rightClicked();
                 } else {
@@ -443,6 +454,14 @@ PanelWindow {
             id: barItem
             width: parent.width
             height: bar.barH
+
+            // Botão direito no fundo da barra: modo edição (como no KDE). Fica
+            // por baixo dos módulos, que têm o próprio clique.
+            MouseArea {
+                anchors.fill: parent
+                acceptedButtons: Qt.RightButton
+                onClicked: ShellLayout.editing = !ShellLayout.editing
+            }
 
             // ---------- esquerda: workspaces + janela ativa ----------
             RowLayout {
@@ -581,7 +600,8 @@ PanelWindow {
             Module {
                 id: clockMod
                 kind: ""
-                visible: ShellLayout.barModule("clock")
+                editKey: "clock"
+                visible: ShellLayout.showModule("clock")
                 anchors.centerIn: parent
                 onClicked: bar.clockClicked()
 
@@ -653,7 +673,8 @@ PanelWindow {
                 Module {
                     id: notifMod
                     kind: ""
-                    visible: ShellLayout.barModule("notifications")
+                    editKey: "notifications"
+                    visible: ShellLayout.showModule("notifications")
                     onClicked: bar.notifClicked()
                     onRightClicked: NotifService.toggleDnd()
 
@@ -685,7 +706,8 @@ PanelWindow {
                 Module {
                     id: visualConfigMod
                     kind: ""
-                    visible: ShellLayout.barModule("settings")
+                    editKey: "settings"
+                    visible: ShellLayout.showModule("settings")
                     onClicked: bar.visualConfigClicked()
 
                     BarIcon {
@@ -700,7 +722,8 @@ PanelWindow {
                     kind: "wifi"
                     // Desktop ligado só no cabo não tem placa Wi-Fi: mostrar um
                     // ícone de "Wi-Fi desligado" pra sempre só confundia.
-                    visible: bar.wifiDevice !== null && ShellLayout.barModule("network")
+                    editKey: "network"
+                    visible: bar.wifiDevice !== null && ShellLayout.showModule("network")
                     BarIcon { text: bar.wifiIcon() }
                 }
 
@@ -708,7 +731,8 @@ PanelWindow {
                     id: btMod
                     kind: "bt"
                     // Idem para máquinas sem adaptador Bluetooth.
-                    visible: bar.btAdapter !== null && ShellLayout.barModule("bluetooth")
+                    editKey: "bluetooth"
+                    visible: bar.btAdapter !== null && ShellLayout.showModule("bluetooth")
                     BarIcon {
                         text: !bar.btAdapter || !bar.btAdapter.enabled ? Theme.icons.btOff
                             : bar.btConnected > 0 ? Theme.icons.btConnected : Theme.icons.bt
@@ -719,7 +743,8 @@ PanelWindow {
                 Module {
                     id: audioMod
                     kind: "audio"
-                    visible: ShellLayout.barModule("audio")
+                    editKey: "audio"
+                    visible: ShellLayout.showModule("audio")
                     onClicked: if (bar.sink) bar.sink.audio.muted = !bar.sink.audio.muted
                     onWheel: d => bar.wheelVolume(d)
                     BarIcon { text: bar.volIcon(bar.sink) }
@@ -729,7 +754,8 @@ PanelWindow {
                 Module {
                     id: brMod
                     kind: "brightness"
-                    visible: ShellLayout.barModule("brightness")
+                    editKey: "brightness"
+                    visible: ShellLayout.showModule("brightness")
                     onWheel: d => bar.wheelBrightness(d)
                     BarIcon { text: Theme.icons.brightness }
                     BarText { text: Math.round(bar.brightness * 100) + "%" }
@@ -738,7 +764,8 @@ PanelWindow {
                 Module {
                     id: batMod
                     kind: "battery"
-                    visible: bar.battery && bar.battery.isLaptopBattery && ShellLayout.barModule("battery")
+                    editKey: "battery"
+                    visible: bar.battery && bar.battery.isLaptopBattery && ShellLayout.showModule("battery")
                     BarIcon {
                         text: bar.batIcon()
                         color: bar.battery && bar.battery.percentage <= 0.15 && bar.battery.state !== UPowerDeviceState.Charging

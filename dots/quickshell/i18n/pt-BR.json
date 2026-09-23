@@ -1342,5 +1342,17 @@
   "header.sub_20": "Onde ficam a barra, a dock e a central de ações.",
   "header.sub_21": "Crie e troque atalhos.",
   "layout.dock_pins": "Apps fixados",
-  "layout.dock_pins_desc": "Setas mudam a ordem, × tira da dock. Para fixar, clique com o botão direito num app aberto na dock ou no launcher."
+  "layout.dock_pins_desc": "Setas mudam a ordem, × tira da dock. Para fixar, clique com o botão direito num app aberto na dock ou no launcher.",
+  "edit.handle": "Arraste a barra",
+  "edit.title": "Modo edição",
+  "edit.hint": "Clique nos itens da barra para esconder ou mostrar. Arraste a alça para mudar a barra de borda. Esc sai.",
+  "edit.done": "Concluir",
+  "edit.custom": "Personalizado",
+  "edit.bar_autohide": "Barra só com o mouse",
+  "edit.dock_on": "Usar a dock",
+  "edit.dock_autohide": "Dock só com o mouse",
+  "edit.dock_full": "Dock de ponta a ponta",
+  "edit.side_on": "Central de ações",
+  "edit.widgets_hint": "Widgets: arraste pela área de trabalho; use a barra de edição deles para adicionar ou remover.",
+  "dmenu.edit_mode": "Modo edição"
 }

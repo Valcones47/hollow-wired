@@ -83,6 +83,21 @@ QtObject {
         root.set("bar", "modules", next);
     }
 
+    // Modo edição (estilo KDE): não é gravado. Enquanto ligado, os módulos
+    // escondidos aparecem apagados na barra e um clique liga/desliga cada um.
+    property bool editing: false
+    function showModule(name) {
+        return root.barModule(name) || root.editing;
+    }
+
+    // qs ipc call layout edit | editOn | editOff
+    property IpcHandler ipc: IpcHandler {
+        target: "layout"
+        function edit(): void { root.editing = !root.editing; }
+        function editOn(): void { root.editing = true; }
+        function editOff(): void { root.editing = false; }
+    }
+
     readonly property bool dockEnabled: get("dock", "enabled", true)
     readonly property string dockPosition: get("dock", "position", "bottom")
     readonly property bool dockAutohide: get("dock", "autohide", true)

@@ -33,6 +33,7 @@ VisualConfigPanel 1.0 VisualConfigPanel.qml
 singleton ShellCustomization 1.0 ShellCustomization.qml
 singleton ShellLayout 1.0 ShellLayout.qml
 Welcome 1.0 Welcome.qml
+EditMode 1.0 EditMode.qml
 WelcomeMark 1.0 WelcomeMark.qml
 GlitchText 1.0 GlitchText.qml
 WiredRain 1.0 WiredRain.qml
