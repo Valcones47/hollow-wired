@@ -121,8 +121,7 @@ Scope {
         // aparecer na tela sem nenhuma pausa estática.
         onFinished: fadeScope.reveal(true)
         easing.type: Easing.Bezier
-        easing.bezierCurve: fadeScope.style === "wave" ? [0.4, 0.0, 0.25, 1.0, 1.0, 1.0]
-                                                       : [0.25, 0.1, 0.25, 1.0, 1.0, 1.0]
+        easing.bezierCurve: [0.25, 0.1, 0.25, 1.0, 1.0, 1.0]
     }
 
     // Limite: se o sinal de "renderizador novo no ar" nunca chegar, revela
@@ -295,8 +294,8 @@ Scope {
                     const far = Math.sqrt(cx * cx + (h - cy) * (h - cy));
                     // Começa com a frente já encostando no canto superior
                     // direito, sem gastar o começo da animação fora da tela.
-                    const near = Math.sqrt((cx - w) * (cx - w) + cy * cy) * 0.9;
-                    const R = near + p * (far + feather * 1.45 - near);
+                    const near = Math.sqrt((cx - w) * (cx - w) + cy * cy);
+                    const R = near + p * (far + feather * 1.12 - near);
 
                     function softDisc(x, y, r, solid) {
                         // Opaco até `solid` do raio, some até a borda. Com a
