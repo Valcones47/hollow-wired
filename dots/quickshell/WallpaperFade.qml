@@ -24,7 +24,7 @@ import "."
 // Estilos de entrada (user-prefs.json > wallpaper_transition):
 //   fade   crossfade simples
 //   wipe   varredura lateral
-//   wave   mancha suave e arredondada vindo da direita (borda desfocada)
+//   wave   frente diagonal contínua do canto sup. direito ao inf. esquerdo (borda macia)
 //   grow   círculo que abre do centro
 //
 // Uso (ver rice-wallpaper-fade):
@@ -253,15 +253,17 @@ Scope {
                 }
             }
 
-            // "Onda": o wallpaper novo entra pela direita numa rampa suave —
-            // topo primeiro, depois meio, depois base —, com borda
-            // muito macia — como se viesse desfocado. Não é uma linha nem um
-            // anel: a frente é um disco grande de borda larga, cercado de
-            // bolhas também desfocadas que deixam o contorno irregular e
-            // redondo, e que mudam de tamanho devagar enquanto avançam.
+            // "Onda" (referência: vídeo 2042.mp4, analisado pelo Antigravity):
+            // uma frente reta e contínua na diagonal, entrando pelo canto
+            // superior direito e saindo pelo inferior esquerdo. O topo lidera
+            // (inclinação de ~37° da vertical) e a borda é um degradê macio de
+            // ~140 px (na tela de 1920). Antes era um disco enorme cercado de
+            // bolhas desfocadas; a referência não tem anel nem bolhas.
             //
-            // Tudo desenhado aqui dentro, em coordenadas de pintura: um `Item`
-            // girado dentro da máscara faz o alfa sair uniforme (regra 3).
+            // Tudo desenhado aqui dentro, em coordenadas de pintura, com um
+            // degradê linear do próprio Canvas: um `Item` girado dentro da
+            // máscara faz o alfa sair uniforme (regra 3), e o LinearGradient do
+            // Qt5Compat devolve a média (regra 2).
             Canvas {
                 id: waveMask
                 width: fadeWin.width
@@ -282,58 +284,24 @@ Scope {
                     ctx.reset();
                     const w = width;
                     const h = height;
-                    // Centro do arco acima e à direita da tela, fora dela: a
-                    // frente vira uma rampa — o topo chega primeiro, depois o
-                    // meio, depois a base. Com o centro à altura do meio da
-                    // tela ela parecia sair do meio.
-                    const cx = w * 1.1;
-                    const cy = -h * 0.45;
-                    // Borda macia bem larga: é o que dá o ar de desfoque.
-                    const feather = w * 0.24;
-                    const far = Math.sqrt(cx * cx + (h - cy) * (h - cy));
-                    // Começa já encostando na quina da tela e termina cobrindo 100% no canto oposto
-                    const near = Math.sqrt((cx - w) * (cx - w) + cy * cy);
-                    const R = (near + feather * 0.2) + p * (far - near + feather * 0.3);
-
-                    function softDisc(x, y, r, solid) {
-                        // Opaco até `solid` do raio, some até a borda. Com a
-                        // tela ainda sem tamanho o raio dá 0 e o `solid` NaN,
-                        // que o gradiente recusa com erro.
-                        if (!(r > 0) || !isFinite(x) || !isFinite(y)) return;
-                        if (!isFinite(solid)) solid = 0;
-                        const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-                        g.addColorStop(0, "rgba(255,255,255,1)");
-                        g.addColorStop(Math.max(0, Math.min(0.99, solid)), "rgba(255,255,255,1)");
-                        g.addColorStop(1, "rgba(255,255,255,0)");
-                        ctx.fillStyle = g;
-                        ctx.fillRect(x - r, y - r, r * 2, r * 2);
-                    }
-
-                    // A onda entra visível suavemente desde o começo do movimento.
-                    ctx.globalAlpha = Math.min(1, 0.2 + p * 4);
-
-                    // Disco principal.
-                    softDisc(cx, cy, R, (R - feather) / R);
-
-                    // Bolhas na frente, espalhadas entre a direção do canto
-                    // inferior direito e a do canto superior esquerdo. Tamanho
-                    // e fase fixos por bolha, para o contorno não tremer.
-                    const a0 = Math.atan2(h - cy, w - cx);
-                    const a1 = Math.atan2(-cy, -cx);
-                    const blobs = 9;
-                    for (let i = 0; i < blobs; i++) {
-                        const t = i / (blobs - 1);
-                        const ang = a0 + (a1 - a0) * t;
-                        const seed = Math.sin(i * 12.9898) * 43758.5453;
-                        const rnd = seed - Math.floor(seed);
-                        const breathe = 0.85 + 0.3 * Math.sin(p * Math.PI * 2 + i * 1.7);
-                        const br = (w * 0.16 + w * 0.08 * rnd) * breathe + feather * 0.3;
-                        const dist = R - feather * (0.55 + 0.35 * rnd);
-                        if (dist <= 0)
-                            continue;
-                        softDisc(cx + Math.cos(ang) * dist, cy + Math.sin(ang) * dist, br, 0.35);
-                    }
-                    ctx.globalAlpha = 1;
+                    if (!(w > 0) || !(h > 0)) return;
+                    // n: normal da frente, apontando para o lado ainda não
+                    // coberto (esquerda e para baixo). u = ponto · n.
+                    const theta = 37 * Math.PI / 180;
+                    const nx = -Math.cos(theta), ny = Math.sin(theta);
+                    const feather = Math.max(80, Math.min(150, w * 0.073));
+                    // u no canto superior direito (primeiro a ser coberto) e no
+                    // inferior esquerdo (último).
+                    const uMin = w * nx;
+                    const uMax = h * ny;
+                    // A frente F vai de "nada na tela" a "tudo coberto, com a
+                    // borda macia já fora da tela".
+                    const F = uMin + p * (uMax - uMin + feather);
+                    const g = ctx.createLinearGradient(nx * (F - feather), ny * (F - feather), nx * F, ny * F);
+                    g.addColorStop(0, "rgba(255,255,255,1)");
+                    g.addColorStop(1, "rgba(255,255,255,0)");
+                    ctx.fillStyle = g;
+                    ctx.fillRect(0, 0, w, h);
                 }
             }
 
