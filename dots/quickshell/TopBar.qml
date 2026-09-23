@@ -286,7 +286,7 @@ PanelWindow {
         implicitHeight: bar.barH - 8
         radius: height / 2
         color: modArea.containsMouse || bar.pop === kind ? Theme.tileHigh : "transparent"
-        Behavior on color { ColorAnimation { duration: 140 } }
+        Behavior on color { ColorAnimation { duration: Theme.ms(140) } }
 
         RowLayout {
             id: modRow
@@ -299,7 +299,7 @@ PanelWindow {
         property real pressX: 0
         z: dragging ? 5 : 0
         scale: dragging ? 1.08 : 1
-        Behavior on scale { NumberAnimation { duration: 120 } }
+        Behavior on scale { NumberAnimation { duration: Theme.ms(120) } }
 
         MouseArea {
             id: modArea
@@ -409,7 +409,7 @@ PanelWindow {
         // Sai por cima da borda quando escondida, em vez de simplesmente
         // sumir: o movimento mostra de onde ela volta.
         y: bar.barShown ? 0 : -bar.barH
-        Behavior on y { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+        Behavior on y { NumberAnimation { duration: Theme.ms(260); easing.type: Easing.OutCubic } }
 
         HoverHandler {
             enabled: ShellLayout.barAutohide
@@ -433,11 +433,11 @@ PanelWindow {
         property real popH: popTargetH
         property real popX: Math.max(Theme.frameThickness + radius,
             Math.min(width - Theme.frameThickness - radius - Math.max(popTargetW, 1), bar.popAnchorX - popTargetW / 2))
-        Behavior on popW { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
-        Behavior on popH { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+        Behavior on popW { NumberAnimation { duration: Theme.ms(260); easing.type: Easing.OutCubic } }
+        Behavior on popH { NumberAnimation { duration: Theme.ms(260); easing.type: Easing.OutCubic } }
         Behavior on popX {
             enabled: root.popH > 4
-            NumberAnimation { duration: 260; easing.type: Easing.OutCubic }
+            NumberAnimation { duration: Theme.ms(260); easing.type: Easing.OutCubic }
         }
 
         onPopWChanged: shape.requestPaint()
@@ -531,9 +531,9 @@ PanelWindow {
                                     : modelData.urgent ? Theme.critical
                                     : wsArea.containsMouse ? Theme.textColor
                                     : Theme.withAlpha(Theme.subtext, modelData.occupied ? 0.55 : 0.28)
-                                Behavior on width { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
-                                Behavior on height { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
-                                Behavior on color { ColorAnimation { duration: 160 } }
+                                Behavior on width { NumberAnimation { duration: Theme.ms(220); easing.type: Easing.OutCubic } }
+                                Behavior on height { NumberAnimation { duration: Theme.ms(220); easing.type: Easing.OutCubic } }
+                                Behavior on color { ColorAnimation { duration: Theme.ms(160) } }
                                 MouseArea {
                                     id: wsArea
                                     anchors.fill: parent
@@ -569,7 +569,7 @@ PanelWindow {
                          : specialArea.containsMouse ? Theme.tileHigh : Theme.tile
                     border.width: open ? 1 : 0
                     border.color: Theme.primary
-                    Behavior on color { ColorAnimation { duration: 140 } }
+                    Behavior on color { ColorAnimation { duration: Theme.ms(140) } }
 
                     Row {
                         id: specialRow
@@ -1007,7 +1007,7 @@ PanelWindow {
                 }
                 opacity: root.popTargetW > 0 && Math.abs(root.popW - root.popTargetW) < 30
                     && Math.abs(root.popH - root.popTargetH) < 30 ? 1 : 0
-                Behavior on opacity { NumberAnimation { duration: 140 } }
+                Behavior on opacity { NumberAnimation { duration: Theme.ms(140) } }
 
                 // ---------- equalizador ----------
                 Item {
@@ -1128,7 +1128,7 @@ PanelWindow {
                                 anchors.verticalCenter: parent.verticalCenter
                                 x: Networking.wifiEnabled ? parent.width - width - 3 : 3
                                 color: Theme.textColor
-                                Behavior on x { NumberAnimation { duration: 140 } }
+                                Behavior on x { NumberAnimation { duration: Theme.ms(140) } }
                             }
                             MouseArea {
                                 anchors.fill: parent

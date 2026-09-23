@@ -766,6 +766,47 @@ PanelWindow {
         }
     }
 
+    // ---- perfis de desempenho (rice-perf-profile) ----
+    // perf = { profile, values: {blur_level, shadows, anim_windows, ...} }.
+    // Um pedido por vez: `running = true` num processo rodando é ignorado, então
+    // o último pedido fica guardado e roda na saída.
+    property var perf: ({ profile: "medio", values: {} })
+    property bool perfCustomOpen: false
+    property var perfPending: null
+    Process {
+        id: perfGetProc
+        command: ["rice-perf-profile", "get"]
+        stdout: StdioCollector {
+            onStreamFinished: { try { win.perf = JSON.parse(text); } catch (e) {} }
+        }
+    }
+    Process {
+        id: perfSetProc
+        stdout: StdioCollector {
+            onStreamFinished: { try { win.perf = JSON.parse(text); } catch (e) {} }
+        }
+        onExited: {
+            loadHyprPrefsProc.running = true;
+            if (win.perfPending) {
+                command = win.perfPending;
+                win.perfPending = null;
+                running = true;
+            }
+        }
+    }
+    function perfRun(args) {
+        const cmd = ["rice-perf-profile"].concat(args);
+        if (perfSetProc.running) perfPending = cmd;
+        else { perfSetProc.command = cmd; perfSetProc.running = true; }
+    }
+    function perfItem(key, val) {
+        // mostra na hora; a resposta do script confirma
+        const v = Object.assign({}, win.perf.values || {});
+        v[key] = val;
+        win.perf = { profile: "custom", values: v, profiles: win.perf.profiles };
+        perfRun(["item", key, String(val)]);
+    }
+
     Process {
         id: loadHyprPrefsProc
         command: ["rice-hypr-prefs", "get"]
@@ -1148,6 +1189,7 @@ PanelWindow {
         loadMakoProc.running = true;
         loadNightlightProc.running = true;
         loadHyprPrefsProc.running = true;
+        perfGetProc.running = true;
         loadMonitorsProc.running = true;
         checkBacklightProc.running = true;
         checkTouchpadProc.running = true;
@@ -1251,7 +1293,7 @@ PanelWindow {
                 height: width
                 radius: width / 2
                 color: Theme.textColor
-                Behavior on width { NumberAnimation { duration: 100 } }
+                Behavior on width { NumberAnimation { duration: Theme.ms(100) } }
             }
 
             MouseArea {
@@ -1334,7 +1376,7 @@ PanelWindow {
                 anchors.verticalCenter: parent.verticalCenter
                 x: csw.checked ? parent.width - width - 3 : 3
                 color: Theme.textColor
-                Behavior on x { NumberAnimation { duration: 140 } }
+                Behavior on x { NumberAnimation { duration: Theme.ms(140) } }
             }
 
             MouseArea {
@@ -1360,7 +1402,7 @@ PanelWindow {
             anchors.verticalCenter: parent.verticalCenter
             x: swt.checked ? parent.width - width - 3 : 3
             color: Theme.textColor
-            Behavior on x { NumberAnimation { duration: 140 } }
+            Behavior on x { NumberAnimation { duration: Theme.ms(140) } }
         }
 
         MouseArea {
@@ -1384,7 +1426,7 @@ PanelWindow {
         color: mc.active ? Theme.tileHigh : (mcArea.containsMouse ? Theme.tileHigh : Theme.tile)
         border.width: mc.active ? 2 : 1
         border.color: mc.active ? Theme.primary : Theme.withAlpha(Theme.outline, 0.25)
-        Behavior on color { ColorAnimation { duration: 140 } }
+        Behavior on color { ColorAnimation { duration: Theme.ms(140) } }
 
         ColumnLayout {
             id: mcCol
@@ -1517,7 +1559,7 @@ PanelWindow {
             implicitWidth: 5
             radius: 3
             color: psb.pressed ? Theme.primary : Theme.withAlpha(Theme.primary, psb.hovered ? 0.6 : 0.35)
-            Behavior on color { ColorAnimation { duration: 120 } }
+            Behavior on color { ColorAnimation { duration: Theme.ms(120) } }
         }
     }
 
@@ -1619,13 +1661,13 @@ PanelWindow {
             height: 22
             radius: 11
             color: otg.checked ? Theme.primary : Theme.tileHigh
-            Behavior on color { ColorAnimation { duration: 140 } }
+            Behavior on color { ColorAnimation { duration: Theme.ms(140) } }
             Rectangle {
                 width: 16; height: 16; radius: 8
                 anchors.verticalCenter: parent.verticalCenter
                 x: otg.checked ? parent.width - width - 3 : 3
                 color: otg.checked ? Theme.background : Theme.subtext
-                Behavior on x { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+                Behavior on x { NumberAnimation { duration: Theme.ms(140); easing.type: Easing.OutCubic } }
             }
             MouseArea {
                 anchors.fill: parent
@@ -1660,7 +1702,7 @@ PanelWindow {
                     height: 26
                     radius: 7
                     color: segItem.active ? Theme.tileHigh : (segArea.containsMouse ? Theme.withAlpha(Theme.tileHigh, 0.45) : "transparent")
-                    Behavior on color { ColorAnimation { duration: 120 } }
+                    Behavior on color { ColorAnimation { duration: Theme.ms(120) } }
                     Text {
                         id: segText
                         anchors.centerIn: parent
@@ -1767,7 +1809,7 @@ PanelWindow {
     Rectangle {
         anchors.fill: parent
         color: Qt.rgba(0, 0, 0, win.open ? 0.65 : 0)
-        Behavior on color { ColorAnimation { duration: 200 } }
+        Behavior on color { ColorAnimation { duration: Theme.ms(200) } }
         MouseArea {
             anchors.fill: parent
             onClicked: win.open = false
@@ -1803,7 +1845,7 @@ PanelWindow {
             implicitHeight: 38
             radius: 19
             color: closeArea.containsMouse ? Theme.withAlpha(Theme.critical, 0.85) : Theme.withAlpha(Theme.tileHigh, 0.6)
-            Behavior on color { ColorAnimation { duration: 140 } }
+            Behavior on color { ColorAnimation { duration: Theme.ms(140) } }
 
             Text {
                 anchors.centerIn: parent
@@ -1891,8 +1933,8 @@ PanelWindow {
 
         opacity: win.open ? 1 : 0
         scale: win.open ? 1 : 0.94
-        Behavior on opacity { NumberAnimation { duration: 180 } }
-        Behavior on scale { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+        Behavior on opacity { NumberAnimation { duration: Theme.ms(180) } }
+        Behavior on scale { NumberAnimation { duration: Theme.ms(220); easing.type: Easing.OutCubic } }
 
         MouseArea { anchors.fill: parent } // não fechar ao clicar dentro
 
@@ -1914,7 +1956,7 @@ PanelWindow {
             border.color: Theme.primary
 
             opacity: visible ? 1 : 0
-            Behavior on opacity { NumberAnimation { duration: 180 } }
+            Behavior on opacity { NumberAnimation { duration: Theme.ms(180) } }
 
             RowLayout {
                 id: revertRow
@@ -2242,7 +2284,7 @@ PanelWindow {
                                         color: Theme.secondary
                                     }
 
-                                    Behavior on color { ColorAnimation { duration: 120 } }
+                                    Behavior on color { ColorAnimation { duration: Theme.ms(120) } }
 
                                     Rectangle {
                                         width: 3
@@ -3176,7 +3218,7 @@ PanelWindow {
                                             border.width: monCard.isSelected ? 1.5 : 1
                                             border.color: monCard.isSelected ? Theme.primary : Theme.withAlpha(Theme.outline, 0.2)
 
-                                            Behavior on color { ColorAnimation { duration: 140 } }
+                                            Behavior on color { ColorAnimation { duration: Theme.ms(140) } }
 
                                             RowLayout {
                                                 anchors.fill: parent
@@ -4514,7 +4556,7 @@ PanelWindow {
                                                         anchors.verticalCenter: parent.verticalCenter
                                                         x: autoCard.modelData.enabled ? parent.width - width - 3 : 3
                                                         color: Theme.textColor
-                                                        Behavior on x { NumberAnimation { duration: 120 } }
+                                                        Behavior on x { NumberAnimation { duration: Theme.ms(120) } }
                                                     }
 
                                                     MouseArea {
@@ -5237,7 +5279,137 @@ PanelWindow {
                                 width: parent.width - 18   // faixa da barra de rolagem
                                 spacing: 10
 
-                                GroupLabel { Layout.topMargin: 0; text: Theme.t("effects.g_nightlight", "Luz noturna") }
+                                GroupLabel { Layout.topMargin: 0; text: Theme.t("perf.group", "Desempenho") }
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: Theme.t("perf.desc", "Junta desfoque, sombras e animações num nível só. Leve é o melhor para placa integrada e bateria.")
+                                    wrapMode: Text.WordWrap
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 11
+                                    color: Theme.withAlpha(Theme.subtext, 0.8)
+                                }
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 8
+                                    Repeater {
+                                        model: [
+                                            { k: "leve", name: Theme.t("perf.leve", "Leve"), sub: Theme.t("perf.leve_sub", "Sem desfoque, animações curtas") },
+                                            { k: "medio", name: Theme.t("perf.medio", "Médio"), sub: Theme.t("perf.medio_sub", "O visual padrão") },
+                                            { k: "pesado", name: Theme.t("perf.pesado", "Pesado"), sub: Theme.t("perf.pesado_sub", "Desfoque forte e sombras") },
+                                            { k: "custom", name: Theme.t("perf.custom", "Personalizado"), sub: Theme.t("perf.custom_sub", "Escolha item por item") }
+                                        ]
+                                        delegate: Rectangle {
+                                            id: pcard
+                                            required property var modelData
+                                            readonly property bool active: win.perf.profile === pcard.modelData.k
+                                            Layout.fillWidth: true
+                                            Layout.preferredWidth: 1
+                                            implicitHeight: pcardCol.implicitHeight + 20
+                                            radius: 12
+                                            color: pcard.active ? Theme.tileHigh : (pcardArea.containsMouse ? Theme.withAlpha(Theme.tileHigh, 0.6) : Theme.withAlpha(Theme.tile, 0.55))
+                                            border.width: pcard.active ? 1 : 0
+                                            border.color: Theme.withAlpha(Theme.primary, 0.8)
+                                            ColumnLayout {
+                                                id: pcardCol
+                                                anchors.left: parent.left
+                                                anchors.right: parent.right
+                                                anchors.top: parent.top
+                                                anchors.margins: 10
+                                                spacing: 2
+                                                Text {
+                                                    Layout.fillWidth: true
+                                                    text: pcard.modelData.name
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 13
+                                                    font.weight: Font.DemiBold
+                                                    color: Theme.textColor
+                                                }
+                                                Text {
+                                                    Layout.fillWidth: true
+                                                    text: pcard.modelData.sub
+                                                    wrapMode: Text.WordWrap
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 10
+                                                    color: Theme.subtext
+                                                }
+                                            }
+                                            MouseArea {
+                                                id: pcardArea
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: {
+                                                    if (pcard.modelData.k === "custom") {
+                                                        win.perfCustomOpen = !win.perfCustomOpen;
+                                                        return;
+                                                    }
+                                                    win.perf = { profile: pcard.modelData.k, values: win.perf.values, profiles: win.perf.profiles };
+                                                    win.perfRun(["set", pcard.modelData.k]);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                OptionGroup {
+                                    visible: win.perfCustomOpen || win.perf.profile === "custom"
+                                    OptionRow {
+                                        title: Theme.t("perf.blur", "Desfoque")
+                                        Segmented {
+                                            options: [
+                                                { value: "off", label: Theme.t("perf.off", "Desligado") },
+                                                { value: "leve", label: Theme.t("perf.light", "Leve") },
+                                                { value: "padrao", label: Theme.t("perf.normal", "Padrão") },
+                                                { value: "forte", label: Theme.t("perf.strong", "Forte") }
+                                            ]
+                                            current: (win.perf.values || {}).blur_level
+                                            onPicked: v => win.perfItem("blur_level", v)
+                                        }
+                                    }
+                                    RowDivider {}
+                                    Repeater {
+                                        model: [
+                                            { key: "anim_windows", title: Theme.t("perf.windows", "Janelas"), sub: Theme.t("perf.windows_sub", "Abrir, fechar e mover") },
+                                            { key: "anim_workspaces", title: Theme.t("perf.workspaces", "Áreas de trabalho"), sub: Theme.t("perf.workspaces_sub", "Trocar de área") },
+                                            { key: "shell_anim", title: Theme.t("perf.shell", "Painéis do shell"), sub: Theme.t("perf.shell_sub", "Barra, dock, central, launcher e popups") }
+                                        ]
+                                        delegate: ColumnLayout {
+                                            id: lvRow
+                                            required property var modelData
+                                            required property int index
+                                            Layout.fillWidth: true
+                                            spacing: 0
+                                            OptionRow {
+                                                title: lvRow.modelData.title
+                                                subtitle: lvRow.modelData.sub
+                                                Segmented {
+                                                    options: [
+                                                        { value: "off", label: Theme.t("perf.anim_off", "Sem animação") },
+                                                        { value: "rapido", label: Theme.t("perf.anim_fast", "Rápida") },
+                                                        { value: "completo", label: Theme.t("perf.anim_full", "Completa") }
+                                                    ]
+                                                    current: (win.perf.values || {})[lvRow.modelData.key]
+                                                    onPicked: v => win.perfItem(lvRow.modelData.key, v)
+                                                }
+                                            }
+                                            RowDivider {}
+                                        }
+                                    }
+                                    OptionToggle {
+                                        title: Theme.t("perf.shadows", "Sombras das janelas")
+                                        checked: (win.perf.values || {}).shadows === true
+                                        onToggled: nv => win.perfItem("shadows", nv)
+                                    }
+                                    RowDivider {}
+                                    OptionToggle {
+                                        title: Theme.t("perf.live", "Prévia ao vivo no Super + Tab")
+                                        subtitle: Theme.t("perf.live_sub", "Desligada, as janelas aparecem como foto parada.")
+                                        checked: (win.perf.values || {}).overview_live !== false
+                                        onToggled: nv => win.perfItem("overview_live", nv)
+                                    }
+                                }
+
+                                GroupLabel { text: Theme.t("effects.g_nightlight", "Luz noturna") }
 
                                 OptionGroup {
                                     OptionToggle {
@@ -8096,7 +8268,7 @@ PanelWindow {
                                                     color: isRec ? Theme.critical : (recMuteMouse.containsMouse ? Theme.primary : Theme.surface)
                                                     border.width: 1
                                                     border.color: isRec ? Theme.critical : (recMuteMouse.containsMouse ? Theme.primary : Theme.withAlpha(Theme.outline, 0.3))
-                                                    Behavior on color { ColorAnimation { duration: 150 } }
+                                                    Behavior on color { ColorAnimation { duration: Theme.ms(150) } }
 
                                                     RowLayout {
                                                         id: recMuteRow
@@ -8327,7 +8499,7 @@ PanelWindow {
                                                     color: isRec ? Theme.critical : (recDeafenMouse.containsMouse ? Theme.primary : Theme.surface)
                                                     border.width: 1
                                                     border.color: isRec ? Theme.critical : (recDeafenMouse.containsMouse ? Theme.primary : Theme.withAlpha(Theme.outline, 0.3))
-                                                    Behavior on color { ColorAnimation { duration: 150 } }
+                                                    Behavior on color { ColorAnimation { duration: Theme.ms(150) } }
 
                                                     RowLayout {
                                                         id: recDeafenRow
@@ -9003,7 +9175,7 @@ PanelWindow {
                                     border.width: 1
                                     border.color: Theme.withAlpha(Theme.primary, 0.35)
 
-                                    Behavior on color { ColorAnimation { duration: 140 } }
+                                    Behavior on color { ColorAnimation { duration: Theme.ms(140) } }
 
                                     RowLayout {
                                         anchors.fill: parent
@@ -9304,7 +9476,7 @@ PanelWindow {
                                             color: lpArea.containsMouse ? Theme.tileHigh : Theme.withAlpha(Theme.tile, 0.55)
                                             border.width: lpCard.active ? 2 : 0
                                             border.color: Theme.primary
-                                            Behavior on color { ColorAnimation { duration: 140 } }
+                                            Behavior on color { ColorAnimation { duration: Theme.ms(140) } }
 
                                             ColumnLayout {
                                                 id: lpCol
@@ -9434,7 +9606,7 @@ PanelWindow {
                                                     color: modChip.on ? Theme.tileHigh : (modChipArea.containsMouse ? Theme.withAlpha(Theme.tileHigh, 0.45) : "transparent")
                                                     border.width: modChip.on ? 0 : 1
                                                     border.color: Theme.withAlpha(Theme.outline, 0.2)
-                                                    Behavior on color { ColorAnimation { duration: 120 } }
+                                                    Behavior on color { ColorAnimation { duration: Theme.ms(120) } }
 
                                                     Row {
                                                         id: modChipRow
@@ -9731,7 +9903,7 @@ PanelWindow {
                                                     border.width: isSelected ? 0 : 1
                                                     border.color: Theme.withAlpha(Theme.outline, 0.15)
 
-                                                    Behavior on color { ColorAnimation { duration: 100 } }
+                                                    Behavior on color { ColorAnimation { duration: Theme.ms(100) } }
 
                                                     RowLayout {
                                                         anchors.centerIn: parent

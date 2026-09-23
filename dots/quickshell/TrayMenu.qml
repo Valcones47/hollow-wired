@@ -115,7 +115,7 @@ ColumnLayout {
         radius: 8
         color: rowArea.containsMouse && enabled ? Theme.tileHigh : "transparent"
         opacity: enabled ? 1 : 0.45
-        Behavior on color { ColorAnimation { duration: 100 } }
+        Behavior on color { ColorAnimation { duration: Theme.ms(100) } }
 
         RowLayout {
             id: rowLayout

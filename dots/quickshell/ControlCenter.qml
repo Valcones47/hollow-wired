@@ -216,7 +216,7 @@ PanelWindow {
         implicitHeight: 58
         radius: 14
         color: tile.active ? Theme.primary : (mainArea.containsMouse ? Theme.tileHigh : Theme.tile)
-        Behavior on color { ColorAnimation { duration: 140 } }
+        Behavior on color { ColorAnimation { duration: Theme.ms(140) } }
 
         RowLayout {
             anchors.fill: parent
@@ -266,7 +266,7 @@ PanelWindow {
                     anchors.centerIn: parent
                     text: Theme.icons.chevronRight
                     rotation: tile.expanded ? 90 : 0
-                    Behavior on rotation { NumberAnimation { duration: 140 } }
+                    Behavior on rotation { NumberAnimation { duration: Theme.ms(140) } }
                     font.family: Theme.iconFontFamily
                     font.pixelSize: 16
                     color: tile.active ? Theme.background : Theme.subtext
@@ -298,7 +298,7 @@ PanelWindow {
         implicitHeight: 36
         radius: 18
         color: rb.armed ? Theme.withAlpha(Theme.critical, 0.55) : (rbArea.containsMouse ? Theme.tileHigh : Theme.tile)
-        Behavior on color { ColorAnimation { duration: 120 } }
+        Behavior on color { ColorAnimation { duration: Theme.ms(120) } }
         Text {
             anchors.centerIn: parent
             text: rb.icon
@@ -342,8 +342,8 @@ PanelWindow {
         opacity: cc.open ? 1 : 0
         scale: cc.open ? 1 : 0.96
         transformOrigin: side ? (onLeft ? Item.BottomLeft : Item.BottomRight) : Item.TopRight
-        Behavior on opacity { NumberAnimation { duration: 160 } }
-        Behavior on scale { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+        Behavior on opacity { NumberAnimation { duration: Theme.ms(160) } }
+        Behavior on scale { NumberAnimation { duration: Theme.ms(200); easing.type: Easing.OutCubic } }
 
         focus: true
         Keys.onEscapePressed: cc.open = false
@@ -502,7 +502,7 @@ PanelWindow {
                                 anchors.centerIn: parent
                                 text: Theme.icons.chevronRight
                                 rotation: cc.audioOpen ? 90 : 0
-                                Behavior on rotation { NumberAnimation { duration: 140 } }
+                                Behavior on rotation { NumberAnimation { duration: Theme.ms(140) } }
                                 font.family: Theme.iconFontFamily
                                 font.pixelSize: 16
                                 color: Theme.subtext

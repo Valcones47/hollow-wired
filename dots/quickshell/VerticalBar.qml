@@ -185,7 +185,7 @@ PanelWindow {
         implicitHeight: 36
         radius: 12
         color: bbArea.containsMouse ? Theme.tileHigh : "transparent"
-        Behavior on color { ColorAnimation { duration: 130 } }
+        Behavior on color { ColorAnimation { duration: Theme.ms(130) } }
 
         Text {
             anchors.centerIn: parent
@@ -223,7 +223,7 @@ PanelWindow {
         property real pressY: 0
         z: dragging ? 5 : 0
         scale: dragging ? 1.1 : 1
-        Behavior on scale { NumberAnimation { duration: 120 } }
+        Behavior on scale { NumberAnimation { duration: Theme.ms(120) } }
 
         MouseArea {
             id: bbArea
@@ -318,7 +318,7 @@ PanelWindow {
         height: parent.height
         // Sai pela lateral quando está escondida.
         x: (vbar.onLeft ? 0 : parent.width - width) + (vbar.shown ? 0 : (vbar.onLeft ? -vbar.barW : vbar.barW))
-        Behavior on x { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+        Behavior on x { NumberAnimation { duration: Theme.ms(260); easing.type: Easing.OutCubic } }
 
         HoverHandler {
             enabled: ShellLayout.barAutohide
@@ -390,8 +390,8 @@ PanelWindow {
                                 : wsDot.modelData.urgent ? Theme.critical
                                 : wsArea.containsMouse ? Theme.textColor
                                 : Theme.withAlpha(Theme.subtext, wsDot.modelData.occupied ? 0.55 : 0.28)
-                            Behavior on implicitHeight { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
-                            Behavior on color { ColorAnimation { duration: 160 } }
+                            Behavior on implicitHeight { NumberAnimation { duration: Theme.ms(220); easing.type: Easing.OutCubic } }
+                            Behavior on color { ColorAnimation { duration: Theme.ms(160) } }
 
                             MouseArea {
                                 id: wsArea
@@ -624,12 +624,12 @@ PanelWindow {
                     color: ctlArea.containsMouse || vCtl.dragging ? Theme.tileHigh : Theme.withAlpha(Theme.tile, 0.6)
                     border.width: vCtl.editable ? 1 : 0
                     border.color: Theme.withAlpha(Theme.primary, 0.7)
-                    Behavior on color { ColorAnimation { duration: 130 } }
+                    Behavior on color { ColorAnimation { duration: Theme.ms(130) } }
                     property bool dragging: false
                     property real pressY: 0
                     z: dragging ? 5 : 0
                     scale: dragging ? 1.1 : 1
-                    Behavior on scale { NumberAnimation { duration: 120 } }
+                    Behavior on scale { NumberAnimation { duration: Theme.ms(120) } }
 
                     ColumnLayout {
                         id: ctlCol
@@ -800,9 +800,9 @@ PanelWindow {
         border.width: 1
         opacity: vbar.pop !== "" ? 1 : 0
         visible: opacity > 0
-        Behavior on opacity { NumberAnimation { duration: 150 } }
-        Behavior on x { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
-        Behavior on y { enabled: popBox.opacity > 0.5; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+        Behavior on opacity { NumberAnimation { duration: Theme.ms(150) } }
+        Behavior on x { NumberAnimation { duration: Theme.ms(180); easing.type: Easing.OutCubic } }
+        Behavior on y { enabled: popBox.opacity > 0.5; NumberAnimation { duration: Theme.ms(180); easing.type: Easing.OutCubic } }
 
         HoverHandler {
             onHoveredChanged: hovered ? popHide.stop() : vbar.leavePop()

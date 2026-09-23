@@ -405,7 +405,7 @@ PanelWindow {
                                     // capturam um quadro e param. Antes eram até três
                                     // áreas de trabalho recopiando todas as janelas a
                                     // cada quadro, o que travava a GPU integrada.
-                                    live: ov.open && card.centered
+                                    live: ov.open && card.centered && Theme.overviewLive
                                     paintCursor: false
                                 }
                                 IconImage {
@@ -476,7 +476,7 @@ PanelWindow {
                     color: "transparent"
                     border.width: card.centered ? 3 : 1
                     border.color: card.centered ? Theme.primary : Theme.withAlpha("white", 0.15)
-                    Behavior on border.width { NumberAnimation { duration: 150 } }
+                    Behavior on border.width { NumberAnimation { duration: Theme.ms(150) } }
                 }
 
                 // Número da área embaixo.
@@ -550,7 +550,7 @@ PanelWindow {
                              : here ? Theme.withAlpha(Theme.primary, 0.2) : "transparent"
                         border.width: here ? 1 : 0
                         border.color: Theme.withAlpha(Theme.primary, 0.6)
-                        Behavior on color { ColorAnimation { duration: 140 } }
+                        Behavior on color { ColorAnimation { duration: Theme.ms(140) } }
 
                         Row {
                             id: chipRow

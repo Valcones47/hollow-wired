@@ -22,6 +22,12 @@ Uso:
   rice-anim set <grupo> speed <1-20>
   rice-anim set <grupo> style <estilo>
   rice-anim apply                                 # regrava e aplica o que está salvo
+
+Níveis de desempenho (perfis do rice-perf-profile, em user-prefs.json):
+  anim_windows    = off | rapido | completo   (abrir/fechar/mover/fade de janelas)
+  anim_workspaces = off | rapido | completo   (troca de área de trabalho e especial)
+"completo" é o preset/curvas escolhidos; "rapido" usa a curva sem passar do
+ponto e no máximo metade do tempo; "off" desliga as folhas do grupo.
 """
 
 import copy
@@ -137,11 +143,37 @@ def effective(prefs):
     return preset, copy.deepcopy(PRESETS.get(preset, PRESETS["smooth"]))
 
 
+# Grupos de cada nível de desempenho.
+LEVEL_GROUPS = {
+    "anim_windows": ["open", "close", "move", "fade"],
+    "anim_workspaces": ["workspaces", "special"],
+}
+
+
+def with_levels(prefs, groups):
+    """Aplica os níveis de desempenho sobre as curvas efetivas.
+
+    Devolve (grupos, desligados). Não mexe no que está salvo em anim_custom:
+    voltar para "completo" recupera o preset exatamente.
+    """
+    groups = copy.deepcopy(groups)
+    off = set()
+    for key, names in LEVEL_GROUPS.items():
+        level = prefs.get(key) or "completo"
+        for name in names:
+            if level == "off":
+                off.add(name)
+            elif level == "rapido":
+                groups[name]["curve"] = list(SNAP)
+                groups[name]["speed"] = max(1.0, min(2.5, float(groups[name]["speed"]) * 0.5))
+    return groups, off
+
+
 def num(v):
     return ("%.3f" % float(v)).rstrip("0").rstrip(".") or "0"
 
 
-def render(groups):
+def render(groups, off=frozenset()):
     lines = [
         "-- Gerado por rice-anim (painel Rice > Efeitos > Animação). Não editar à mão:",
         "-- é regravado a cada mudança no painel.",
@@ -161,9 +193,10 @@ def render(groups):
         cfg = groups[name]
         style = cfg.get("style") or ""
         style_part = f', style = "{style}"' if style else ""
+        leaf_on = "false" if name in off else on
         for leaf in leaves:
             lines.append(
-                f'hl.animation({{ leaf = "{leaf}", enabled = {on}, speed = {num(cfg["speed"])}, '
+                f'hl.animation({{ leaf = "{leaf}", enabled = {leaf_on}, speed = {num(cfg["speed"])}, '
                 f'bezier = "rice_{name}"{style_part} }})'
             )
     return "\n".join(lines) + "\n"
@@ -171,7 +204,7 @@ def render(groups):
 
 def apply(prefs):
     preset, groups = effective(prefs)
-    text = render(groups)
+    text = render(*with_levels(prefs, groups))
     tmp = OUT + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         f.write(text)

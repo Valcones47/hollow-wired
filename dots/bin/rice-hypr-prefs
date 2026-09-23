@@ -94,6 +94,9 @@ apply_all() {
     touchpad_dwt=$(jq -r '.touchpad_dwt // false' "$PREFS_FILE")
     vrr=$(jq -r '.vrr // 0' "$PREFS_FILE")
     blur=$(jq -r 'if .blur == false then false else true end' "$PREFS_FILE")
+    # Sombras: desligadas por padrão (custam fillrate numa iGPU a 144 Hz); o
+    # perfil "pesado" do rice-perf-profile liga.
+    shadows=$(jq -r 'if .shadows == true then true else false end' "$PREFS_FILE")
     # Qualidade do desfoque: leve (integradas fracas), padrao, forte.
     blur_quality=$(jq -r '.blur_quality // "padrao"' "$PREFS_FILE")
     case "$blur_quality" in
@@ -135,6 +138,9 @@ hl.config({
         inactive_opacity = $inactive_opacity,
         dim_inactive = $dim_inactive,
         dim_strength = $dim_strength,
+        shadow = {
+            enabled = $shadows
+        },
         blur = {
             enabled = $blur,
             size = $blur_size,

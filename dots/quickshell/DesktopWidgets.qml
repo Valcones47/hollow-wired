@@ -266,8 +266,8 @@ PanelWindow {
             return Theme.withAlpha(wAccent, 0.35);
         }
 
-        Behavior on color { ColorAnimation { duration: 180 } }
-        Behavior on border.color { ColorAnimation { duration: 180 } }
+        Behavior on color { ColorAnimation { duration: Theme.ms(180) } }
+        Behavior on border.color { ColorAnimation { duration: Theme.ms(180) } }
 
         // Brilho de vidro no topo para o estilo Glass
         Rectangle {
@@ -823,7 +823,7 @@ PanelWindow {
                         property real amp: w.playing ? 1 : 0.25
                         property string loaded: ""
                         property bool artReady: false
-                        Behavior on amp { NumberAnimation { duration: 600; easing.type: Easing.InOutQuad } }
+                        Behavior on amp { NumberAnimation { duration: Theme.ms(600); easing.type: Easing.InOutQuad } }
                         onAmpChanged: requestPaint()
                         onPhaseChanged: requestPaint()
                         onImageLoaded: {
@@ -1503,7 +1503,7 @@ PanelWindow {
                             height: (parent.height - 8) * w.pct
                             radius: 5
                             color: w.levelColor
-                            Behavior on height { NumberAnimation { duration: 600; easing.type: Easing.OutCubic } }
+                            Behavior on height { NumberAnimation { duration: Theme.ms(600); easing.type: Easing.OutCubic } }
                             SequentialAnimation on opacity {
                                 running: w.charging
                                 loops: Animation.Infinite
@@ -1984,8 +1984,8 @@ PanelWindow {
         opacity: dwWindow.editMode ? 1 : 0
         visible: opacity > 0
 
-        Behavior on y { NumberAnimation { duration: 250; easing.type: Easing.OutBack } }
-        Behavior on opacity { NumberAnimation { duration: 200 } }
+        Behavior on y { NumberAnimation { duration: Theme.ms(250); easing.type: Easing.OutBack } }
+        Behavior on opacity { NumberAnimation { duration: Theme.ms(200) } }
 
         implicitWidth: Math.min(dwWindow.width - 40, editRow.implicitWidth + 32)
         implicitHeight: 50
@@ -2066,7 +2066,7 @@ PanelWindow {
                             color: addArea.containsMouse ? Theme.primary : Theme.tile
                             border.color: Theme.withAlpha(Theme.primary, 0.3); border.width: 1
 
-                            Behavior on color { ColorAnimation { duration: 150 } }
+                            Behavior on color { ColorAnimation { duration: Theme.ms(150) } }
 
                             Text {
                                 id: addBtnText
@@ -2161,7 +2161,7 @@ PanelWindow {
         border.width: 1
         visible: dwWindow.editMode && dwWindow.selectedWidgetData !== null
         opacity: visible ? 1 : 0
-        Behavior on opacity { NumberAnimation { duration: 180 } }
+        Behavior on opacity { NumberAnimation { duration: Theme.ms(180) } }
 
         ColumnLayout {
             id: inspCol

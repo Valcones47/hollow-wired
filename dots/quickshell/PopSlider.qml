@@ -104,7 +104,7 @@ RowLayout {
                 height: width
                 radius: width / 2
                 color: Theme.textColor
-                Behavior on width { NumberAnimation { duration: 100 } }
+                Behavior on width { NumberAnimation { duration: Theme.ms(100) } }
             }
             MouseArea {
                 id: area

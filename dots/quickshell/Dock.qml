@@ -193,8 +193,8 @@ PanelWindow {
             : row.implicitWidth + 24
         property real bodyH: dock.shown ? dock.dockH : 0
         property real bodyW: dockTargetW
-        Behavior on bodyH { NumberAnimation { duration: 280; easing.type: Easing.OutCubic } }
-        Behavior on bodyW { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+        Behavior on bodyH { NumberAnimation { duration: Theme.ms(280); easing.type: Easing.OutCubic } }
+        Behavior on bodyW { NumberAnimation { duration: Theme.ms(220); easing.type: Easing.OutCubic } }
 
         readonly property real popTargetW: dock.pop !== "" && dock.shown ? popContent.implicitWidth + 28 : 0
         readonly property real popTargetH: dock.pop !== "" && dock.shown ? popContent.implicitHeight + 24 : 0
@@ -210,9 +210,9 @@ PanelWindow {
             const hi = fits ? bodyL + dockTargetW - m - w : width - Theme.frameThickness - radius - w;
             return Math.max(lo, Math.min(hi, dock.popAnchorX - w / 2));
         }
-        Behavior on popW { NumberAnimation { duration: 240; easing.type: Easing.OutCubic } }
-        Behavior on popH { NumberAnimation { duration: 240; easing.type: Easing.OutCubic } }
-        Behavior on popX { enabled: root.popH > 4; NumberAnimation { duration: 240; easing.type: Easing.OutCubic } }
+        Behavior on popW { NumberAnimation { duration: Theme.ms(240); easing.type: Easing.OutCubic } }
+        Behavior on popH { NumberAnimation { duration: Theme.ms(240); easing.type: Easing.OutCubic } }
+        Behavior on popX { enabled: root.popH > 4; NumberAnimation { duration: Theme.ms(240); easing.type: Easing.OutCubic } }
 
         onBodyHChanged: shape.requestPaint()
         onBodyWChanged: shape.requestPaint()
@@ -331,7 +331,7 @@ PanelWindow {
                         anchors.margins: 2
                         radius: 14
                         color: launcherArea.containsMouse ? Theme.tileHigh : "transparent"
-                        Behavior on color { ColorAnimation { duration: 120 } }
+                        Behavior on color { ColorAnimation { duration: Theme.ms(120) } }
                     }
 
                     AnimatedImage {
@@ -420,7 +420,7 @@ PanelWindow {
                             x: app.dragging ? app.dragX : app.shift
                             Behavior on x {
                                 enabled: !app.dragging
-                                NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+                                NumberAnimation { duration: Theme.ms(180); easing.type: Easing.OutCubic }
                             }
                         }
 
@@ -440,7 +440,7 @@ PanelWindow {
                             radius: 14
                             color: appArea.containsMouse || (dock.pop === "app" && dock.popItem && dock.popItem.key === app.modelData.key)
                                 ? Theme.tileHigh : "transparent"
-                            Behavior on color { ColorAnimation { duration: 120 } }
+                            Behavior on color { ColorAnimation { duration: Theme.ms(120) } }
                         }
 
                         IconImage {
@@ -449,7 +449,7 @@ PanelWindow {
                             implicitSize: dock.iconSize
                             source: dock.iconFor(app.modelData)
                             scale: appArea.pressed ? 0.88 : appArea.containsMouse ? 1.08 : 1
-                            Behavior on scale { NumberAnimation { duration: 140; easing.type: Easing.OutBack } }
+                            Behavior on scale { NumberAnimation { duration: Theme.ms(140); easing.type: Easing.OutBack } }
                         }
 
                         // workspace do app (canto inferior esquerdo)
@@ -489,7 +489,7 @@ PanelWindow {
                                     height: 4
                                     radius: 2
                                     color: app.active ? Theme.primary : Theme.subtext
-                                    Behavior on width { NumberAnimation { duration: 180 } }
+                                    Behavior on width { NumberAnimation { duration: Theme.ms(180) } }
                                 }
                             }
                         }
@@ -570,7 +570,7 @@ PanelWindow {
                         anchors.margins: 2
                         radius: 14
                         color: gamesArea.containsMouse || dock.pop === "games" ? Theme.tileHigh : "transparent"
-                        Behavior on color { ColorAnimation { duration: 120 } }
+                        Behavior on color { ColorAnimation { duration: Theme.ms(120) } }
                     }
                     Text {
                         anchors.centerIn: parent
@@ -579,7 +579,7 @@ PanelWindow {
                         font.pixelSize: 30
                         color: Theme.primary
                         scale: gamesArea.containsMouse ? 1.08 : 1
-                        Behavior on scale { NumberAnimation { duration: 140; easing.type: Easing.OutBack } }
+                        Behavior on scale { NumberAnimation { duration: Theme.ms(140); easing.type: Easing.OutBack } }
                     }
                     MouseArea {
                         id: gamesArea
@@ -617,7 +617,7 @@ PanelWindow {
                 readonly property Item current: dock.pop === "app" ? appPop : dock.pop === "games" ? gamesPop : null
                 opacity: root.popTargetW > 0 && Math.abs(root.popW - root.popTargetW) < 30
                     && Math.abs(root.popH - root.popTargetH) < 30 ? 1 : 0
-                Behavior on opacity { NumberAnimation { duration: 130 } }
+                Behavior on opacity { NumberAnimation { duration: Theme.ms(130) } }
 
                 // ---------- app ----------
                 ColumnLayout {
@@ -774,7 +774,7 @@ PanelWindow {
                                 color: gameArea.containsMouse || dragging ? Theme.tileHigh : Theme.tile
                                 border.width: gamesPop.dragFrom >= 0 && gamesPop.dragTo === index && !dragging ? 2 : 0
                                 border.color: Theme.primary
-                                Behavior on color { ColorAnimation { duration: 120 } }
+                                Behavior on color { ColorAnimation { duration: Theme.ms(120) } }
                                 transform: Translate { x: game.dx; y: game.dy }
 
                                 // balança de leve no modo edição
@@ -797,7 +797,7 @@ PanelWindow {
                                         implicitSize: 40
                                         source: Quickshell.iconPath(game.modelData.icon, "applications-games")
                                         scale: gameArea.containsMouse && !dock.gamesEdit ? 1.08 : 1
-                                        Behavior on scale { NumberAnimation { duration: 140; easing.type: Easing.OutBack } }
+                                        Behavior on scale { NumberAnimation { duration: Theme.ms(140); easing.type: Easing.OutBack } }
                                     }
                                     Text {
                                         Layout.fillWidth: true

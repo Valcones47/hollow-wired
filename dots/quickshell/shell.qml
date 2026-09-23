@@ -308,9 +308,9 @@ ShellRoot {
             y: hub.sideMode || hub.open ? 0 : -height
             x: !hub.sideMode || hub.open ? 0 : (hub.sideLeft ? -width : width)
             opacity: hub.open ? 1 : 0
-            Behavior on y { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
-            Behavior on x { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
-            Behavior on opacity { NumberAnimation { duration: 200 } }
+            Behavior on y { NumberAnimation { duration: Theme.ms(260); easing.type: Easing.OutCubic } }
+            Behavior on x { NumberAnimation { duration: Theme.ms(260); easing.type: Easing.OutCubic } }
+            Behavior on opacity { NumberAnimation { duration: Theme.ms(200) } }
 
             // ---------- cantos invertidos (junção com a waybar) ----------
             Canvas {
@@ -445,7 +445,7 @@ ShellRoot {
                                         radius: Theme.tileRadius
                                         color: tabArea.containsMouse && !tabDelegate.active
                                             ? Theme.withAlpha(Theme.textColor, 0.06) : "transparent"
-                                        Behavior on color { ColorAnimation { duration: 120 } }
+                                        Behavior on color { ColorAnimation { duration: Theme.ms(120) } }
                                     }
 
                                     Column {
@@ -458,7 +458,7 @@ ShellRoot {
                                             font.family: Theme.iconFontFamily
                                             font.pixelSize: 20
                                             color: tabDelegate.active ? Theme.primary : Theme.subtext
-                                            Behavior on color { ColorAnimation { duration: 150 } }
+                                            Behavior on color { ColorAnimation { duration: Theme.ms(150) } }
                                         }
                                         Text {
                                             id: tabLabel
@@ -468,7 +468,7 @@ ShellRoot {
                                             font.pixelSize: 12
                                             font.weight: tabDelegate.active ? Font.DemiBold : Font.Normal
                                             color: tabDelegate.active ? Theme.primary : Theme.subtext
-                                            Behavior on color { ColorAnimation { duration: 150 } }
+                                            Behavior on color { ColorAnimation { duration: Theme.ms(150) } }
                                         }
                                     }
 
@@ -500,8 +500,8 @@ ShellRoot {
                             anchors.bottom: parent.bottom
                             x: tabWidth * card.currentTab + (tabWidth - width) / 2
                             color: Theme.primary
-                            Behavior on x { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
-                            Behavior on width { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+                            Behavior on x { NumberAnimation { duration: Theme.ms(220); easing.type: Easing.OutCubic } }
+                            Behavior on width { NumberAnimation { duration: Theme.ms(220); easing.type: Easing.OutCubic } }
                         }
                     }
 
@@ -513,43 +513,43 @@ ShellRoot {
                             anchors.fill: parent
                             opacity: card.currentTab === 0 ? 1 : 0
                             visible: opacity > 0
-                            Behavior on opacity { NumberAnimation { duration: 140 } }
+                            Behavior on opacity { NumberAnimation { duration: Theme.ms(140) } }
                         }
                         Media {
                             anchors.fill: parent
                             opacity: card.currentTab === 1 ? 1 : 0
                             visible: opacity > 0
-                            Behavior on opacity { NumberAnimation { duration: 140 } }
+                            Behavior on opacity { NumberAnimation { duration: Theme.ms(140) } }
                         }
                         Monitoring {
                             anchors.fill: parent
                             opacity: card.currentTab === 2 ? 1 : 0
                             visible: opacity > 0
-                            Behavior on opacity { NumberAnimation { duration: 140 } }
+                            Behavior on opacity { NumberAnimation { duration: Theme.ms(140) } }
                         }
                         Workspaces {
                             anchors.fill: parent
                             opacity: card.currentTab === 3 ? 1 : 0
                             visible: opacity > 0
-                            Behavior on opacity { NumberAnimation { duration: 140 } }
+                            Behavior on opacity { NumberAnimation { duration: Theme.ms(140) } }
                         }
                         Appearance {
                             anchors.fill: parent
                             opacity: card.currentTab === 4 ? 1 : 0
                             visible: opacity > 0
-                            Behavior on opacity { NumberAnimation { duration: 140 } }
+                            Behavior on opacity { NumberAnimation { duration: Theme.ms(140) } }
                         }
                         Notifications {
                             anchors.fill: parent
                             opacity: card.currentTab === 5 && hub.visible ? 1 : 0
                             visible: opacity > 0
-                            Behavior on opacity { NumberAnimation { duration: 140 } }
+                            Behavior on opacity { NumberAnimation { duration: Theme.ms(140) } }
                         }
                         Recording {
                             anchors.fill: parent
                             opacity: card.currentTab === 6 && hub.visible ? 1 : 0
                             visible: opacity > 0
-                            Behavior on opacity { NumberAnimation { duration: 140 } }
+                            Behavior on opacity { NumberAnimation { duration: Theme.ms(140) } }
                         }
                     }
                 }

@@ -291,6 +291,28 @@ QtObject {
         }
     }
 
+    // Desempenho (rice-perf-profile, em user-prefs.json): nível das animações
+    // dos painéis do shell e prévia ao vivo no Super + Tab. `ms(d)` escala as
+    // durações das transições (Behaviors): rápido = metade, off = instantâneo.
+    // Não usar em animação com loops infinitos (duração 0 em loop gira a CPU).
+    property string shellAnim: "completo"
+    property bool overviewLive: true
+    readonly property real animScale: shellAnim === "off" ? 0 : shellAnim === "rapido" ? 0.5 : 1
+    function ms(d) { return Math.round(d * root.animScale); }
+    property FileView perfPrefsFile: FileView {
+        path: Quickshell.env("HOME") + "/.config/hypr/user-prefs.json"
+        watchChanges: true
+        printErrors: false
+        onFileChanged: reload()
+        onLoaded: {
+            try {
+                const d = JSON.parse(text()) || {};
+                root.shellAnim = ["off", "rapido", "completo"].includes(d.shell_anim) ? d.shell_anim : "completo";
+                root.overviewLive = d.overview_live !== false;
+            } catch (e) {}
+        }
+    }
+
     property FileView accentOverrideFile: FileView {
         path: Quickshell.env("HOME") + "/.config/hypr/color-overrides.json"
         watchChanges: true

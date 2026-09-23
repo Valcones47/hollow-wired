@@ -88,7 +88,7 @@ PanelWindow {
     Rectangle {
         anchors.fill: parent
         color: Qt.rgba(0, 0, 0, sw.open ? 0.3 : 0)
-        Behavior on color { ColorAnimation { duration: 160 } }
+        Behavior on color { ColorAnimation { duration: Theme.ms(160) } }
         MouseArea { anchors.fill: parent; onClicked: sw.cancel() }
     }
 
@@ -136,8 +136,8 @@ PanelWindow {
         border.color: Theme.withAlpha(Theme.outline, 0.25)
         opacity: sw.open ? 1 : 0
         scale: sw.open ? 1 : 0.94
-        Behavior on opacity { NumberAnimation { duration: 140 } }
-        Behavior on scale { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+        Behavior on opacity { NumberAnimation { duration: Theme.ms(140) } }
+        Behavior on scale { NumberAnimation { duration: Theme.ms(180); easing.type: Easing.OutCubic } }
 
         MouseArea { anchors.fill: parent }
 
@@ -162,8 +162,8 @@ PanelWindow {
                     border.width: sel ? 2 : 0
                     border.color: Theme.primary
                     scale: sel ? 1.03 : 1
-                    Behavior on scale { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
-                    Behavior on color { ColorAnimation { duration: 120 } }
+                    Behavior on scale { NumberAnimation { duration: Theme.ms(140); easing.type: Easing.OutCubic } }
+                    Behavior on color { ColorAnimation { duration: Theme.ms(120) } }
 
                     readonly property var entry: modelData.wayland ? (DesktopEntries.byId(modelData.wayland.appId)
                         || DesktopEntries.heuristicLookup(modelData.wayland.appId)) : null

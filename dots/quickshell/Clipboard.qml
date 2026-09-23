@@ -397,7 +397,7 @@ PanelWindow {
         opacity: clipWindow.open ? 1 : 0
         visible: opacity > 0
 
-        Behavior on opacity { NumberAnimation { duration: 200 } }
+        Behavior on opacity { NumberAnimation { duration: Theme.ms(200) } }
 
         MouseArea {
             anchors.fill: parent
@@ -453,7 +453,7 @@ PanelWindow {
         clip: true
         opacity: clipWindow.open && clipWindow.hoverText !== "" ? 1 : 0
         visible: opacity > 0
-        Behavior on opacity { NumberAnimation { duration: 120 } }
+        Behavior on opacity { NumberAnimation { duration: Theme.ms(120) } }
         Text {
             id: peekBody
             anchors.left: parent.left
@@ -484,7 +484,7 @@ PanelWindow {
         border.width: 1
         opacity: clipWindow.open && clipWindow.hoverThumb !== "" && bigImg.status === Image.Ready ? 1 : 0
         visible: opacity > 0
-        Behavior on opacity { NumberAnimation { duration: 120 } }
+        Behavior on opacity { NumberAnimation { duration: Theme.ms(120) } }
 
         Image {
             id: bigImg
@@ -515,8 +515,8 @@ PanelWindow {
         opacity: clipWindow.open ? 1 : 0
         visible: opacity > 0
 
-        Behavior on scale { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
-        Behavior on opacity { NumberAnimation { duration: 200 } }
+        Behavior on scale { NumberAnimation { duration: Theme.ms(250); easing.type: Easing.OutCubic } }
+        Behavior on opacity { NumberAnimation { duration: Theme.ms(200) } }
 
         MouseArea {
             anchors.fill: parent
@@ -675,7 +675,7 @@ PanelWindow {
                         border.width: 1
                         border.color: clipWindow.tab === index ? Theme.withAlpha(Theme.primary, 0.55) : "transparent"
 
-                        Behavior on color { ColorAnimation { duration: 140 } }
+                        Behavior on color { ColorAnimation { duration: Theme.ms(140) } }
 
                         Row {
                             anchors.centerIn: parent
@@ -838,7 +838,7 @@ PanelWindow {
                         color: clipScroll.pressed
                             ? Theme.primary
                             : (clipScroll.hovered ? Theme.withAlpha(Theme.primary, 0.75) : Theme.withAlpha(Theme.outline, 0.55))
-                        Behavior on color { ColorAnimation { duration: 120 } }
+                        Behavior on color { ColorAnimation { duration: Theme.ms(120) } }
                     }
                     background: Rectangle {
                         implicitWidth: 6
@@ -887,7 +887,7 @@ PanelWindow {
                     border.color: clipWindow.selectedIndex === index ? Theme.primary : "transparent"
                     border.width: 1
 
-                    Behavior on color { ColorAnimation { duration: 100 } }
+                    Behavior on color { ColorAnimation { duration: Theme.ms(100) } }
 
                     RowLayout {
                         anchors.fill: parent
@@ -951,7 +951,7 @@ PanelWindow {
                                 font.pixelSize: 13
                                 color: rowRect.starred ? Theme.accent1 : Theme.subtext
 
-                                Behavior on color { ColorAnimation { duration: 120 } }
+                                Behavior on color { ColorAnimation { duration: Theme.ms(120) } }
                             }
 
                             MouseArea {

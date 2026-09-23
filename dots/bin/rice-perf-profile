@@ -1,0 +1,152 @@
+#!/usr/bin/env python3
+"""rice-perf-profile — perfis de desempenho: leve, médio, pesado e personalizado.
+
+Um perfil é só um jeito rápido de gravar, de uma vez, as preferências que pesam
+na GPU (em ~/.config/hypr/user-prefs.json):
+
+  blur, blur_quality   desfoque (desligado | leve | padrao | forte)
+  shadows              sombras das janelas
+  anim_windows         abrir/fechar/mover janelas   (off | rapido | completo)
+  anim_workspaces      troca de área de trabalho    (off | rapido | completo)
+  shell_anim           animações dos painéis do shell (off | rapido | completo)
+  overview_live        prévia ao vivo das janelas no Super + Tab
+
+O perfil atual não é guardado: é o que bate com os valores gravados, ou
+"custom". Assim, mexer no desfoque pelo Super + B ou pela central já aparece
+como "Personalizado" sem precisar avisar ninguém.
+
+Quem aplica: rice-hypr-prefs (desfoque, sombras), rice-anim (animações do
+Hyprland) e o próprio Quickshell (Theme lê shell_anim e overview_live).
+
+Uso:
+  rice-perf-profile get                 # JSON: perfil atual, valores e perfis
+  rice-perf-profile set <leve|medio|pesado>
+  rice-perf-profile item <chave> <valor>   # vira "Personalizado"
+      chaves: blur_level (off|leve|padrao|forte), shadows (true|false),
+              anim_windows, anim_workspaces, shell_anim (off|rapido|completo),
+              overview_live (true|false)
+"""
+
+import json
+import os
+import subprocess
+import sys
+
+HOME = os.path.expanduser("~")
+PREFS = os.path.join(HOME, ".config/hypr/user-prefs.json")
+
+LEVELS = ["off", "rapido", "completo"]
+
+PROFILES = {
+    # Integradas fracas / bateria: nada de desfoque, animações curtas.
+    "leve": {"blur": False, "blur_quality": "leve", "shadows": False,
+             "anim_windows": "rapido", "anim_workspaces": "rapido",
+             "shell_anim": "rapido", "overview_live": False},
+    # O visual padrão do rice.
+    "medio": {"blur": True, "blur_quality": "padrao", "shadows": False,
+              "anim_windows": "completo", "anim_workspaces": "completo",
+              "shell_anim": "completo", "overview_live": True},
+    # Tudo no máximo.
+    "pesado": {"blur": True, "blur_quality": "forte", "shadows": True,
+               "anim_windows": "completo", "anim_workspaces": "completo",
+               "shell_anim": "completo", "overview_live": True},
+}
+
+DEFAULTS = PROFILES["medio"]
+
+
+def load():
+    try:
+        with open(PREFS, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+def save(prefs):
+    tmp = PREFS + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(prefs, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+    os.replace(tmp, PREFS)
+
+
+def values(prefs):
+    return {k: prefs.get(k, DEFAULTS[k]) for k in DEFAULTS}
+
+
+def blur_level(v):
+    if v["blur"] is False:
+        return "off"
+    return v["blur_quality"] if v["blur_quality"] in ("leve", "padrao", "forte") else "padrao"
+
+
+def matched(v):
+    for name, prof in PROFILES.items():
+        if all(v[k] == prof[k] for k in prof if k != "blur_quality") and \
+                (not prof["blur"] or v["blur_quality"] == prof["blur_quality"]):
+            return name
+    return "custom"
+
+
+def run(cmd):
+    try:
+        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=20)
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+
+
+def apply(old, new):
+    run(["rice-hypr-prefs", "apply"])
+    run(["rice-anim", "apply"])
+    # As regras de camada (quais painéis têm desfoque) só saem do arquivo de
+    # configuração: trocar a qualidade precisa de reload (ver rice-hypr-prefs).
+    if old.get("blur_quality") != new.get("blur_quality") or old.get("blur") != new.get("blur"):
+        run(["hyprctl", "reload"])
+
+
+def dump(prefs):
+    v = values(prefs)
+    print(json.dumps({
+        "profile": matched(v),
+        "values": dict(v, blur_level=blur_level(v)),
+        "profiles": PROFILES,
+    }, ensure_ascii=False))
+
+
+def main(argv):
+    cmd = argv[0] if argv else "get"
+    prefs = load()
+    old = values(prefs)
+
+    if cmd == "get":
+        dump(prefs)
+        return 0
+
+    if cmd == "set" and len(argv) > 1 and argv[1] in PROFILES:
+        prefs.update(PROFILES[argv[1]])
+    elif cmd == "item" and len(argv) > 2:
+        key, val = argv[1], argv[2]
+        if key == "blur_level" and val in ("off", "leve", "padrao", "forte"):
+            prefs["blur"] = val != "off"
+            if val != "off":
+                prefs["blur_quality"] = val
+        elif key in ("shadows", "overview_live") and val in ("true", "false"):
+            prefs[key] = val == "true"
+        elif key in ("anim_windows", "anim_workspaces", "shell_anim") and val in LEVELS:
+            prefs[key] = val
+        else:
+            print(__doc__.strip(), file=sys.stderr)
+            return 1
+    else:
+        print(__doc__.strip(), file=sys.stderr)
+        return 1
+
+    save(prefs)
+    apply(old, values(prefs))
+    dump(prefs)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

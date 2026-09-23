@@ -74,7 +74,7 @@ PanelWindow {
     // uma faixa inalcançável atrás do launcher.
     property real edgeY: height - Theme.frameThickness
         - (launcher.dockShown ? Theme.dockHeight + Theme.gap : 0)
-    Behavior on edgeY { NumberAnimation { duration: 240; easing.type: Easing.OutCubic } }
+    Behavior on edgeY { NumberAnimation { duration: Theme.ms(240); easing.type: Easing.OutCubic } }
     onEdgeYChanged: shape.requestPaint()
 
     onOpenChanged: {
@@ -190,7 +190,7 @@ PanelWindow {
             + (launcher.results.length > 0 ? 12 : 44)
         readonly property real targetH: launcher.searchH + listH + 14
         property real panelH: launcher.open ? targetH : 0
-        Behavior on panelH { NumberAnimation { duration: 280; easing.type: Easing.OutCubic } }
+        Behavior on panelH { NumberAnimation { duration: Theme.ms(280); easing.type: Easing.OutCubic } }
         onPanelHChanged: shape.requestPaint()
         Connections {
             target: Theme
@@ -407,7 +407,7 @@ PanelWindow {
                                 implicitSize: 34
                                 source: launcher.appIconSource(rowItem.modelData.icon)
                                 scale: rowItem.ListView.isCurrentItem ? 1.08 : 1
-                                Behavior on scale { NumberAnimation { duration: 140; easing.type: Easing.OutBack } }
+                                Behavior on scale { NumberAnimation { duration: Theme.ms(140); easing.type: Easing.OutBack } }
                             }
                             ColumnLayout {
                                 Layout.fillWidth: true
@@ -525,8 +525,8 @@ PanelWindow {
                 opacity: e ? 1 : 0
                 scale: e ? 1 : 0.94
                 transformOrigin: Item.Right
-                Behavior on opacity { NumberAnimation { duration: 130 } }
-                Behavior on scale { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+                Behavior on opacity { NumberAnimation { duration: Theme.ms(130) } }
+                Behavior on scale { NumberAnimation { duration: Theme.ms(160); easing.type: Easing.OutCubic } }
 
                 width: 250
                 height: menuCol.implicitHeight + 16

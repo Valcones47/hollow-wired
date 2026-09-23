@@ -210,7 +210,7 @@ Item {
                 radius: 4
                 height: Math.max(width, parent.height * Math.min(1, res.value))
                 color: res.value >= 0.9 ? Theme.critical : Theme.primary
-                Behavior on height { NumberAnimation { duration: 600; easing.type: Easing.OutCubic } }
+                Behavior on height { NumberAnimation { duration: Theme.ms(600); easing.type: Easing.OutCubic } }
             }
         }
         Text {
@@ -726,7 +726,7 @@ Item {
                             color: modelData.big
                                 ? (ctlArea.containsMouse ? Theme.mix(Theme.primary, Theme.foreground, 0.15) : Theme.primary)
                                 : (ctlArea.containsMouse ? Theme.tileHigh : "transparent")
-                            Behavior on color { ColorAnimation { duration: 120 } }
+                            Behavior on color { ColorAnimation { duration: Theme.ms(120) } }
 
                             Icon {
                                 anchors.centerIn: parent

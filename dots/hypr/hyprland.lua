@@ -396,7 +396,9 @@ hl.config({
         inactive_opacity = 1.0,
 
         shadow = {
-            enabled      = false, -- Desativado: economiza fillrate e latência pesada na Intel UHD a 144Hz
+            -- Desligado por padrão: economiza fillrate e latência pesada na Intel
+            -- UHD a 144Hz. O perfil "pesado" (rice-perf-profile) grava shadows=true.
+            enabled      = prefBool("shadows", false),
             range        = 4,
             render_power = 3,
             color        = wallust.wallust_shadow_color,

@@ -345,8 +345,8 @@ PanelWindow {
             color: btn.armed ? Theme.critical
                 : (area.containsMouse || sidebar.pop === btn.kind) ? Theme.tileHigh : "transparent"
             scale: area.pressed ? 0.9 : 1
-            Behavior on color { ColorAnimation { duration: 140 } }
-            Behavior on scale { NumberAnimation { duration: 90 } }
+            Behavior on color { ColorAnimation { duration: Theme.ms(140) } }
+            Behavior on scale { NumberAnimation { duration: Theme.ms(90) } }
 
             Text {
                 anchors.centerIn: parent
@@ -428,7 +428,7 @@ PanelWindow {
         // ---------- geometria animada ----------
         readonly property real radius: Theme.frameRadius
         property real bodyW: sidebar.effectiveOpen ? Theme.sidebarWidth : 0
-        Behavior on bodyW { NumberAnimation { duration: 280; easing.type: Easing.OutCubic } }
+        Behavior on bodyW { NumberAnimation { duration: Theme.ms(280); easing.type: Easing.OutCubic } }
         readonly property real bodyH: column.implicitHeight + Theme.gap * 4
         readonly property real bodyTop: Math.round((height - bodyH) / 2)
         readonly property real bodyBottom: bodyTop + bodyH
@@ -439,13 +439,13 @@ PanelWindow {
         property real popW: popTargetW
         property real popH: popTargetH
         property real popTop: Math.max(radius, Math.min(height - popTargetH - radius, sidebar.popAnchorY - popTargetH / 2))
-        Behavior on popW { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
-        Behavior on popH { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+        Behavior on popW { NumberAnimation { duration: Theme.ms(260); easing.type: Easing.OutCubic } }
+        Behavior on popH { NumberAnimation { duration: Theme.ms(260); easing.type: Easing.OutCubic } }
         // Só desliza entre ícones com o popup já aberto; abrindo do zero
         // ele nasce direto na altura certa.
         Behavior on popTop {
             enabled: root.popW > 4
-            NumberAnimation { duration: 260; easing.type: Easing.OutCubic }
+            NumberAnimation { duration: Theme.ms(260); easing.type: Easing.OutCubic }
         }
 
         onBodyWChanged: shape.requestPaint()
@@ -698,7 +698,7 @@ PanelWindow {
                             radius: height / 2
                             color: (trayArea.containsMouse || (sidebar.pop === "tray" && sidebar.popTray === trayBtn.modelData))
                                 ? Theme.tileHigh : "transparent"
-                            Behavior on color { ColorAnimation { duration: 140 } }
+                            Behavior on color { ColorAnimation { duration: Theme.ms(140) } }
                         }
                         IconImage {
                             anchors.centerIn: parent
@@ -837,7 +837,7 @@ PanelWindow {
                 // tamanho e volta quando assenta — a troca de conteúdo vira
                 // um fade em vez de corte seco.
                 opacity: root.popTargetW > 0 && Math.abs(root.popW - root.popTargetW) < 24 ? 1 : 0
-                Behavior on opacity { NumberAnimation { duration: 140 } }
+                Behavior on opacity { NumberAnimation { duration: Theme.ms(140) } }
 
                 ColumnLayout {
                     id: suspendPop

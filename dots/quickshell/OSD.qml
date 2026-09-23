@@ -262,16 +262,16 @@ PanelWindow {
         opacity: osdWindow.open ? 1 : 0
         scale: osdWindow.open ? 1 : 0.88
 
-        Behavior on y { NumberAnimation { duration: 250; easing.type: Easing.OutBack } }
-        Behavior on opacity { NumberAnimation { duration: 200 } }
-        Behavior on scale { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
+        Behavior on y { NumberAnimation { duration: Theme.ms(250); easing.type: Easing.OutBack } }
+        Behavior on opacity { NumberAnimation { duration: Theme.ms(200) } }
+        Behavior on scale { NumberAnimation { duration: Theme.ms(250); easing.type: Easing.OutCubic } }
 
         readonly property bool media: osdWindow.osdType === "media"
         width: media ? 380 : 280
         height: media ? 62 : 46
         radius: height / 2
-        Behavior on width { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
-        Behavior on height { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+        Behavior on width { NumberAnimation { duration: Theme.ms(220); easing.type: Easing.OutCubic } }
+        Behavior on height { NumberAnimation { duration: Theme.ms(220); easing.type: Easing.OutCubic } }
         color: Theme.surface
         border.color: Theme.withAlpha(Theme.primary, 0.45)
         border.width: 1
@@ -414,7 +414,7 @@ PanelWindow {
                         color: osdWindow.isMuted ? Theme.subtext : Theme.primary
 
                         Behavior on width {
-                            NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
+                            NumberAnimation { duration: Theme.ms(120); easing.type: Easing.OutCubic }
                         }
                     }
                 }

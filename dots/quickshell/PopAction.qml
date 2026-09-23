@@ -21,7 +21,7 @@ Rectangle {
     color: armed ? Theme.withAlpha(Theme.critical, 0.5)
         : actArea.containsMouse ? Theme.tileHigh
         : selected ? Theme.withAlpha(Theme.primary, 0.22) : Theme.tile
-    Behavior on color { ColorAnimation { duration: 120 } }
+    Behavior on color { ColorAnimation { duration: Theme.ms(120) } }
 
     Timer { id: actDisarm; interval: 3000; onTriggered: act.armed = false }
 
