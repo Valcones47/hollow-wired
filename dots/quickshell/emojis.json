@@ -1,0 +1,737 @@
+[
+  {
+    "char": "😀",
+    "name": "grinning",
+    "desc": "sorriso feliz alegre smile"
+  },
+  {
+    "char": "😃",
+    "name": "smiley",
+    "desc": "sorridente feliz alegre"
+  },
+  {
+    "char": "😄",
+    "name": "smile",
+    "desc": "sorriso aberto olhos felizes"
+  },
+  {
+    "char": "😁",
+    "name": "grin",
+    "desc": "sorriso dentes contente"
+  },
+  {
+    "char": "😆",
+    "name": "laughing",
+    "desc": "gargalhada risada rindo"
+  },
+  {
+    "char": "😅",
+    "name": "sweat_smile",
+    "desc": "sorriso suor alívio ufa"
+  },
+  {
+    "char": "🤣",
+    "name": "rofl",
+    "desc": "rolando de rir gargalhando"
+  },
+  {
+    "char": "😂",
+    "name": "joy",
+    "desc": "chorando de rir lagrimas risos"
+  },
+  {
+    "char": "🙂",
+    "name": "slightly_smiling",
+    "desc": "sorriso leve simpatico"
+  },
+  {
+    "char": "😉",
+    "name": "wink",
+    "desc": "piscadela piscando wink"
+  },
+  {
+    "char": "😊",
+    "name": "blush",
+    "desc": "envergonhado fofo meigo timido"
+  },
+  {
+    "char": "😇",
+    "name": "innocent",
+    "desc": "anjo aureola santo inocente"
+  },
+  {
+    "char": "🥰",
+    "name": "smiling_face_with_hearts",
+    "desc": "apaixonado coracoes carinho amor"
+  },
+  {
+    "char": "😍",
+    "name": "heart_eyes",
+    "desc": "olhos coracao apaixonado amor adorei"
+  },
+  {
+    "char": "🤩",
+    "name": "star_struck",
+    "desc": "fascinado estrelas incrivel"
+  },
+  {
+    "char": "😘",
+    "name": "kissing_heart",
+    "desc": "beijo coracao carinho bjo"
+  },
+  {
+    "char": "😋",
+    "name": "yum",
+    "desc": "delicia gostoso saboroso fome"
+  },
+  {
+    "char": "😛",
+    "name": "stuck_out_tongue",
+    "desc": "lingua brincadeira zoacao"
+  },
+  {
+    "char": "😜",
+    "name": "stuck_out_tongue_winking_eye",
+    "desc": "lingua piscando zoeira"
+  },
+  {
+    "char": "🤪",
+    "name": "zany_face",
+    "desc": "louco biruta maluco doido"
+  },
+  {
+    "char": "🤨",
+    "name": "raised_eyebrow",
+    "desc": "sobrancelha suspeita desconfiado"
+  },
+  {
+    "char": "🧐",
+    "name": "monocle",
+    "desc": "monoculo examinando curioso pensativo"
+  },
+  {
+    "char": "🤓",
+    "name": "nerd",
+    "desc": "nerd oculos inteligente geek"
+  },
+  {
+    "char": "😎",
+    "name": "sunglasses",
+    "desc": "oculos de sol legal estilo top cool"
+  },
+  {
+    "char": "🥳",
+    "name": "partying_face",
+    "desc": "festa aniversario celebracao confete"
+  },
+  {
+    "char": "😏",
+    "name": "smirk",
+    "desc": "sorriso maroto safado ironico"
+  },
+  {
+    "char": "😒",
+    "name": "unamused",
+    "desc": "insatisfeito desapontado sem graca"
+  },
+  {
+    "char": "😞",
+    "name": "disappointed",
+    "desc": "desapontado triste chateado"
+  },
+  {
+    "char": "😔",
+    "name": "pensive",
+    "desc": "pensativo triste reflexivo"
+  },
+  {
+    "char": "😟",
+    "name": "worried",
+    "desc": "preocupado apreensivo"
+  },
+  {
+    "char": "😕",
+    "name": "confused",
+    "desc": "confuso em duvida desorientado"
+  },
+  {
+    "char": "🙁",
+    "name": "slightly_frowning",
+    "desc": "triste leve emburrado"
+  },
+  {
+    "char": "😣",
+    "name": "persevere",
+    "desc": "esforco aguentando tenso"
+  },
+  {
+    "char": "😖",
+    "name": "confounded",
+    "desc": "frustrado irritado chateado"
+  },
+  {
+    "char": "😫",
+    "name": "tired_face",
+    "desc": "cansado exausto farto"
+  },
+  {
+    "char": "🥺",
+    "name": "pleading_face",
+    "desc": "implorando por favor pidonho fofo"
+  },
+  {
+    "char": "😢",
+    "name": "cry",
+    "desc": "chorando lagrima triste choro"
+  },
+  {
+    "char": "😭",
+    "name": "sob",
+    "desc": "pranto chorando muito desesperado"
+  },
+  {
+    "char": "😤",
+    "name": "triumph",
+    "desc": "bufando irritado determinado furioso"
+  },
+  {
+    "char": "😠",
+    "name": "angry",
+    "desc": "bravo irritado zangado raiva"
+  },
+  {
+    "char": "😡",
+    "name": "rage",
+    "desc": "furioso vermelho odio revolta"
+  },
+  {
+    "char": "🤬",
+    "name": "cursing",
+    "desc": "xingamento palavrao boca censurada"
+  },
+  {
+    "char": "🤯",
+    "name": "exploding_head",
+    "desc": "mente explodindo chocado uau choque"
+  },
+  {
+    "char": "😳",
+    "name": "flushed",
+    "desc": "chocado corado vergonha surpreso"
+  },
+  {
+    "char": "🥵",
+    "name": "hot_face",
+    "desc": "calor quente suando ardendo"
+  },
+  {
+    "char": "🥶",
+    "name": "cold_face",
+    "desc": "frio congelando gelado azul"
+  },
+  {
+    "char": "😱",
+    "name": "scream",
+    "desc": "grito pavor susto medo panico"
+  },
+  {
+    "char": "😨",
+    "name": "fearful",
+    "desc": "assustado apreensivo medo"
+  },
+  {
+    "char": "😴",
+    "name": "sleeping",
+    "desc": "dormindo sono sono ronco zzz"
+  },
+  {
+    "char": "🥱",
+    "name": "yawning",
+    "desc": "bocejo sono cansado tedio"
+  },
+  {
+    "char": "🤐",
+    "name": "zipper_mouth",
+    "desc": "ziper calado segredo silencio"
+  },
+  {
+    "char": "🤫",
+    "name": "shushing",
+    "desc": "psiu silencio shh segredo"
+  },
+  {
+    "char": "🤔",
+    "name": "thinking",
+    "desc": "pensando duvida refletindo hmm"
+  },
+  {
+    "char": "🫡",
+    "name": "saluting_face",
+    "desc": "continencia respeito sim senhor entendido"
+  },
+  {
+    "char": "🫠",
+    "name": "melting_face",
+    "desc": "derretendo calor vergonha sumindo"
+  },
+  {
+    "char": "👍",
+    "name": "thumbsup",
+    "desc": "positivo legal joinha sim ok aprovado"
+  },
+  {
+    "char": "👎",
+    "name": "thumbsdown",
+    "desc": "negativo ruim nao desaprovado"
+  },
+  {
+    "char": "👏",
+    "name": "clap",
+    "desc": "palmas aplausos parabens bravo"
+  },
+  {
+    "char": "🙌",
+    "name": "raised_hands",
+    "desc": "maos para o alto comemoracao viva glória"
+  },
+  {
+    "char": "👐",
+    "name": "open_hands",
+    "desc": "maos abertas abraco"
+  },
+  {
+    "char": "🤝",
+    "name": "handshake",
+    "desc": "aperto de mao acordo parceria combinado"
+  },
+  {
+    "char": "🙏",
+    "name": "pray",
+    "desc": "oracao por favor gratidao obrigado rezando"
+  },
+  {
+    "char": "✌️",
+    "name": "v",
+    "desc": "paz e amor vitoria dois dedos peace"
+  },
+  {
+    "char": "🤞",
+    "name": "fingers_crossed",
+    "desc": "dedos cruzados sorte torcida esperanca"
+  },
+  {
+    "char": "🫰",
+    "name": "hand_with_index_and_thumb_crossed",
+    "desc": "coracao coreano dinheiro amor"
+  },
+  {
+    "char": "🤟",
+    "name": "love_you_gesture",
+    "desc": "te amo gesto rock amor"
+  },
+  {
+    "char": "🤘",
+    "name": "sign_of_the_horns",
+    "desc": "rock metal chifre show"
+  },
+  {
+    "char": "👌",
+    "name": "ok_hand",
+    "desc": "perfeito beleza certinho ok"
+  },
+  {
+    "char": "🤌",
+    "name": "pinched_fingers",
+    "desc": "italiano que isso gesto dedos juntos"
+  },
+  {
+    "char": "👈",
+    "name": "point_left",
+    "desc": "apontando esquerda veja la"
+  },
+  {
+    "char": "👉",
+    "name": "point_right",
+    "desc": "apontando direita veja ca"
+  },
+  {
+    "char": "👆",
+    "name": "point_up_2",
+    "desc": "apontando cima olhe acima"
+  },
+  {
+    "char": "👇",
+    "name": "point_down",
+    "desc": "apontando baixo olhe abaixo link"
+  },
+  {
+    "char": "☝️",
+    "name": "point_up",
+    "desc": "um momento atencao apontando"
+  },
+  {
+    "char": "✋",
+    "name": "raised_hand",
+    "desc": "pare mao levantada alto chega"
+  },
+  {
+    "char": "👋",
+    "name": "wave",
+    "desc": "aceno tchau ola oi adeus"
+  },
+  {
+    "char": "🤙",
+    "name": "call_me_hand",
+    "desc": "shaka hang loose liga nois tranquilo"
+  },
+  {
+    "char": "💪",
+    "name": "muscle",
+    "desc": "musculo forca forte treino foco academia"
+  },
+  {
+    "char": "🦾",
+    "name": "mechanical_arm",
+    "desc": "braco robotico bionico ciborgue tecnologia"
+  },
+  {
+    "char": "🖕",
+    "name": "middle_finger",
+    "desc": "dedo do meio revolta xingamento"
+  },
+  {
+    "char": "❤️",
+    "name": "heart",
+    "desc": "coracao vermelho amor paixao carinho love"
+  },
+  {
+    "char": "🧡",
+    "name": "orange_heart",
+    "desc": "coracao laranja calor amizade"
+  },
+  {
+    "char": "💛",
+    "name": "yellow_heart",
+    "desc": "coracao amarelo alegria sol"
+  },
+  {
+    "char": "💚",
+    "name": "green_heart",
+    "desc": "coracao verde esperanca natureza"
+  },
+  {
+    "char": "💙",
+    "name": "blue_heart",
+    "desc": "coracao azul lealdade confianca paz"
+  },
+  {
+    "char": "💜",
+    "name": "purple_heart",
+    "desc": "coracao roxo misterio elegancia"
+  },
+  {
+    "char": "🖤",
+    "name": "black_heart",
+    "desc": "coracao preto dark luto gothic"
+  },
+  {
+    "char": "🤍",
+    "name": "white_heart",
+    "desc": "coracao branco pureza paz"
+  },
+  {
+    "char": "🤎",
+    "name": "brown_heart",
+    "desc": "coracao marrom chocolate"
+  },
+  {
+    "char": "💔",
+    "name": "broken_heart",
+    "desc": "coracao partido desilusao tristeza dor"
+  },
+  {
+    "char": "❤️‍🔥",
+    "name": "heart_on_fire",
+    "desc": "coracao em chamas paixao ardente fogo"
+  },
+  {
+    "char": "✨",
+    "name": "sparkles",
+    "desc": "brilho estrelas magica novidade destaque"
+  },
+  {
+    "char": "⭐",
+    "name": "star",
+    "desc": "estrela favorito destaque iluminado"
+  },
+  {
+    "char": "🌟",
+    "name": "glowing_star",
+    "desc": "estrela brilhante especial uau"
+  },
+  {
+    "char": "💥",
+    "name": "boom",
+    "desc": "explosao impacto colisao uau"
+  },
+  {
+    "char": "🔥",
+    "name": "fire",
+    "desc": "fogo chama quente brabo trend top hype"
+  },
+  {
+    "char": "💻",
+    "name": "computer",
+    "desc": "computador notebook pc laptop dev codigo"
+  },
+  {
+    "char": "🖥️",
+    "name": "desktop",
+    "desc": "monitor tela computador pc setup"
+  },
+  {
+    "char": "⌨️",
+    "name": "keyboard",
+    "desc": "teclado digitar atalho mecanico"
+  },
+  {
+    "char": "🖱️",
+    "name": "mouse",
+    "desc": "mouse clique ponteiro periferico"
+  },
+  {
+    "char": "📱",
+    "name": "mobile",
+    "desc": "celular smartphone iphone android ligacao"
+  },
+  {
+    "char": "💡",
+    "name": "bulb",
+    "desc": "lampada ideia luz criatividade pensamento"
+  },
+  {
+    "char": "🚀",
+    "name": "rocket",
+    "desc": "foguete lancamento decolar rapido voar subida"
+  },
+  {
+    "char": "⚡",
+    "name": "zap",
+    "desc": "raio eletricidade energia veloz flash trovão"
+  },
+  {
+    "char": "⚙️",
+    "name": "gear",
+    "desc": "engrenagem configuracao ajustes sistema tools"
+  },
+  {
+    "char": "🔧",
+    "name": "wrench",
+    "desc": "ferramenta chave conserto manutencao reparo"
+  },
+  {
+    "char": "🔒",
+    "name": "lock",
+    "desc": "cadeado bloqueado seguro privacidade senha"
+  },
+  {
+    "char": "🔓",
+    "name": "unlock",
+    "desc": "desbloqueado aberto livre acesso"
+  },
+  {
+    "char": "🔑",
+    "name": "key",
+    "desc": "chave segredo acesso senha token api"
+  },
+  {
+    "char": "🎯",
+    "name": "target",
+    "desc": "alvo foco objetivo acertou meta precisao"
+  },
+  {
+    "char": "🎉",
+    "name": "tada",
+    "desc": "festa parabens comemoracao celebracao confetes"
+  },
+  {
+    "char": "☕",
+    "name": "coffee",
+    "desc": "cafe caneca bebida cafezinho energia manha"
+  },
+  {
+    "char": "🍺",
+    "name": "beer",
+    "desc": "cerveja brinde chopp festa bar rolê"
+  },
+  {
+    "char": "🍕",
+    "name": "pizza",
+    "desc": "pizza comida lanche queijo"
+  },
+  {
+    "char": "🍔",
+    "name": "burger",
+    "desc": "hamburguer lanche fast food comida"
+  },
+  {
+    "char": "🎮",
+    "name": "gamepad",
+    "desc": "controle videogame jogos gamer playstation xbox"
+  },
+  {
+    "char": "🎧",
+    "name": "headphones",
+    "desc": "fone de ouvido musica som audio podcast"
+  },
+  {
+    "char": "📷",
+    "name": "camera",
+    "desc": "camera foto fotografia lente clique print"
+  },
+  {
+    "char": "📸",
+    "name": "camera_flash",
+    "desc": "foto com flash captura registro"
+  },
+  {
+    "char": "🎵",
+    "name": "musical_note",
+    "desc": "musica nota melodia cancao ritmo"
+  },
+  {
+    "char": "🎶",
+    "name": "notes",
+    "desc": "notas musicais som cantando melodia"
+  },
+  {
+    "char": "🔔",
+    "name": "bell",
+    "desc": "sino notificacao aviso alerta lembrete"
+  },
+  {
+    "char": "📦",
+    "name": "package",
+    "desc": "pacote encomenda caixa entrega software"
+  },
+  {
+    "char": "🔍",
+    "name": "search",
+    "desc": "lupa busca pesquisar procurar encontrar"
+  },
+  {
+    "char": "📌",
+    "name": "pin",
+    "desc": "alfinete fixar marcador lembrete nota"
+  },
+  {
+    "char": "📍",
+    "name": "round_pushpin",
+    "desc": "marcador localizacao ponto mapa aqui"
+  },
+  {
+    "char": "📅",
+    "name": "date",
+    "desc": "calendario data compromisso dia agenda"
+  },
+  {
+    "char": "🗑️",
+    "name": "trash",
+    "desc": "lixeira excluir lixo apagar remover"
+  },
+  {
+    "char": "📝",
+    "name": "memo",
+    "desc": "anotacao bloco de notas texto escrever recado"
+  },
+  {
+    "char": "📁",
+    "name": "folder",
+    "desc": "pasta diretorio arquivos documentos"
+  },
+  {
+    "char": "📂",
+    "name": "open_folder",
+    "desc": "pasta aberta arquivos browsing"
+  },
+  {
+    "char": "📄",
+    "name": "document",
+    "desc": "pagina documento texto arquivo folha"
+  },
+  {
+    "char": "📊",
+    "name": "chart",
+    "desc": "grafico estatistica barras dados relatorio"
+  },
+  {
+    "char": "📈",
+    "name": "chart_increasing",
+    "desc": "grafico subindo alta crescimento sucesso"
+  },
+  {
+    "char": "📉",
+    "name": "chart_decreasing",
+    "desc": "grafico descendo queda baixa prejuizo"
+  },
+  {
+    "char": "✅",
+    "name": "white_check_mark",
+    "desc": "confirmado concluido check feito certo ok"
+  },
+  {
+    "char": "❌",
+    "name": "x",
+    "desc": "erro cancelado nao x errado recusa"
+  },
+  {
+    "char": "⚠️",
+    "name": "warning",
+    "desc": "aviso alerta atencao cuidado perigo"
+  },
+  {
+    "char": "⛔",
+    "name": "no_entry",
+    "desc": "proibido pare entrada proibida bloqueio"
+  },
+  {
+    "char": "🚫",
+    "name": "prohibited",
+    "desc": "proibido cancelado nao permitido"
+  },
+  {
+    "char": "❓",
+    "name": "question",
+    "desc": "interrogacao duvida pergunta como que"
+  },
+  {
+    "char": "❗",
+    "name": "exclamation",
+    "desc": "exclamacao atencao aviso importante uau"
+  },
+  {
+    "char": "💯",
+    "name": "100",
+    "desc": "cem perfeito nota dez total aprovado top"
+  },
+  {
+    "char": "🌐",
+    "name": "globe",
+    "desc": "globo internet web rede mundo terra online"
+  },
+  {
+    "char": "🤖",
+    "name": "robot",
+    "desc": "robo bot inteligencia artificial automacao ia"
+  },
+  {
+    "char": "💀",
+    "name": "skull",
+    "desc": "caveira morte morto perigo rindo de morrer"
+  },
+  {
+    "char": "👀",
+    "name": "eyes",
+    "desc": "olhos olhando observando atento veja atento visual"
+  }
+]

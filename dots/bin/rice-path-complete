@@ -1,0 +1,51 @@
+#!/usr/bin/env python3
+"""
+rice-path-complete — Completa caminhos de arquivos e pastas para o Quickshell Launcher.
+Uso: rice-path-complete "~/Downloads" ou rice-path-complete "/etc/"
+Retorna JSON: [{"name": "Downloads/", "path": "/home/user/Downloads", "isDir": true}, ...]
+"""
+
+import os
+import sys
+import json
+
+def complete_path(q):
+    q = os.path.expanduser(q.strip())
+    if not q:
+        q = os.path.expanduser('~')
+
+    if os.path.isdir(q) and q.endswith('/'):
+        folder = q
+        prefix = ''
+    else:
+        folder = os.path.dirname(q) or '.'
+        prefix = os.path.basename(q).lower()
+
+    results = []
+    if os.path.isdir(folder):
+        try:
+            for entry in sorted(os.listdir(folder)):
+                if entry.startswith('.') and not prefix.startswith('.'):
+                    continue
+                if prefix and not entry.lower().startswith(prefix):
+                    continue
+                full_path = os.path.join(folder, entry)
+                is_dir = os.path.isdir(full_path)
+                results.append({
+                    'name': entry + ('/' if is_dir else ''),
+                    'path': full_path,
+                    'isDir': is_dir
+                })
+                if len(results) >= 20:
+                    break
+        except (PermissionError, OSError):
+            pass
+    return results
+
+def main():
+    q = sys.argv[1] if len(sys.argv) > 1 else ""
+    res = complete_path(q)
+    print(json.dumps(res, ensure_ascii=False))
+
+if __name__ == '__main__':
+    main()

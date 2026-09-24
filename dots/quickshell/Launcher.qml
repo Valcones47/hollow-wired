@@ -82,6 +82,8 @@ PanelWindow {
             closeTimer.stop();
             input.text = "";
             query = "";
+            calcResult = "";
+            pathResults = [];
             menuEntry = null;
             visible = true;
             list.currentIndex = 0;
@@ -95,8 +97,117 @@ PanelWindow {
     Timer { id: closeTimer; interval: 260; onTriggered: launcher.visible = false }
     Timer { id: focusTimer; interval: 20; onTriggered: input.forceActiveFocus() }
 
-    // ================= busca =================
+    // ================= busca e modos por prefixo =================
     property string query: ""
+
+    // Modos por prefixo: '=' conta · ':' emoji · '>' comando · '/' ou '~' caminhos
+    readonly property string searchMode: {
+        const t = query.trim();
+        if (t.startsWith("=")) return "calc";
+        if (t.startsWith(":")) return "emoji";
+        if (t.startsWith(">")) return "cmd";
+        if (t.startsWith("/") || t.startsWith("~")) return "path";
+        return "app";
+    }
+
+    // Catálogo de emojis
+    property var emojisList: []
+    FileView {
+        id: emojiFileView
+        path: Quickshell.env("HOME") + "/.config/quickshell/emojis.json"
+        onLoaded: {
+            try {
+                launcher.emojisList = JSON.parse(text()) || [];
+            } catch (e) {}
+        }
+    }
+
+    // Processo de cálculo com AST seguro (com fila pending para evitar perda de requests)
+    property string calcResult: ""
+    property string pendingCalcExpr: ""
+
+    Process {
+        id: calcProc
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (text.trim() !== "") {
+                    launcher.calcResult = text.trim();
+                }
+            }
+        }
+        onExited: exitCode => {
+            if (exitCode !== 0) launcher.calcResult = "";
+            if (launcher.pendingCalcExpr !== "") {
+                const next = launcher.pendingCalcExpr;
+                launcher.pendingCalcExpr = "";
+                calcProc.command = [Quickshell.env("HOME") + "/.local/bin/rice-calc", next];
+                calcProc.running = true;
+            }
+        }
+    }
+
+    function runCalc(expr) {
+        if (!expr) {
+            launcher.calcResult = "";
+            launcher.pendingCalcExpr = "";
+            return;
+        }
+        if (calcProc.running) {
+            launcher.pendingCalcExpr = expr;
+        } else {
+            calcProc.command = [Quickshell.env("HOME") + "/.local/bin/rice-calc", expr];
+            calcProc.running = true;
+        }
+    }
+
+    // Processo de autocompletar caminhos (com fila pending)
+    property var pathResults: []
+    property string pendingPath: ""
+
+    Process {
+        id: pathProc
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    launcher.pathResults = JSON.parse(text) || [];
+                } catch(e) {
+                    launcher.pathResults = [];
+                }
+            }
+        }
+        onExited: () => {
+            if (launcher.pendingPath !== "") {
+                const next = launcher.pendingPath;
+                launcher.pendingPath = "";
+                pathProc.command = [Quickshell.env("HOME") + "/.local/bin/rice-path-complete", next];
+                pathProc.running = true;
+            }
+        }
+    }
+
+    function runPath(p) {
+        if (!p) {
+            launcher.pathResults = [];
+            launcher.pendingPath = "";
+            return;
+        }
+        if (pathProc.running) {
+            launcher.pendingPath = p;
+        } else {
+            pathProc.command = [Quickshell.env("HOME") + "/.local/bin/rice-path-complete", p];
+            pathProc.running = true;
+        }
+    }
+
+    onQueryChanged: {
+        const t = query.trim();
+        if (t.startsWith("=")) {
+            runCalc(t.slice(1).trim());
+        } else if (t.startsWith("/") || t.startsWith("~")) {
+            runPath(t);
+        }
+    }
+
     readonly property var allApps: {
         const seen = {};
         return DesktopEntries.applications.values.filter(e => {
@@ -128,6 +239,41 @@ PanelWindow {
         return 0;
     }
     readonly property var results: {
+        if (searchMode === "calc") {
+            const expr = query.slice(1).trim();
+            if (!expr) return [{ itemType: "calc_hint" }];
+            return [{
+                itemType: "calc",
+                expr: expr,
+                result: launcher.calcResult,
+                ready: launcher.calcResult !== ""
+            }];
+        }
+        if (searchMode === "emoji") {
+            const term = query.slice(1).trim().toLowerCase();
+            if (!term) {
+                return (launcher.emojisList || []).slice(0, 16).map(em => Object.assign({ itemType: "emoji" }, em));
+            }
+            const filtered = (launcher.emojisList || []).filter(em => {
+                return (em.name && em.name.toLowerCase().includes(term)) ||
+                       (em.desc && em.desc.toLowerCase().includes(term));
+            });
+            return filtered.slice(0, 20).map(em => Object.assign({ itemType: "emoji" }, em));
+        }
+        if (searchMode === "cmd") {
+            const cmd = query.slice(1).trim();
+            if (!cmd) return [{ itemType: "cmd_hint" }];
+            return [{
+                itemType: "cmd",
+                cmd: cmd
+            }];
+        }
+        if (searchMode === "path") {
+            const p = query.trim();
+            if (launcher.pathResults.length === 0) return [{ itemType: "path_hint", path: p }];
+            return launcher.pathResults.map(pr => Object.assign({ itemType: "path" }, pr));
+        }
+
         const q = norm(query.trim());
         const use = DockConfig.usage;
         let r;
@@ -139,7 +285,7 @@ PanelWindow {
                 .sort((a, b) => (b.s - a.s) || ((use[b.e.id] || 0) - (use[a.e.id] || 0)) || (a.e.name || "").localeCompare(b.e.name || ""))
                 .map(x => x.e);
         }
-        return r;
+        return r.map(e => ({ itemType: "app", entry: e }));
     }
     onResultsChanged: {
         list.currentIndex = 0;
@@ -150,6 +296,36 @@ PanelWindow {
         if (!e) return;
         DockConfig.launch(e);
         open = false;
+    }
+
+    function activateItem(item, isShift) {
+        if (!item) return;
+        if (item.itemType === "app") {
+            launchEntry(item.entry);
+        } else if (item.itemType === "calc") {
+            if (item.result) {
+                Quickshell.execDetached(["wl-copy", item.result]);
+                open = false;
+            }
+        } else if (item.itemType === "emoji") {
+            Quickshell.execDetached(["wl-copy", item.char]);
+            open = false;
+        } else if (item.itemType === "cmd") {
+            if (isShift) {
+                Quickshell.execDetached(["bash", "-c", item.cmd]);
+            } else {
+                Quickshell.execDetached(["kitty", "-e", "bash", "-c", item.cmd]);
+            }
+            open = false;
+        } else if (item.itemType === "path") {
+            if (item.isDir) {
+                input.text = item.path.endsWith("/") ? item.path : (item.path + "/");
+                input.cursorPosition = input.text.length;
+            } else {
+                Quickshell.execDetached(["xdg-open", item.path]);
+                open = false;
+            }
+        }
     }
 
     function appIconSource(iconName) {
@@ -265,18 +441,53 @@ PanelWindow {
                         anchors.leftMargin: 16
                         anchors.rightMargin: 16
                         spacing: 10
+
+                        // Ícone dinâmico baseado no modo
                         Text {
-                            text: Theme.icons.magnify
+                            text: {
+                                if (launcher.searchMode === "calc") return Theme.icons.calc || "󰪚";
+                                if (launcher.searchMode === "emoji") return Theme.icons.smile || "󰞅";
+                                if (launcher.searchMode === "cmd") return Theme.icons.console || "󰆍";
+                                if (launcher.searchMode === "path") return Theme.icons.folder || "󰉋";
+                                return Theme.icons.magnify;
+                            }
                             font.family: Theme.iconFontFamily
                             font.pixelSize: 20
                             color: Theme.primary
                         }
+
+                        // Badge do modo ativo (apenas quando não é modo app padrão)
+                        Rectangle {
+                            visible: launcher.searchMode !== "app"
+                            implicitWidth: modeBadgeTxt.implicitWidth + 12
+                            implicitHeight: 22
+                            radius: 11
+                            color: Theme.withAlpha(Theme.primary, 0.15)
+                            border.width: 1
+                            border.color: Theme.withAlpha(Theme.primary, 0.4)
+                            Text {
+                                id: modeBadgeTxt
+                                anchors.centerIn: parent
+                                text: {
+                                    if (launcher.searchMode === "calc") return Theme.t("launcher.mode_calc", "Cálculo");
+                                    if (launcher.searchMode === "emoji") return Theme.t("launcher.mode_emoji", "Emojis");
+                                    if (launcher.searchMode === "cmd") return Theme.t("launcher.mode_cmd", "Comando");
+                                    if (launcher.searchMode === "path") return Theme.t("launcher.mode_path", "Arquivos");
+                                    return "";
+                                }
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 11
+                                font.weight: Font.DemiBold
+                                color: Theme.primary
+                            }
+                        }
+
                         TextInput {
                             id: input
                             Layout.fillWidth: true
                             text: launcher.query
                             onTextChanged: launcher.query = text
-                            font.family: Theme.fontFamily
+                            font.family: launcher.searchMode === "cmd" ? Theme.monoFamily : Theme.fontFamily
                             font.pixelSize: 15
                             color: Theme.textColor
                             selectionColor: Theme.withAlpha(Theme.primary, 0.4)
@@ -285,7 +496,13 @@ PanelWindow {
                             Text {
                                 anchors.verticalCenter: parent.verticalCenter
                                 visible: input.text === ""
-                                text: Theme.t("launcher.search_placeholder", "Buscar apps…")
+                                text: {
+                                    if (launcher.searchMode === "calc") return Theme.t("launcher.ph_calc", "Digite a conta (ex: 25 * 4, sqrt(144))...");
+                                    if (launcher.searchMode === "emoji") return Theme.t("launcher.ph_emoji", "Buscar emoji por nome ou descrição...");
+                                    if (launcher.searchMode === "cmd") return Theme.t("launcher.ph_cmd", "Digite o comando para rodar no shell...");
+                                    if (launcher.searchMode === "path") return Theme.t("launcher.ph_path", "Caminho de pasta ou arquivo...");
+                                    return Theme.t("launcher.search_placeholder", "Buscar apps… (= conta · : emoji · > comando · / caminho)");
+                                }
                                 font: input.font
                                 color: Theme.subtext
                             }
@@ -308,6 +525,15 @@ PanelWindow {
                                     }
                                     event.accepted = true;
                                 } else if (event.key === Qt.Key_Tab) {
+                                    if (launcher.searchMode === "path" && list.currentIndex >= 0 && list.currentIndex < launcher.results.length) {
+                                        const it = launcher.results[list.currentIndex];
+                                        if (it && it.itemType === "path" && it.isDir) {
+                                            input.text = it.path.endsWith("/") ? it.path : (it.path + "/");
+                                            input.cursorPosition = input.text.length;
+                                            event.accepted = true;
+                                            return;
+                                        }
+                                    }
                                     if (list.count > 0) {
                                         list.currentIndex = (list.currentIndex + 1) % list.count;
                                         list.positionViewAtIndex(list.currentIndex, ListView.Contain);
@@ -321,18 +547,22 @@ PanelWindow {
                                     event.accepted = true;
                                 } else if (event.key === Qt.Key_Menu
                                         || ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && (event.modifiers & Qt.ShiftModifier))) {
-                                    if (list.currentItem && list.currentIndex >= 0 && list.currentIndex < launcher.results.length)
-                                        launcher.openMenu(launcher.results[list.currentIndex], list.currentItem);
+                                    if (launcher.searchMode === "app" && list.currentItem && list.currentIndex >= 0 && list.currentIndex < launcher.results.length) {
+                                        launcher.openMenu(launcher.results[list.currentIndex].entry, list.currentItem);
+                                    } else if (launcher.searchMode === "cmd" && list.currentIndex >= 0 && list.currentIndex < launcher.results.length) {
+                                        launcher.activateItem(launcher.results[list.currentIndex], true);
+                                    }
                                     event.accepted = true;
                                 } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                                    if (list.currentIndex >= 0 && list.currentIndex < launcher.results.length)
-                                        launcher.launchEntry(launcher.results[list.currentIndex]);
+                                    if (list.currentIndex >= 0 && list.currentIndex < launcher.results.length) {
+                                        launcher.activateItem(launcher.results[list.currentIndex], !!(event.modifiers & Qt.ShiftModifier));
+                                    }
                                     event.accepted = true;
                                 }
                             }
                         }
                         Text {
-                            visible: launcher.results.length > 0
+                            visible: launcher.results.length > 0 && launcher.searchMode === "app"
                             text: launcher.results.length
                             font.family: Theme.fontFamily
                             font.pixelSize: 11
@@ -403,47 +633,142 @@ PanelWindow {
                             anchors.rightMargin: 12
                             spacing: 12
 
-                            IconImage {
-                                implicitSize: 34
-                                source: launcher.appIconSource(rowItem.modelData.icon)
-                                scale: rowItem.ListView.isCurrentItem ? 1.08 : 1
-                                Behavior on scale { NumberAnimation { duration: Theme.ms(140); easing.type: Easing.OutBack } }
+                            // Ícone / Glifo / Imagem
+                            Item {
+                                implicitWidth: 34
+                                implicitHeight: 34
+                                Layout.alignment: Qt.AlignVCenter
+
+                                // App Icon
+                                IconImage {
+                                    anchors.fill: parent
+                                    visible: rowItem.modelData.itemType === "app"
+                                    source: rowItem.modelData.itemType === "app" ? launcher.appIconSource(rowItem.modelData.entry.icon) : ""
+                                    scale: rowItem.ListView.isCurrentItem ? 1.08 : 1
+                                    Behavior on scale { NumberAnimation { duration: Theme.ms(140); easing.type: Easing.OutBack } }
+                                }
+
+                                // Emoji
+                                Text {
+                                    anchors.centerIn: parent
+                                    visible: rowItem.modelData.itemType === "emoji"
+                                    text: rowItem.modelData.itemType === "emoji" ? (rowItem.modelData.char || "") : ""
+                                    font.pixelSize: 24
+                                }
+
+                                // Ícone Nerd Font para Calc, Cmd, Path
+                                Text {
+                                    anchors.centerIn: parent
+                                    visible: rowItem.modelData.itemType !== "app" && rowItem.modelData.itemType !== "emoji"
+                                    text: {
+                                        if (rowItem.modelData.itemType === "calc" || rowItem.modelData.itemType === "calc_hint") return Theme.icons.calc || "󰪚";
+                                        if (rowItem.modelData.itemType === "cmd" || rowItem.modelData.itemType === "cmd_hint") return Theme.icons.console || "󰆍";
+                                        if (rowItem.modelData.itemType === "path" || rowItem.modelData.itemType === "path_hint") {
+                                            return (rowItem.modelData.isDir ? Theme.icons.folder : Theme.icons.file) || "󰉋";
+                                        }
+                                        return Theme.icons.magnify;
+                                    }
+                                    font.family: Theme.iconFontFamily
+                                    font.pixelSize: 22
+                                    color: Theme.primary
+                                }
                             }
+
+                            // Textos de título e subtítulo
                             ColumnLayout {
                                 Layout.fillWidth: true
-                                spacing: 0
+                                spacing: 1
+
                                 Text {
                                     Layout.fillWidth: true
-                                    text: rowItem.modelData.name
+                                    text: {
+                                        if (rowItem.modelData.itemType === "app") return rowItem.modelData.entry.name;
+                                        if (rowItem.modelData.itemType === "calc") return rowItem.modelData.ready ? rowItem.modelData.result : rowItem.modelData.expr;
+                                        if (rowItem.modelData.itemType === "calc_hint") return Theme.t("launcher.calc_hint_title", "Calculadora Matemática");
+                                        if (rowItem.modelData.itemType === "emoji") return ":" + rowItem.modelData.name + ":";
+                                        if (rowItem.modelData.itemType === "cmd") return rowItem.modelData.cmd;
+                                        if (rowItem.modelData.itemType === "cmd_hint") return Theme.t("launcher.cmd_hint_title", "Executar Comando Shell");
+                                        if (rowItem.modelData.itemType === "path") return rowItem.modelData.name;
+                                        if (rowItem.modelData.itemType === "path_hint") return Theme.t("launcher.mode_path", "Arquivos");
+                                        return "";
+                                    }
                                     elide: Text.ElideRight
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: 14
-                                    font.weight: rowItem.ListView.isCurrentItem ? Font.DemiBold : Font.Normal
-                                    color: Theme.textColor
+                                    font.family: (rowItem.modelData.itemType === "cmd") ? Theme.monoFamily : Theme.fontFamily
+                                    font.pixelSize: (rowItem.modelData.itemType === "calc" && rowItem.modelData.ready) ? 16 : 14
+                                    font.weight: (rowItem.ListView.isCurrentItem || (rowItem.modelData.itemType === "calc" && rowItem.modelData.ready)) ? Font.DemiBold : Font.Normal
+                                    color: (rowItem.modelData.itemType === "calc" && rowItem.modelData.ready) ? Theme.primary : Theme.textColor
                                 }
+
                                 Text {
                                     Layout.fillWidth: true
                                     visible: text !== ""
-                                    text: rowItem.modelData.genericName || rowItem.modelData.comment || ""
+                                    text: {
+                                        if (rowItem.modelData.itemType === "app") return rowItem.modelData.entry.genericName || rowItem.modelData.entry.comment || "";
+                                        if (rowItem.modelData.itemType === "calc") return rowItem.modelData.ready ? (rowItem.modelData.expr + " = " + rowItem.modelData.result) : "Calculando...";
+                                        if (rowItem.modelData.itemType === "calc_hint") return Theme.t("launcher.calc_hint_sub", "Digite qualquer expressão aritmética: +, -, *, /, %, sqrt, pi...");
+                                        if (rowItem.modelData.itemType === "emoji") return rowItem.modelData.desc;
+                                        if (rowItem.modelData.itemType === "cmd") return Theme.t("launcher.cmd_run_sub", "Enter: terminal Kitty · Shift+Enter: segundo plano");
+                                        if (rowItem.modelData.itemType === "cmd_hint") return Theme.t("launcher.cmd_hint_sub", "Digite qualquer comando do sistema (ex: >btop, >kitty...)");
+                                        if (rowItem.modelData.itemType === "path") return rowItem.modelData.path;
+                                        if (rowItem.modelData.itemType === "path_hint") return rowItem.modelData.path ? ("Nenhum arquivo em: " + rowItem.modelData.path) : "Digite um caminho com ~ ou /";
+                                        return "";
+                                    }
                                     elide: Text.ElideRight
                                     font.family: Theme.fontFamily
                                     font.pixelSize: 11
                                     color: Theme.subtext
                                 }
                             }
+
+                            // Badges de Game / Pinned (apenas para app)
                             Text {
-                                visible: DockConfig.isGame(rowItem.modelData.id)
+                                visible: rowItem.modelData.itemType === "app" && DockConfig.isGame(rowItem.modelData.entry.id)
                                 text: Theme.icons.gamepad
                                 font.family: Theme.iconFontFamily
                                 font.pixelSize: 15
                                 color: Theme.subtext
                             }
                             Text {
-                                visible: DockConfig.isPinned(rowItem.modelData.id)
+                                visible: rowItem.modelData.itemType === "app" && DockConfig.isPinned(rowItem.modelData.entry.id)
                                 text: Theme.icons.pin
                                 font.family: Theme.iconFontFamily
                                 font.pixelSize: 15
                                 color: Theme.subtext
+                            }
+
+                            // Badge de ação para calc, emoji, cmd e path
+                            Rectangle {
+                                visible: (rowItem.modelData.itemType === "calc" && rowItem.modelData.ready) ||
+                                         rowItem.modelData.itemType === "emoji" ||
+                                         rowItem.modelData.itemType === "cmd" ||
+                                         rowItem.modelData.itemType === "path"
+                                implicitWidth: actBadgeTxt.implicitWidth + 12
+                                implicitHeight: 22
+                                radius: 6
+                                color: Theme.tileHigh
+                                border.width: 1
+                                border.color: Theme.withAlpha(Theme.outline, 0.2)
+                                Text {
+                                    id: actBadgeTxt
+                                    anchors.centerIn: parent
+                                    text: {
+                                        if (rowItem.modelData.itemType === "calc" || rowItem.modelData.itemType === "emoji") {
+                                            return Theme.t("launcher.copy_badge", "Enter copia");
+                                        }
+                                        if (rowItem.modelData.itemType === "cmd") {
+                                            return "Enter";
+                                        }
+                                        if (rowItem.modelData.itemType === "path") {
+                                            return rowItem.modelData.isDir
+                                                ? Theme.t("launcher.open_folder_badge", "Tab/Enter abre pasta")
+                                                : Theme.t("launcher.open_file_badge", "Enter abre arquivo");
+                                        }
+                                        return "";
+                                    }
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 10
+                                    color: Theme.subtext
+                                }
                             }
                         }
 
@@ -458,9 +783,13 @@ PanelWindow {
                             }
                             onClicked: mouse => {
                                 list.currentIndex = rowItem.index;
-                                if (mouse.button === Qt.RightButton) launcher.openMenu(rowItem.modelData, rowItem);
-                                else if (launcher.menuEntry) launcher.menuEntry = null;
-                                else launcher.launchEntry(rowItem.modelData);
+                                if (mouse.button === Qt.RightButton && rowItem.modelData.itemType === "app") {
+                                    launcher.openMenu(rowItem.modelData.entry, rowItem);
+                                } else if (launcher.menuEntry) {
+                                    launcher.menuEntry = null;
+                                } else {
+                                    launcher.activateItem(rowItem.modelData, false);
+                                }
                             }
                         }
                     }
@@ -599,9 +928,18 @@ PanelWindow {
     IpcHandler {
         target: "launcher"
         function toggle(): void { launcher.open = !launcher.open; }
+        function openWith(q: string): void {
+            launcher.open = true;
+            Qt.callLater(() => {
+                input.text = q;
+                launcher.query = q;
+                input.cursorPosition = q.length;
+            });
+        }
         function state(): string {
             return "open=" + launcher.open + " inputFocus=" + input.activeFocus + " dockShown=" + launcher.dockShown
-                + " sidebarOpen=" + launcher.sidebarOpen + " barPopup=" + launcher.barPopupOpen;
+                + " sidebarOpen=" + launcher.sidebarOpen + " barPopup=" + launcher.barPopupOpen
+                + " mode=" + launcher.searchMode;
         }
     }
 }
