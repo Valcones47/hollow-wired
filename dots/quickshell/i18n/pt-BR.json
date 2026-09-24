@@ -1654,5 +1654,14 @@
   "theme.light": "Claro",
   "theme.auto": "Automático",
   "theme.light_from": "Claro a partir de",
-  "theme.dark_from": "Escuro a partir de"
+  "theme.dark_from": "Escuro a partir de",
+  "launcher.window_sub": "Janela aberta",
+  "launcher.setting_sub": "Configurações",
+  "launcher.calculating": "Calculando…",
+  "launcher.no_files_in": "Nenhum arquivo em: ",
+  "launcher.type_path": "Digite um caminho com ~ ou /",
+  "launcher.badge_window": "Janela",
+  "launcher.badge_setting": "Painel",
+  "launcher.badge_folder": "Pasta",
+  "launcher.badge_file": "Arquivo"
 }

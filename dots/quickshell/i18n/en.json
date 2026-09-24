@@ -1654,5 +1654,14 @@
   "theme.light": "Light",
   "theme.auto": "Automatic",
   "theme.light_from": "Light from",
-  "theme.dark_from": "Dark from"
+  "theme.dark_from": "Dark from",
+  "launcher.window_sub": "Open window",
+  "launcher.setting_sub": "Settings",
+  "launcher.calculating": "Calculating…",
+  "launcher.no_files_in": "No files in: ",
+  "launcher.type_path": "Type a path starting with ~ or /",
+  "launcher.badge_window": "Window",
+  "launcher.badge_setting": "Settings",
+  "launcher.badge_folder": "Folder",
+  "launcher.badge_file": "File"
 }

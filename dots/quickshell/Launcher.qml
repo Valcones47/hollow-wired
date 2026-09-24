@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
+import Quickshell.Hyprland
 import Quickshell.Wayland
 import Quickshell.Widgets
 import "."
@@ -199,7 +200,52 @@ PanelWindow {
         }
     }
 
+    // ---- busca universal: arquivos (fd), com espera curta entre teclas ----
+    property var fileResults: []
+    Timer {
+        id: fileDebounce
+        interval: 260
+        onTriggered: {
+            const q = launcher.query.trim();
+            if (launcher.searchMode !== "app" || q.length < 3) { launcher.fileResults = []; return; }
+            if (fileProc.running) { restart(); return; }
+            fileProc.command = ["sh", "-c",
+                "fd -F -i --max-results 6 --max-depth 6 -- \"$1\" \"$HOME\" 2>/dev/null | while IFS= read -r p; do [ -d \"$p\" ] && echo \"d$p\" || echo \"f$p\"; done",
+                "_", q];
+            fileProc.running = true;
+        }
+    }
+    Process {
+        id: fileProc
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const out = [];
+                for (const line of text.split("\n")) {
+                    if (line.length < 2) continue;
+                    const path = line.slice(1).replace(/\/$/, "");
+                    out.push({ itemType: "path", isDir: line[0] === "d", path: path, name: path.split("/").pop(), universal: true });
+                }
+                launcher.fileResults = out;
+            }
+        }
+    }
+
+    // Janelas abertas e opções do painel que casam com o texto.
+    function windowMatches(q) {
+        return Hyprland.toplevels.values.filter(h => {
+            const cls = h.lastIpcObject ? (h.lastIpcObject.class || "") : "";
+            return norm(h.title).includes(q) || norm(cls).includes(q);
+        }).slice(0, 5).map(h => ({ itemType: "window", toplevel: h,
+            title: h.title || "", cls: h.lastIpcObject ? (h.lastIpcObject.class || "") : "" }));
+    }
+    function settingMatches(q) {
+        return SettingsIndex.entries.filter(e =>
+            norm((e.name || "") + " " + (e.desc || "") + " " + (e.keywords || "")).includes(q)
+        ).slice(0, 4).map(e => ({ itemType: "setting", entry: e }));
+    }
+
     onQueryChanged: {
+        fileDebounce.restart();
         const t = query.trim();
         if (t.startsWith("=")) {
             runCalc(t.slice(1).trim());
@@ -285,7 +331,11 @@ PanelWindow {
                 .sort((a, b) => (b.s - a.s) || ((use[b.e.id] || 0) - (use[a.e.id] || 0)) || (a.e.name || "").localeCompare(b.e.name || ""))
                 .map(x => x.e);
         }
-        return r.map(e => ({ itemType: "app", entry: e }));
+        const apps = r.map(e => ({ itemType: "app", entry: e }));
+        if (q === "") return apps;
+        // Busca universal: apps primeiro, depois janelas, painel e arquivos.
+        const extra = windowMatches(q).concat(settingMatches(q), launcher.fileResults);
+        return extra.length > 0 ? apps.slice(0, 8).concat(extra) : apps;
     }
     onResultsChanged: {
         list.currentIndex = 0;
@@ -319,6 +369,18 @@ PanelWindow {
                 // (um "ls" piscava e sumia).
                 Quickshell.execDetached(["kitty", "--hold", "-e", "bash", "-c", item.cmd]);
             }
+            open = false;
+        } else if (item.itemType === "window") {
+            const h = item.toplevel;
+            if (h && h.wayland) DockConfig.focusWindow(h.wayland);
+            else if (h) Hyprland.dispatch("hl.dsp.focus({ window = \"address:" + (String(h.address).startsWith("0x") ? h.address : "0x" + h.address) + "\" })");
+            open = false;
+        } else if (item.itemType === "setting") {
+            Quickshell.execDetached(["sh", "-c", "qs ipc call visualconfig open && qs ipc call visualconfig tab \"$1\"", "_", String(item.entry.tabIndex)]);
+            open = false;
+        } else if (item.itemType === "path" && item.universal && item.isDir) {
+            // Pasta achada pela busca universal: abre no gerenciador de arquivos.
+            Quickshell.execDetached(["xdg-open", item.path]);
             open = false;
         } else if (item.itemType === "path") {
             if (item.isDir) {
@@ -550,7 +612,8 @@ PanelWindow {
                                     event.accepted = true;
                                 } else if (event.key === Qt.Key_Menu
                                         || ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && (event.modifiers & Qt.ShiftModifier))) {
-                                    if (launcher.searchMode === "app" && list.currentItem && list.currentIndex >= 0 && list.currentIndex < launcher.results.length) {
+                                    if (launcher.searchMode === "app" && list.currentItem && list.currentIndex >= 0 && list.currentIndex < launcher.results.length
+                                            && launcher.results[list.currentIndex].itemType === "app") {
                                         launcher.openMenu(launcher.results[list.currentIndex].entry, list.currentItem);
                                     } else if (launcher.searchMode === "cmd" && list.currentIndex >= 0 && list.currentIndex < launcher.results.length) {
                                         launcher.activateItem(launcher.results[list.currentIndex], true);
@@ -666,6 +729,8 @@ PanelWindow {
                                     text: {
                                         if (rowItem.modelData.itemType === "calc" || rowItem.modelData.itemType === "calc_hint") return Theme.icons.calc || "󰪚";
                                         if (rowItem.modelData.itemType === "cmd" || rowItem.modelData.itemType === "cmd_hint") return Theme.icons.console || "󰆍";
+                                        if (rowItem.modelData.itemType === "window") return Theme.icons.apps;
+                                        if (rowItem.modelData.itemType === "setting") return rowItem.modelData.entry.icon || Theme.icons.tune;
                                         if (rowItem.modelData.itemType === "path" || rowItem.modelData.itemType === "path_hint") {
                                             return (rowItem.modelData.isDir ? Theme.icons.folder : Theme.icons.file) || "󰉋";
                                         }
@@ -693,6 +758,8 @@ PanelWindow {
                                         if (rowItem.modelData.itemType === "cmd_hint") return Theme.t("launcher.cmd_hint_title", "Executar Comando Shell");
                                         if (rowItem.modelData.itemType === "path") return rowItem.modelData.name;
                                         if (rowItem.modelData.itemType === "path_hint") return Theme.t("launcher.mode_path", "Arquivos");
+                                        if (rowItem.modelData.itemType === "window") return rowItem.modelData.title || rowItem.modelData.cls;
+                                        if (rowItem.modelData.itemType === "setting") return rowItem.modelData.entry.name;
                                         return "";
                                     }
                                     elide: Text.ElideRight
@@ -707,13 +774,15 @@ PanelWindow {
                                     visible: text !== ""
                                     text: {
                                         if (rowItem.modelData.itemType === "app") return rowItem.modelData.entry.genericName || rowItem.modelData.entry.comment || "";
-                                        if (rowItem.modelData.itemType === "calc") return rowItem.modelData.ready ? (rowItem.modelData.expr + " = " + rowItem.modelData.result) : "Calculando...";
+                                        if (rowItem.modelData.itemType === "calc") return rowItem.modelData.ready ? (rowItem.modelData.expr + " = " + rowItem.modelData.result) : Theme.t("launcher.calculating", "Calculando…");
                                         if (rowItem.modelData.itemType === "calc_hint") return Theme.t("launcher.calc_hint_sub", "Digite qualquer expressão aritmética: +, -, *, /, %, sqrt, pi...");
                                         if (rowItem.modelData.itemType === "emoji") return rowItem.modelData.desc;
                                         if (rowItem.modelData.itemType === "cmd") return Theme.t("launcher.cmd_run_sub", "Enter: terminal Kitty · Shift+Enter: segundo plano");
                                         if (rowItem.modelData.itemType === "cmd_hint") return Theme.t("launcher.cmd_hint_sub", "Digite qualquer comando do sistema (ex: >btop, >kitty...)");
                                         if (rowItem.modelData.itemType === "path") return rowItem.modelData.path;
-                                        if (rowItem.modelData.itemType === "path_hint") return rowItem.modelData.path ? ("Nenhum arquivo em: " + rowItem.modelData.path) : "Digite um caminho com ~ ou /";
+                                        if (rowItem.modelData.itemType === "window") return Theme.t("launcher.window_sub", "Janela aberta") + (rowItem.modelData.cls ? " · " + rowItem.modelData.cls : "");
+                                        if (rowItem.modelData.itemType === "setting") return Theme.t("launcher.setting_sub", "Configurações") + " · " + (rowItem.modelData.entry.desc || "");
+                                        if (rowItem.modelData.itemType === "path_hint") return rowItem.modelData.path ? (Theme.t("launcher.no_files_in", "Nenhum arquivo em: ") + rowItem.modelData.path) : Theme.t("launcher.type_path", "Digite um caminho com ~ ou /");
                                         return "";
                                     }
                                     elide: Text.ElideRight
@@ -744,7 +813,9 @@ PanelWindow {
                                 visible: (rowItem.modelData.itemType === "calc" && rowItem.modelData.ready) ||
                                          rowItem.modelData.itemType === "emoji" ||
                                          rowItem.modelData.itemType === "cmd" ||
-                                         rowItem.modelData.itemType === "path"
+                                         rowItem.modelData.itemType === "path" ||
+                                         rowItem.modelData.itemType === "window" ||
+                                         rowItem.modelData.itemType === "setting"
                                 implicitWidth: actBadgeTxt.implicitWidth + 12
                                 implicitHeight: 22
                                 radius: 6
@@ -760,6 +831,11 @@ PanelWindow {
                                         }
                                         if (rowItem.modelData.itemType === "cmd") {
                                             return "Enter";
+                                        }
+                                        if (rowItem.modelData.itemType === "window") return Theme.t("launcher.badge_window", "Janela");
+                                        if (rowItem.modelData.itemType === "setting") return Theme.t("launcher.badge_setting", "Painel");
+                                        if (rowItem.modelData.itemType === "path" && rowItem.modelData.universal) {
+                                            return rowItem.modelData.isDir ? Theme.t("launcher.badge_folder", "Pasta") : Theme.t("launcher.badge_file", "Arquivo");
                                         }
                                         if (rowItem.modelData.itemType === "path") {
                                             return rowItem.modelData.isDir
