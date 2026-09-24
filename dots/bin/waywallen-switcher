@@ -733,7 +733,8 @@ class SwitcherWindow(Gtk.ApplicationWindow):
             at = int(max(25, min(wave, wave - boot - 40)))
             try:
                 import time
-                with open("/tmp/rice-wallfade.log", "a", encoding="utf-8") as lf:
+                # Mesmo diagnóstico do rice-wallpaper-fade, em $XDG_RUNTIME_DIR (privado).
+                with open(os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "rice-wallfade.log"), "a", encoding="utf-8") as lf:
                     lf.write(time.strftime("%H:%M:%S") + f" live: subida ≈{boot:.0f} ms, troca aos {at} ms da onda de {wave} ms\n")
             except OSError:
                 pass

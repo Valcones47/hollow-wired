@@ -32,7 +32,9 @@ qs_call() {
 }
 
 PREFS="$HOME/.config/hypr/user-prefs.json"
-LOG="/tmp/rice-wallfade.log"
+# Diagnóstico (uma linha por troca). Em $XDG_RUNTIME_DIR (privado), não no
+# /tmp, que todo usuário lê e mostraria os nomes dos wallpapers.
+LOG="${XDG_RUNTIME_DIR:-/tmp}/rice-wallfade.log"
 
 # Sem isto, "a transição não funciona" vira adivinhação: não dá para saber se o
 # problema é quem chama, a imagem, o IPC ou o tempo. Mesma ideia do log dos
@@ -165,7 +167,7 @@ while time.time() < deadline:
                 time.sleep(0.04)   # o quadro chegar à tela
                 sys.exit(0)
             break
-    time.sleep(0.02)
+    time.sleep(0.05)
 sys.exit(1)
 PY
             then
@@ -246,8 +248,13 @@ sleep "$(awk -v ms="$delay_ms" 'BEGIN { printf "%.3f", ms / 1000 }')"
 "$@"
 status=$?
 
-# A camada some sozinha por tempo (e tem um limite de segurança no QML), mas se
-# a troca falhou não faz sentido segurar a tela coberta.
-[ "$status" -ne 0 ] && qs_call dismiss >/dev/null
+# Desde que a camada só sai com reveal (o wallpaper animado espera o quadro
+# novo), quem cobre tem que revelar: sem isto a tela ficava parada até o
+# limite de segurança do QML (onda + 2,5 s). Se a troca falhou, tira na hora.
+if [ "$status" -ne 0 ]; then
+    qs_call dismiss >/dev/null
+else
+    qs_call reveal >/dev/null
+fi
 
 exit "$status"

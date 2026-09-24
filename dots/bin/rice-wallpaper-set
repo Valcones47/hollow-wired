@@ -128,6 +128,9 @@ apply_wallpaper() {
         hyprctl hyprpaper unload all >/dev/null 2>&1
         hyprctl hyprpaper preload "$img" >/dev/null 2>&1
         hyprctl hyprpaper wallpaper ",$img" >/dev/null 2>&1
+        # A camada do --cover só sai com reveal (senão ficava até o limite de
+        # segurança, onda + 2,5 s).
+        have rice-wallpaper-fade && rice-wallpaper-fade --reveal-when-ready "" >/dev/null 2>&1
     else
         (setsid hyprpaper >/dev/null 2>&1 &)
     fi
