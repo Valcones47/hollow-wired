@@ -1645,5 +1645,7 @@
   "agenda.tasks": "Tasks",
   "agenda.clear_done": "Clear done",
   "agenda.new_task": "New task (Enter adds)",
-  "agenda.no_tasks": "Nothing pending"
+  "agenda.no_tasks": "Nothing pending",
+  "cc.saved_networks": "Saved networks",
+  "cc.forget_hint": "Click twice to forget the network (the saved password is deleted)."
 }

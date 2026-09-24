@@ -232,7 +232,7 @@ QtObject {
         fog: "\u{F0591}", rainy: "\u{F0597}", pouring: "\u{F0596}", snowy: "\u{F0598}",
         lightning: "\u{F0593}",
         lock: "\u{F033E}", record: "\u{F044A}", coffee: "\u{F0176}", coffeeOff: "\u{F0FAA}",
-        blur: "\u{F00A3}", blurOff: "\u{F00A4}",
+        blur: "\u{F00B5}", blurOff: "\u{F00B7}",
         broom: "\u{F00E2}",
         volHigh: "\u{F057E}", volMid: "\u{F0580}", volLow: "\u{F057F}", volOff: "\u{F0581}",
         mic: "\u{F036C}", micOff: "\u{F036D}", brightness: "\u{F00DF}",

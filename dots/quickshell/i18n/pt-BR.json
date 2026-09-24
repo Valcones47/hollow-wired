@@ -1645,5 +1645,7 @@
   "agenda.tasks": "Tarefas",
   "agenda.clear_done": "Limpar feitas",
   "agenda.new_task": "Nova tarefa (Enter adiciona)",
-  "agenda.no_tasks": "Nada pendente"
+  "agenda.no_tasks": "Nada pendente",
+  "cc.saved_networks": "Redes salvas",
+  "cc.forget_hint": "Clique duas vezes para esquecer a rede (a senha salva é apagada)."
 }

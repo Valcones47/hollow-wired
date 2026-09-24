@@ -128,8 +128,59 @@ def measure_ping():
         pass
     return None
 
+def split_terse(line):
+    """Divide uma linha do `nmcli -t` nos ':' que não estão escapados (\\:)."""
+    parts = re.split(r'(?<!\\):', line)
+    return [p.replace('\\:', ':').replace('\\\\', '\\') for p in parts]
+
+
+def connections():
+    """Conexões salvas do NetworkManager: nome, uuid, tipo e se está ativa."""
+    out = []
+    try:
+        txt = subprocess.check_output(
+            ["nmcli", "-t", "-f", "NAME,UUID,TYPE,ACTIVE", "connection", "show"],
+            text=True, stderr=subprocess.DEVNULL)
+    except Exception:
+        return out
+    for line in txt.splitlines():
+        f = split_terse(line)
+        if len(f) >= 4:
+            out.append({"name": f[0], "uuid": f[1], "type": f[2], "active": f[3] in ("yes", "sim")})
+    return out
+
+
+# VPN pelo NetworkManager: plugins (OpenVPN, WireGuard via NM...) e WireGuard nativo.
+VPN_TYPES = ("vpn", "wireguard")
+
+
 def main():
     cmd = sys.argv[1] if len(sys.argv) > 1 else "status"
+
+    if cmd == "vpn-list":
+        print(json.dumps([c for c in connections() if c["type"] in VPN_TYPES]))
+        return
+
+    if cmd == "saved-wifi":
+        print(json.dumps([c for c in connections() if c["type"] == "802-11-wireless"]))
+        return
+
+    if cmd in ("vpn-up", "vpn-down", "forget") and len(sys.argv) > 2:
+        uuid = sys.argv[2]
+        con = next((c for c in connections() if c["uuid"] == uuid), None)
+        if not con:
+            print(json.dumps({"success": False, "error": "conexão não encontrada"}))
+            return
+        if cmd == "forget" and con["type"] != "802-11-wireless":
+            print(json.dumps({"success": False, "error": "só redes Wi-Fi podem ser esquecidas aqui"}))
+            return
+        action = {"vpn-up": "up", "vpn-down": "down", "forget": "delete"}[cmd]
+        res = subprocess.run(["nmcli", "connection", action, "uuid", uuid], capture_output=True, text=True)
+        ok = res.returncode == 0
+        if not ok:
+            notify(res.stderr.strip()[:120] or "Falha", con["name"], icon="dialog-error")
+        print(json.dumps({"success": ok}))
+        return
 
     if cmd == "status":
         print(json.dumps(get_status(), indent=2))
@@ -178,7 +229,7 @@ def main():
             print(json.dumps({"success": False, "error": res.stderr.strip()}))
         return
 
-    print("Uso: rice-network [status|scan|ping|toggle-wifi|connect <SSID> [PASS]|disconnect]")
+    print("Uso: rice-network [status|scan|ping|toggle-wifi|connect <SSID> [PASS]|disconnect|vpn-list|vpn-up <uuid>|vpn-down <uuid>|saved-wifi|forget <uuid>]")
 
 if __name__ == "__main__":
     main()

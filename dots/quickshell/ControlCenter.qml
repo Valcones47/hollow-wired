@@ -73,9 +73,12 @@ PanelWindow {
             blurCheck.running = true;
             nightCheck.running = true;
             cc.readBrightness();
+            cc.refreshNet();
         } else {
             cc.hoverMode = false;
             cc.btOpen = false;
+            cc.wifiOpen = false;
+            cc.vpnOpen = false;
             cc.audioOpen = false;
             powerRow.disarm();
         }
@@ -197,6 +200,37 @@ PanelWindow {
 
     // --- seções que abrem ---
     property bool btOpen: false
+
+    // --- VPN e redes salvas (rice-network → nmcli), lidos ao abrir ---
+    property bool wifiOpen: false
+    property bool vpnOpen: false
+    property var vpns: []
+    property var savedWifi: []
+    readonly property var activeVpn: vpns.find(v => v.active) || null
+    function refreshNet() {
+        if (!vpnProc.running) vpnProc.running = true;
+        if (!savedProc.running) savedProc.running = true;
+    }
+    Process {
+        id: vpnProc
+        command: ["rice-network", "vpn-list"]
+        stdout: StdioCollector { onStreamFinished: { try { cc.vpns = JSON.parse(text) || []; } catch (e) {} } }
+    }
+    Process {
+        id: savedProc
+        command: ["rice-network", "saved-wifi"]
+        stdout: StdioCollector { onStreamFinished: { try { cc.savedWifi = JSON.parse(text) || []; } catch (e) {} } }
+    }
+    // Ligar/desligar VPN ou esquecer rede: um pedido por vez, e relê a lista no fim.
+    Process {
+        id: netAction
+        onExited: cc.refreshNet()
+    }
+    function runNet(args) {
+        if (netAction.running) return;
+        netAction.command = ["rice-network"].concat(args);
+        netAction.running = true;
+    }
     property bool audioOpen: false
 
     // ================= componentes =================
@@ -384,7 +418,25 @@ PanelWindow {
                             : cc.activeNetwork ? cc.activeNetwork.name : Theme.t("cc.not_connected", "Sem conexão")
                         active: Networking.wifiEnabled
                         visible: cc.wifiDevice !== null
+                        more: cc.savedWifi.length > 0
+                        expanded: cc.wifiOpen
                         onToggled: Networking.wifiEnabled = !Networking.wifiEnabled
+                        onMoreClicked: cc.wifiOpen = !cc.wifiOpen
+                    }
+                    Tile {
+                        icon: Theme.icons.lock
+                        label: "VPN"
+                        sub: cc.activeVpn ? cc.activeVpn.name : Theme.t("cc.off", "Desligado")
+                        active: cc.activeVpn !== null
+                        visible: cc.vpns.length > 0
+                        more: true
+                        expanded: cc.vpnOpen
+                        // Com uma VPN só, o bloco liga e desliga ela; com mais, abre a lista.
+                        onToggled: {
+                            if (cc.vpns.length === 1) cc.runNet([cc.vpns[0].active ? "vpn-down" : "vpn-up", cc.vpns[0].uuid]);
+                            else cc.vpnOpen = !cc.vpnOpen;
+                        }
+                        onMoreClicked: cc.vpnOpen = !cc.vpnOpen
                     }
                     Tile {
                         icon: !cc.btAdapter || !cc.btAdapter.enabled ? Theme.icons.btOff
@@ -426,6 +478,44 @@ PanelWindow {
                         sub: cc.nightLight ? Theme.t("cc.on", "Ligado") : Theme.t("cc.off", "Desligado")
                         active: cc.nightLight
                         onToggled: if (!nightToggle.running) nightToggle.running = true
+                    }
+                }
+
+                // ---------- redes Wi-Fi salvas ----------
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    visible: cc.wifiOpen
+                    spacing: 4
+                    PopTitle { text: Theme.t("cc.saved_networks", "Redes salvas") }
+                    PopText { text: Theme.t("cc.forget_hint", "Clique duas vezes para esquecer a rede (a senha salva é apagada).") }
+                    Repeater {
+                        model: cc.wifiOpen ? cc.savedWifi : []
+                        delegate: PopAction {
+                            required property var modelData
+                            icon: Theme.icons.trash
+                            label: modelData.name
+                            detail: modelData.active ? Theme.t("cc.connected", "conectado") : ""
+                            needsConfirm: true
+                            onActivated: cc.runNet(["forget", modelData.uuid])
+                        }
+                    }
+                }
+
+                // ---------- VPN ----------
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    visible: cc.vpnOpen && cc.vpns.length > 0
+                    spacing: 4
+                    Repeater {
+                        model: cc.vpnOpen ? cc.vpns : []
+                        delegate: PopAction {
+                            required property var modelData
+                            icon: Theme.icons.lock
+                            label: modelData.name
+                            detail: netAction.running ? "…" : modelData.active ? Theme.t("cc.connected", "conectado") : ""
+                            selected: modelData.active
+                            onActivated: cc.runNet([modelData.active ? "vpn-down" : "vpn-up", modelData.uuid])
+                        }
                     }
                 }
 
