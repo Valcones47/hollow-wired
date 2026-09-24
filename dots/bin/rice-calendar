@@ -1,0 +1,283 @@
+#!/usr/bin/env python3
+"""rice-calendar — eventos de calendários .ics (arquivo local ou URL) para a Agenda do Hub.
+
+Fontes em ~/.config/hollow-wired/calendar.json: {"sources": ["~/agenda.ics", "https://..."]}.
+URLs (também webcal://) ficam em cache em ~/.cache/hollow-wired/calendar/ e são baixadas
+de novo depois de 30 min (ou com `refresh`). Sem internet, usa o último cache.
+
+Uso:
+  rice-calendar events [--from AAAA-MM-DD] [--days N]   JSON com as ocorrências
+  rice-calendar list | add <fonte> | remove <fonte> | refresh
+
+Recorrência (RRULE, EXDATE) pelo python-dateutil. Tudo é convertido para a hora local.
+"""
+
+import datetime as dt
+import hashlib
+import json
+import os
+import sys
+import time
+import urllib.request
+
+try:
+    from dateutil.rrule import rrulestr
+except ImportError:  # sem dateutil: eventos recorrentes aparecem só na primeira data
+    rrulestr = None
+
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    ZoneInfo = None
+
+HOME = os.path.expanduser("~")
+CONF = os.path.join(os.environ.get("XDG_CONFIG_HOME", os.path.join(HOME, ".config")), "hollow-wired", "calendar.json")
+CACHE = os.path.join(os.environ.get("XDG_CACHE_HOME", os.path.join(HOME, ".cache")), "hollow-wired", "calendar")
+MAX_AGE = 30 * 60
+
+
+def load_conf():
+    try:
+        with open(CONF) as f:
+            d = json.load(f)
+        src = d.get("sources", [])
+        return [s for s in src if isinstance(s, str) and s.strip()]
+    except (OSError, ValueError):
+        return []
+
+
+def save_conf(sources):
+    os.makedirs(os.path.dirname(CONF), exist_ok=True)
+    with open(CONF, "w") as f:
+        json.dump({"sources": sources}, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+
+
+def is_url(s):
+    return s.startswith(("http://", "https://", "webcal://"))
+
+
+def cache_path(url):
+    return os.path.join(CACHE, hashlib.sha1(url.encode()).hexdigest()[:16] + ".ics")
+
+
+def fetch(url, force=False):
+    path = cache_path(url)
+    fresh = os.path.exists(path) and time.time() - os.path.getmtime(path) < MAX_AGE
+    if fresh and not force:
+        return path
+    real = "https://" + url[len("webcal://"):] if url.startswith("webcal://") else url
+    try:
+        req = urllib.request.Request(real, headers={"User-Agent": "hollow-wired-calendar"})
+        with urllib.request.urlopen(req, timeout=10) as r:
+            data = r.read()
+        if b"BEGIN:VCALENDAR" not in data[:4096]:
+            raise ValueError("não é um .ics")
+        os.makedirs(CACHE, exist_ok=True)
+        tmp = path + ".tmp"
+        with open(tmp, "wb") as f:
+            f.write(data)
+        os.replace(tmp, path)
+    except Exception as e:  # sem internet ou URL ruim: fica com o cache antigo
+        print(f"rice-calendar: {url}: {e}", file=sys.stderr)
+    return path if os.path.exists(path) else None
+
+
+def read_source(src, force=False):
+    path = fetch(src, force) if is_url(src) else os.path.expanduser(src)
+    if not path:
+        return ""
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            return f.read()
+    except OSError as e:
+        print(f"rice-calendar: {src}: {e}", file=sys.stderr)
+        return ""
+
+
+def unfold(text):
+    out = []
+    for line in text.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
+        if line[:1] in (" ", "\t") and out:
+            out[-1] += line[1:]
+        elif line:
+            out.append(line)
+    return out
+
+
+def parse_prop(line):
+    head, _, value = line.partition(":")
+    parts = head.split(";")
+    params = {}
+    for p in parts[1:]:
+        k, _, v = p.partition("=")
+        params[k.upper()] = v.strip('"')
+    return parts[0].upper(), params, value
+
+
+def unescape(v):
+    return v.replace("\\n", " ").replace("\\N", " ").replace("\\,", ",").replace("\\;", ";").replace("\\\\", "\\").strip()
+
+
+def to_local(value, params):
+    """Devolve (datetime local sem fuso, dia_inteiro)."""
+    value = value.strip()
+    if params.get("VALUE") == "DATE" or (len(value) == 8 and value.isdigit()):
+        return dt.datetime.strptime(value[:8], "%Y%m%d"), True
+    utc = value.endswith("Z")
+    t = dt.datetime.strptime(value.rstrip("Z")[:15], "%Y%m%dT%H%M%S")
+    if utc:
+        return t.replace(tzinfo=dt.timezone.utc).astimezone().replace(tzinfo=None), False
+    tzid = params.get("TZID")
+    if tzid and ZoneInfo:
+        try:
+            return t.replace(tzinfo=ZoneInfo(tzid)).astimezone().replace(tzinfo=None), False
+        except Exception:
+            pass
+    return t, False
+
+
+def local_rule(rule):
+    """UNTIL em UTC (…Z) vira hora local sem fuso, igual ao DTSTART convertido."""
+    parts = []
+    for p in rule.split(";"):
+        if p.upper().startswith("UNTIL="):
+            v = p.split("=", 1)[1]
+            try:
+                t, allday = to_local(v, {})
+                v = t.strftime("%Y%m%d") if allday else t.strftime("%Y%m%dT%H%M%S")
+            except ValueError:
+                pass
+            p = "UNTIL=" + v
+        parts.append(p)
+    return ";".join(parts)
+
+
+def events_in(text, start, end, label):
+    out = []
+    ev = None
+    for line in unfold(text):
+        if line == "BEGIN:VEVENT":
+            ev = {"exdate": []}
+            continue
+        if line == "END:VEVENT":
+            if ev:
+                out.extend(expand(ev, start, end, label))
+            ev = None
+            continue
+        if ev is None:
+            continue
+        name, params, value = parse_prop(line)
+        try:
+            if name == "DTSTART":
+                ev["start"], ev["allday"] = to_local(value, params)
+            elif name == "DTEND":
+                ev["end"], _ = to_local(value, params)
+            elif name == "SUMMARY":
+                ev["title"] = unescape(value)
+            elif name == "LOCATION":
+                ev["location"] = unescape(value)
+            elif name == "RRULE":
+                ev["rrule"] = value
+            elif name == "EXDATE":
+                for v in value.split(","):
+                    ev["exdate"].append(to_local(v, params)[0])
+            elif name == "STATUS":
+                ev["status"] = value.upper()
+            elif name == "RECURRENCE-ID":
+                ev["recurrence_id"] = to_local(value, params)[0]
+        except ValueError:
+            continue
+    return out
+
+
+def expand(ev, start, end, label):
+    if "start" not in ev or ev.get("status") == "CANCELLED":
+        return []
+    s = ev["start"]
+    allday = ev.get("allday", False)
+    dur = (ev["end"] - s) if "end" in ev else (dt.timedelta(days=1) if allday else dt.timedelta(0))
+    occ = [s]
+    if ev.get("rrule") and rrulestr and not ev.get("recurrence_id"):
+        try:
+            rule = rrulestr(local_rule(ev["rrule"]), dtstart=s)
+            occ = rule.between(start - dur, end, inc=True)
+        except Exception as e:
+            print(f"rice-calendar: RRULE ignorada ({e})", file=sys.stderr)
+    ex = set(ev["exdate"])
+    res = []
+    for o in occ:
+        if o in ex or o + dur < start or o >= end:
+            continue
+        res.append({
+            "date": o.strftime("%Y-%m-%d"),
+            "start": "" if allday else o.strftime("%H:%M"),
+            "end": "" if allday else (o + dur).strftime("%H:%M"),
+            "allDay": allday,
+            "days": max(1, (dur.days if allday else 1)),
+            "title": ev.get("title", ""),
+            "location": ev.get("location", ""),
+            "source": label,
+        })
+    return res
+
+
+def cmd_events(argv):
+    today = dt.date.today()
+    first = (today.replace(day=1) - dt.timedelta(days=1)).replace(day=1)
+    days = 150
+    i = 0
+    while i < len(argv):
+        if argv[i] == "--from" and i + 1 < len(argv):
+            first = dt.date.fromisoformat(argv[i + 1]); i += 2
+        elif argv[i] == "--days" and i + 1 < len(argv):
+            days = int(argv[i + 1]); i += 2
+        else:
+            i += 1
+    start = dt.datetime.combine(first, dt.time())
+    end = start + dt.timedelta(days=days)
+    out = []
+    for src in load_conf():
+        label = os.path.basename(src.rstrip("/")) if not is_url(src) else src.split("//", 1)[-1].split("/", 1)[0]
+        out.extend(events_in(read_source(src), start, end, label))
+    # Eventos de vários dias aparecem em cada dia.
+    spread = []
+    for e in out:
+        spread.append(e)
+        if e["allDay"] and e["days"] > 1:
+            d0 = dt.date.fromisoformat(e["date"])
+            for k in range(1, e["days"]):
+                spread.append(dict(e, date=(d0 + dt.timedelta(days=k)).isoformat()))
+    spread.sort(key=lambda e: (e["date"], not e["allDay"], e["start"], e["title"]))
+    print(json.dumps(spread, ensure_ascii=False))
+
+
+def main():
+    argv = sys.argv[1:]
+    cmd = argv[0] if argv else "events"
+    if cmd == "events":
+        cmd_events(argv[1:])
+    elif cmd == "list":
+        print(json.dumps(load_conf(), ensure_ascii=False))
+    elif cmd == "add" and len(argv) > 1:
+        src = argv[1].strip()
+        cur = load_conf()
+        if src and src not in cur:
+            cur.append(src)
+            save_conf(cur)
+        if is_url(src):
+            fetch(src, force=True)
+    elif cmd == "remove" and len(argv) > 1:
+        save_conf([s for s in load_conf() if s != argv[1]])
+    elif cmd == "refresh":
+        for s in load_conf():
+            if is_url(s):
+                fetch(s, force=True)
+    else:
+        print(__doc__.strip(), file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

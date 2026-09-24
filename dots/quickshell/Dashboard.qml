@@ -696,6 +696,14 @@ Item {
                                         visible: modelData.isToday
                                         color: Theme.primary
                                     }
+                                    // Dia com evento nos calendários da Agenda.
+                                    Rectangle {
+                                        visible: modelData.inMonth && (CalendarService.byDay[CalendarService.key(root.now.getFullYear(), root.now.getMonth(), modelData.day)] || []).length > 0
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        anchors.bottom: parent.bottom
+                                        width: 3; height: 3; radius: 1.5
+                                        color: modelData.isToday ? Theme.primary : Theme.subtext
+                                    }
                                     Text {
                                         anchors.centerIn: parent
                                         text: modelData.day

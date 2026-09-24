@@ -1634,5 +1634,16 @@
   "privacy.screen": "tela",
   "bar.item_picker": "Conta-gotas",
   "layout.bar_privacy": "Avisar quando microfone, câmera ou tela estão em uso",
-  "layout.bar_privacy_sub": "Um ponto na barra enquanto algum app usa; o mouse em cima mostra qual."
+  "layout.bar_privacy_sub": "Um ponto na barra enquanto algum app usa; o mouse em cima mostra qual.",
+  "hub.tab_agenda": "Agenda",
+  "agenda.today": "Hoje",
+  "agenda.all_day": "dia todo",
+  "agenda.no_sources": "Adicione um calendário .ics abaixo para ver seus eventos",
+  "agenda.no_events": "Nenhum evento",
+  "agenda.calendars": "Calendários",
+  "agenda.add_source": "Arquivo .ics ou link (Enter adiciona)",
+  "agenda.tasks": "Tarefas",
+  "agenda.clear_done": "Limpar feitas",
+  "agenda.new_task": "Nova tarefa (Enter adiciona)",
+  "agenda.no_tasks": "Nada pendente"
 }

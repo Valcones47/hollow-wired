@@ -63,3 +63,6 @@ PolkitDialog 1.0 PolkitDialog.qml
 
 singleton ColorPick 1.0 ColorPick.qml
 singleton Privacy 1.0 Privacy.qml
+singleton CalendarService 1.0 CalendarService.qml
+singleton TodoService 1.0 TodoService.qml
+Agenda 1.0 Agenda.qml

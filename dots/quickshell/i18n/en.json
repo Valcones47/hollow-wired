@@ -1634,5 +1634,16 @@
   "privacy.screen": "screen",
   "bar.item_picker": "Color picker",
   "layout.bar_privacy": "Show when the microphone, camera or screen is in use",
-  "layout.bar_privacy_sub": "A dot on the bar while an app uses them; hover shows which."
+  "layout.bar_privacy_sub": "A dot on the bar while an app uses them; hover shows which.",
+  "hub.tab_agenda": "Agenda",
+  "agenda.today": "Today",
+  "agenda.all_day": "all day",
+  "agenda.no_sources": "Add an .ics calendar below to see your events",
+  "agenda.no_events": "No events",
+  "agenda.calendars": "Calendars",
+  "agenda.add_source": ".ics file or link (Enter adds)",
+  "agenda.tasks": "Tasks",
+  "agenda.clear_done": "Clear done",
+  "agenda.new_task": "New task (Enter adds)",
+  "agenda.no_tasks": "Nothing pending"
 }

@@ -409,7 +409,8 @@ ShellRoot {
                     { icon: Theme.icons.workspaces, label: Theme.t("hub.tab_workspaces", "Workspaces") },
                     { icon: Theme.icons.tune, label: Theme.t("hub.tab_appearance", "Aparência") },
                     { icon: Theme.icons.bell, label: Theme.t("hub.tab_notifications", "Notificações") },
-                    { icon: Theme.icons.record, label: Theme.t("hub.tab_recording", "Gravação") }
+                    { icon: Theme.icons.record, label: Theme.t("hub.tab_recording", "Gravação") },
+                    { icon: Theme.icons.calendar, label: Theme.t("hub.tab_agenda", "Agenda") }
                 ]
 
                 ColumnLayout {
@@ -554,6 +555,12 @@ ShellRoot {
                         Recording {
                             anchors.fill: parent
                             opacity: card.currentTab === 6 && hub.visible ? 1 : 0
+                            visible: opacity > 0
+                            Behavior on opacity { NumberAnimation { duration: Theme.ms(140) } }
+                        }
+                        Agenda {
+                            anchors.fill: parent
+                            opacity: card.currentTab === 7 && hub.visible ? 1 : 0
                             visible: opacity > 0
                             Behavior on opacity { NumberAnimation { duration: Theme.ms(140) } }
                         }
