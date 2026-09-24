@@ -90,7 +90,14 @@ Legacy tools like Waybar, Rofi, SwayOSD, and Wofi are completely omitted. Every 
 - **10-band equalizer (`rice-eq`)**: opened from the small music icon next to the top-bar clock, built on PipeWire's own `filter-chain` biquads — no EasyEffects, nothing extra to install. It runs as a transient user unit and registers as a WirePlumber *smart filter*, so it slots in front of whatever output is the default (speakers, Bluetooth headset, HDMI) and follows it when that changes, while the volume controls keep seeing the real device. Gains change live without cutting the audio; eight presets plus custom bands (drag, scroll, double-click to reset), with automatic pre-gain so boosts don't clip.
 - **Animation curves (`rice-anim`)**: presets (Smooth, Bouncy, Snappy, Wind — the end-4/ML4W `wind/winIn/winOut` curves — and Material 3), or a Custom mode where each group (open, close, move, fade, workspaces, special workspace) gets its own draggable Bézier curve, duration and style, with a live preview using the same curve. The result is written to `~/.config/hypr/animations.lua`, which `hyprland.lua` loads, so the choice survives `hyprctl reload` — previously it was only applied with `hyprctl eval` and a reload silently reverted it.
 
+- **Universal search**: the launcher finds apps, open windows, Settings pages (opens the right page) and files by name in one box; `=` calculator, `:` emoji (pasted into the focused field), `>` run a command, `/` browse folders.
+- **Agenda (Hub)**: a to-do list plus events from `.ics` calendars (local file or link, recurring events included), with dots on the days that have events.
+- **Native notifications**: the shell is the notification server — grouped per app, action buttons, swipe to dismiss; `mako` stays as an automatic fallback. The lock screen shows only the app and count unless you allow the text.
+- **Privacy dot and color picker**: a dot on the bar while the microphone, camera or screen sharing is in use (hover shows which app), and an eyedropper with the last 8 colours in HEX/RGB/HSL.
+- **VPN and saved networks** in the Control Center (NetworkManager VPN/WireGuard on/off, forget a Wi-Fi network).
+
 ### Theming & Dynamic Colors
+- **Light, dark or automatic (`rice-theme-mode`)**: the same wallpaper palette with a light or dark background for the whole rice (bar, panels, terminal, GTK apps via `color-scheme`), or switching by time of day.
 - **Wallust Palette Engine**: Dynamic color palette extracted directly from the active wallpaper. Automatically updates Hyprland window borders, Quickshell UI surfaces, and Kitty terminal colors without requiring session restarts.
 - **Hand-picked colour overrides (`rice-colors`)**: any palette entry can be replaced by hand from the Control Center colour wheel. Overrides live in a separate user file and are re-applied on top of every freshly extracted palette, so they survive wallpaper changes. `rice-colors auto 0` freezes the palette entirely.
 - **Waywallen Integration**: Animated Wallpaper Engine scenes via Flatpak and a native layer-shell bridge. Wallpapers automatically pause when any application is in fullscreen to guarantee zero resource waste during games or video playback.
@@ -117,23 +124,30 @@ Legacy tools like Waybar, Rofi, SwayOSD, and Wofi are completely omitted. Every 
 
 ## Keybindings
 
+Full list and user guides (getting started, coming from Windows, FAQ): [`docs/`](docs/README.md).
+
 | Shortcut | Description |
 |---|---|
 | `Super` or `Super + R` | Toggle Application Launcher |
 | `Super + Q` | Open Kitty Terminal |
 | `Super + E` | Open Dolphin File Manager |
 | `Super + I` | Open Control Center / Settings Hub (20 Categories) |
-| `Super + F1` | Keybindings Cheatsheet |
+| `Super + F1` | Welcome guide |
+| `Super + Shift + F1` | Keybindings Cheatsheet |
 | `Super + V` | Native Clipboard History |
 | `Super + W` | Toggle Desktop Widgets Edit Mode |
 | `Super + S` | Open Wallpaper Switcher |
 | `Super + B` | Toggle Compositor Blur |
 | `Super + Shift + B` | Toggle Ultra-Performance Mode (Blur & Animations OFF) |
 | `Super + '` | Toggle Dropdown Terminal (*Dropterm*) |
-| `Super + L` | Lock Screen (`hyprlock`) |
+| `Super + L` | Lock Screen (Quickshell, `rice-lock`) |
+| `Ctrl + Alt + Del` | Session screen: suspend, restart, shut down, log out (or the power sidebar) |
+| `Super + G` | Quick Notes (can be detached as a floating note) |
+| `Super + D` | Jump to an empty workspace (again to come back) |
+| `Super + Shift + T` | Copy the text in a screen region (OCR, optional translation) |
 | `Super + M` | Exit Hyprland Session |
 | `Alt + Tab` | Live Window Switcher |
-| `Super + Tab` | Workspace Overview — 3D carousel of every workspace with live windows, plus a row of all open apps |
+| `Super + Tab` | Workspace Overview — 3D carousel of every workspace with live windows, plus a row of all open apps; `/` searches, drag a window to move it to another workspace |
 | `Super + Esc` or `Ctrl + Shift + Esc` | Task Manager (Mission Center, falls back to the Plasma/GNOME monitor or `btop`) |
 | Right-click on the desktop | Quick menu: Settings, Display, Terminal, Wallpaper, Edit widgets, Files, Overview, Shortcuts |
 | `Print` or `Super + Shift + S` | Region Screenshot — saves, copies to clipboard and notifies. Cancelling the selection captures the **entire screen** instead of doing nothing |
@@ -193,6 +207,8 @@ rice-update
 
 - **Update Detection**: Background checks quietly query the upstream repository for new commits.
 - **UI Notifications**: When updates are available, the update badge in the **Energy Sidebar** and **Control Center** highlights the new commit count.
+- **Going back**: `rice-update rollback` (or *Go back to the previous version* in Settings) restores the backup taken before an update, keeping the settings you changed since. The current state is saved first, so the rollback can be undone.
+- **Optional modules**: the installer asks about screen recording and the "coming from Windows" apps; declined modules are remembered and skipped by updates.
 - **Automated Backup**: Applying updates creates an automatic timestamped backup in `~/.config/rice-backup-<timestamp>`, pulls changes, syncs configurations, and hot-reloads Quickshell in place without interrupting open windows.
 - **Safe against running binaries**: helpers are installed with `install(1)`, which unlinks before writing. A binary that happens to be running (the wallpaper bridge, the blur watcher) can no longer abort the update halfway and leave the machine half-new, half-old.
 - **Resumes an interrupted update**: a marker records the last sync that actually *finished*. If the git tree moved but the marker did not, the next run redoes the sync instead of reporting "already up to date".
