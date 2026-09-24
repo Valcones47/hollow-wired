@@ -72,7 +72,7 @@ PanelWindow {
             {
                 id: Date.now().toString(),
                 title: "Nota rápida",
-                content: "Bem-vindo ao Quick Notes!\n\n• Suas notas salvam sozinhas continuamente.\n• Use Super + O para abrir ou fechar de qualquer lugar.\n• Crie novas notas e organize seus rascunhos na barra lateral.",
+                content: "Bem-vindo ao Quick Notes!\n\n• Suas notas salvam sozinhas continuamente.\n• Use Super + G para abrir ou fechar de qualquer lugar.\n• Crie novas notas e organize seus rascunhos na barra lateral.",
                 updatedAt: new Date().toISOString()
             }
         ];

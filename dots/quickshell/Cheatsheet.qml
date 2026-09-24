@@ -241,7 +241,7 @@ PanelWindow {
                                 { keys: ["Super", "F1"], desc: Theme.t("cheatsheet.desc_welcome", "Guia de boas-vindas") },
                                 { keys: ["Super", "Shift", "F1"], desc: Theme.t("cheatsheet.desc_cheatsheet", "Esta lista de atalhos") },
                                 { keys: ["Super", "W"], desc: Theme.t("cheatsheet.desc_widgets", "Editor de Widgets de Desktop") },
-                                { keys: ["Super", "O"], desc: Theme.t("cheatsheet.desc_quicknotes", "Bloco de notas rápido flutuante") },
+                                { keys: ["Super", "G"], desc: Theme.t("cheatsheet.desc_quicknotes", "Bloco de notas rápido flutuante") },
                                 { keys: ["Super", "N"], desc: Theme.t("cheatsheet.desc_notif", "Painel de Notificações") },
                                 { keys: ["Super", "Shift", "N"], desc: Theme.t("cheatsheet.desc_dnd", "Alternar Não Perturbe (DND)") },
                                 { keys: ["Super", "S"], desc: Theme.t("cheatsheet.desc_wallpaper", "Seletor de Wallpapers Waywallen") },
