@@ -1688,5 +1688,7 @@
   "ai.translating": "Traduzindo…",
   "ai.translate": "Traduzir",
   "ai.copy": "Copiar",
-  "cheatsheet.desc_ai": "Assistente de IA (conversa e tradução)"
+  "cheatsheet.desc_ai": "Assistente de IA (conversa e tradução)",
+  "net.powersave": "Economia de energia do Wi-Fi",
+  "net.powersave_sub": "Ligada gasta menos bateria, mas deixa o Wi-Fi mais lento e instável. Pede a senha."
 }

@@ -1325,6 +1325,24 @@ PanelWindow {
         }
     }
 
+    // Economia de energia do Wi-Fi: null = sem placa Wi-Fi (a opção some).
+    property var wifiPowersave: null
+    Process {
+        id: powersaveGetProc
+        command: ["rice-network", "powersave"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try { const d = JSON.parse(text); win.wifiPowersave = d.ifaces.length > 0 ? d.enabled === true : null; } catch (e) {}
+            }
+        }
+    }
+    Process {
+        id: powersaveSetProc
+        // Senha recusada: relê e a chave volta para o estado real.
+        onExited: powersaveGetProc.running = true
+    }
+    onCurrentTabChanged: if (currentTab === 11) powersaveGetProc.running = true
+
     // Ctrl+Alt+Del: "dialog" (SessionDialog) ou "sidebar" (EnergySidebar).
     property string ctrlAltDelMode: "dialog"
     FileView {
@@ -6539,6 +6557,22 @@ PanelWindow {
                                             Quickshell.execDetached(["rice-network", "scan"]);
                                             loadNetScanProc.running = true;
                                             showToast(Theme.t("toast.scanning_wifi", "Buscando redes Wi-Fi..."));
+                                        }
+                                    }
+                                }
+
+                                // Economia de energia do Wi-Fi (rice-network powersave): ligada,
+                                // a placa cochila entre pacotes e a velocidade cai e oscila.
+                                OptionGroup {
+                                    visible: win.wifiPowersave !== null
+                                    OptionToggle {
+                                        title: Theme.t("net.powersave", "Economia de energia do Wi-Fi")
+                                        subtitle: Theme.t("net.powersave_sub", "Ligada gasta menos bateria, mas deixa o Wi-Fi mais lento e instável. Pede a senha.")
+                                        checked: win.wifiPowersave === true
+                                        onToggled: nv => {
+                                            win.wifiPowersave = nv;
+                                            powersaveSetProc.command = ["rice-network", "powersave", nv ? "on" : "off"];
+                                            powersaveSetProc.running = true;
                                         }
                                     }
                                 }

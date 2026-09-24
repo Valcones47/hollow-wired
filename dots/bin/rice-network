@@ -10,6 +10,7 @@ Uso:
   rice-network ping
 """
 
+import os
 import sys
 import subprocess
 import json
@@ -154,8 +155,64 @@ def connections():
 VPN_TYPES = ("vpn", "wireguard")
 
 
+# Economia de energia do Wi-Fi: a placa "cochila" entre pacotes. Medido aqui:
+# ligada, ~400 Mbit/s e oscilando; desligada, ~460 Mbit/s. O rice deixa
+# desligada por padrão (install.sh). A escolha fica no NetworkManager
+# (wifi.powersave: 2 = desligada, 3 = ligada), que vale em toda conexão e
+# sobrevive a reinícios; o `iw` aplica na hora.
+POWERSAVE_CONF = "/etc/NetworkManager/conf.d/99-hollow-wired-wifi-powersave.conf"
+
+
+def wifi_ifaces():
+    try:
+        out = subprocess.check_output(["nmcli", "-t", "-f", "DEVICE,TYPE", "device"], text=True, stderr=subprocess.DEVNULL)
+        return [l.split(":")[0] for l in out.splitlines() if l.split(":")[1:2] == ["wifi"]]
+    except Exception:
+        return []
+
+
+def powersave_status():
+    on = None
+    for dev in wifi_ifaces():
+        try:
+            out = subprocess.check_output(["iw", "dev", dev, "get", "power_save"], text=True, stderr=subprocess.DEVNULL)
+            on = "on" in out.lower()
+            break
+        except Exception:
+            pass
+    saved = None
+    try:
+        with open(POWERSAVE_CONF) as f:
+            m = re.search(r"wifi\.powersave\s*=\s*(\d)", f.read())
+            if m:
+                saved = m.group(1) == "3"
+    except OSError:
+        pass
+    return {"enabled": on, "saved": saved, "ifaces": wifi_ifaces()}
+
+
+def powersave_set(enable):
+    val = "3" if enable else "2"
+    conf = f"[connection]\n# hollow-wired: economia de energia do Wi-Fi (2 = desligada, 3 = ligada)\nwifi.powersave = {val}\n"
+    script = f"printf '%s' \"$1\" > {POWERSAVE_CONF} && chmod 644 {POWERSAVE_CONF}"
+    for dev in wifi_ifaces():
+        script += f" && iw dev {dev} set power_save {'on' if enable else 'off'}"
+    # Uma senha só (janela do polkit); no terminal, sudo.
+    runner = ["sudo"] if os.geteuid() != 0 and sys.stdin.isatty() else ([] if os.geteuid() == 0 else ["pkexec"])
+    res = subprocess.run(runner + ["sh", "-c", script, "_", conf], capture_output=True, text=True)
+    return res.returncode == 0
+
+
 def main():
     cmd = sys.argv[1] if len(sys.argv) > 1 else "status"
+
+    if cmd == "powersave":
+        if len(sys.argv) > 2 and sys.argv[2] in ("on", "off"):
+            ok = powersave_set(sys.argv[2] == "on")
+            print(json.dumps({"success": ok, **powersave_status()}))
+        else:
+            print(json.dumps(powersave_status()))
+        return
 
     if cmd == "vpn-list":
         print(json.dumps([c for c in connections() if c["type"] in VPN_TYPES]))
@@ -229,7 +286,7 @@ def main():
             print(json.dumps({"success": False, "error": res.stderr.strip()}))
         return
 
-    print("Uso: rice-network [status|scan|ping|toggle-wifi|connect <SSID> [PASS]|disconnect|vpn-list|vpn-up <uuid>|vpn-down <uuid>|saved-wifi|forget <uuid>]")
+    print("Uso: rice-network [status|scan|ping|toggle-wifi|connect <SSID> [PASS]|disconnect|vpn-list|vpn-up <uuid>|vpn-down <uuid>|saved-wifi|forget <uuid>|powersave [on|off]]")
 
 if __name__ == "__main__":
     main()

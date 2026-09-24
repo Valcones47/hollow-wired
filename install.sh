@@ -681,6 +681,16 @@ for svc in NetworkManager bluetooth power-profiles-daemon; do
     fi
 done
 
+# Economia de energia do Wi-Fi desligada por padrão: ligada, a placa "cochila"
+# entre pacotes e a velocidade cai e oscila (medido: ~400 → ~460 Mbit/s ao
+# desligar). Quem já escolheu (arquivo existe) não é tocado; muda no painel.
+PS_CONF=/etc/NetworkManager/conf.d/99-hollow-wired-wifi-powersave.conf
+if [ -d /etc/NetworkManager ] && [ ! -f "$PS_CONF" ]; then
+    sudo mkdir -p /etc/NetworkManager/conf.d
+    printf '[connection]\n# hollow-wired: economia de energia do Wi-Fi (2 = desligada, 3 = ligada)\nwifi.powersave = 2\n' \
+        | sudo tee "$PS_CONF" >/dev/null && ok_msg "Economia de energia do Wi-Fi desligada (mais velocidade)."
+fi
+
 # ------------------------------------------------------------------------------
 # PAPEL DE PAREDE GARANTIDO
 # ------------------------------------------------------------------------------

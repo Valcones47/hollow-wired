@@ -1688,5 +1688,7 @@
   "ai.translating": "Translating…",
   "ai.translate": "Translate",
   "ai.copy": "Copy",
-  "cheatsheet.desc_ai": "AI assistant (chat and translation)"
+  "cheatsheet.desc_ai": "AI assistant (chat and translation)",
+  "net.powersave": "Wi-Fi power saving",
+  "net.powersave_sub": "On uses less battery but makes Wi-Fi slower and less stable. Asks for your password."
 }
