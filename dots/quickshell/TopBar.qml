@@ -237,6 +237,9 @@ PanelWindow {
 
     // --- rede ---
     readonly property var wifiDevice: Networking.devices.values.find(d => d.type === DeviceType.Wifi) || null
+    // Cabo ligado: o ícone de rede mostra o cabo (o tráfego sai por ele, que
+    // tem prioridade no NetworkManager); antes a barra só sabia de Wi-Fi.
+    readonly property var wiredDevice: Networking.devices.values.find(d => d.type === DeviceType.Wired && d.connected) || null
     readonly property var activeNetwork: wifiDevice ? wifiDevice.networks.values.find(n => n.connected) || null : null
     function wifiIcon() {
         if (!Networking.wifiEnabled) return Theme.icons.wifiOff;
@@ -843,8 +846,8 @@ PanelWindow {
                     // Desktop ligado só no cabo não tem placa Wi-Fi: mostrar um
                     // ícone de "Wi-Fi desligado" pra sempre só confundia.
                     editKey: "network"
-                    visible: bar.wifiDevice !== null && ShellLayout.barHas("network")
-                    BarIcon { text: bar.wifiIcon() }
+                    visible: (bar.wifiDevice !== null || bar.wiredDevice !== null) && ShellLayout.barHas("network")
+                    BarIcon { text: bar.wiredDevice ? Theme.icons.ethernet : bar.wifiIcon() }
                 }
 
                 // Brilho, som e bateria num bloco só: o clique abre a central

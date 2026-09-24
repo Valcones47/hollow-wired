@@ -121,6 +121,9 @@ PanelWindow {
     }
 
     readonly property var wifiDevice: Networking.devices.values.find(d => d.type === DeviceType.Wifi) || null
+    // Cabo ligado: o ícone de rede mostra o cabo (o tráfego sai por ele, que
+    // tem prioridade no NetworkManager); antes a barra só sabia de Wi-Fi.
+    readonly property var wiredDevice: Networking.devices.values.find(d => d.type === DeviceType.Wired && d.connected) || null
     readonly property var activeNetwork: wifiDevice ? wifiDevice.networks.values.find(n => n.connected) || null : null
     function wifiIcon() {
         if (!Networking.wifiEnabled || !vbar.activeNetwork) return Theme.icons.wifiOff;
@@ -605,9 +608,9 @@ PanelWindow {
                     id: vNet
                     editKey: "network"
                     visible: ShellLayout.barHas("network")
-                    icon: vbar.wifiIcon()
+                    icon: vbar.wiredDevice ? Theme.icons.ethernet : vbar.wifiIcon()
                     popKind: "wifi"
-                    iconColor: vbar.activeNetwork ? Theme.textColor : Theme.subtext
+                    iconColor: vbar.activeNetwork || vbar.wiredDevice ? Theme.textColor : Theme.subtext
                     onActivated: Quickshell.execDetached(["quickshell", "ipc", "call", "visualconfig", "tab", "11"])
                 }
 
