@@ -1,0 +1,125 @@
+#!/usr/bin/env bash
+# rice-theme-mode — tema claro ou escuro do rice inteiro (ou automático pelo horário).
+#
+# A escolha fica em ~/.config/hollow-wired/theme-mode.json (estado do usuário):
+#   {"mode": "dark"|"light"|"auto", "light_from": "07:00", "dark_from": "18:00", "applied": "dark"}
+# Quem converte as cores é o rice-colors (mesma paleta do wallpaper, versão
+# clara ou escura); ele regrava Hyprland, Quickshell, kitty, mako e hyprlock.
+# Os apps GTK4/libadwaita (e o que segue o portal) acompanham pelo
+# color-scheme do gsettings.
+#
+# Uso:
+#   rice-theme-mode get                  JSON com a escolha e o modo em vigor
+#   rice-theme-mode set dark|light|auto
+#   rice-theme-mode toggle               claro <-> escuro (sai do automático)
+#   rice-theme-mode hours 07:00 18:00    horário do automático (claro a partir de, escuro a partir de)
+#   rice-theme-mode tick                 no automático, aplica se o horário virou (chamado pelo Quickshell)
+set -euo pipefail
+
+FILE="${XDG_CONFIG_HOME:-$HOME/.config}/hollow-wired/theme-mode.json"
+mkdir -p "$(dirname "$FILE")"
+
+read_json() {
+    python3 - "$FILE" <<'EOF'
+import json, sys
+try:
+    d = json.load(open(sys.argv[1]))
+except Exception:
+    d = {}
+d.setdefault("mode", "dark"); d.setdefault("light_from", "07:00"); d.setdefault("dark_from", "18:00")
+print(json.dumps(d))
+EOF
+}
+
+# write_key chave valor
+write_key() {
+    python3 - "$FILE" "$1" "$2" <<'EOF'
+import json, sys
+path, k, v = sys.argv[1:4]
+try:
+    d = json.load(open(path))
+except Exception:
+    d = {}
+d[k] = v
+tmp = path + ".tmp"
+with open(tmp, "w") as f:
+    json.dump(d, f, indent=2)
+    f.write("\n")
+import os
+os.replace(tmp, path)
+EOF
+}
+
+# Modo em vigor agora ("light"/"dark"), com o automático resolvido.
+effective() {
+    python3 - "$FILE" <<'EOF'
+import json, sys, datetime
+try:
+    d = json.load(open(sys.argv[1]))
+except Exception:
+    d = {}
+mode = d.get("mode", "dark")
+def mins(v, dflt):
+    try:
+        h, m = str(v).split(":"); return int(h) * 60 + int(m)
+    except Exception:
+        return dflt
+if mode == "auto":
+    n = datetime.datetime.now(); cur = n.hour * 60 + n.minute
+    lf, df = mins(d.get("light_from"), 420), mins(d.get("dark_from"), 1080)
+    light = (lf <= cur < df) if lf <= df else not (df <= cur < lf)
+    print("light" if light else "dark")
+else:
+    print("light" if mode == "light" else "dark")
+EOF
+}
+
+apply_now() {
+    local eff
+    eff=$(effective)
+    command -v rice-colors >/dev/null 2>&1 && rice-colors apply >/dev/null 2>&1 || true
+    if command -v gsettings >/dev/null 2>&1; then
+        gsettings set org.gnome.desktop.interface color-scheme \
+            "$([ "$eff" = light ] && echo prefer-light || echo prefer-dark)" 2>/dev/null || true
+    fi
+    write_key applied "$eff"
+}
+
+cmd="${1:-get}"
+case "$cmd" in
+    get)
+        python3 - "$(read_json)" "$(effective)" <<'EOF'
+import json, sys
+d = json.loads(sys.argv[1]); d["effective"] = sys.argv[2]
+print(json.dumps(d))
+EOF
+        ;;
+    set)
+        case "${2:-}" in dark|light|auto) ;; *) echo "use: set dark|light|auto" >&2; exit 1 ;; esac
+        write_key mode "$2"
+        apply_now
+        ;;
+    toggle)
+        if [ "$(effective)" = light ]; then write_key mode dark; else write_key mode light; fi
+        apply_now
+        ;;
+    hours)
+        for v in "${2:-}" "${3:-}"; do
+            [[ "$v" =~ ^([01][0-9]|2[0-3]):[0-5][0-9]$ ]] || { echo "horário inválido: $v (use HH:MM)" >&2; exit 1; }
+        done
+        write_key light_from "$2"
+        write_key dark_from "$3"
+        [ "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("mode",""))' "$FILE")" = auto ] && apply_now
+        ;;
+    tick)
+        applied=$(python3 -c 'import json,sys
+try: print(json.load(open(sys.argv[1])).get("applied",""))
+except Exception: print("")' "$FILE")
+        [ "$(effective)" != "$applied" ] && apply_now
+        ;;
+    *)
+        sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'
+        exit 1
+        ;;
+esac
+exit 0

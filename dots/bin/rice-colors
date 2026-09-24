@@ -163,6 +163,77 @@ def enforce_dark_background(data):
     return data
 
 
+# ------------------------------------------------- modo claro
+
+# rice-theme-mode grava a escolha em ~/.config/hollow-wired/theme-mode.json:
+# {"mode": "dark"|"light"|"auto", "light_from": "07:00", "dark_from": "18:00"}.
+# No claro, a mesma paleta do wallpaper vira fundo claro e texto escuro, e os
+# destaques são escurecidos até terem contraste com o fundo. O Theme.qml já
+# troca o sentido do contraste sozinho quando o fundo é claro.
+THEME_MODE = os.path.join(HOME, ".config/hollow-wired/theme-mode.json")
+
+
+def _minutes(hhmm, default):
+    try:
+        h, m = str(hhmm).split(":")
+        return int(h) * 60 + int(m)
+    except (ValueError, AttributeError):
+        return default
+
+
+def theme_mode():
+    """"light" ou "dark" (o "auto" já resolvido pelo horário)."""
+    d = load_json(THEME_MODE)
+    mode = d.get("mode", "dark")
+    if mode == "auto":
+        import datetime
+        now = datetime.datetime.now()
+        cur = now.hour * 60 + now.minute
+        lf = _minutes(d.get("light_from"), 7 * 60)
+        df = _minutes(d.get("dark_from"), 18 * 60)
+        if lf <= df:
+            return "light" if lf <= cur < df else "dark"
+        return "dark" if df <= cur < lf else "light"
+    return "light" if mode == "light" else "dark"
+
+
+def _hls_set(hex_color, light=None, max_sat=None):
+    import colorsys
+    h, l, sat = colorsys.rgb_to_hls(*_rgb(hex_color))
+    if light is not None:
+        l = light
+    if max_sat is not None:
+        sat = min(sat, max_sat)
+    return _hex(colorsys.hls_to_rgb(h, l, sat))
+
+
+def to_light(p):
+    """Variante clara da paleta (fundo claro, texto e destaques escuros)."""
+    import colorsys
+    out = dict(p)
+    out["background"] = _hls_set(p["background"], 0.94, 0.22)
+    out["foreground"] = _hls_set(p["foreground"], 0.14, 0.25)
+    out["cursor"] = out["foreground"]
+    # "preto" e "branco" do terminal trocam de papel: preto vira texto escuro,
+    # branco vira cinza médio (como nos temas claros comuns).
+    out["color0"] = _hls_set(p["color0"], 0.22, 0.2)
+    out["color8"] = _hls_set(p["color8"], 0.48, 0.2)
+    out["color7"] = _hls_set(p["color7"], 0.40, 0.2)
+    out["color15"] = _hls_set(p["color15"], 0.30, 0.2)
+    for i in (1, 2, 3, 4, 5, 6, 9, 10, 11, 12, 13, 14):
+        k = "color%d" % i
+        h, l, sat = colorsys.rgb_to_hls(*_rgb(p[k]))
+        out[k] = _hex(colorsys.hls_to_rgb(h, min(l, 0.40), sat))
+    return out
+
+
+def darken(hex_color, factor):
+    """Contrário do lighten: mistura com preto (os templates pedem lighten
+    para o texto do terminal ficar legível no escuro; no claro é o inverso)."""
+    r, g, b = _rgb(hex_color)
+    return _hex((r * (1 - factor), g * (1 - factor), b * (1 - factor)))
+
+
 def base_palette():
     """Paleta vinda do wallpaper, sem as trocas do usuário."""
     data = enforce_dark_background(load_json(BASE))
@@ -179,6 +250,8 @@ def base_palette():
             out[k] = v
     if not norm(data.get("cursor", "")):
         out["cursor"] = out["foreground"]
+    if theme_mode() == "light":
+        out = to_light(out)
     return out
 
 
@@ -207,6 +280,8 @@ PLACEHOLDER = re.compile(r'\{\{\s*([a-zA-Z0-9_]+)\s*((?:\|[^}]*)?)\}\}')
 
 
 def render(text, palette):
+    light = theme_mode() == "light"
+
     def sub(m):
         key, filters = m.group(1), m.group(2)
         value = palette.get(key)
@@ -218,7 +293,8 @@ def render(text, palette):
             else:
                 lm = re.match(r'lighten\(\s*([0-9.]+)\s*\)', f)
                 if lm:
-                    value = lighten(value, float(lm.group(1)))
+                    f_ = float(lm.group(1))
+                    value = darken(value, f_) if light else lighten(value, f_)
                 else:
                     # Filtro desconhecido: melhor deixar a cor crua do que
                     # escrever lixo num arquivo de configuração.

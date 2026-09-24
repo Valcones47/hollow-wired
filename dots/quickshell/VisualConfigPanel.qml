@@ -1306,6 +1306,25 @@ PanelWindow {
     }
 
     property bool polkitNativeEnabled: false
+    // Tema claro/escuro (rice-theme-mode; ~/.config/hollow-wired/theme-mode.json).
+    property string themeMode: "dark"
+    property string themeLightFrom: "07:00"
+    property string themeDarkFrom: "18:00"
+    FileView {
+        path: Quickshell.env("HOME") + "/.config/hollow-wired/theme-mode.json"
+        watchChanges: true
+        printErrors: false
+        onFileChanged: reload()
+        onLoaded: {
+            try {
+                const d = JSON.parse(text()) || {};
+                win.themeMode = ["dark", "light", "auto"].includes(d.mode) ? d.mode : "dark";
+                win.themeLightFrom = d.light_from || "07:00";
+                win.themeDarkFrom = d.dark_from || "18:00";
+            } catch (e) {}
+        }
+    }
+
     // Ctrl+Alt+Del: "dialog" (SessionDialog) ou "sidebar" (EnergySidebar).
     property string ctrlAltDelMode: "dialog"
     FileView {
@@ -5118,6 +5137,52 @@ PanelWindow {
                                                         win.openColorPicker("color" + parent.modelData, "c" + parent.modelData, parent.hex);
                                                     }
                                                 }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Tema claro/escuro do rice inteiro (rice-theme-mode).
+                                OptionGroup {
+                                    OptionRow {
+                                        title: Theme.t("theme.mode_title", "Tema")
+                                        subtitle: Theme.t("theme.mode_sub", "A mesma paleta do wallpaper, com fundo claro ou escuro. Vale para barra, painéis, terminal e apps GTK.")
+                                        Segmented {
+                                            options: [
+                                                { value: "dark", label: Theme.t("theme.dark", "Escuro") },
+                                                { value: "light", label: Theme.t("theme.light", "Claro") },
+                                                { value: "auto", label: Theme.t("theme.auto", "Automático") }
+                                            ]
+                                            current: win.themeMode
+                                            onPicked: v => {
+                                                win.themeMode = v;
+                                                Quickshell.execDetached(["rice-theme-mode", "set", v]);
+                                            }
+                                        }
+                                    }
+                                    RowDivider { visible: win.themeMode === "auto" }
+                                    OptionRow {
+                                        visible: win.themeMode === "auto"
+                                        title: Theme.t("theme.light_from", "Claro a partir de")
+                                        Segmented {
+                                            options: ["06:00", "07:00", "08:00", "09:00"].map(h => ({ value: h, label: h }))
+                                            current: win.themeLightFrom
+                                            onPicked: v => {
+                                                win.themeLightFrom = v;
+                                                Quickshell.execDetached(["rice-theme-mode", "hours", v, win.themeDarkFrom]);
+                                            }
+                                        }
+                                    }
+                                    RowDivider { visible: win.themeMode === "auto" }
+                                    OptionRow {
+                                        visible: win.themeMode === "auto"
+                                        title: Theme.t("theme.dark_from", "Escuro a partir de")
+                                        Segmented {
+                                            options: ["17:00", "18:00", "19:00", "20:00"].map(h => ({ value: h, label: h }))
+                                            current: win.themeDarkFrom
+                                            onPicked: v => {
+                                                win.themeDarkFrom = v;
+                                                Quickshell.execDetached(["rice-theme-mode", "hours", win.themeLightFrom, v]);
                                             }
                                         }
                                     }

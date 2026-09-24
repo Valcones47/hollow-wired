@@ -315,6 +315,27 @@ QtObject {
         }
     }
 
+    // Tema automático pelo horário: a cada minuto pergunta ao rice-theme-mode
+    // se o horário virou (ele só regrava as cores quando muda de fato).
+    property bool themeAuto: false
+    property FileView themeModeFile: FileView {
+        path: Quickshell.env("HOME") + "/.config/hollow-wired/theme-mode.json"
+        watchChanges: true
+        printErrors: false
+        onFileChanged: reload()
+        onLoaded: {
+            try { root.themeAuto = (JSON.parse(text()) || {}).mode === "auto"; } catch (e) { root.themeAuto = false; }
+        }
+        onLoadFailed: root.themeAuto = false
+    }
+    property Timer themeTick: Timer {
+        interval: 60000
+        repeat: true
+        triggeredOnStart: true
+        running: root.themeAuto
+        onTriggered: Quickshell.execDetached(["rice-theme-mode", "tick"])
+    }
+
     property FileView accentOverrideFile: FileView {
         path: Quickshell.env("HOME") + "/.config/hypr/color-overrides.json"
         watchChanges: true

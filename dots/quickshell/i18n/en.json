@@ -1647,5 +1647,12 @@
   "agenda.new_task": "New task (Enter adds)",
   "agenda.no_tasks": "Nothing pending",
   "cc.saved_networks": "Saved networks",
-  "cc.forget_hint": "Click twice to forget the network (the saved password is deleted)."
+  "cc.forget_hint": "Click twice to forget the network (the saved password is deleted).",
+  "theme.mode_title": "Theme",
+  "theme.mode_sub": "The same wallpaper palette with a light or dark background. Applies to the bar, panels, terminal and GTK apps.",
+  "theme.dark": "Dark",
+  "theme.light": "Light",
+  "theme.auto": "Automatic",
+  "theme.light_from": "Light from",
+  "theme.dark_from": "Dark from"
 }
