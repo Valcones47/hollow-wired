@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# rice-ocr — Captura uma área da tela e extrai o texto diretamente para o clipboard via OCR (Super + Shift + T).
+
+set -euo pipefail
+
+# Dependências necessárias
+for cmd in grim slurp tesseract wl-copy notify-send; do
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+        notify-send -u critical "OCR hollow-wired" "Comando '$cmd' não está instalado."
+        exit 1
+    fi
+done
+
+# Localização dos modelos de idiomas
+TESS_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/tessdata"
+if [ -d "$TESS_DIR" ] && [ -f "$TESS_DIR/por.traineddata" ]; then
+    export TESSDATA_PREFIX="$TESS_DIR"
+fi
+
+TMP_IMG="/tmp/rice-ocr-snap-$$.png"
+trap 'rm -f "$TMP_IMG"' EXIT
+
+# Seleção de região com slurp (Esc cancela silenciosamente)
+geom=$(slurp -d -b "#000000aa" -c "#ff77a8" -w 2 2>/dev/null || true)
+[ -n "$geom" ] || exit 0
+
+# Captura a região selecionada
+grim -g "$geom" "$TMP_IMG" 2>/dev/null || exit 0
+
+[ -s "$TMP_IMG" ] || exit 0
+
+# Detecta quais idiomas estão disponíveis
+langs="por+eng"
+avail_langs=$(tesseract --list-langs 2>/dev/null || true)
+if echo "$avail_langs" | grep -q "spa"; then
+    langs="$langs+spa"
+fi
+if echo "$avail_langs" | grep -q "jpn"; then
+    langs="$langs+jpn"
+fi
+
+# Executa o OCR
+text=$(tesseract "$TMP_IMG" stdout -l "$langs" 2>/dev/null || true)
+
+# Remove espaços em branco do início e do fim
+trimmed=$(echo "$text" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+
+if [ -n "$trimmed" ]; then
+    # Envia para a área de transferência do Wayland
+    printf "%s" "$trimmed" | wl-copy
+
+    # Prepara resumo para a notificação
+    char_count=$(printf "%s" "$trimmed" | wc -m)
+    line_count=$(printf "%s" "$trimmed" | wc -l)
+    
+    # Prévia de até 140 caracteres
+    preview=$(echo "$trimmed" | head -n 3 | cut -c 1-140)
+    if [ "$char_count" -gt 140 ]; then
+        preview="${preview}..."
+    fi
+
+    notify-send -a "hollow-wired" -i "edit-copy" \
+        "Texto copiado para a Área de Transferência" \
+        "<b>${char_count} caracteres</b> (${line_count} linhas):\n<i>${preview}</i>"
+else
+    notify-send -a "hollow-wired" -u low -i "dialog-information" \
+        "OCR hollow-wired" \
+        "Nenhum texto legível foi encontrado na área selecionada."
+fi

@@ -257,6 +257,7 @@ PanelWindow {
                                 { keys: ["Super", "Shift", "R"], desc: Theme.t("cheatsheet.desc_record_region", "Gravar a tela inteira (de novo para parar)") },
                                 { keys: ["Super", "Ctrl", "Shift", "R"], desc: Theme.t("cheatsheet.desc_record_screen", "Gravar tela inteira") },
                                 { keys: ["Super", "Shift", "C"], desc: Theme.t("cheatsheet.desc_picker", "Conta-gotas de cores") },
+                                { keys: ["Super", "Shift", "T"], desc: Theme.t("cheatsheet.desc_ocr", "Copiar texto de imagem/vídeo da tela (OCR)") },
                                 { keys: ["Super", "V"], desc: Theme.t("cheatsheet.desc_clipboard", "Histórico da área de transferência") },
                                 { keys: ["Super", "Ctrl", "V"], desc: Theme.t("cheatsheet.desc_clipboard_fav", "Favoritos da área de transferência") },
                                 { keys: ["Num Lock"], desc: Theme.t("cheatsheet.desc_mic", "Mute / Unmute do microfone") },

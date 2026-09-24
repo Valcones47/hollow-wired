@@ -799,6 +799,8 @@ hl.bind(mainMod .. " + SHIFT + S",       hl.dsp.exec_cmd("rice-screenshot region
 hl.bind(mainMod .. " + ALT + S",         hl.dsp.exec_cmd("rice-screenshot edit"))
 hl.bind("SHIFT + Print",                 hl.dsp.exec_cmd("rice-screenshot output"))
 hl.bind("CTRL + Print",                  hl.dsp.exec_cmd("rice-screenshot window"))
+-- OCR: seleciona uma área da tela e extrai o texto direto para o clipboard (estilo end-4)
+hl.bind(mainMod .. " + SHIFT + T",       hl.dsp.exec_cmd("rice-ocr"))
 
 -----------------------
 ---- QoL (backlog) ----

@@ -396,7 +396,8 @@ PanelWindow {
                 { key: "Super + Alt + S", action: Theme.t("binds.act_screenshot_swappy", "Captura com Editor de Anotações (Swappy)") },
                 { key: "Shift + Print", action: Theme.t("binds.act_screenshot_full", "Captura da Tela Inteira") },
                 { key: "Ctrl + Print", action: Theme.t("binds.act_screenshot_window", "Captura da Janela Ativa") },
-                { key: "Super + Shift + R", action: Theme.t("binds.act_record_full", "Gravar Vídeo da Tela Inteira") }
+                { key: "Super + Shift + R", action: Theme.t("binds.act_record_full", "Gravar Vídeo da Tela Inteira") },
+                { key: "Super + Shift + T", action: Theme.t("binds.act_ocr", "Reconhecer e Copiar Texto da Tela (OCR)") }
             ]
         },
         {
