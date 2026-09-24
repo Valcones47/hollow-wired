@@ -102,8 +102,10 @@ QtObject {
     }
 
     // Poller de contingência: verifica se o mako está ativo e faz fallback se necessário
+    // Com o Quickshell como servidor, basta conferir de vez em quando se ele
+    // continua dono do nome (15 s); com o mako, o contador vem do makoctl.
     property Timer pollTimer: Timer {
-        interval: 3500
+        interval: root.currentOwner === "quickshell" ? 15000 : 3500
         running: true
         repeat: true
         triggeredOnStart: true
@@ -162,7 +164,8 @@ QtObject {
 
     function refresh() {
         if (!ownerCheckProc.running) ownerCheckProc.running = true;
-        if (!syncProc.running) syncProc.running = true;
+        // rice-notif-status lê o mako: no modo nativo não tem o que ler.
+        if (root.currentOwner !== "quickshell" && !syncProc.running) syncProc.running = true;
     }
 
     function toggleDnd() {

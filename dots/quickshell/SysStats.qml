@@ -48,32 +48,45 @@ QtObject {
         }
     }
 
-    // ---------- CPU: uso % (delta de /proc/stat em 1s) + temperatura ----------
+    // ---------- CPU: uso % (delta de /proc/stat entre leituras) + temperatura ----------
+    // Antes: um bash com `sleep 1` e o `sensors` a cada 2,5 s. Agora /proc/stat
+    // e o hwmon da CPU (coretemp/k10temp, achado uma vez) são lidos direto; o
+    // uso é a diferença desde a leitura anterior.
     property Timer cpuTimer: Timer {
         interval: 2500
         running: root.active
         repeat: true
         triggeredOnStart: true
         onTriggered: {
-            root.cpuProc.running = true;
+            root.sampleCpu();
             if (root.gpuName === "GPU") root.gpuNameProc.running = true;
         }
     }
-    property Process cpuProc: Process {
-        command: ["bash", "-c",
-            "read _ u1 n1 s1 i1 w1 ir1 so1 _ < /proc/stat; sleep 1; " +
-            "read _ u2 n2 s2 i2 w2 ir2 so2 _ < /proc/stat; " +
-            "t1=$((u1+n1+s1+i1+w1+ir1+so1)); t2=$((u2+n2+s2+i2+w2+ir2+so2)); " +
-            "id1=$((i1+w1)); id2=$((i2+w2)); dt=$((t2-t1)); di=$((id2-id1)); " +
-            "pct=$(( dt>0 ? (100*(dt-di))/dt : 0 )); " +
-            "temp=$(sensors 2>/dev/null | awk '/(Package id 0|Tctl|Tdie|CPU Temperature|Core 0)/ {match($0, /[0-9]+\\.[0-9]+/, a); print a[0]; exit}'); " +
-            "echo \"$pct ${temp:-0}\""]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                const parts = text.trim().split(/\s+/);
-                root.cpuUsage = parseFloat(parts[0]) / 100 || 0;
-                root.cpuTemp = parts[1] ? parseFloat(parts[1]) : 0;
+    property var _cpuPrev: null
+    property FileView statFile: FileView { path: "/proc/stat"; blockLoading: true; printErrors: false }
+    property string tempPath: ""
+    property FileView tempFile: FileView { path: root.tempPath; blockLoading: true; printErrors: false }
+    property Process tempFind: Process {
+        running: true
+        command: ["sh", "-c", "for d in /sys/class/hwmon/hwmon*; do case $(cat $d/name 2>/dev/null) in "
+            + "coretemp|k10temp|zenpower|cpu_thermal) echo $d/temp1_input; exit;; esac; done"]
+        stdout: StdioCollector { onStreamFinished: root.tempPath = text.trim() }
+    }
+    function sampleCpu() {
+        statFile.reload();
+        const f = ((statFile.text() || "").split("\n")[0] || "").trim().split(/\s+/).slice(1).map(Number);
+        if (f.length >= 7) {
+            const total = f.slice(0, 7).reduce((a, b) => a + b, 0), idle = f[3] + f[4];
+            if (root._cpuPrev) {
+                const dt = total - root._cpuPrev.t, di = idle - root._cpuPrev.i;
+                if (dt > 0) root.cpuUsage = Math.max(0, Math.min(1, (dt - di) / dt));
             }
+            root._cpuPrev = { t: total, i: idle };
+        }
+        if (root.tempPath !== "") {
+            tempFile.reload();
+            const v = parseInt(tempFile.text());
+            if (v > 0) root.cpuTemp = v / 1000;
         }
     }
 
@@ -86,8 +99,12 @@ QtObject {
         onTriggered: root.gpuProc.running = true
     }
     property Process gpuProc: Process {
+        // O nvidia-smi ACORDA a placa (sai do D3cold): chamado a cada 2,5 s
+        // enquanto houver widget de sistema, a NVIDIA nunca dormia (bateria e
+        // temperatura). Só pergunta a ela se já estiver acordada.
         command: ["bash", "-c",
-            "if command -v nvidia-smi >/dev/null 2>&1; then " +
+            "st=$(cat /sys/bus/pci/drivers/nvidia/0000:*/power/runtime_status 2>/dev/null | head -1); " +
+            "if [ \"$st\" = active ] && command -v nvidia-smi >/dev/null 2>&1; then " +
             "    nvidia-smi --query-gpu=utilization.gpu,temperature.gpu --format=csv,noheader,nounits 2>/dev/null || echo '0,0'; " +
             "else " +
             "    echo '0,0'; " +

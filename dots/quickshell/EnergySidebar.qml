@@ -205,12 +205,23 @@ PanelWindow {
     // ================= QoL: gravação, café, luz noturna, GPU, reboot, cache =================
     // Gravando? (rice-record grava o pid em $XDG_RUNTIME_DIR/rice-record.pid)
     property bool recording: false
+    // Antes era um bash a cada 2 s, para sempre. Agora o arquivo de pid é
+    // observado (o rice-record cria ao começar e apaga ao parar); o kill -0
+    // confirma, e só enquanto grava há uma checagem lenta (processo que morreu
+    // sem apagar o pid).
+    FileView {
+        path: Quickshell.env("XDG_RUNTIME_DIR") + "/rice-record.pid"
+        watchChanges: true
+        printErrors: false
+        onFileChanged: reload()
+        onLoaded: if (!recProc.running) recProc.running = true
+        onLoadFailed: sidebar.recording = false
+    }
     Timer {
-        interval: 2000
-        running: true
+        interval: 15000
+        running: sidebar.recording
         repeat: true
-        triggeredOnStart: true
-        onTriggered: recProc.running = true
+        onTriggered: if (!recProc.running) recProc.running = true
     }
     Process {
         id: recProc
