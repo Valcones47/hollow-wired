@@ -1556,5 +1556,13 @@
   "session.ok": "OK",
   "session.cancel": "Cancel",
   "binds.act_session": "Session Menu (Shut Down / Restart)",
-  "cheatsheet.desc_session": "Shutdown and session menu"
+  "cheatsheet.desc_session": "Shutdown and session menu",
+  "ocr.section_title": "Screen Text Recognition (OCR)",
+  "ocr.section_sub": "Shortcut Super + Shift + T to extract text from any screen area",
+  "ocr.toggle_title": "Automatic Text Translation",
+  "ocr.toggle_sub": "When capturing, automatically translates text from other languages into Portuguese.",
+  "ocr.privacy_title": "Privacy Notice",
+  "ocr.privacy_sub": "When enabled, captured screen text is sent to the public MyMemory API for language detection and translation. Disabled by default.",
+  "ocr.enabled_toast": "Automatic translation enabled for OCR",
+  "ocr.disabled_toast": "Automatic translation disabled for OCR"
 }

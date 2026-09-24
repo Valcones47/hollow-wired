@@ -1556,5 +1556,13 @@
   "session.ok": "OK",
   "session.cancel": "Cancelar",
   "binds.act_session": "Menu de Sessão (Desligar / Reiniciar)",
-  "cheatsheet.desc_session": "Menu de desligamento e sessão"
+  "cheatsheet.desc_session": "Menu de desligamento e sessão",
+  "ocr.section_title": "Reconhecimento de Texto da Tela (OCR)",
+  "ocr.section_sub": "Atalho Super + Shift + T para extrair texto de qualquer área da tela",
+  "ocr.toggle_title": "Tradução Automática de Texto",
+  "ocr.toggle_sub": "Ao capturar, traduz textos em outros idiomas automaticamente para Português.",
+  "ocr.privacy_title": "Aviso de Privacidade",
+  "ocr.privacy_sub": "Quando ativado, o texto selecionado na tela é enviado à API pública MyMemory para detecção e tradução. Desativado por padrão.",
+  "ocr.enabled_toast": "Tradução automática ativada no OCR",
+  "ocr.disabled_toast": "Tradução automática desativada no OCR"
 }

@@ -1288,6 +1288,23 @@ PanelWindow {
         }
     }
 
+    property bool ocrTranslate: false
+
+    Process {
+        id: loadOcrPrefsProc
+        command: ["rice-ocr", "--status"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const d = JSON.parse(text);
+                    if (d) {
+                        win.ocrTranslate = d.translate === true;
+                    }
+                } catch (e) {}
+            }
+        }
+    }
+
     property string recordingDiscordTarget: ""
     property bool editingManualMute: false
     property bool editingManualDeafen: false
@@ -1377,6 +1394,7 @@ PanelWindow {
         loadSoftwareUpdatesProc.running = true;
         loadRiceUpdateProc.running = true;
         loadDiscordProc.running = true;
+        loadOcrPrefsProc.running = true;
     }
 
     // Debounce genérico para sliders
@@ -9055,6 +9073,35 @@ PanelWindow {
                                                 }
                                             }
                                         }
+                                    }
+                                }
+
+                                // ==================== RECONHECIMENTO DE TEXTO & TRADUÇÃO (OCR) ====================
+                                SectionHeader {
+                                    title: Theme.t("ocr.section_title", "Reconhecimento de Texto da Tela (OCR)")
+                                    subtitle: Theme.t("ocr.section_sub", "Atalho Super + Shift + T para extrair texto de qualquer área da tela")
+                                }
+
+                                OptionGroup {
+                                    OptionToggle {
+                                        title: Theme.t("ocr.toggle_title", "Tradução Automática de Texto")
+                                        subtitle: Theme.t("ocr.toggle_sub", "Ao capturar, traduz textos em outros idiomas automaticamente para Português.")
+                                        checked: win.ocrTranslate
+                                        onToggled: nextVal => {
+                                            win.ocrTranslate = nextVal;
+                                            if (nextVal) {
+                                                Quickshell.execDetached(["rice-ocr", "--enable-translate"]);
+                                                win.showToast(Theme.t("ocr.enabled_toast", "Tradução automática ativada no OCR"));
+                                            } else {
+                                                Quickshell.execDetached(["rice-ocr", "--disable-translate"]);
+                                                win.showToast(Theme.t("ocr.disabled_toast", "Tradução automática desativada no OCR"));
+                                            }
+                                        }
+                                    }
+                                    RowDivider {}
+                                    OptionRow {
+                                        title: Theme.t("ocr.privacy_title", "Aviso de Privacidade")
+                                        subtitle: Theme.t("ocr.privacy_sub", "Quando ativado, o texto selecionado na tela é enviado à API pública MyMemory para detecção e tradução. Desativado por padrão.")
                                     }
                                 }
                             }

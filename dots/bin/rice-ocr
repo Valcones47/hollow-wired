@@ -1,7 +1,51 @@
 #!/usr/bin/env bash
 # rice-ocr — Captura uma área da tela e extrai o texto diretamente para o clipboard via OCR (Super + Shift + T).
+# Com suporte a tradução automática e detecção de idioma (opcional, desligado por padrão).
 
 set -euo pipefail
+
+PREFS_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/hollow-wired/ocr-prefs.json"
+
+# Subcomandos para controle pelo painel ou terminal
+case "${1:-}" in
+    --status)
+        if [ -f "$PREFS_FILE" ]; then
+            cat "$PREFS_FILE"
+        else
+            echo '{"translate": false, "target_lang": "pt-BR"}'
+        fi
+        exit 0
+        ;;
+    --enable-translate)
+        mkdir -p "$(dirname "$PREFS_FILE")"
+        echo '{"translate": true, "target_lang": "pt-BR"}' > "$PREFS_FILE"
+        echo "enabled"
+        exit 0
+        ;;
+    --disable-translate)
+        mkdir -p "$(dirname "$PREFS_FILE")"
+        echo '{"translate": false, "target_lang": "pt-BR"}' > "$PREFS_FILE"
+        echo "disabled"
+        exit 0
+        ;;
+    --toggle-translate)
+        mkdir -p "$(dirname "$PREFS_FILE")"
+        cur="false"
+        if [ -f "$PREFS_FILE" ]; then
+            if grep -q '"translate"[[:space:]]*:[[:space:]]*true' "$PREFS_FILE" 2>/dev/null; then
+                cur="true"
+            fi
+        fi
+        if [ "$cur" = "true" ]; then
+            echo '{"translate": false, "target_lang": "pt-BR"}' > "$PREFS_FILE"
+            echo "disabled"
+        else
+            echo '{"translate": true, "target_lang": "pt-BR"}' > "$PREFS_FILE"
+            echo "enabled"
+        fi
+        exit 0
+        ;;
+esac
 
 # Dependências necessárias
 for cmd in grim slurp tesseract wl-copy notify-send; do
@@ -29,7 +73,7 @@ grim -g "$geom" "$TMP_IMG" 2>/dev/null || exit 0
 
 [ -s "$TMP_IMG" ] || exit 0
 
-# Detecta quais idiomas estão disponíveis
+# Detecta quais idiomas estão disponíveis no Tesseract
 langs="por+eng"
 avail_langs=$(tesseract --list-langs 2>/dev/null || true)
 if echo "$avail_langs" | grep -q "spa"; then
@@ -45,25 +89,119 @@ text=$(tesseract "$TMP_IMG" stdout -l "$langs" 2>/dev/null || true)
 # Remove espaços em branco do início e do fim
 trimmed=$(echo "$text" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
 
-if [ -n "$trimmed" ]; then
-    # Envia para a área de transferência do Wayland
-    printf "%s" "$trimmed" | wl-copy
-
-    # Prepara resumo para a notificação
-    char_count=$(printf "%s" "$trimmed" | wc -m)
-    line_count=$(printf "%s" "$trimmed" | wc -l)
-    
-    # Prévia de até 140 caracteres
-    preview=$(echo "$trimmed" | head -n 3 | cut -c 1-140)
-    if [ "$char_count" -gt 140 ]; then
-        preview="${preview}..."
-    fi
-
-    notify-send -a "hollow-wired" -i "edit-copy" \
-        "Texto copiado para a Área de Transferência" \
-        "<b>${char_count} caracteres</b> (${line_count} linhas):\n<i>${preview}</i>"
-else
+if [ -z "$trimmed" ]; then
     notify-send -a "hollow-wired" -u low -i "dialog-information" \
         "OCR hollow-wired" \
         "Nenhum texto legível foi encontrado na área selecionada."
+    exit 0
 fi
+
+# Checa se a tradução está ativada nas preferências
+translate_enabled=false
+if [ -f "$PREFS_FILE" ]; then
+    if grep -q '"translate"[[:space:]]*:[[:space:]]*true' "$PREFS_FILE" 2>/dev/null; then
+        translate_enabled=true
+    fi
+fi
+
+if [ "$translate_enabled" = "true" ] && command -v python3 >/dev/null 2>&1; then
+    # Executa detecção de idioma e tradução via API MyMemory com fallback offline
+    trans_json=$(python3 - "$trimmed" << 'EOF'
+import sys, json, urllib.request, urllib.parse
+
+raw_text = sys.argv[1] if len(sys.argv) > 1 else ""
+if not raw_text.strip():
+    print(json.dumps({"status": "empty"}))
+    sys.exit(0)
+
+# Divide em chunks de até 450 caracteres respeitando quebras de linha
+chunks = []
+lines = raw_text.split('\n')
+cur = ''
+for line in lines:
+    if len(cur) + len(line) + 1 > 400:
+        if cur: chunks.append(cur)
+        cur = line
+    else:
+        cur = (cur + '\n' + line) if cur else line
+if cur: chunks.append(cur)
+
+translated_chunks = []
+detected_lang = ""
+
+try:
+    for c in chunks:
+        if not c.strip():
+            translated_chunks.append(c)
+            continue
+        params = urllib.parse.urlencode({'q': c, 'langpair': 'autodetect|pt-BR'})
+        url = f"https://api.mymemory.translated.net/get?{params}"
+        req = urllib.request.Request(url, headers={'User-Agent': 'hollow-wired-rice/1.0'})
+        with urllib.request.urlopen(req, timeout=3.5) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+            t_chunk = data.get('responseData', {}).get('translatedText', c)
+            det = data.get('responseData', {}).get('detectedLanguage', '')
+            if det and not detected_lang:
+                detected_lang = det
+            translated_chunks.append(t_chunk)
+
+    full_trans = '\n'.join(translated_chunks)
+    print(json.dumps({
+        "status": "ok",
+        "translated": full_trans,
+        "detected": detected_lang or "auto"
+    }))
+except Exception as e:
+    print(json.dumps({
+        "status": "error",
+        "error": str(e)
+    }))
+EOF
+) || trans_json='{"status":"error"}'
+
+    status=$(python3 -c "import json, sys; d=json.loads(sys.argv[1]); print(d.get('status','error'))" "$trans_json" 2>/dev/null || echo "error")
+
+    if [ "$status" = "ok" ]; then
+        translated_text=$(python3 -c "import json, sys; d=json.loads(sys.argv[1]); print(d.get('translated',''))" "$trans_json" 2>/dev/null || true)
+        detected_lang=$(python3 -c "import json, sys; d=json.loads(sys.argv[1]); print(d.get('detected',''))" "$trans_json" 2>/dev/null || echo "auto")
+
+        # Se detectou que já era português ou o texto traduzido for idêntico
+        if [ "$detected_lang" = "pt" ] || [ "$detected_lang" = "pt-BR" ] || [ "$translated_text" = "$trimmed" ]; then
+            printf "%s" "$trimmed" | wl-copy
+            char_count=$(printf "%s" "$trimmed" | wc -m)
+            line_count=$(printf "%s" "$trimmed" | wc -l)
+            preview=$(echo "$trimmed" | head -n 3 | cut -c 1-140)
+            [ "$char_count" -gt 140 ] && preview="${preview}..."
+
+            notify-send -a "hollow-wired" -i "edit-copy" \
+                "Texto copiado (Português detectado)" \
+                "<b>${char_count} caracteres</b> (${line_count} linhas):\n<i>${preview}</i>"
+        else
+            # Copia a tradução para a área de transferência
+            printf "%s" "$translated_text" | wl-copy
+            
+            orig_prev=$(echo "$trimmed" | head -n 2 | cut -c 1-100)
+            [ "$(printf "%s" "$trimmed" | wc -m)" -gt 100 ] && orig_prev="${orig_prev}..."
+            
+            trans_prev=$(echo "$translated_text" | head -n 2 | cut -c 1-120)
+            [ "$(printf "%s" "$translated_text" | wc -m)" -gt 120 ] && trans_prev="${trans_prev}..."
+
+            lang_upper=$(echo "$detected_lang" | tr '[:lower:]' '[:upper:]')
+            notify-send -a "hollow-wired" -i "accessories-dictionary" \
+                "Texto Traduzido (${lang_upper} → PT)" \
+                "<b>Tradução:</b> <i>${trans_prev}</i>\n<b>Original:</b> <i>${orig_prev}</i>"
+        fi
+        exit 0
+    fi
+fi
+
+# Fallback offline padrão (ou quando tradução está desativada)
+printf "%s" "$trimmed" | wl-copy
+char_count=$(printf "%s" "$trimmed" | wc -m)
+line_count=$(printf "%s" "$trimmed" | wc -l)
+preview=$(echo "$trimmed" | head -n 3 | cut -c 1-140)
+[ "$char_count" -gt 140 ] && preview="${preview}..."
+
+notify-send -a "hollow-wired" -i "edit-copy" \
+    "Texto copiado para a Área de Transferência" \
+    "<b>${char_count} caracteres</b> (${line_count} linhas):\n<i>${preview}</i>"
