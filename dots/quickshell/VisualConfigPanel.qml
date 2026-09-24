@@ -9945,6 +9945,14 @@ PanelWindow {
                                                     win.showToast(Theme.t("toast.rice_fix", "Procurando problemas no rice..."));
                                                 }
                                             }
+
+                                            // Volta para o backup feito antes da última atualização
+                                            // (rice-update rollback); as preferências atuais ficam.
+                                            ActionBtn {
+                                                icon: Theme.icons.backupRestore
+                                                text: Theme.t("store.rice_rollback_btn", "Voltar à versão anterior")
+                                                onClicked: Quickshell.execDetached(["rice-update", "rollback-gui"])
+                                            }
                                         }
 
                                         // Lista do que vem na atualização (até 5 novidades).

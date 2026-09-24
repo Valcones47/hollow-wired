@@ -1,4 +1,7 @@
 # Pacotes do hollow-wired — um por linha; "#" começa comentário.
+# "@modulo" no comentário marca um pacote opcional: o install.sh pergunta por
+# módulo e guarda os recusados em ~/.config/hollow-wired/skip-modules, que o
+# rice-update respeita. Módulos: @gravacao, @apps.
 # Lido pelo install.sh (instalação) e pelo rice-update (atualização: quem já
 # tem o rice recebe os pacotes novos que entrarem aqui). Pacotes que não estão
 # nos repositórios oficiais são instalados pelo AUR (yay/paru).
@@ -22,8 +25,8 @@ pipewire-alsa
 wireplumber
 
 # Captura, Gravação & Área de Transferência
-gpu-screen-recorder   # Gravação na própria GPU (rice-record); leve até em placa integrada
-wf-recorder           # Reserva do rice-record quando o gpu-screen-recorder falta
+gpu-screen-recorder   # Gravação na própria GPU (rice-record); leve até em placa integrada @gravacao
+wf-recorder           # Reserva do rice-record quando o gpu-screen-recorder falta @gravacao
 grim
 slurp
 swappy
@@ -103,23 +106,23 @@ qt6-wayland
 gnome-keyring     # Guarda senhas de navegador, Discord, VS Code etc.
 
 # Bom ter para quem chega do Windows: abrir o que baixar sem caçar programa
-ark               # Compactados (zip, rar, 7z)
-unzip
-7zip
-unrar
-ntfs-3g           # Pendrives e HDs formatados no Windows
-exfatprogs
-dosfstools
-kio-extras        # Miniaturas, celulares e rede no Dolphin
-ffmpegthumbs      # Miniaturas de vídeo no Dolphin
-kdegraphics-thumbnailers # Miniaturas de PDF e imagens RAW
-gwenview          # Visualizador de imagens
-okular            # PDF
+ark               # Compactados (zip, rar, 7z)  @apps
+unzip   # @apps
+7zip   # @apps
+unrar   # @apps
+ntfs-3g           # Pendrives e HDs formatados no Windows  @apps
+exfatprogs   # @apps
+dosfstools   # @apps
+kio-extras        # Miniaturas, celulares e rede no Dolphin  @apps
+ffmpegthumbs      # Miniaturas de vídeo no Dolphin  @apps
+kdegraphics-thumbnailers # Miniaturas de PDF e imagens RAW  @apps
+gwenview          # Visualizador de imagens  @apps
+okular            # PDF  @apps
 kate              # Editor de texto
 kmenuedit         # "Editar entrada" no menu do launcher
 mpv               # Player de vídeo
-pavucontrol       # Controle de som detalhado
-ttf-liberation    # Fontes compatíveis com Arial/Times/Courier (documentos do Office)
+pavucontrol       # Controle de som detalhado  @apps
+ttf-liberation    # Fontes compatíveis com Arial/Times/Courier (documentos do Office)  @apps
 
 # Bibliotecas de Interface & Atalhos
 gtk4-layer-shell

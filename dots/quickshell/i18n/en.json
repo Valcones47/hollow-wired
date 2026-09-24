@@ -1667,5 +1667,6 @@
   "overview.keys2": "← → navigate  ·  Enter open  ·  / search  ·  drag a window to another workspace  ·  Esc close",
   "overview.keys_vertical2": "↑ ↓ navigate  ·  Enter open  ·  / search  ·  drag a window to another workspace  ·  Esc close",
   "overview.search_ph": "window name",
-  "overview.no_match": "none"
+  "overview.no_match": "none",
+  "store.rice_rollback_btn": "Go back to the previous version"
 }

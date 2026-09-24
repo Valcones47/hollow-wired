@@ -244,11 +244,36 @@ step_banner "02/04" "Dependências Essenciais do Rice" "Instalando Hyprland, Qui
 # Lista focada 100% no ricing e interface (SEM drivers proprietários de GPU e SEM pacotes de jogos)
 # Lista em packages.txt (a mesma que o rice-update usa para instalar o que
 # entrar de novo em quem já tem o rice).
+# Módulos opcionais: pacotes marcados com "@modulo" no packages.txt. Os
+# recusados ficam em ~/.config/hollow-wired/skip-modules (o rice-update
+# também respeita, para não instalá-los numa atualização).
+SKIP_FILE="$HOME/.config/hollow-wired/skip-modules"
+mkdir -p "$(dirname "$SKIP_FILE")"
+touch "$SKIP_FILE"
+if [ -t 0 ]; then
+    echo -e "  ${BOLD}Módulos opcionais${NC} ${GRAY}(Enter = sim)${NC}"
+    ask_module() {
+        local mod="$1" desc="$2" ans
+        read -rp "  $desc [S/n]: " ans || ans=s
+        if [[ "${ans:-s}" =~ ^[Nn]$ ]]; then
+            grep -qx "$mod" "$SKIP_FILE" || echo "$mod" >> "$SKIP_FILE"
+        else
+            sed -i "/^${mod}\$/d" "$SKIP_FILE"
+        fi
+    }
+    ask_module gravacao "Gravação de tela (gpu-screen-recorder, wf-recorder)"
+    ask_module apps "Programas para quem vem do Windows (compactados, PDF, imagens, pendrives NTFS)"
+fi
+
 RICE_PACKAGES=()
-while IFS= read -r line || [ -n "$line" ]; do
-    line="${line%%#*}"
+while IFS= read -r raw || [ -n "$raw" ]; do
+    line="${raw%%#*}"
     line="${line//[[:space:]]/}"
-    [ -n "$line" ] && RICE_PACKAGES+=("$line")
+    [ -n "$line" ] || continue
+    if [[ "$raw" =~ @([a-z]+) ]] && grep -qx "${BASH_REMATCH[1]}" "$SKIP_FILE" 2>/dev/null; then
+        continue
+    fi
+    RICE_PACKAGES+=("$line")
 done < "$SCRIPT_DIR/packages.txt"
 
 info_msg "Sincronizando chaveiros de segurança e banco do pacman..."
