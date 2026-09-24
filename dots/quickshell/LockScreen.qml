@@ -135,7 +135,7 @@ Scope {
         wallVideo = "";
         infoProc.running = true;
         weatherProc.running = true;
-        notifProc.running = true;
+        root.refreshNotifs();
         capsProc.running = true;
     }
 
@@ -160,12 +160,13 @@ Scope {
         h[item.id] = true;
         hiddenIds = h;
         if (pendingOpen && pendingOpen.id === item.id) pendingOpen = null;
-        Quickshell.execDetached(["makoctl", "dismiss", "-n", String(item.id)]);
-        notifProc.running = true;
+        if (NotifService.currentOwner === "quickshell") NotifService.dismissToast(item.id);
+        else Quickshell.execDetached(["makoctl", "dismiss", "-n", String(item.id)]);
+        root.refreshNotifs();
     }
     function clearAll() {
         NotifService.setCleared(Math.max(NotifService.maxId, notifMaxId));
-        Quickshell.execDetached(["makoctl", "dismiss", "--all"]);
+        if (NotifService.currentOwner !== "quickshell") Quickshell.execDetached(["makoctl", "dismiss", "--all"]);
         pendingOpen = null;
         notifGroups = [];
         notifTotal = 0;
@@ -176,6 +177,12 @@ Scope {
     // Abre depois de destravar: aciona a ação padrão se a notificação ainda
     // está ativa no mako; senão abre o app dela, ou a imagem (capturas de tela).
     function openNotification(item) {
+        // Servidor do Quickshell: a ação padrão vai direto pelo objeto guardado.
+        if (NotifService.currentOwner === "quickshell") {
+            const h = NotifService.history.find(x => x.id === item.id);
+            const def = h && h.ref && h.ref.actions ? h.ref.actions.find(a => a.identifier === "default") : null;
+            if (def) { try { def.invoke(); return; } catch (e) {} }
+        }
         const icon = item.icon || "";
         const img = icon.startsWith("/") && /\.(png|jpe?g|webp|gif)$/i.test(icon) ? icon : "";
         const entry = item.entry || "";
@@ -434,7 +441,44 @@ Scope {
         } catch (e) {}
     }
 
-    // ---------- notificações (mako), agrupadas por app ----------
+    // ---------- notificações, agrupadas por app ----------
+    // Servidor do Quickshell (padrão): o histórico do NotifService. Mako: pelo
+    // makoctl (notifProc). Sem "conteúdo na tela de bloqueio" (padrão), cada
+    // item vira "Nova notificação" sem texto: dá para ver de qual app e
+    // quantas, não o que dizem.
+    function refreshNotifs() {
+        if (NotifService.currentOwner === "quickshell") buildNativeGroups();
+        else notifProc.running = true;
+    }
+    function maskContent(groups) {
+        if (NotifService.lockContent) return groups;
+        const hidden = Theme.t("lock.notif_hidden", "Nova notificação");
+        return groups.map(g => Object.assign({}, g, { items: g.items.map(i => Object.assign({}, i, { s: hidden, b: "" })) }));
+    }
+    function buildNativeGroups() {
+        const hidden = root.hiddenIds, cleared = NotifService.clearedUpTo;
+        const byApp = {}, order = [];
+        let maxId = 0, away = 0;
+        for (const n of NotifService.history) {        // mais novas primeiro
+            if (n.id <= cleared || hidden[n.id]) continue;
+            const app = n.appName || "";
+            if (!byApp[app]) { byApp[app] = { app: app, icon: n.appIcon || "", items: [] }; order.push(app); }
+            if (byApp[app].items.length < 20)
+                byApp[app].items.push({ id: n.id, s: n.summary || "", b: n.body || "", icon: n.appIcon || "", entry: n.desktopEntry || "" });
+            maxId = Math.max(maxId, n.id);
+            if (n.id > root.awayBaseId) away++;
+        }
+        const groups = order.map(a => Object.assign(byApp[a], { count: byApp[a].items.length }));
+        root.notifGroups = root.maskContent(groups);
+        root.notifTotal = groups.reduce((t, g) => t + g.count, 0);
+        root.notifMaxId = maxId;
+        root.awayNotifs = away;
+    }
+    Connections {
+        target: NotifService
+        function onHistoryChanged() { if (root.active && NotifService.currentOwner === "quickshell") root.buildNativeGroups(); }
+        function onLockContentChanged() { if (root.active) root.refreshNotifs(); }
+    }
     Process {
         id: notifProc
         command: ["bash", "-c",
@@ -459,7 +503,7 @@ Scope {
                         }
                         groups.push({ app: g.app, icon: g.icon, count: items.length, items: items });
                     }
-                    root.notifGroups = groups;
+                    root.notifGroups = root.maskContent(groups);
                     root.notifTotal = groups.reduce((a, g) => a + g.count, 0);
                     root.notifMaxId = maxId;
                     root.awayNotifs = away;
@@ -473,7 +517,7 @@ Scope {
     Timer {
         interval: 5000
         repeat: true
-        running: root.active
+        running: root.active && NotifService.currentOwner !== "quickshell"
         onTriggered: notifProc.running = true
     }
 

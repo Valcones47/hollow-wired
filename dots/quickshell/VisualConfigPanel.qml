@@ -3233,6 +3233,18 @@ PanelWindow {
                                             Quickshell.execDetached(["bash", "-c", "python3 -c \"import json, os; p=os.path.expanduser('~/.config/hollow-wired/notifications.json'); d=json.load(open(p)) if os.path.exists(p) else {}; d['sound']=" + (nextVal ? "True" : "False") + "; json.dump(d, open(p, 'w'), indent=2)\""]);
                                         }
                                     }
+
+                                    RowDivider {}
+
+                                    OptionToggle {
+                                        title: Theme.t("notif.lock_content", "Mostrar o texto na tela de bloqueio")
+                                        subtitle: Theme.t("notif.lock_content_sub", "Desligado: com a tela bloqueada aparece só o app e quantas notificações chegaram.")
+                                        checked: NotifService.lockContent
+                                        onToggled: nextVal => {
+                                            NotifService.lockContent = nextVal;
+                                            Quickshell.execDetached(["bash", "-c", "python3 -c \"import json, os; p=os.path.expanduser('~/.config/hollow-wired/notifications.json'); d=json.load(open(p)) if os.path.exists(p) else {}; d['lock_content']=" + (nextVal ? "True" : "False") + "; json.dump(d, open(p, 'w'), indent=2)\""]);
+                                        }
+                                    }
                                 }
 
                                 Rectangle {

@@ -1668,5 +1668,8 @@
   "overview.keys_vertical2": "↑ ↓ navigate  ·  Enter open  ·  / search  ·  drag a window to another workspace  ·  Esc close",
   "overview.search_ph": "window name",
   "overview.no_match": "none",
-  "store.rice_rollback_btn": "Go back to the previous version"
+  "store.rice_rollback_btn": "Go back to the previous version",
+  "lock.notif_hidden": "New notification",
+  "notif.lock_content": "Show the text on the lock screen",
+  "notif.lock_content_sub": "Off: while locked, only the app and how many notifications arrived are shown."
 }

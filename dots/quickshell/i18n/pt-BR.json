@@ -1668,5 +1668,8 @@
   "overview.keys_vertical2": "↑ ↓ navegar  ·  Enter abrir  ·  / buscar  ·  arraste uma janela para outra área  ·  Esc fechar",
   "overview.search_ph": "nome da janela",
   "overview.no_match": "nada",
-  "store.rice_rollback_btn": "Voltar à versão anterior"
+  "store.rice_rollback_btn": "Voltar à versão anterior",
+  "lock.notif_hidden": "Nova notificação",
+  "notif.lock_content": "Mostrar o texto na tela de bloqueio",
+  "notif.lock_content_sub": "Desligado: com a tela bloqueada aparece só o app e quantas notificações chegaram."
 }

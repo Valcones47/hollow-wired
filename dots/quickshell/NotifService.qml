@@ -16,6 +16,9 @@ QtObject {
     property int defaultTimeout: 5000
     property string position: "top-right"
     property bool soundEnabled: false
+    // Tela de bloqueio mostra título/texto das notificações? Desligado por
+    // padrão: com a tela bloqueada, quem passa só vê de qual app e quantas.
+    property bool lockContent: false
 
     // Estado operacional
     property bool dnd: false
@@ -64,6 +67,7 @@ QtObject {
                 root.defaultTimeout = parseInt(c.timeout) || 5000;
                 root.position = c.position || "top-right";
                 root.soundEnabled = !!c.sound;
+                root.lockContent = c.lock_content === true;
             } catch (e) {}
         }
     }
@@ -84,7 +88,10 @@ QtObject {
         watchChanges: true
         onFileChanged: reload()
         onLoaded: {
-            root.clearedUpTo = parseInt(text()) || 0;
+            const v = parseInt(text()) || 0;
+            // Modo nativo: um valor acima do maior id desta sessão é de antes
+            // (mako ou outra sessão) e esconderia as notificações novas.
+            root.clearedUpTo = (root.currentOwner === "quickshell" && v > root.maxId) ? 0 : v;
             root.ready = true;
             root.refresh();
         }
@@ -127,6 +134,14 @@ QtObject {
         stdout: StdioCollector {
             onStreamFinished: {
                 const owner = text.trim();
+                // O histórico do servidor do Quickshell mora só na memória e os
+                // ids recomeçam em 1 a cada início; o "limpo até o id N" vindo
+                // do mako (ou de uma sessão anterior) escondia as notificações
+                // novas do histórico, da tela de bloqueio e do contador.
+                if (owner === "quickshell" && root.currentOwner !== "quickshell") {
+                    root.clearedUpTo = 0;
+                    root.unreadCount = root.history.length;
+                }
                 root.currentOwner = owner;
                 if (owner === "none") {
                     // Fallback de emergência se nenhum servidor estiver com o D-Bus
@@ -193,6 +208,7 @@ QtObject {
             id: id,
             appName: appName,
             appIcon: appIcon,
+            desktopEntry: notif.desktopEntry || "",
             summary: summary,
             body: body,
             urgency: urgency,
