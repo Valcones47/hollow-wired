@@ -1542,5 +1542,19 @@
   "shellcustom.weather_saved": "Saved!",
   "quicknotes.pin_window": "Pin to Window",
   "quicknotes.unpin": "Unpin",
-  "layout.mod_weather": "Weather"
+  "layout.mod_weather": "Weather",
+  "session.suspend": "Sleep",
+  "session.reboot": "Restart",
+  "session.shutdown": "Shut Down",
+  "session.logout": "Log Out",
+  "session.desc_suspend": "Suspend session",
+  "session.desc_reboot": "Reboot system",
+  "session.desc_shutdown": "Power off PC",
+  "session.desc_logout": "End session",
+  "session.action_in": "Executing ",
+  "session.seconds": "in %1 seconds... (Esc cancels)",
+  "session.ok": "OK",
+  "session.cancel": "Cancel",
+  "binds.act_session": "Session Menu (Shut Down / Restart)",
+  "cheatsheet.desc_session": "Shutdown and session menu"
 }

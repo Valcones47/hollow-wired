@@ -252,6 +252,7 @@ ShellRoot {
     Welcome {}
     QuickNotes {}
     StickyNote {}
+    SessionDialog {}
     EditMode {}
     ControlCenter {
         id: controlCenter

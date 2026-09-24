@@ -1542,5 +1542,19 @@
   "shellcustom.weather_saved": "Salvo!",
   "quicknotes.pin_window": "Destacar em Janela",
   "quicknotes.unpin": "Desafixar",
-  "layout.mod_weather": "Clima"
+  "layout.mod_weather": "Clima",
+  "session.suspend": "Suspender",
+  "session.reboot": "Reiniciar",
+  "session.shutdown": "Desligar",
+  "session.logout": "Sair",
+  "session.desc_suspend": "Dormir",
+  "session.desc_reboot": "Reiniciar sistema",
+  "session.desc_shutdown": "Desligar o PC",
+  "session.desc_logout": "Encerrar sessão",
+  "session.action_in": "Executando ",
+  "session.seconds": "em %1 segundos... (Esc cancela)",
+  "session.ok": "OK",
+  "session.cancel": "Cancelar",
+  "binds.act_session": "Menu de Sessão (Desligar / Reiniciar)",
+  "cheatsheet.desc_session": "Menu de desligamento e sessão"
 }

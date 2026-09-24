@@ -662,9 +662,9 @@ end
 if hasCommand("zapzap") then
     hl.bind("CTRL + bracketright", hl.dsp.exec_cmd("zapzap"))
 end
--- Ctrl + Alt + Delete = Menu de Energia / Desligar / Suspender
-hl.bind("CTRL + ALT + Delete", hl.dsp.exec_cmd("quickshell ipc call sidebar toggle"))
-hl.bind("CTRL + ALT + delete", hl.dsp.exec_cmd("quickshell ipc call sidebar toggle"))
+-- Ctrl + Alt + Delete = Menu de Sessão / Desligar / Suspender
+hl.bind("CTRL + ALT + Delete", hl.dsp.exec_cmd("quickshell ipc call session open"))
+hl.bind("CTRL + ALT + delete", hl.dsp.exec_cmd("quickshell ipc call session open"))
 
 -- "e+1"/"e-1" são aceitos sem erro mas não movem nada neste provider Lua:
 -- o Super + roda do mouse estava quebrado em silêncio. O relativo que funciona
