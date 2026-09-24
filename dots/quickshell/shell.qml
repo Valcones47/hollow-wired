@@ -253,6 +253,8 @@ ShellRoot {
     QuickNotes {}
     StickyNote {}
     SessionDialog {}
+    // Assistente de IA (Super + Ctrl + A): conversa e tradução pelo rice-ai.
+    AiSidebar {}
     NotifToasts {}
     PolkitDialog {}
     EditMode {}

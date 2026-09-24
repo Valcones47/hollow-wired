@@ -452,6 +452,7 @@ hl.layer_rule({ match = { namespace = "quickshell-overview" }, blur = blurBigPan
 hl.layer_rule({ match = { namespace = "quickshell-session" }, blur = blurBigPanels, ignore_alpha = 0.3 })
 hl.layer_rule({ match = { namespace = "quickshell-polkit" }, blur = blurBigPanels, ignore_alpha = 0.3 })
 hl.layer_rule({ match = { namespace = "quickshell-notifications" }, blur = true, ignore_alpha = 0.3 })
+hl.layer_rule({ match = { namespace = "quickshell-ai" }, blur = true, ignore_alpha = 0.3 })
 hl.layer_rule({ match = { namespace = "quickshell-desktop-widgets" }, blur = false })
 
 -- Beziers customizados (não usa só os presets padrão)
@@ -598,6 +599,8 @@ hl.bind(mainMod .. " + CTRL + V", hl.dsp.exec_cmd("quickshell ipc call clipboard
 hl.bind(mainMod .. " + W", hl.dsp.exec_cmd("quickshell ipc call desktopwidgets toggleEdit"))
 -- Super+G = Bloco de Notas Rápido flutuante com auto-save (QuickNotes.qml)
 hl.bind(mainMod .. " + G", hl.dsp.exec_cmd("quickshell ipc call quicknotes toggle"))
+-- Super+Ctrl+A = Assistente de IA (conversa e tradução; AiSidebar.qml + rice-ai)
+hl.bind(mainMod .. " + CTRL + A", hl.dsp.exec_cmd("quickshell ipc call ai toggle"))
 -- Super+N = Notificações / Super+Shift+N = Alternar Não Perturbe (DND)
 hl.bind(mainMod .. " + N", hl.dsp.exec_cmd("quickshell ipc call notif open"))
 hl.bind(mainMod .. " + SHIFT + N", hl.dsp.exec_cmd("quickshell ipc call notif toggleDnd"))

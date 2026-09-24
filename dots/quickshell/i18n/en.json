@@ -1671,5 +1671,22 @@
   "store.rice_rollback_btn": "Go back to the previous version",
   "lock.notif_hidden": "New notification",
   "notif.lock_content": "Show the text on the lock screen",
-  "notif.lock_content_sub": "Off: while locked, only the app and how many notifications arrived are shown."
+  "notif.lock_content_sub": "Off: while locked, only the app and how many notifications arrived are shown.",
+  "ai.title": "Assistant",
+  "ai.tab_chat": "Chat",
+  "ai.tab_translate": "Translate",
+  "ai.no_model": "no model",
+  "ai.key_ph": "API key (Enter saves)",
+  "ai.key_saved": "Key saved on this computer",
+  "ai.key_forget": "forget",
+  "ai.empty_local": "Ask anything. With Ollama, everything runs on this computer.",
+  "ai.empty_cloud": "Ask anything. The text is sent to the chosen service.",
+  "ai.thinking": "answering…",
+  "ai.input_ph": "Message (Enter sends, Shift+Enter new line)",
+  "ai.clear": "Clear",
+  "ai.tr_ph": "Paste the text here",
+  "ai.translating": "Translating…",
+  "ai.translate": "Translate",
+  "ai.copy": "Copy",
+  "cheatsheet.desc_ai": "AI assistant (chat and translation)"
 }

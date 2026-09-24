@@ -1671,5 +1671,22 @@
   "store.rice_rollback_btn": "Voltar à versão anterior",
   "lock.notif_hidden": "Nova notificação",
   "notif.lock_content": "Mostrar o texto na tela de bloqueio",
-  "notif.lock_content_sub": "Desligado: com a tela bloqueada aparece só o app e quantas notificações chegaram."
+  "notif.lock_content_sub": "Desligado: com a tela bloqueada aparece só o app e quantas notificações chegaram.",
+  "ai.title": "Assistente",
+  "ai.tab_chat": "Conversa",
+  "ai.tab_translate": "Tradução",
+  "ai.no_model": "sem modelo",
+  "ai.key_ph": "Chave de API (Enter salva)",
+  "ai.key_saved": "Chave salva neste computador",
+  "ai.key_forget": "esquecer",
+  "ai.empty_local": "Pergunte qualquer coisa. Com o Ollama, tudo roda neste computador.",
+  "ai.empty_cloud": "Pergunte qualquer coisa. O texto vai para o serviço escolhido.",
+  "ai.thinking": "respondendo…",
+  "ai.input_ph": "Mensagem (Enter envia, Shift+Enter quebra linha)",
+  "ai.clear": "Limpar",
+  "ai.tr_ph": "Cole o texto aqui",
+  "ai.translating": "Traduzindo…",
+  "ai.translate": "Traduzir",
+  "ai.copy": "Copiar",
+  "cheatsheet.desc_ai": "Assistente de IA (conversa e tradução)"
 }

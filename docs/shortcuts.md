@@ -32,6 +32,7 @@ and you can create or change shortcuts in **Settings → Keyboard Shortcuts**.
 | `Super + V` | Clipboard history (`Super + Ctrl + V`: favorites) |
 | `Super + N` | Notifications (`Super + Shift + N`: do not disturb) |
 | `Super + G` | Quick notes |
+| `Super + Ctrl + A` | AI assistant: chat and translation (Ollama locally, or Gemini/OpenAI with your key) |
 | `Super + W` | Edit desktop widgets |
 | `Super + S` | Wallpaper picker |
 | `Super + Esc` or `Ctrl + Shift + Esc` | Task manager |

@@ -143,6 +143,7 @@ Full list and user guides (getting started, coming from Windows, FAQ): [`docs/`]
 | `Super + L` | Lock Screen (Quickshell, `rice-lock`) |
 | `Ctrl + Alt + Del` | Session screen: suspend, restart, shut down, log out (or the power sidebar) |
 | `Super + G` | Quick Notes (can be detached as a floating note) |
+| `Super + Ctrl + A` | AI assistant sidebar: chat and translation — Ollama (local) or Gemini/OpenAI with your own key, stored with 600 permissions outside the repo |
 | `Super + D` | Jump to an empty workspace (again to come back) |
 | `Super + Shift + T` | Copy the text in a screen region (OCR, optional translation) |
 | `Super + M` | Exit Hyprland Session |

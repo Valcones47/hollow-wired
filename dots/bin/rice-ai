@@ -1,0 +1,178 @@
+#!/usr/bin/env python3
+"""rice-ai — conversa e tradução para a barra de IA do Quickshell.
+
+Provedores: Ollama (local, sem chave), Gemini e OpenAI (chave do usuário).
+Escolhas em ~/.config/hollow-wired/ai.json: {"provider": "ollama", "models": {...}}.
+Chaves em ~/.config/hollow-wired/ai-keys.json, permissão 600, NUNCA no repositório.
+
+Uso:
+  rice-ai status                         JSON: provedor, modelo, se tem chave, modelos do Ollama
+  rice-ai set-provider ollama|gemini|openai
+  rice-ai set-model <modelo>             modelo do provedor atual
+  rice-ai set-key <provedor>             lê a chave da entrada padrão (não vai para argv/histórico)
+  rice-ai forget-key <provedor>
+  rice-ai ask                            lê [{"role","content"},...] em JSON da entrada; imprime a resposta
+  rice-ai translate <idioma>             lê o texto da entrada; imprime a tradução
+Erros saem como texto começando com "ERRO:" (a barra mostra como mensagem).
+"""
+
+import json
+import os
+import sys
+import urllib.error
+import urllib.request
+
+CONF_DIR = os.path.join(os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config")), "hollow-wired")
+CONF = os.path.join(CONF_DIR, "ai.json")
+KEYS = os.path.join(CONF_DIR, "ai-keys.json")
+OLLAMA = os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
+# Modelos padrão: trocáveis com set-model (os nomes mudam com o tempo).
+DEFAULT_MODELS = {"gemini": "gemini-2.5-flash", "openai": "gpt-4o-mini", "ollama": ""}
+PROVIDERS = ("ollama", "gemini", "openai")
+TIMEOUT = 90
+
+
+def load(path):
+    try:
+        with open(path) as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def save(path, data, private=False):
+    os.makedirs(CONF_DIR, exist_ok=True)
+    tmp = path + ".tmp"
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600 if private else 0o644)
+    with os.fdopen(fd, "w") as f:
+        json.dump(data, f, indent=2)
+        f.write("\n")
+    os.replace(tmp, path)
+    if private:
+        os.chmod(path, 0o600)
+
+
+def conf():
+    c = load(CONF)
+    if c.get("provider") not in PROVIDERS:
+        c["provider"] = "ollama"
+    c.setdefault("models", {})
+    return c
+
+
+def http_json(url, body=None, headers=None, timeout=TIMEOUT):
+    data = json.dumps(body).encode() if body is not None else None
+    req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json", **(headers or {})})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return json.loads(r.read().decode())
+
+
+def ollama_models():
+    try:
+        return [m["name"] for m in http_json(OLLAMA + "/api/tags", timeout=3).get("models", [])]
+    except Exception:
+        return None
+
+
+def model_for(c):
+    p = c["provider"]
+    m = c["models"].get(p) or DEFAULT_MODELS[p]
+    if p == "ollama" and not m:
+        ms = ollama_models() or []
+        m = ms[0] if ms else ""
+    return m
+
+
+def ask(messages):
+    c = conf()
+    p = c["provider"]
+    model = model_for(c)
+    key = load(KEYS).get(p, "")
+    try:
+        if p == "ollama":
+            if ollama_models() is None:
+                return "ERRO: o Ollama não está rodando (instale o pacote ollama e rode `ollama serve`)."
+            if not model:
+                return "ERRO: nenhum modelo no Ollama. Baixe um, por exemplo: ollama pull llama3.2"
+            r = http_json(OLLAMA + "/api/chat", {"model": model, "messages": messages, "stream": False})
+            return r.get("message", {}).get("content", "").strip()
+        if not key:
+            return f"ERRO: falta a chave de API do {p.capitalize()} (campo Chave, na barra)."
+        if p == "gemini":
+            contents = []
+            system = ""
+            for m in messages:
+                if m["role"] == "system":
+                    system += m["content"] + "\n"
+                    continue
+                contents.append({"role": "model" if m["role"] == "assistant" else "user", "parts": [{"text": m["content"]}]})
+            body = {"contents": contents}
+            if system:
+                body["systemInstruction"] = {"parts": [{"text": system.strip()}]}
+            r = http_json(f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+                          body, {"x-goog-api-key": key})
+            parts = r.get("candidates", [{}])[0].get("content", {}).get("parts", [])
+            return "".join(x.get("text", "") for x in parts).strip()
+        if p == "openai":
+            r = http_json("https://api.openai.com/v1/chat/completions",
+                          {"model": model, "messages": messages}, {"Authorization": "Bearer " + key})
+            return r["choices"][0]["message"]["content"].strip()
+    except urllib.error.HTTPError as e:
+        detail = ""
+        try:
+            detail = json.loads(e.read().decode()).get("error", {}).get("message", "")
+        except Exception:
+            pass
+        return f"ERRO: {p} respondeu {e.code}" + (f": {detail}" if detail else "")
+    except urllib.error.URLError as e:
+        return f"ERRO: sem conexão com {p} ({e.reason})"
+    except Exception as e:
+        return f"ERRO: {e}"
+    return "ERRO: provedor desconhecido"
+
+
+LANGS = {"pt": "Brazilian Portuguese", "en": "English", "es": "Spanish", "ja": "Japanese"}
+
+
+def main():
+    a = sys.argv[1:]
+    cmd = a[0] if a else "status"
+    if cmd == "status":
+        c = conf()
+        keys = load(KEYS)
+        print(json.dumps({"provider": c["provider"], "model": model_for(c),
+                          "hasKey": {p: bool(keys.get(p)) for p in PROVIDERS},
+                          "ollamaModels": ollama_models()}))
+    elif cmd == "set-provider" and len(a) > 1 and a[1] in PROVIDERS:
+        c = conf(); c["provider"] = a[1]; save(CONF, c)
+    elif cmd == "set-model" and len(a) > 1:
+        c = conf(); c["models"][c["provider"]] = a[1].strip(); save(CONF, c)
+    elif cmd == "set-key" and len(a) > 1 and a[1] in ("gemini", "openai"):
+        key = sys.stdin.read().strip()
+        k = load(KEYS)
+        if key:
+            k[a[1]] = key
+        save(KEYS, k, private=True)
+    elif cmd == "forget-key" and len(a) > 1:
+        k = load(KEYS); k.pop(a[1], None); save(KEYS, k, private=True)
+    elif cmd == "ask":
+        try:
+            msgs = json.loads(sys.stdin.read() or "[]")
+        except ValueError:
+            msgs = []
+        msgs = [m for m in msgs if isinstance(m, dict) and m.get("role") in ("system", "user", "assistant")]
+        print(ask(msgs) if msgs else "ERRO: mensagem vazia")
+    elif cmd == "translate" and len(a) > 1:
+        text = sys.stdin.read().strip()
+        lang = LANGS.get(a[1], a[1])
+        print(ask([{"role": "system", "content": f"Translate the user's text to {lang}. Reply with the translation only, keeping line breaks."},
+                   {"role": "user", "content": text}]) if text else "")
+    else:
+        print(__doc__.strip(), file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
