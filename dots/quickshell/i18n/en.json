@@ -1663,5 +1663,9 @@
   "launcher.badge_window": "Window",
   "launcher.badge_setting": "Settings",
   "launcher.badge_folder": "Folder",
-  "launcher.badge_file": "File"
+  "launcher.badge_file": "File",
+  "overview.keys2": "← → navigate  ·  Enter open  ·  / search  ·  drag a window to another workspace  ·  Esc close",
+  "overview.keys_vertical2": "↑ ↓ navigate  ·  Enter open  ·  / search  ·  drag a window to another workspace  ·  Esc close",
+  "overview.search_ph": "window name",
+  "overview.no_match": "none"
 }

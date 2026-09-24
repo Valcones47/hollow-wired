@@ -1663,5 +1663,9 @@
   "launcher.badge_window": "Janela",
   "launcher.badge_setting": "Painel",
   "launcher.badge_folder": "Pasta",
-  "launcher.badge_file": "Arquivo"
+  "launcher.badge_file": "Arquivo",
+  "overview.keys2": "← → navegar  ·  Enter abrir  ·  / buscar  ·  arraste uma janela para outra área  ·  Esc fechar",
+  "overview.keys_vertical2": "↑ ↓ navegar  ·  Enter abrir  ·  / buscar  ·  arraste uma janela para outra área  ·  Esc fechar",
+  "overview.search_ph": "nome da janela",
+  "overview.no_match": "nada"
 }

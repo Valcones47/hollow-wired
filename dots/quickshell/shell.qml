@@ -307,16 +307,34 @@ ShellRoot {
             onTriggered: hub.visible = false
         }
 
+        // Barra em cima: o hub "cresce" do relógio, como na Caelestia. O
+        // `slide` é uma janela de recorte que começa estreita e baixa no
+        // centro da barra e abre até o tamanho cheio; o conteúdo fica parado
+        // dentro dela (x compensado), então nada escorrega, só aparece.
+        // Barra na lateral: continua deslizando do lado dela.
         Item {
             id: slide
-            width: parent.width
-            height: parent.height
-            y: hub.sideMode || hub.open ? 0 : -height
-            x: !hub.sideMode || hub.open ? 0 : (hub.sideLeft ? -width : width)
+            readonly property real closedW: 240
+            width: hub.sideMode || hub.open ? parent.width : Math.min(closedW, parent.width)
+            height: hub.sideMode || hub.open ? parent.height : 0
+            y: 0
+            x: hub.sideMode
+                ? (hub.open ? 0 : (hub.sideLeft ? -parent.width : parent.width))
+                : (parent.width - width) / 2
+            clip: !hub.sideMode
             opacity: hub.open ? 1 : 0
-            Behavior on y { NumberAnimation { duration: Theme.ms(260); easing.type: Easing.OutCubic } }
-            Behavior on x { NumberAnimation { duration: Theme.ms(260); easing.type: Easing.OutCubic } }
-            Behavior on opacity { NumberAnimation { duration: Theme.ms(200) } }
+            Behavior on height { NumberAnimation { duration: Theme.ms(300); easing.type: Easing.OutCubic } }
+            Behavior on width { NumberAnimation { duration: Theme.ms(260); easing.type: Easing.OutQuart } }
+            // Em cima o x só acompanha a largura (centraliza); animar o x também
+            // atrasava a posição e a abertura saía torta para a direita.
+            Behavior on x { enabled: hub.sideMode; NumberAnimation { duration: Theme.ms(260); easing.type: Easing.OutCubic } }
+            Behavior on opacity { NumberAnimation { duration: Theme.ms(hub.open ? 120 : 220) } }
+
+            Item {
+            id: slideContent
+            x: hub.sideMode ? 0 : -slide.x
+            width: hub.width
+            height: hub.height
 
             // ---------- cantos invertidos (junção com a waybar) ----------
             Canvas {
@@ -566,6 +584,7 @@ ShellRoot {
                         }
                     }
                 }
+            }
             }
         }
 

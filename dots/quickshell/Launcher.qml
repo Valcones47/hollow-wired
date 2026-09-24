@@ -1018,7 +1018,8 @@ PanelWindow {
         function state(): string {
             return "open=" + launcher.open + " inputFocus=" + input.activeFocus + " dockShown=" + launcher.dockShown
                 + " sidebarOpen=" + launcher.sidebarOpen + " barPopup=" + launcher.barPopupOpen
-                + " mode=" + launcher.searchMode;
+                + " mode=" + launcher.searchMode
+                + " results=" + launcher.results.slice(0, 12).map(r => r.itemType).join(",");
         }
     }
 }

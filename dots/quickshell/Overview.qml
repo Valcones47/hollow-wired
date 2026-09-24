@@ -50,6 +50,52 @@ PanelWindow {
 
     property real monAspect: 16 / 9
 
+    // ---------- busca (/) ----------
+    // As letras h/j/k/l e w/a/s/d já navegam, então a busca começa com "/",
+    // como no vim. Filtra pelo título ou pela classe; Enter vai para a primeira.
+    property bool filtering: false
+    property string filter: ""
+    function norm(t) { return (t || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""); }
+    function matchesFilter(w) {
+        return !ov.filter || ov.norm((w.title || "") + " " + (w.cls || "")).includes(ov.norm(ov.filter));
+    }
+    readonly property var filtered: ov.allWins.filter(w => ov.matchesFilter(w))
+    onFilterChanged: {
+        const w = ov.filtered[0];
+        if (!ov.filter || !w) return;
+        const i = ov.spaces.findIndex(sp => sp.id === w.wsId);
+        if (i >= 0) ov.current = i;
+    }
+
+    // ---------- arrastar janela para outra área ----------
+    property var dragWin: null
+    property point dragPos: Qt.point(0, 0)
+    // Índice do cartão debaixo do mouse (a posição dos cartões segue o
+    // `offset` do carrossel: 0,74 largura para o vizinho, 0,4 para os demais).
+    readonly property int dropTarget: {
+        if (!ov.dragWin) return -1;
+        const p = stage.mapFromItem(null, ov.dragPos.x, ov.dragPos.y);
+        const size = ov.vertical ? stage.cardW / ov.monAspect : stage.cardW;
+        const dd = ((ov.vertical ? p.y - stage.height / 2 : p.x - stage.width / 2)) / size;
+        const a = Math.abs(dd);
+        const steps = a < 0.37 ? 0 : a < 0.94 ? 1 : 1 + Math.round((a - 0.74) / 0.4);
+        const i = ov.current + Math.sign(dd) * steps;
+        return i >= 0 && i < ov.spaces.length ? i : -1;
+    }
+    property int reloadKeep: -1
+    function dropWin() {
+        const w = ov.dragWin, i = ov.dropTarget;
+        ov.dragWin = null;
+        if (!w || i < 0 || i === ov.current) return;
+        const sp = ov.spaces[i];
+        const target = sp.kind === "special" ? '"' + sp.name + '"' : String(sp.id);
+        Hyprland.dispatch('hl.dsp.window.move({ workspace = ' + target + ', window = "address:' + w.address + '", silent = true })');
+        // Relê tudo e fica no cartão de destino, para ver a janela chegar.
+        ov.reloadKeep = i;
+        reloadTimer.restart();
+    }
+    Timer { id: reloadTimer; interval: 120; onTriggered: loadProc.running = true }
+
     // Áreas de trabalho na vertical (rice-workspace-layout): o carrossel
     // empilha de cima para baixo e gira no eixo horizontal.
     property bool vertical: false
@@ -68,6 +114,8 @@ PanelWindow {
             closeTimer.stop();
             visible = true;
             shown = 0;
+            filtering = false;
+            filter = "";
             showAnim.restart();
             focusTimer.restart();
         } else {
@@ -223,6 +271,13 @@ PanelWindow {
             const si = list.findIndex(s => s.name === specialOpen);
             if (si >= 0) cur = si;
         }
+        if (ov.reloadKeep >= 0) {
+            // Recarga depois de arrastar uma janela: fica onde estava.
+            cur = Math.min(ov.reloadKeep, list.length - 1);
+            ov.reloadKeep = -1;
+            ov.current = cur;
+            return;
+        }
         ov.current = Math.max(0, cur);
         // Sem mola na abertura: o carrossel já nasce no lugar certo.
         ov.pos = ov.current;
@@ -256,6 +311,26 @@ PanelWindow {
         focus: true
         Keys.onPressed: event => {
             const k = event.key;
+            if (ov.filtering) {
+                if (k === Qt.Key_Escape) {
+                    ov.filtering = false;
+                    ov.filter = "";
+                } else if (k === Qt.Key_Return || k === Qt.Key_Enter) {
+                    if (ov.filtered.length > 0) ov.focusWin(ov.filtered[0]);
+                } else if (k === Qt.Key_Backspace) {
+                    if (ov.filter === "") ov.filtering = false;
+                    else ov.filter = ov.filter.slice(0, -1);
+                } else if (event.text && event.text.length > 0 && event.text.charCodeAt(0) >= 32) {
+                    ov.filter += event.text;
+                } else return;
+                event.accepted = true;
+                return;
+            }
+            if (k === Qt.Key_Slash) {
+                ov.filtering = true;
+                event.accepted = true;
+                return;
+            }
             const next = ov.vertical ? [Qt.Key_Down, Qt.Key_J, Qt.Key_S] : [Qt.Key_Right, Qt.Key_L, Qt.Key_D];
             const prev = ov.vertical ? [Qt.Key_Up, Qt.Key_K, Qt.Key_W] : [Qt.Key_Left, Qt.Key_H, Qt.Key_A];
             if (k === Qt.Key_Tab || next.includes(k)) ov.step(1);
@@ -390,6 +465,8 @@ PanelWindow {
                             width: Math.max(24, modelData.w * frame.width)
                             height: Math.max(18, modelData.h * frame.height)
                             z: modelData.floating ? 2 : 1
+                            opacity: (ov.filter && !ov.matchesFilter(modelData) ? 0.3 : 1)
+                                * (ov.dragWin && ov.dragWin.address === modelData.address ? 0.35 : 1)
 
                             ClippingRectangle {
                                 anchors.fill: parent
@@ -433,8 +510,24 @@ PanelWindow {
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 enabled: card.centered
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: ov.focusWin(mini.modelData)
+                                cursorShape: ov.dragWin ? Qt.ClosedHandCursor : Qt.PointingHandCursor
+                                // Arrastar (mais de 12 px) leva a janela para o cartão
+                                // em que for solta; clique simples vai até ela.
+                                property point pressAt
+                                property bool moved: false
+                                preventStealing: true
+                                onPressed: mouse => { pressAt = Qt.point(mouse.x, mouse.y); moved = false; }
+                                onPositionChanged: mouse => {
+                                    if (!pressed) return;
+                                    if (!moved && Math.hypot(mouse.x - pressAt.x, mouse.y - pressAt.y) > 12) {
+                                        moved = true;
+                                        ov.dragWin = mini.modelData;
+                                    }
+                                    if (moved) ov.dragPos = mapToItem(null, mouse.x, mouse.y);
+                                }
+                                onReleased: if (moved) ov.dropWin()
+                                onCanceled: ov.dragWin = null
+                                onClicked: if (!moved) ov.focusWin(mini.modelData)
                             }
                         }
                     }
@@ -477,8 +570,9 @@ PanelWindow {
                     anchors.fill: frame
                     radius: frame.radius
                     color: "transparent"
-                    border.width: card.centered ? 3 : 1
-                    border.color: card.centered ? Theme.primary : Theme.withAlpha("white", 0.15)
+                    readonly property bool dropHere: ov.dropTarget === card.index && !card.centered
+                    border.width: card.centered || dropHere ? 3 : 1
+                    border.color: dropHere ? Theme.tertiary : card.centered ? Theme.primary : Theme.withAlpha("white", 0.15)
                     Behavior on border.width { NumberAnimation { duration: Theme.ms(150) } }
                 }
 
@@ -549,6 +643,7 @@ PanelWindow {
                         height: 48
                         width: chipRow.implicitWidth + 20
                         radius: 14
+                        opacity: ov.matchesFilter(chip.modelData) ? 1 : 0.3
                         color: chipArea.containsMouse ? Theme.tileHigh
                              : here ? Theme.withAlpha(Theme.primary, 0.2) : "transparent"
                         border.width: here ? 1 : 0
@@ -610,11 +705,49 @@ PanelWindow {
         anchors.bottomMargin: 14
         opacity: ov.shown * 0.7
         text: ov.vertical
-              ? Theme.t("overview.keys_vertical", "↑ ↓ navegar  ·  Enter abrir  ·  clique numa janela para ir até ela  ·  Esc fechar")
-              : Theme.t("overview.keys", "← → navegar  ·  Enter abrir  ·  clique numa janela para ir até ela  ·  Esc fechar")
+              ? Theme.t("overview.keys_vertical2", "↑ ↓ navegar  ·  Enter abrir  ·  / buscar  ·  arraste uma janela para outra área  ·  Esc fechar")
+              : Theme.t("overview.keys2", "← → navegar  ·  Enter abrir  ·  / buscar  ·  arraste uma janela para outra área  ·  Esc fechar")
         font.family: Theme.fontFamily
         font.pixelSize: 12
         color: "white"
+    }
+
+    // campo da busca (/)
+    Rectangle {
+        visible: ov.filtering
+        anchors.horizontalCenter: parent.horizontalCenter
+        y: stage.y + stage.height + 30
+        width: Math.max(260, searchText.implicitWidth + 44)
+        height: 38
+        radius: 19
+        color: Theme.withAlpha(Theme.background, 0.9)
+        border.width: 1
+        border.color: Theme.withAlpha(Theme.primary, 0.6)
+        Text {
+            id: searchText
+            anchors.centerIn: parent
+            text: "/ " + (ov.filter || Theme.t("overview.search_ph", "nome da janela"))
+                + (ov.filter && ov.filtered.length === 0 ? "  ·  " + Theme.t("overview.no_match", "nada") : "")
+            font.family: Theme.fontFamily
+            font.pixelSize: 14
+            color: ov.filter ? Theme.textColor : Theme.subtext
+        }
+    }
+
+    // janela sendo arrastada
+    Rectangle {
+        visible: ov.dragWin !== null
+        x: ov.dragPos.x - width / 2
+        y: ov.dragPos.y - height / 2
+        width: 64; height: 64; radius: 16
+        color: Theme.withAlpha(Theme.background, 0.9)
+        border.width: 2
+        border.color: ov.dropTarget >= 0 && ov.dropTarget !== ov.current ? Theme.tertiary : Theme.primary
+        IconImage {
+            anchors.centerIn: parent
+            implicitSize: 36
+            source: ov.dragWin ? ov.iconFor(ov.dragWin.cls) : ""
+        }
     }
 
     GlobalShortcut {
