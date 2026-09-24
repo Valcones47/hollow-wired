@@ -58,4 +58,5 @@ singleton WeatherService 1.0 WeatherService.qml
 singleton PomodoroService 1.0 PomodoroService.qml
 StickyNote 1.0 StickyNote.qml
 SessionDialog 1.0 SessionDialog.qml
+NotifToasts 1.0 NotifToasts.qml
 

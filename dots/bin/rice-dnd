@@ -1,11 +1,37 @@
 #!/usr/bin/env bash
-# rice-dnd: Alterna modo Não Perturbe (DND) no mako e notifica quickshell
-if makoctl mode 2>/dev/null | grep -q 'do-not-disturb'; then
-    makoctl mode -r do-not-disturb
-    notify-send -a "Sistema" -i "notifications" "Não Perturbe Desativado" "Notificações normais restauradas"
-else
-    notify-send -a "Sistema" -i "notifications-disabled" "Não Perturbe Ativado" "Notificações em silêncio"
-    sleep 0.5
-    makoctl mode -a do-not-disturb
+# rice-dnd: Alterna modo Não Perturbe (DND) no Quickshell e no mako com suporte dual
+set -euo pipefail
+
+CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/quickshell"
+mkdir -p "$CACHE_DIR"
+DND_FILE="$CACHE_DIR/notif-dnd"
+
+# Determina se DND está atualmente ligado
+IS_DND=false
+if [ -f "$DND_FILE" ]; then
+    [ "$(cat "$DND_FILE" 2>/dev/null)" = "true" ] && IS_DND=true
+elif command -v makoctl >/dev/null 2>&1 && makoctl mode 2>/dev/null | grep -q 'do-not-disturb'; then
+    IS_DND=true
 fi
-quickshell ipc call notif refresh 2>/dev/null || true
+
+if [ "$IS_DND" = "true" ]; then
+    # Desativa DND
+    echo "false" > "$DND_FILE"
+    if command -v makoctl >/dev/null 2>&1; then
+        makoctl mode -r do-not-disturb 2>/dev/null || true
+    fi
+    notify-send -a "Sistema" -i "notifications" "Não Perturbe Desativado" "Notificações normais restauradas" 2>/dev/null || true
+else
+    # Ativa DND
+    notify-send -a "Sistema" -i "notifications-disabled" "Não Perturbe Ativado" "Notificações em silêncio" 2>/dev/null || true
+    sleep 0.4
+    echo "true" > "$DND_FILE"
+    if command -v makoctl >/dev/null 2>&1; then
+        makoctl mode -a do-not-disturb 2>/dev/null || true
+    fi
+fi
+
+# Notifica Quickshell via IPC se estiver rodando
+if command -v quickshell >/dev/null 2>&1; then
+    quickshell ipc call notif refresh 2>/dev/null || true
+fi

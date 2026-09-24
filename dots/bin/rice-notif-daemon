@@ -1,0 +1,175 @@
+#!/usr/bin/env bash
+# rice-notif-daemon: Supervisor de notificações do hollow-wired
+# Alterna entre o servidor nativo do Quickshell e o fallback mako,
+# garantindo que a sessão nunca fique sem servidor de notificação.
+set -euo pipefail
+
+CONF_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/hollow-wired"
+CONF_FILE="$CONF_DIR/notifications.json"
+
+mkdir -p "$CONF_DIR"
+if [ ! -f "$CONF_FILE" ]; then
+    cat << 'EOF' > "$CONF_FILE"
+{
+  "provider": "quickshell",
+  "timeout": 5000,
+  "position": "top-right",
+  "sound": false
+}
+EOF
+fi
+
+get_pref_provider() {
+    if command -v jq >/dev/null 2>&1 && [ -f "$CONF_FILE" ]; then
+        jq -r '.provider // "quickshell"' "$CONF_FILE" 2>/dev/null || echo "quickshell"
+    else
+        echo "quickshell"
+    fi
+}
+
+get_dbus_owner() {
+    if ! command -v busctl >/dev/null 2>&1; then
+        echo "unknown"
+        return
+    fi
+    local status
+    status=$(busctl --user status org.freedesktop.Notifications 2>/dev/null || true)
+    if [ -z "$status" ]; then
+        echo "none"
+    elif echo "$status" | grep -q 'Comm=quickshell'; then
+        echo "quickshell"
+    elif echo "$status" | grep -q 'Comm=mako'; then
+        echo "mako"
+    else
+        echo "other"
+    fi
+}
+
+is_qs_running() {
+    pgrep -x quickshell >/dev/null 2>&1 || pgrep -x qs >/dev/null 2>&1
+}
+
+is_mako_running() {
+    pgrep -x mako >/dev/null 2>&1
+}
+
+start_mako() {
+    if ! is_mako_running && command -v mako >/dev/null 2>&1; then
+        setsid mako >/dev/null 2>&1 &
+        sleep 0.1
+    fi
+}
+
+stop_mako() {
+    if is_mako_running; then
+        pkill -x mako 2>/dev/null || true
+    fi
+}
+
+do_sync() {
+    local pref
+    pref=$(get_pref_provider)
+
+    if [ "$pref" = "quickshell" ]; then
+        if is_qs_running; then
+            # Quickshell está ativo: desliga o mako para o Quickshell assumir o D-Bus
+            stop_mako
+        else
+            # Quickshell não está rodando: fallback para o mako imediatamente
+            start_mako
+        fi
+    else
+        # Preferência é mako: garante que o mako esteja ativo
+        start_mako
+    fi
+}
+
+do_check() {
+    local owner
+    owner=$(get_dbus_owner)
+    local pref
+    pref=$(get_pref_provider)
+
+    if [ "$owner" = "none" ]; then
+        # Ninguém é o dono: se Quickshell estiver rodando, aguarda 0.5s;
+        # se ainda não registrou, sobe o mako imediatamente.
+        if is_qs_running && [ "$pref" = "quickshell" ]; then
+            sleep 0.5
+            owner=$(get_dbus_owner)
+            if [ "$owner" = "none" ]; then
+                start_mako
+            fi
+        else
+            start_mako
+        fi
+    elif [ "$owner" = "mako" ] && [ "$pref" = "quickshell" ] && is_qs_running; then
+        stop_mako
+    fi
+}
+
+do_watch() {
+    # Loop protetor de contingência (executado em background)
+    while true; do
+        if ! is_qs_running; then
+            if ! is_mako_running; then
+                start_mako
+            fi
+        fi
+        sleep 2.5
+    done
+}
+
+do_status() {
+    local pref owner qs mako
+    pref=$(get_pref_provider)
+    owner=$(get_dbus_owner)
+    is_qs_running && qs="true" || qs="false"
+    is_mako_running && mako="true" || mako="false"
+
+    cat << EOF
+{
+  "provider_preference": "$pref",
+  "active_dbus_owner": "$owner",
+  "quickshell_running": $qs,
+  "mako_running": $mako
+}
+EOF
+}
+
+cmd="${1:-sync}"
+case "$cmd" in
+    sync)
+        do_sync
+        ;;
+    check|fallback)
+        do_check
+        ;;
+    watch)
+        do_watch
+        ;;
+    status)
+        do_status
+        ;;
+    set-provider)
+        new_prov="${2:-quickshell}"
+        if [ "$new_prov" != "quickshell" ] && [ "$new_prov" != "mako" ]; then
+            echo "Provedor inválido: $new_prov (use 'quickshell' ou 'mako')" >&2
+            exit 1
+        fi
+        python3 -c "
+import json, os
+path = os.path.expanduser('~/.config/hollow-wired/notifications.json')
+try:
+    with open(path, 'r') as f: d = json.load(f)
+except Exception:
+    d = {}
+d['provider'] = '$new_prov'
+with open(path, 'w') as f: json.dump(d, f, indent=2)
+"
+        do_sync
+        ;;
+    *)
+        echo "Uso: rice-notif-daemon [sync|check|fallback|watch|status|set-provider <quickshell|mako>]" >&2
+        exit 1
+        ;;
+esac

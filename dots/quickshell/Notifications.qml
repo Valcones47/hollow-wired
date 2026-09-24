@@ -22,11 +22,28 @@ Item {
     property bool dnd: NotifService.dnd
 
     function refresh() {
-        histProc.running = true;
-        modeProc.running = true;
+        if (NotifService.currentOwner === "quickshell") {
+            const list = (NotifService.history || []).map(n => {
+                return {
+                    id: n.id,
+                    app_name: n.appName,
+                    app_icon: n.appIcon,
+                    desktop_entry: n.appIcon,
+                    summary: n.summary,
+                    body: n.body,
+                    urgency: n.urgency === 2 ? "critical" : "normal",
+                    onScreen: NotifService.activeToasts.some(t => t.id === n.id),
+                    timeStr: n.time ? new Date(n.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ""
+                };
+            });
+            root.items = list.filter(n => n.id > root.clearedUpTo);
+        } else {
+            histProc.running = true;
+            modeProc.running = true;
+        }
     }
     onVisibleChanged: if (visible) refresh()
-    Timer { interval: 4000; running: root.visible; repeat: true; onTriggered: root.refresh() }
+    Timer { interval: 3000; running: root.visible; repeat: true; onTriggered: root.refresh() }
 
     Process {
         id: histProc
@@ -53,29 +70,16 @@ Item {
         command: ["makoctl", "mode"]
         stdout: StdioCollector { onStreamFinished: root.dnd = text.includes("do-not-disturb") }
     }
-    Process {
-        id: dndToggle
-        command: ["makoctl", "mode", "-t", "do-not-disturb"]
-        onExited: {
-            modeProc.running = true;
-            NotifService.refresh();
-        }
-    }
     Process { id: mkdirProc; command: ["mkdir", "-p", Quickshell.env("HOME") + "/.cache/quickshell"] }
     Component.onCompleted: mkdirProc.running = true
 
     function setCleared(id) {
         items = [];
         NotifService.setCleared(id);
-        Quickshell.execDetached(["makoctl", "dismiss", "-a"]);
     }
 
     function iconSource(n) {
-        const i = n.app_icon || n.desktop_entry || "";
-        if (i === "") return "";
-        if (i.startsWith("/")) return "file://" + i;
-        if (i.startsWith("file://")) return i;
-        return Quickshell.iconPath(i, true);
+        return NotifService.iconSource(n);
     }
 
     ColumnLayout {
@@ -91,16 +95,19 @@ Item {
             ColumnLayout {
                 Layout.fillWidth: true
                 spacing: 0
-                PopTitle { text: root.items.length === 0 ? "Nenhuma notificação" : root.items.length + (root.items.length === 1 ? " notificação" : " notificações") }
-                PopText { text: root.dnd ? "Não perturbe ligado — elas chegam aqui, mas não aparecem na tela" : "Histórico do mako (sem horário — o mako não guarda)"; font.pixelSize: 11 }
+                PopTitle { text: root.items.length === 0 ? Theme.t("notif.empty", "Nenhuma notificação") : root.items.length + (root.items.length === 1 ? Theme.t("notif.single", " notificação") : Theme.t("notif.plural", " notificações")) }
+                PopText {
+                    text: root.dnd ? Theme.t("notif.dnd_sub", "Não perturbe ligado — elas chegam aqui, mas não aparecem na tela") : (NotifService.currentOwner === "quickshell" ? Theme.t("notif.sub_native", "Servidor nativo com horário e suporte a ações") : Theme.t("notif.sub_mako", "Histórico do mako"))
+                    font.pixelSize: 11
+                }
             }
 
             PopAction {
                 Layout.fillWidth: false
                 icon: root.dnd ? Theme.icons.bellOff : Theme.icons.bell
-                label: root.dnd ? "Não perturbe: ligado" : "Não perturbe"
+                label: root.dnd ? Theme.t("notif.dnd_on", "Não perturbe: ligado") : Theme.t("notif.dnd_btn", "Não perturbe")
                 selected: root.dnd
-                onActivated: dndToggle.running = true
+                onActivated: NotifService.toggleDnd()
             }
             PopAction {
                 Layout.fillWidth: false
@@ -179,7 +186,7 @@ Item {
                                 color: Theme.textColor
                             }
                             Text {
-                                text: (card.modelData.app_name || card.modelData.desktop_entry || "") + (card.modelData.onScreen ? " · na tela" : "")
+                                text: (card.modelData.timeStr ? card.modelData.timeStr + " · " : "") + (card.modelData.app_name || card.modelData.desktop_entry || "") + (card.modelData.onScreen ? " · " + Theme.t("notif.on_screen", "na tela") : "")
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 10
                                 color: Theme.subtext

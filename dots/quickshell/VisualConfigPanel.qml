@@ -3177,6 +3177,41 @@ PanelWindow {
                                 width: parent.width - 18   // faixa da barra de rolagem
                                 spacing: 16
 
+                                SectionHeader {
+                                    title: Theme.t("notif.section_provider", "Servidor de Notificações")
+                                    subtitle: Theme.t("notif.section_provider_sub", "Escolha entre o servidor nativo com toasts interativos ou o mako clássico")
+                                }
+
+                                OptionGroup {
+                                    OptionRow {
+                                        title: Theme.t("notif.provider_label", "Provedor Ativo")
+                                        subtitle: NotifService.currentOwner === "quickshell" ? Theme.t("notif.provider_qs_active", "Quickshell ativo como servidor principal") : Theme.t("notif.provider_mako_active", "Mako ativo como servidor principal")
+                                        Segmented {
+                                            options: [
+                                                { value: "quickshell", label: Theme.t("notif.provider_qs", "Nativo (Quickshell)") },
+                                                { value: "mako", label: Theme.t("notif.provider_mako", "Mako (Legado)") }
+                                            ]
+                                            current: NotifService.provider
+                                            onPicked: val => {
+                                                Quickshell.execDetached(["rice-notif-daemon", "set-provider", val]);
+                                                NotifService.provider = val;
+                                            }
+                                        }
+                                    }
+
+                                    RowDivider {}
+
+                                    OptionToggle {
+                                        title: Theme.t("notif.sound_label", "Alerta Sonoro Suave")
+                                        subtitle: Theme.t("notif.sound_sub", "Toca um sinal acústico leve ao receber novas notificações")
+                                        checked: NotifService.soundEnabled
+                                        onToggled: nextVal => {
+                                            NotifService.soundEnabled = nextVal;
+                                            Quickshell.execDetached(["bash", "-c", "python3 -c \"import json, os; p=os.path.expanduser('~/.config/hollow-wired/notifications.json'); d=json.load(open(p)) if os.path.exists(p) else {}; d['sound']=" + (nextVal ? "True" : "False") + "; json.dump(d, open(p, 'w'), indent=2)\""]);
+                                        }
+                                    }
+                                }
+
                                 Rectangle {
                                     Layout.fillWidth: true
                                     visible: win.makoProblems.length > 0
