@@ -38,6 +38,7 @@
   "cheatsheet.desc_settings": "Rice Visual Settings Panel",
   "cheatsheet.desc_cheatsheet": "This shortcut list",
   "cheatsheet.desc_widgets": "Desktop Widgets Editor",
+  "cheatsheet.desc_quicknotes": "Floating quick notes scratchpad",
   "cheatsheet.desc_notif": "Notifications Center",
   "cheatsheet.desc_dnd": "Toggle Do Not Disturb (DND)",
   "cheatsheet.desc_wallpaper": "Waywallen Wallpaper Switcher",
@@ -702,6 +703,7 @@
   "binds.act_clipboard": "Clipboard History",
   "binds.act_blur": "Toggle window blur",
   "binds.act_widgets": "Edit Desktop Widgets",
+  "binds.act_quicknotes": "Quick Notes Scratchpad",
   "binds.act_notifcenter": "Open Notification Center",
   "binds.act_dnd": "Toggle Do Not Disturb (DND)",
   "binds.act_lock": "Lock Screen (Hyprlock)",
@@ -1516,5 +1518,9 @@
   "dock.tip_caf_on": "The screen won't turn off by itself. Click to disable.",
   "dock.tip_caf_off": "Click so the screen doesn't turn off by itself.",
   "dock.tip_gpu_on": "On (an app is using it).",
-  "dock.tip_gpu_off": "Sleeping, saving battery."
+  "dock.tip_gpu_off": "Sleeping, saving battery.",
+  "quicknotes.title": "Quick Notes",
+  "quicknotes.autosave": "Auto-save active",
+  "quicknotes.new_note": "New note",
+  "quicknotes.placeholder": "Type your notes here..."
 }

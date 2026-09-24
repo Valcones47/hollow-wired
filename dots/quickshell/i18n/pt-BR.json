@@ -38,6 +38,7 @@
   "cheatsheet.desc_settings": "Painel de Configurações do Rice",
   "cheatsheet.desc_cheatsheet": "Esta lista de atalhos",
   "cheatsheet.desc_widgets": "Editor de Widgets de Desktop",
+  "cheatsheet.desc_quicknotes": "Bloco de notas rápido flutuante",
   "cheatsheet.desc_notif": "Painel de Notificações",
   "cheatsheet.desc_dnd": "Alternar Não Perturbe (DND)",
   "cheatsheet.desc_wallpaper": "Seletor de Wallpapers Waywallen",
@@ -702,6 +703,7 @@
   "binds.act_clipboard": "Histórico da Área de Transferência",
   "binds.act_blur": "Ligar/desligar o desfoque das janelas",
   "binds.act_widgets": "Editar Widgets da Área de Trabalho",
+  "binds.act_quicknotes": "Bloco de Notas Rápido (QuickNotes)",
   "binds.act_notifcenter": "Abrir Central de Notificações",
   "binds.act_dnd": "Alternar Não Perturbe (DND)",
   "binds.act_lock": "Bloquear Tela (Hyprlock)",
@@ -1516,5 +1518,9 @@
   "dock.tip_caf_on": "A tela não apaga sozinha. Clique para desligar.",
   "dock.tip_caf_off": "Clique para a tela não apagar sozinha.",
   "dock.tip_gpu_on": "Ligada (algum app está usando).",
-  "dock.tip_gpu_off": "Dormindo, sem gastar bateria."
+  "dock.tip_gpu_off": "Dormindo, sem gastar bateria.",
+  "quicknotes.title": "Bloco de Notas Rápido",
+  "quicknotes.autosave": "Auto-salvamento ativo",
+  "quicknotes.new_note": "Nova nota",
+  "quicknotes.placeholder": "Digite suas anotações aqui..."
 }

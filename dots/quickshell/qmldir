@@ -53,4 +53,5 @@ LockScreen 1.0 LockScreen.qml
 LockView 1.0 LockView.qml
 LockShape 1.0 LockShape.qml
 LockWave 1.0 LockWave.qml
+QuickNotes 1.0 QuickNotes.qml
 

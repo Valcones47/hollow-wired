@@ -250,6 +250,7 @@ ShellRoot {
     Cheatsheet {}
     Clipboard {}
     Welcome {}
+    QuickNotes {}
     EditMode {}
     ControlCenter {
         id: controlCenter

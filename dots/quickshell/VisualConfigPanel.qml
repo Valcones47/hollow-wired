@@ -381,6 +381,7 @@ PanelWindow {
                 { key: "Super + Ctrl + V", action: Theme.t("binds.act_clipboard_fav", "Favoritos da Área de Transferência") },
                 { key: "Super + B", action: Theme.t("binds.act_blur", "Alternar Desfoque de Janelas (Blur On/Off)") },
                 { key: "Super + W", action: Theme.t("binds.act_widgets", "Editar Widgets da Área de Trabalho") },
+                { key: "Super + O", action: Theme.t("binds.act_quicknotes", "Bloco de Notas Rápido (QuickNotes)") },
                 { key: "Super + N", action: Theme.t("binds.act_notifcenter", "Abrir Central de Notificações") },
                 { key: "Super + Shift + N", action: Theme.t("binds.act_dnd", "Alternar Não Perturbe (DND)") },
                 { key: "Super + L", action: Theme.t("binds.act_lock", "Bloquear Tela (Hyprlock)") },
