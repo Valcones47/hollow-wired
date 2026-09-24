@@ -254,8 +254,6 @@ PanelWindow {
                                 Layout.fillWidth: true
                                 radius: 6
                                 color: actMouse.containsMouse ? Theme.tileHigh : Theme.withAlpha(Theme.tileHigh, 0.5)
-                                border.width: 1
-                                border.color: actMouse.containsMouse ? Theme.primary : Theme.border
 
                                 Text {
                                     anchors.centerIn: parent

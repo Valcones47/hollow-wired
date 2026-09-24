@@ -6,7 +6,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import "."
 
-// Modal flutuante de Bloco de Notas Rápido (Super + O) com múltiplas notas.
+// Modal flutuante de Bloco de Notas Rápido (Super + G) com múltiplas notas.
 // Auto-save contínuo em ~/.config/hollow-wired/quicknotes.json.
 PanelWindow {
     id: notesWindow
@@ -253,16 +253,14 @@ PanelWindow {
                         Layout.preferredWidth: 64
                         Layout.preferredHeight: 20
                         radius: 5
-                        color: Theme.withAlpha(Theme.primary, 0.12)
-                        border.width: 1
-                        border.color: Theme.withAlpha(Theme.primary, 0.30)
+                        color: Theme.tileHigh
                         Text {
                             anchors.centerIn: parent
-                            text: "Super + O"
+                            text: "Super + G"
                             font.family: Theme.fontFamily
                             font.pixelSize: 10
                             font.weight: Font.DemiBold
-                            color: Theme.primary
+                            color: Theme.subtext
                         }
                     }
 
@@ -273,9 +271,7 @@ PanelWindow {
                         Layout.preferredHeight: 28
                         Layout.preferredWidth: pinRow.implicitWidth + 18
                         radius: 6
-                        color: pinBtnArea.containsMouse ? Theme.withAlpha(Theme.primary, 0.25) : Theme.withAlpha(Theme.primary, 0.12)
-                        border.width: 1
-                        border.color: Theme.withAlpha(Theme.primary, 0.40)
+                        color: pinBtnArea.containsMouse ? Theme.tileHigh : Theme.tile
 
                         readonly property bool isCurrentPinned: {
                             if (!notesWindow.notes || notesWindow.notes.length === 0) return false;
@@ -313,13 +309,6 @@ PanelWindow {
                             cursorShape: Qt.PointingHandCursor
                             onClicked: notesWindow.pinCurrentNote()
                         }
-                    }
-
-                    Text {
-                        text: Theme.t("quicknotes.autosave", "Auto-salvamento ativo")
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 11
-                        color: Theme.subtext
                     }
 
                     // Botão Fechar
@@ -372,9 +361,7 @@ PanelWindow {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 34
                             radius: 8
-                            color: newNoteArea.containsMouse ? Theme.withAlpha(Theme.primary, 0.25) : Theme.withAlpha(Theme.primary, 0.14)
-                            border.width: 1
-                            border.color: Theme.withAlpha(Theme.primary, 0.40)
+                            color: newNoteArea.containsMouse ? Theme.tileHigh : Theme.tile
                             Behavior on color { ColorAnimation { duration: 120 } }
 
                             Row {
@@ -426,12 +413,8 @@ PanelWindow {
                                 height: 48
                                 radius: 8
                                 color: notesWindow.activeIndex === index
-                                    ? Theme.withAlpha(Theme.primary, 0.20)
-                                    : (itemMouse.containsMouse ? Theme.tileHigh : "transparent")
-                                border.width: 1
-                                border.color: notesWindow.activeIndex === index
-                                    ? Theme.withAlpha(Theme.primary, 0.45)
-                                    : "transparent"
+                                    ? Theme.tileHigh
+                                    : (itemMouse.containsMouse ? Theme.withAlpha(Theme.tileHigh, 0.5) : "transparent")
 
                                 RowLayout {
                                     anchors.fill: parent

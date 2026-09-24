@@ -382,7 +382,7 @@ PanelWindow {
                 Rectangle {
                     implicitWidth: 1
                     implicitHeight: 30
-                    anchors.verticalCenter: parent.verticalCenter
+                    Layout.alignment: Qt.AlignVCenter
                     color: Theme.withAlpha(Theme.outline, 0.45)
                 }
 

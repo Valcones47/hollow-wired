@@ -407,49 +407,46 @@ Item {
                         anchors.margins: 8
                         spacing: 4
 
-                        // Seletor de modo no topo: Relógio vs Pomodoro
-                        RowLayout {
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: 22
-                            spacing: 4
-
-                            Rectangle {
-                                Layout.fillWidth: true
-                                Layout.fillHeight: true
-                                radius: 4
-                                color: !clockPomoTile.showPomodoro ? Theme.withAlpha(Theme.primary, 0.22) : "transparent"
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: "󰥔 " + Theme.t("dash.clock", "Relógio")
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: 10
-                                    font.weight: !clockPomoTile.showPomodoro ? Font.Bold : Font.Normal
-                                    color: !clockPomoTile.showPomodoro ? Theme.primary : Theme.subtext
-                                }
-                                MouseArea {
-                                    anchors.fill: parent
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: clockPomoTile.showPomodoro = false
-                                }
-                            }
-
-                            Rectangle {
-                                Layout.fillWidth: true
-                                Layout.fillHeight: true
-                                radius: 4
-                                color: clockPomoTile.showPomodoro ? Theme.withAlpha(Theme.primary, 0.22) : "transparent"
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: "󰄉 " + Theme.t("dash.pomodoro", "Pomodoro")
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: 10
-                                    font.weight: clockPomoTile.showPomodoro ? Font.Bold : Font.Normal
-                                    color: clockPomoTile.showPomodoro ? Theme.primary : Theme.subtext
-                                }
-                                MouseArea {
-                                    anchors.fill: parent
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: clockPomoTile.showPomodoro = true
+                        // Seletor Relógio / Pomodoro só com ícones: com os nomes
+                        // escritos, o cartão estreito cortava o texto.
+                        Rectangle {
+                            Layout.alignment: Qt.AlignHCenter
+                            implicitWidth: modeRow.implicitWidth + 6
+                            implicitHeight: 26
+                            radius: 8
+                            color: Theme.withAlpha(Theme.background, 0.55)
+                            Row {
+                                id: modeRow
+                                anchors.centerIn: parent
+                                spacing: 2
+                                Repeater {
+                                    model: [
+                                        { pomo: false, icon: Theme.icons.clock },
+                                        { pomo: true, icon: Theme.icons.timer }
+                                    ]
+                                    delegate: Rectangle {
+                                        id: modeBtn
+                                        required property var modelData
+                                        readonly property bool on: clockPomoTile.showPomodoro === modeBtn.modelData.pomo
+                                        width: 36
+                                        height: 20
+                                        radius: 6
+                                        color: modeBtn.on ? Theme.tileHigh : (modeArea.containsMouse ? Theme.withAlpha(Theme.tileHigh, 0.45) : "transparent")
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: modeBtn.modelData.icon
+                                            font.family: Theme.iconFontFamily
+                                            font.pixelSize: 13
+                                            color: modeBtn.on ? Theme.textColor : Theme.subtext
+                                        }
+                                        MouseArea {
+                                            id: modeArea
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: clockPomoTile.showPomodoro = modeBtn.modelData.pomo
+                                        }
+                                    }
                                 }
                             }
                         }
