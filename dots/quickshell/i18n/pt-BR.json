@@ -1623,5 +1623,16 @@
   "session.cad_sub": "Tela central com suspender, reiniciar, desligar e sair, ou a barra lateral de energia",
   "session.cad_dialog": "Tela central",
   "session.cad_sidebar": "Barra lateral",
-  "bar.item_weather": "Clima"
+  "bar.item_weather": "Clima",
+  "picker.title": "Cores recentes",
+  "picker.empty": "Clique no ícone para pegar uma cor da tela",
+  "picker.copied": "copiado",
+  "picker.pick": "Pegar uma cor da tela",
+  "privacy.title": "Em uso agora",
+  "privacy.mic": "microfone",
+  "privacy.cam": "câmera",
+  "privacy.screen": "tela",
+  "bar.item_picker": "Conta-gotas",
+  "layout.bar_privacy": "Avisar quando microfone, câmera ou tela estão em uso",
+  "layout.bar_privacy_sub": "Um ponto na barra enquanto algum app usa; o mouse em cima mostra qual."
 }

@@ -1623,5 +1623,16 @@
   "session.cad_sub": "A centered screen with suspend, restart, shut down and log out, or the power sidebar",
   "session.cad_dialog": "Centered screen",
   "session.cad_sidebar": "Sidebar",
-  "bar.item_weather": "Weather"
+  "bar.item_weather": "Weather",
+  "picker.title": "Recent colors",
+  "picker.empty": "Click the icon to pick a color from the screen",
+  "picker.copied": "copied",
+  "picker.pick": "Pick a color from the screen",
+  "privacy.title": "In use now",
+  "privacy.mic": "microphone",
+  "privacy.cam": "camera",
+  "privacy.screen": "screen",
+  "bar.item_picker": "Color picker",
+  "layout.bar_privacy": "Show when the microphone, camera or screen is in use",
+  "layout.bar_privacy_sub": "A dot on the bar while an app uses them; hover shows which."
 }

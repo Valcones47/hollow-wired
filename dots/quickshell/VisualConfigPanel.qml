@@ -10106,6 +10106,13 @@ PanelWindow {
                                         onToggled: nv => ShellLayout.set("bar", "showTitle", nv)
                                     }
                                     RowDivider {}
+                                    OptionToggle {
+                                        title: Theme.t("layout.bar_privacy", "Avisar quando microfone, câmera ou tela estão em uso")
+                                        subtitle: Theme.t("layout.bar_privacy_sub", "Um ponto na barra enquanto algum app usa; o mouse em cima mostra qual.")
+                                        checked: ShellLayout.barPrivacy
+                                        onToggled: nv => ShellLayout.set("bar", "privacy", nv)
+                                    }
+                                    RowDivider {}
                                     OptionRow {
                                         title: Theme.t("layout.ws_count", "Botões de área de trabalho")
                                         subtitle: Theme.t("layout.ws_count_short", "Fixos, aparecem mesmo sem janela aberta.")

@@ -277,7 +277,7 @@ PanelWindow {
     function barModuleItems() {
         return { notifications: vNotif, network: vNet, control: vCtl, tray: vTray, updates: vUpd,
                  night: vNight, caffeine: vCaf, record: vRec, screenshot: vShot, clipboard: vClip,
-                 gpu: vGpu, lock: vLock, settings: vSet, power: vPower };
+                 picker: vPick, gpu: vGpu, lock: vLock, settings: vSet, power: vPower };
     }
     function applyBarOrder() {
         const items = vbar.barModuleItems();
@@ -747,6 +747,22 @@ PanelWindow {
                     visible: ShellLayout.barHas("clipboard")
                     icon: Theme.icons.clipboard
                     onActivated: Quickshell.execDetached(["quickshell", "ipc", "call", "clipboard", "open"])
+                }
+                BarButton {
+                    id: vPick
+                    editKey: "picker"
+                    visible: ShellLayout.barHas("picker")
+                    icon: Theme.icons.eyedropper
+                    iconColor: ColorPick.picking ? Theme.primary : Theme.textColor
+                    onActivated: ColorPick.pick()
+                }
+                // Privacidade: só enquanto microfone, câmera ou tela estão em uso.
+                BarButton {
+                    id: vPriv
+                    visible: ShellLayout.barPrivacy && Privacy.active
+                    icon: Privacy.screenApps.length > 0 ? Theme.icons.screenShare
+                        : Privacy.camApps.length > 0 ? Theme.icons.webcam : Theme.icons.mic
+                    iconColor: Theme.critical
                 }
                 BarButton {
                     id: vGpu

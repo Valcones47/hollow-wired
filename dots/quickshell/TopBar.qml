@@ -368,7 +368,7 @@ PanelWindow {
     function barModuleItems() {
         return { weather: weatherMod, notifications: notifMod, network: wifiMod, control: ctlMod, tray: trayMod,
                  updates: updMod, night: nightMod, caffeine: cafMod, record: recMod, screenshot: shotMod,
-                 clipboard: clipMod, gpu: gpuMod, lock: lockMod, settings: setMod, power: powMod };
+                 clipboard: clipMod, picker: pickMod, gpu: gpuMod, lock: lockMod, settings: setMod, power: powMod };
     }
     function applyBarOrder() {
         const items = bar.barModuleItems();
@@ -758,6 +758,32 @@ PanelWindow {
                     }
                 }
 
+                // Privacidade: um ponto só enquanto microfone, câmera ou
+                // compartilhamento de tela estão em uso; o hover diz quem.
+                Module {
+                    id: privMod
+                    kind: "privacy"
+                    visible: ShellLayout.barPrivacy && Privacy.active
+                    Rectangle {
+                        implicitWidth: 8
+                        implicitHeight: 8
+                        radius: 4
+                        color: Theme.critical
+                    }
+                    BarIcon {
+                        visible: Privacy.camApps.length > 0 || Privacy.screenApps.length > 0
+                        text: Privacy.screenApps.length > 0 ? Theme.icons.screenShare : Theme.icons.webcam
+                        font.pixelSize: 14
+                        color: Theme.critical
+                    }
+                    BarIcon {
+                        visible: Privacy.micApps.length > 0
+                        text: Theme.icons.mic
+                        font.pixelSize: 14
+                        color: Theme.critical
+                    }
+                }
+
                 Module {
                     id: weatherMod
                     kind: ""
@@ -974,6 +1000,15 @@ PanelWindow {
                 }
 
                 Module {
+                    id: pickMod
+                    kind: "picker"
+                    editKey: "picker"
+                    visible: ShellLayout.barHas("picker")
+                    onClicked: { bar.pop = ""; ColorPick.pick(); }
+                    BarIcon { text: Theme.icons.eyedropper; font.pixelSize: 15 }
+                }
+
+                Module {
                     id: gpuMod
                     kind: ""
                     editKey: "gpu"
@@ -1047,6 +1082,8 @@ PanelWindow {
                     case "wifi": return wifiPop;
                     case "record": return recordPop;
                     case "media": return mediaPop;
+                    case "picker": return pickerPop;
+                    case "privacy": return privacyPop;
                     }
                     return null;
                 }
@@ -1433,6 +1470,108 @@ PanelWindow {
                     }
                 }
 
+                // ---------- conta-gotas ----------
+                ColumnLayout {
+                    id: pickerPop
+                    visible: popContent.current === pickerPop
+                    width: 300
+                    spacing: 6
+
+                    PopTitle { text: Theme.t("picker.title", "Cores recentes") }
+                    PopText {
+                        visible: ColorPick.history.length === 0
+                        text: Theme.t("picker.empty", "Clique no ícone para pegar uma cor da tela")
+                    }
+                    Repeater {
+                        model: ColorPick.history
+                        delegate: RowLayout {
+                            id: colorRow
+                            required property var modelData
+                            Layout.fillWidth: true
+                            spacing: 8
+                            Rectangle {
+                                implicitWidth: 18
+                                implicitHeight: 18
+                                radius: 5
+                                color: colorRow.modelData
+                                border.width: 1
+                                border.color: Theme.border
+                            }
+                            Repeater {
+                                model: [colorRow.modelData, ColorPick.rgb(colorRow.modelData), ColorPick.hsl(colorRow.modelData)]
+                                delegate: Rectangle {
+                                    id: fmt
+                                    required property var modelData
+                                    required property int index
+                                    Layout.fillWidth: fmt.index > 0
+                                    implicitWidth: fmtText.implicitWidth + 12
+                                    implicitHeight: 24
+                                    radius: 6
+                                    color: fmtArea.containsMouse ? Theme.tileHigh : "transparent"
+                                    Text {
+                                        id: fmtText
+                                        anchors.centerIn: parent
+                                        text: ColorPick.copied === fmt.modelData ? Theme.t("picker.copied", "copiado") : fmt.modelData
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 11
+                                        color: ColorPick.copied === fmt.modelData ? Theme.primary : Theme.subtext
+                                    }
+                                    MouseArea {
+                                        id: fmtArea
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: ColorPick.copy(fmt.modelData)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    PopAction {
+                        Layout.topMargin: 4
+                        icon: Theme.icons.eyedropper
+                        label: Theme.t("picker.pick", "Pegar uma cor da tela")
+                        onActivated: { bar.pop = ""; ColorPick.pick(); }
+                    }
+                }
+
+                // ---------- privacidade ----------
+                ColumnLayout {
+                    id: privacyPop
+                    visible: popContent.current === privacyPop
+                    width: 280
+                    spacing: 4
+
+                    PopTitle { text: Theme.t("privacy.title", "Em uso agora") }
+                    Repeater {
+                        model: Privacy.micApps
+                        delegate: PopAction {
+                            required property var modelData
+                            icon: Theme.icons.mic
+                            label: modelData
+                            detail: Theme.t("privacy.mic", "microfone")
+                        }
+                    }
+                    Repeater {
+                        model: Privacy.camApps
+                        delegate: PopAction {
+                            required property var modelData
+                            icon: Theme.icons.webcam
+                            label: modelData
+                            detail: Theme.t("privacy.cam", "câmera")
+                        }
+                    }
+                    Repeater {
+                        model: Privacy.screenApps
+                        delegate: PopAction {
+                            required property var modelData
+                            icon: Theme.icons.screenShare
+                            label: modelData
+                            detail: Theme.t("privacy.screen", "tela")
+                        }
+                    }
+                }
+
                 // ---------- wifi ----------
                 ColumnLayout {
                     id: wifiPop
@@ -1522,10 +1661,14 @@ PanelWindow {
                 bar.showPopNow("media", mediaMod);
                 return;
             }
-            const m = { audio: ctlMod, wifi: wifiMod }[kind];
+            const m = { audio: ctlMod, wifi: wifiMod, picker: pickMod, privacy: privMod }[kind];
             if (m) bar.showPopNow(kind, m);
         }
         function hide(): void { bar.pop = ""; }
+        // Posição do popup aberto (para testes recortarem o print certo).
+        function geometry(): string {
+            return JSON.stringify({ x: Math.round(popArea.x), y: Math.round(popArea.y), w: Math.round(popArea.width), h: Math.round(popArea.height) });
+        }
         function setBarVisible(v: bool): void { bar.visible = v; }
     }
 }

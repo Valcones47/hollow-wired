@@ -61,3 +61,5 @@ SessionDialog 1.0 SessionDialog.qml
 NotifToasts 1.0 NotifToasts.qml
 PolkitDialog 1.0 PolkitDialog.qml
 
+singleton ColorPick 1.0 ColorPick.qml
+singleton Privacy 1.0 Privacy.qml

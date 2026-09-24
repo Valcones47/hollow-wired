@@ -252,7 +252,7 @@ QtObject {
         gamepad: "\u{F0297}", pin: "\u{F0403}", pencil: "\u{F0CB6}",
         star: "\u{F04CE}", starOutline: "\u{F04D2}", content: "\u{F018F}", paste: "\u{F0192}", keyboard: "\u{F030C}",
         sleep: "\u{F0904}",
-        tune: "\u{F062E}", palette: "\u{F03D8}", settings: "\u{F08B8}",
+        tune: "\u{F062E}", palette: "\u{F03D8}", eyedropper: "\u{F020A}", webcam: "\u{F05A0}", screenShare: "\u{F1483}", settings: "\u{F08B8}",
         check: "\u{F012C}",
         calendar: "\u{F00ED}", timer: "\u{F051B}", quote: "\u{F0281}", speed: "\u{F04C5}",
         equalizer: "\u{F0EA2}", album: "\u{F0025}", bezier: "\u{F0AE8}"
