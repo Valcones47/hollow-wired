@@ -140,6 +140,25 @@ PanelWindow {
         notesWindow.saveNotes();
     }
 
+    function pinCurrentNote() {
+        if (!notesWindow.notes || notesWindow.notes.length === 0) return;
+        const cur = notesWindow.notes[notesWindow.activeIndex];
+        if (!cur) return;
+        const isPinned = cur.pinned === true;
+        if (isPinned) {
+            cur.pinned = false;
+            notesWindow.saveNotes();
+            Quickshell.execDetached(["quickshell", "ipc", "call", "stickynote", "hide"]);
+            return;
+        }
+        for (let i = 0; i < notesWindow.notes.length; i++) {
+            notesWindow.notes[i].pinned = (i === notesWindow.activeIndex);
+        }
+        notesWindow.saveNotes();
+        notesWindow.open = false;
+        Quickshell.execDetached(["quickshell", "ipc", "call", "stickynote", "open"]);
+    }
+
     function extractTitle(content) {
         if (!content) return "Nova nota";
         const lines = content.trim().split("\n");
@@ -248,6 +267,53 @@ PanelWindow {
                     }
 
                     Item { Layout.fillWidth: true }
+
+                    // Botão Destacar em Janela Flutuante (Sticky Note)
+                    Rectangle {
+                        Layout.preferredHeight: 28
+                        Layout.preferredWidth: pinRow.implicitWidth + 18
+                        radius: 6
+                        color: pinBtnArea.containsMouse ? Theme.withAlpha(Theme.primary, 0.25) : Theme.withAlpha(Theme.primary, 0.12)
+                        border.width: 1
+                        border.color: Theme.withAlpha(Theme.primary, 0.40)
+
+                        readonly property bool isCurrentPinned: {
+                            if (!notesWindow.notes || notesWindow.notes.length === 0) return false;
+                            const cur = notesWindow.notes[notesWindow.activeIndex];
+                            return cur && cur.pinned === true;
+                        }
+
+                        Row {
+                            id: pinRow
+                            anchors.centerIn: parent
+                            spacing: 6
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: "󰐃"
+                                font.family: Theme.iconFontFamily
+                                font.pixelSize: 13
+                                color: Theme.primary
+                            }
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: parent.parent.isCurrentPinned
+                                    ? Theme.t("quicknotes.unpin", "Desafixar")
+                                    : Theme.t("quicknotes.pin_window", "Destacar em Janela")
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 11
+                                font.weight: Font.DemiBold
+                                color: Theme.textColor
+                            }
+                        }
+
+                        MouseArea {
+                            id: pinBtnArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: notesWindow.pinCurrentNote()
+                        }
+                    }
 
                     Text {
                         text: Theme.t("quicknotes.autosave", "Auto-salvamento ativo")
@@ -377,14 +443,27 @@ PanelWindow {
                                         Layout.fillWidth: true
                                         spacing: 2
 
-                                        Text {
+                                        RowLayout {
                                             Layout.fillWidth: true
-                                            text: noteItem.modelData.title || notesWindow.extractTitle(noteItem.modelData.content)
-                                            font.family: Theme.fontFamily
-                                            font.pixelSize: 12
-                                            font.weight: notesWindow.activeIndex === noteItem.index ? Font.DemiBold : Font.Normal
-                                            color: notesWindow.activeIndex === noteItem.index ? Theme.textColor : Theme.subtext
-                                            elide: Text.ElideRight
+                                            spacing: 4
+
+                                            Text {
+                                                text: "󰐃"
+                                                font.family: Theme.iconFontFamily
+                                                font.pixelSize: 11
+                                                color: Theme.primary
+                                                visible: noteItem.modelData.pinned === true
+                                            }
+
+                                            Text {
+                                                Layout.fillWidth: true
+                                                text: noteItem.modelData.title || notesWindow.extractTitle(noteItem.modelData.content)
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: 12
+                                                font.weight: notesWindow.activeIndex === noteItem.index ? Font.DemiBold : Font.Normal
+                                                color: notesWindow.activeIndex === noteItem.index ? Theme.textColor : Theme.subtext
+                                                elide: Text.ElideRight
+                                            }
                                         }
 
                                         Text {
@@ -512,11 +591,17 @@ PanelWindow {
         target: "quicknotes"
 
         function toggle(): void {
-            notesWindow.open = !notesWindow.open;
+            if (notesWindow.open) hide();
+            else open();
+        }
+
+        function open(): void {
+            if (notesFile) notesFile.reload();
+            notesWindow.open = true;
         }
 
         function show(): void {
-            notesWindow.open = true;
+            open();
         }
 
         function hide(): void {

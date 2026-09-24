@@ -366,7 +366,7 @@ PanelWindow {
     // Enquanto arrasta, dragOrder guarda a ordem ao vivo e só é gravada ao soltar.
     property var dragOrder: null
     function barModuleItems() {
-        return { notifications: notifMod, network: wifiMod, control: ctlMod, tray: trayMod,
+        return { weather: weatherMod, notifications: notifMod, network: wifiMod, control: ctlMod, tray: trayMod,
                  updates: updMod, night: nightMod, caffeine: cafMod, record: recMod, screenshot: shotMod,
                  clipboard: clipMod, gpu: gpuMod, lock: lockMod, settings: setMod, power: powMod };
     }
@@ -735,6 +735,47 @@ PanelWindow {
                     visible: bar.source && bar.source.audio && bar.source.audio.muted
                     onClicked: bar.source.audio.muted = false
                     BarIcon { text: Theme.icons.micOff; color: Theme.critical }
+                }
+
+                Module {
+                    id: pomodoroMod
+                    kind: "pomodoro"
+                    visible: PomodoroService.active
+                    onClicked: bar.clockClicked()
+                    RowLayout {
+                        spacing: 4
+                        Text {
+                            text: "󰄉"
+                            font.family: Theme.iconFontFamily
+                            font.pixelSize: 13
+                            color: PomodoroService.paused ? Theme.warning : Theme.primary
+                        }
+                        BarText {
+                            text: PomodoroService.timeString
+                            font.weight: Font.DemiBold
+                            color: PomodoroService.paused ? Theme.warning : Theme.textColor
+                        }
+                    }
+                }
+
+                Module {
+                    id: weatherMod
+                    kind: ""
+                    editKey: "weather"
+                    visible: ShellLayout.barHas("weather")
+                    onClicked: bar.clockClicked()
+                    RowLayout {
+                        spacing: 4
+                        BarIcon {
+                            text: WeatherService.icon
+                            font.pixelSize: 14
+                            color: Theme.primary
+                        }
+                        BarText {
+                            text: WeatherService.temp
+                            font.weight: Font.DemiBold
+                        }
+                    }
                 }
 
                 Module {

@@ -54,4 +54,7 @@ LockView 1.0 LockView.qml
 LockShape 1.0 LockShape.qml
 LockWave 1.0 LockWave.qml
 QuickNotes 1.0 QuickNotes.qml
+singleton WeatherService 1.0 WeatherService.qml
+singleton PomodoroService 1.0 PomodoroService.qml
+StickyNote 1.0 StickyNote.qml
 

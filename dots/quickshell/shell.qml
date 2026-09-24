@@ -251,6 +251,7 @@ ShellRoot {
     Clipboard {}
     Welcome {}
     QuickNotes {}
+    StickyNote {}
     EditMode {}
     ControlCenter {
         id: controlCenter

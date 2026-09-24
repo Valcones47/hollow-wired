@@ -128,6 +128,7 @@ Singleton {
     // mostra o disco (levelWanted, ligado pela TopBar). level = média 0..1.
     property bool levelWanted: false
     property real level: 0
+    property var barValues: []
     property Process levelProc: Process {
         running: root.levelWanted && root.player !== null && root.playing
         command: ["cava", "-p", Quickshell.env("HOME") + "/.config/quickshell/cava-bar.conf"]
@@ -136,12 +137,13 @@ Singleton {
             onRead: line => {
                 const parts = line.split(";").filter(x => x.length > 0).map(Number);
                 if (parts.length === 0) return;
+                root.barValues = parts;
                 let sum = 0;
                 for (const v of parts) sum += v;
                 root.level = Math.max(0, Math.min(1, sum / parts.length / 100));
             }
         }
-        onRunningChanged: if (!running) root.level = 0
+        onRunningChanged: if (!running) { root.level = 0; root.barValues = []; }
     }
 
     // ---------- volume do app ----------

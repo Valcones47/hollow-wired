@@ -89,12 +89,12 @@ QtObject {
     //   media    música tocando (na lateral fica no meio da barra)
     //   tray     apps em segundo plano
     //   control  bloco brilho/som/bateria → central de controle
-    readonly property var barCatalog: ["media", "tray", "updates", "notifications", "network", "control",
+    readonly property var barCatalog: ["media", "weather", "tray", "updates", "notifications", "network", "control",
         "night", "caffeine", "record", "screenshot", "clipboard", "gpu", "lock", "settings", "power"]
     readonly property var barItemsDefault: ({
         // "media" em cima substitui o ícone fixo do equalizador que existia
         // ao lado do relógio (o equalizador é uma aba do popup da mídia).
-        top: ["media", "notifications", "network", "control"],
+        top: ["media", "weather", "notifications", "network", "control"],
         side: ["media", "tray", "notifications", "network", "control", "power"]
     })
     function barItemsFor(kind) {

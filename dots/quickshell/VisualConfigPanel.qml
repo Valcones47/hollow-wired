@@ -9979,6 +9979,7 @@ PanelWindow {
                                             Repeater {
                                                 model: [
                                                     { key: "clock", icon: Theme.icons.clock, label: Theme.t("layout.mod_clock", "Relógio") },
+                                                    { key: "weather", icon: Theme.icons.sunny, label: Theme.t("layout.mod_weather", "Clima") },
                                                     { key: "notifications", icon: Theme.icons.bell, label: Theme.t("layout.mod_notif", "Notificações") },
                                                     { key: "audio", icon: Theme.icons.volHigh, label: Theme.t("layout.mod_audio", "Volume") },
                                                     { key: "brightness", icon: Theme.icons.brightness, label: Theme.t("layout.mod_bright", "Brilho") },
@@ -10026,6 +10027,75 @@ PanelWindow {
                                                         hoverEnabled: true
                                                         cursorShape: Qt.PointingHandCursor
                                                         onClicked: ShellLayout.setBarModule(modChip.modelData.key, !modChip.on)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                GroupLabel { text: Theme.t("shellcustom.weather_title", "Previsão do Tempo & Clima") }
+
+                                OptionGroup {
+                                    ColumnLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 8
+                                        Text {
+                                            Layout.fillWidth: true
+                                            text: Theme.t("shellcustom.weather_city_label", "Cidade para o clima (vazio = automático por IP)")
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: 13
+                                            color: Theme.textColor
+                                        }
+                                        RowLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 8
+
+                                            Rectangle {
+                                                Layout.fillWidth: true
+                                                Layout.preferredHeight: 34
+                                                radius: 8
+                                                color: Theme.tileHigh
+                                                border.width: 1
+                                                border.color: Theme.withAlpha(Theme.outline, 0.25)
+
+                                                TextInput {
+                                                    id: weatherCityInput
+                                                    anchors.fill: parent
+                                                    anchors.leftMargin: 10
+                                                    anchors.rightMargin: 10
+                                                    verticalAlignment: TextInput.AlignVCenter
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 12
+                                                    color: Theme.textColor
+                                                    text: WeatherService.city
+                                                    onAccepted: WeatherService.setCity(text)
+                                                }
+                                            }
+
+                                            Rectangle {
+                                                Layout.preferredWidth: 90
+                                                Layout.preferredHeight: 34
+                                                radius: 8
+                                                color: Theme.withAlpha(Theme.primary, 0.25)
+                                                border.width: 1
+                                                border.color: Theme.primary
+
+                                                Text {
+                                                    anchors.centerIn: parent
+                                                    text: Theme.t("shellcustom.weather_refresh", "Atualizar")
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 11
+                                                    font.weight: Font.DemiBold
+                                                    color: Theme.textColor
+                                                }
+
+                                                MouseArea {
+                                                    anchors.fill: parent
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    onClicked: {
+                                                        WeatherService.setCity(weatherCityInput.text);
+                                                        win.showToast(Theme.t("shellcustom.weather_saved", "Clima atualizado!"));
                                                     }
                                                 }
                                             }

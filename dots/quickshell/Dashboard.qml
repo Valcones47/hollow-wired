@@ -66,99 +66,18 @@ Item {
         }
     }
 
-    // ---------- clima (wttr.in, localização pelo IP) ----------
-    // http (não https): o curl daqui falha a verificação TLS do wttr.in
-    // (exit 60), e clima não é dado sensível. Troque weatherLocation por uma cidade ("Sao+Paulo") se o IP cair em
-    // outro lugar. Consulta a cada 30 min, só enquanto a aba está visível.
-    property string weatherLocation: ""
-    property string weatherTemp: "--"
-    property string weatherDesc: "Sem dados"
-    property string weatherPlace: ""
-    property int weatherCode: 0
-    // A resposta do wttr.in (format=j1) já vem com sensação térmica, umidade,
-    // vento, nascer/pôr do sol e a previsão de três dias. Tudo isso era baixado
-    // e jogado fora: só a temperatura era lida.
-    property string weatherFeels: ""
-    property string weatherHumidity: ""
-    property string weatherWind: ""
-    property string weatherSunrise: ""
-    property string weatherSunset: ""
-    property var weatherDays: []
-    Timer {
-        interval: 30 * 60 * 1000
-        running: root.visible
-        repeat: true
-        triggeredOnStart: true
-        onTriggered: weatherProc.running = true
-    }
-    Process {
-        id: weatherProc
-        command: ["curl", "-sf", "--max-time", "10", "http://wttr.in/" + root.weatherLocation + "?format=j1&lang=pt"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                try {
-                    const data = JSON.parse(text);
-                    const cur = data.current_condition[0];
-                    root.weatherTemp = cur.temp_C + "°C";
-                    root.weatherCode = parseInt(cur.weatherCode);
-                    root.weatherDesc = cur.lang_pt ? cur.lang_pt[0].value : cur.weatherDesc[0].value;
-                    root.weatherPlace = data.nearest_area ? data.nearest_area[0].areaName[0].value : "";
-
-                    root.weatherFeels = cur.FeelsLikeC ? cur.FeelsLikeC + "°" : "";
-                    root.weatherHumidity = cur.humidity ? cur.humidity + "%" : "";
-                    root.weatherWind = cur.windspeedKmph ? cur.windspeedKmph + " km/h" : "";
-
-                    const astro = (data.weather && data.weather[0] && data.weather[0].astronomy)
-                                ? data.weather[0].astronomy[0] : null;
-                    // O wttr.in devolve o horário em 12h ("05:23 AM"); aqui o
-                    // relógio é de 24h em todo o resto da interface.
-                    root.weatherSunrise = astro ? root.to24h(astro.sunrise) : "";
-                    root.weatherSunset = astro ? root.to24h(astro.sunset) : "";
-
-                    const days = [];
-                    const names = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-                    for (let i = 0; i < (data.weather || []).length && i < 3; i++) {
-                        const w = data.weather[i];
-                        const d = new Date(w.date + "T12:00:00");
-                        days.push({
-                            label: i === 0 ? Theme.t("dash.today", "Hoje") : names[d.getDay()],
-                            min: w.mintempC + "°",
-                            max: w.maxtempC + "°",
-                            code: parseInt((w.hourly && w.hourly[4]) ? w.hourly[4].weatherCode : "113")
-                        });
-                    }
-                    root.weatherDays = days;
-                } catch (e) {
-                    console.log("Dashboard: resposta do wttr.in inválida:", e);
-                }
-            }
-        }
-    }
-    function to24h(text) {
-        // "05:23 AM" / "5:23 PM" -> "05:23"
-        const m = /^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i.exec((text || "").trim());
-        if (!m)
-            return text || "";
-        let h = parseInt(m[1]);
-        const ampm = (m[3] || "").toUpperCase();
-        if (ampm === "PM" && h !== 12) h += 12;
-        if (ampm === "AM" && h === 12) h = 0;
-        return ("0" + h).slice(-2) + ":" + m[2];
-    }
-
-    function weatherIcon(code, hour) {
-        const night = hour < 6 || hour >= 18;
-        if (code === 113) return night ? Theme.icons.night : Theme.icons.sunny;
-        if (code === 116) return Theme.icons.partly;
-        if (code === 119 || code === 122) return Theme.icons.cloudy;
-        if ([143, 248, 260].includes(code)) return Theme.icons.fog;
-        if ([200, 386, 389, 392, 395].includes(code)) return Theme.icons.lightning;
-        if ([299, 302, 305, 308, 356, 359].includes(code)) return Theme.icons.pouring;
-        if ([179, 182, 185, 227, 230, 317, 320, 323, 326, 329, 332, 335, 338, 350, 362, 365, 368, 371, 374, 377].includes(code))
-            return Theme.icons.snowy;
-        if (code >= 176) return Theme.icons.rainy;
-        return Theme.icons.cloudy;
-    }
+    // ---------- clima centralizado via WeatherService ----------
+    readonly property string weatherTemp: WeatherService.temp
+    readonly property string weatherDesc: WeatherService.desc
+    readonly property string weatherPlace: WeatherService.place
+    readonly property int weatherCode: WeatherService.code
+    readonly property string weatherFeels: WeatherService.feels
+    readonly property string weatherHumidity: WeatherService.humidity
+    readonly property string weatherWind: WeatherService.wind
+    readonly property string weatherSunrise: WeatherService.sunrise
+    readonly property string weatherSunset: WeatherService.sunset
+    readonly property var weatherDays: WeatherService.days
+    function weatherIcon(code, hour) { return WeatherService.iconFor(code, hour); }
 
     // ---------- grade do calendário (inclui dias dos meses vizinhos) ----------
     readonly property var monthGrid: {
@@ -475,49 +394,251 @@ Item {
                 Layout.fillHeight: true
                 spacing: Theme.gap + 2
 
-                // hora vertical: HH ••• MM
+                // Bloco Dual: Relógio / Pomodoro Timer
                 Tile {
-                    Layout.preferredWidth: 92
+                    id: clockPomoTile
+                    Layout.preferredWidth: 124
                     Layout.fillHeight: true
 
-                    ColumnLayout {
-                        anchors.centerIn: parent
-                        spacing: 2
+                    property bool showPomodoro: PomodoroService.active
 
-                        Text {
-                            Layout.alignment: Qt.AlignHCenter
-                            text: Qt.formatDateTime(root.now, "HH")
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 34
-                            font.weight: Font.DemiBold
-                            color: Theme.primary
-                        }
-                        Row {
-                            Layout.alignment: Qt.AlignHCenter
-                            spacing: 5
-                            Repeater {
-                                model: 3
-                                Rectangle {
-                                    width: 5; height: 5; radius: 2.5
-                                    color: Theme.primary
+                    ColumnLayout {
+                        anchors.fill: parent
+                        anchors.margins: 8
+                        spacing: 4
+
+                        // Seletor de modo no topo: Relógio vs Pomodoro
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 22
+                            spacing: 4
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+                                radius: 4
+                                color: !clockPomoTile.showPomodoro ? Theme.withAlpha(Theme.primary, 0.22) : "transparent"
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "󰥔 " + Theme.t("dash.clock", "Relógio")
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 10
+                                    font.weight: !clockPomoTile.showPomodoro ? Font.Bold : Font.Normal
+                                    color: !clockPomoTile.showPomodoro ? Theme.primary : Theme.subtext
+                                }
+                                MouseArea {
+                                    anchors.fill: parent
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: clockPomoTile.showPomodoro = false
+                                }
+                            }
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+                                radius: 4
+                                color: clockPomoTile.showPomodoro ? Theme.withAlpha(Theme.primary, 0.22) : "transparent"
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "󰄉 " + Theme.t("dash.pomodoro", "Pomodoro")
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 10
+                                    font.weight: clockPomoTile.showPomodoro ? Font.Bold : Font.Normal
+                                    color: clockPomoTile.showPomodoro ? Theme.primary : Theme.subtext
+                                }
+                                MouseArea {
+                                    anchors.fill: parent
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: clockPomoTile.showPomodoro = true
                                 }
                             }
                         }
-                        Text {
-                            Layout.alignment: Qt.AlignHCenter
-                            text: Qt.formatDateTime(root.now, "mm")
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 34
-                            font.weight: Font.DemiBold
-                            color: Theme.primary
+
+                        // Conteúdo: Relógio (padrão)
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            visible: !clockPomoTile.showPomodoro
+                            spacing: 2
+
+                            Item { Layout.fillHeight: true }
+
+                            Text {
+                                Layout.alignment: Qt.AlignHCenter
+                                text: Qt.formatDateTime(root.now, "HH")
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 32
+                                font.weight: Font.DemiBold
+                                color: Theme.primary
+                            }
+                            Row {
+                                Layout.alignment: Qt.AlignHCenter
+                                spacing: 5
+                                Repeater {
+                                    model: 3
+                                    Rectangle {
+                                        width: 4; height: 4; radius: 2
+                                        color: Theme.primary
+                                    }
+                                }
+                            }
+                            Text {
+                                Layout.alignment: Qt.AlignHCenter
+                                text: Qt.formatDateTime(root.now, "mm")
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 32
+                                font.weight: Font.DemiBold
+                                color: Theme.primary
+                            }
+                            Text {
+                                Layout.alignment: Qt.AlignHCenter
+                                Layout.topMargin: 4
+                                text: root.dayNames[root.now.getDay()].slice(0, 3) + ", " + root.now.getDate()
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 11
+                                color: Theme.subtext
+                            }
+
+                            Item { Layout.fillHeight: true }
                         }
-                        Text {
-                            Layout.alignment: Qt.AlignHCenter
-                            Layout.topMargin: 6
-                            text: root.dayNames[root.now.getDay()].slice(0, 3) + ", " + root.now.getDate()
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 12
-                            color: Theme.subtext
+
+                        // Conteúdo: Pomodoro Timer
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            Layout.fillHeight: true
+                            visible: clockPomoTile.showPomodoro
+                            spacing: 6
+
+                            // Chips de modo (Foco 25m / Pausa 5m / Longa 15m)
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 3
+                                Repeater {
+                                    model: [
+                                        { id: "work", label: Theme.t("dash.pomo_focus", "Foco") },
+                                        { id: "shortBreak", label: Theme.t("dash.pomo_short", "Pausa") },
+                                        { id: "longBreak", label: Theme.t("dash.pomo_long", "Longa") }
+                                    ]
+                                    delegate: Rectangle {
+                                        required property var modelData
+                                        Layout.fillWidth: true
+                                        Layout.preferredHeight: 18
+                                        radius: 4
+                                        color: PomodoroService.mode === modelData.id
+                                            ? Theme.withAlpha(Theme.primary, 0.3)
+                                            : Theme.tileHigh
+                                        border.width: 1
+                                        border.color: PomodoroService.mode === modelData.id
+                                            ? Theme.primary : "transparent"
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: parent.modelData.label
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: 9
+                                            font.weight: PomodoroService.mode === parent.modelData.id ? Font.Bold : Font.Normal
+                                            color: PomodoroService.mode === parent.modelData.id ? Theme.primary : Theme.subtext
+                                        }
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: PomodoroService.setMode(parent.modelData.id)
+                                        }
+                                    }
+                                }
+                            }
+
+                            Item { Layout.fillHeight: true }
+
+                            // Timer decrescente grande
+                            Text {
+                                Layout.alignment: Qt.AlignHCenter
+                                text: PomodoroService.timeString
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 26
+                                font.weight: Font.Bold
+                                color: PomodoroService.paused ? Theme.warning : Theme.primary
+                            }
+
+                            // Barra de progresso horizontal
+                            Rectangle {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 4
+                                radius: 2
+                                color: Theme.tileHigh
+                                Rectangle {
+                                    height: parent.height
+                                    radius: 2
+                                    width: parent.width * PomodoroService.progress
+                                    color: PomodoroService.paused ? Theme.warning : Theme.primary
+                                    Behavior on width { NumberAnimation { duration: 250 } }
+                                }
+                            }
+
+                            // Botões Iniciar / Pausar e Resetar
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 4
+
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 26
+                                    radius: 6
+                                    color: PomodoroService.running
+                                        ? Theme.withAlpha(Theme.warning, 0.25)
+                                        : Theme.withAlpha(Theme.primary, 0.25)
+                                    border.width: 1
+                                    border.color: PomodoroService.running ? Theme.warning : Theme.primary
+
+                                    Row {
+                                        anchors.centerIn: parent
+                                        spacing: 4
+                                        Text {
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            text: PomodoroService.running ? "󰏤" : "󰐊"
+                                            font.family: Theme.iconFontFamily
+                                            font.pixelSize: 12
+                                            color: PomodoroService.running ? Theme.warning : Theme.primary
+                                        }
+                                        Text {
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            text: PomodoroService.running
+                                                ? Theme.t("dash.pomo_pause", "Pausar")
+                                                : Theme.t("dash.pomo_start", "Iniciar")
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: 10
+                                            font.weight: Font.DemiBold
+                                            color: Theme.textColor
+                                        }
+                                    }
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: PomodoroService.toggle()
+                                    }
+                                }
+
+                                Rectangle {
+                                    Layout.preferredWidth: 26
+                                    Layout.preferredHeight: 26
+                                    radius: 6
+                                    color: Theme.tileHigh
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: "󰑐"
+                                        font.family: Theme.iconFontFamily
+                                        font.pixelSize: 13
+                                        color: Theme.subtext
+                                    }
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: PomodoroService.reset()
+                                    }
+                                }
+                            }
+
+                            Item { Layout.fillHeight: true }
                         }
                     }
                 }
@@ -614,6 +735,8 @@ Item {
             id: mediaTile
             Layout.preferredWidth: 236
             Layout.fillHeight: true
+
+            Binding { target: MediaState; property: "levelWanted"; value: true; when: root.visible && root.player !== null && root.player.isPlaying }
 
             // MPRIS não empurra a posição continuamente — avança local e
             // resincroniza em eventos (mesma lógica da aba Mídia).
@@ -746,6 +869,29 @@ Item {
                                     else root.player.togglePlaying();
                                 }
                             }
+                        }
+                    }
+                }
+
+                // Visualizador de áudio Cava reativo (8 barras de frequência)
+                Row {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.preferredHeight: 18
+                    spacing: 4
+                    visible: root.player !== null && root.player.isPlaying
+
+                    Repeater {
+                        model: 8
+                        delegate: Rectangle {
+                            required property int index
+                            width: 5
+                            radius: 2.5
+                            color: Theme.accent2
+                            property real val: (MediaState.barValues && MediaState.barValues.length > index)
+                                ? MediaState.barValues[index] : 0
+                            height: Math.max(3, Math.min(18, val * 0.18))
+                            anchors.verticalCenter: parent.verticalCenter
+                            Behavior on height { NumberAnimation { duration: 60 } }
                         }
                     }
                 }
