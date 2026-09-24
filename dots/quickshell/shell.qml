@@ -254,6 +254,7 @@ ShellRoot {
     StickyNote {}
     SessionDialog {}
     NotifToasts {}
+    PolkitDialog {}
     EditMode {}
     ControlCenter {
         id: controlCenter

@@ -1599,5 +1599,20 @@
   "notif.dnd_on": "Do not disturb: on",
   "notif.dnd_btn": "Do not disturb",
   "notif.on_screen": "on screen",
-  "notif.just_now": "Just now"
+  "notif.just_now": "Just now",
+  "polkit.title": "Administrative Authentication",
+  "polkit.desc_default": "An application is requesting permission to perform an administrative task.",
+  "polkit.wrong_pass": "Incorrect password. Please try again.",
+  "polkit.prompt_pass": "Enter your administrative password...",
+  "polkit.btn_cancel": "Cancel",
+  "polkit.btn_auth": "Authenticate",
+  "polkit.section_title": "Administrative Authentication (Polkit)",
+  "polkit.section_sub": "Management of the superuser password request dialog (root)",
+  "polkit.toggle_native": "Native Quickshell Polkit Agent",
+  "polkit.toggle_native_sub": "Replaces the default KDE dialog with the integrated rice theme window. Disabled by default for security.",
+  "polkit.enabled_toast": "Quickshell Polkit agent enabled",
+  "polkit.disabled_toast": "Polkit-KDE restored",
+  "polkit.status_label": "Agent Status",
+  "polkit.status_native": "Quickshell agent active",
+  "polkit.status_kde": "polkit-kde-authentication-agent-1 active (Secure default)"
 }

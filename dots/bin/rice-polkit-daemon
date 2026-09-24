@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+# rice-polkit-daemon: Gerencia a alternância entre o polkit-kde-agent e o Quickshell Polkit
+set -euo pipefail
+
+CONF_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/hollow-wired"
+CONF_FILE="$CONF_DIR/polkit.json"
+mkdir -p "$CONF_DIR"
+
+if [ ! -f "$CONF_FILE" ]; then
+    echo '{"enabled": false}' > "$CONF_FILE"
+fi
+
+KDE_AGENT="/usr/lib/polkit-kde-authentication-agent-1"
+
+is_enabled() {
+    if command -v jq >/dev/null 2>&1 && [ -f "$CONF_FILE" ]; then
+        [ "$(jq -r '.enabled // false' "$CONF_FILE" 2>/dev/null)" = "true" ]
+    else
+        grep -q '"enabled": *true' "$CONF_FILE" 2>/dev/null
+    fi
+}
+
+is_kde_running() {
+    pgrep -f "polkit-kde-authentication-agent-1" >/dev/null 2>&1
+}
+
+start_kde() {
+    if ! is_kde_running && [ -x "$KDE_AGENT" ]; then
+        nohup "$KDE_AGENT" >/dev/null 2>&1 &
+        sleep 0.2
+    fi
+}
+
+stop_kde() {
+    if is_kde_running; then
+        pkill -f "polkit-kde-authentication-agent-1" 2>/dev/null || true
+    fi
+}
+
+cmd="${1:-status}"
+case "$cmd" in
+    status)
+        enabled=$(is_enabled && echo "true" || echo "false")
+        kde_run=$(is_kde_running && echo "true" || echo "false")
+        cat << EOF
+{
+  "quickshell_polkit_enabled": $enabled,
+  "polkit_kde_agent_running": $kde_run
+}
+EOF
+        ;;
+    enable)
+        echo '{"enabled": true}' > "$CONF_FILE"
+        stop_kde
+        echo "Agente Polkit Quickshell ativado."
+        ;;
+    disable)
+        echo '{"enabled": false}' > "$CONF_FILE"
+        start_kde
+        echo "Agente Polkit Quickshell desativado (polkit-kde-agent ativo)."
+        ;;
+    toggle)
+        if is_enabled; then
+            "$0" disable
+        else
+            "$0" enable
+        fi
+        ;;
+    ensure)
+        # Garante que o polkit-kde-agent esteja rodando se o Quickshell polkit não estiver habilitado
+        if ! is_enabled; then
+            start_kde
+        fi
+        ;;
+    *)
+        echo "Uso: rice-polkit-daemon [status|enable|disable|toggle|ensure]" >&2
+        exit 1
+        ;;
+esac

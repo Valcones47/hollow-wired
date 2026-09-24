@@ -1305,6 +1305,23 @@ PanelWindow {
         }
     }
 
+    property bool polkitNativeEnabled: false
+
+    Process {
+        id: loadPolkitStatusProc
+        command: ["rice-polkit-daemon", "status"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const d = JSON.parse(text);
+                    if (d) {
+                        win.polkitNativeEnabled = d.quickshell_polkit_enabled === true;
+                    }
+                } catch (e) {}
+            }
+        }
+    }
+
     property string recordingDiscordTarget: ""
     property bool editingManualMute: false
     property bool editingManualDeafen: false
@@ -9511,6 +9528,37 @@ PanelWindow {
                                                 }
                                             }
                                         }
+                                    }
+                                }
+
+                                // ==================== AUTENTICAÇÃO ADMINISTRATIVA (POLKIT) ====================
+                                SectionHeader {
+                                    title: Theme.t("polkit.section_title", "Autenticação Administrativa (Polkit)")
+                                    subtitle: Theme.t("polkit.section_sub", "Gerenciamento da janela de solicitação de senha de superusuário (root)")
+                                }
+
+                                OptionGroup {
+                                    OptionToggle {
+                                        title: Theme.t("polkit.toggle_native", "Agente Polkit Nativo do Quickshell")
+                                        subtitle: Theme.t("polkit.toggle_native_sub", "Substitui a janela padrão do KDE pela janela integrada ao tema do rice. Desligado por padrão por segurança.")
+                                        checked: win.polkitNativeEnabled
+                                        onToggled: nextVal => {
+                                            win.polkitNativeEnabled = nextVal;
+                                            if (nextVal) {
+                                                Quickshell.execDetached(["rice-polkit-daemon", "enable"]);
+                                                win.showToast(Theme.t("polkit.enabled_toast", "Agente Polkit do Quickshell ativado"));
+                                            } else {
+                                                Quickshell.execDetached(["rice-polkit-daemon", "disable"]);
+                                                win.showToast(Theme.t("polkit.disabled_toast", "Polkit-KDE restaurado"));
+                                            }
+                                        }
+                                    }
+
+                                    RowDivider {}
+
+                                    OptionRow {
+                                        title: Theme.t("polkit.status_label", "Status do Agente")
+                                        subtitle: win.polkitNativeEnabled ? Theme.t("polkit.status_native", "Agente Quickshell ativo") : Theme.t("polkit.status_kde", "polkit-kde-authentication-agent-1 ativo (Padrão seguro)")
                                     }
                                 }
                             }

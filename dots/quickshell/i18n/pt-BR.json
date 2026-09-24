@@ -1599,5 +1599,20 @@
   "notif.dnd_on": "Não perturbe: ligado",
   "notif.dnd_btn": "Não perturbe",
   "notif.on_screen": "na tela",
-  "notif.just_now": "Agora"
+  "notif.just_now": "Agora",
+  "polkit.title": "Autenticação Administrativa",
+  "polkit.desc_default": "Uma aplicação está solicitando permissão para executar uma tarefa administrativa.",
+  "polkit.wrong_pass": "Senha incorreta. Tente novamente.",
+  "polkit.prompt_pass": "Digite sua senha de administrador...",
+  "polkit.btn_cancel": "Cancelar",
+  "polkit.btn_auth": "Autenticar",
+  "polkit.section_title": "Autenticação Administrativa (Polkit)",
+  "polkit.section_sub": "Gerenciamento da janela de solicitação de senha de superusuário (root)",
+  "polkit.toggle_native": "Agente Polkit Nativo do Quickshell",
+  "polkit.toggle_native_sub": "Substitui a janela padrão do KDE pela janela integrada ao tema do rice. Desligado por padrão por segurança.",
+  "polkit.enabled_toast": "Agente Polkit do Quickshell ativado",
+  "polkit.disabled_toast": "Polkit-KDE restaurado",
+  "polkit.status_label": "Status do Agente",
+  "polkit.status_native": "Agente Quickshell ativo",
+  "polkit.status_kde": "polkit-kde-authentication-agent-1 ativo (Padrão seguro)"
 }
