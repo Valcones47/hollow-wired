@@ -174,6 +174,8 @@ QtObject {
     readonly property color subtextSoft: _readable(mix(background, foreground, 0.74), 5.5)
     readonly property color outline: color8
     readonly property color surface: withAlpha(background, 0.85) // = fundo da waybar
+    // Contorno neutro de cartões e campos (usado pelos toasts, sessão e polkit).
+    readonly property color border: withAlpha(outline, 0.3)
     readonly property color tile: withAlpha(mix(background, foreground, 0.07), 0.9)
     readonly property color tileHigh: withAlpha(mix(background, foreground, 0.13), 0.95)
 

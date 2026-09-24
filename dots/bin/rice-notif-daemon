@@ -141,6 +141,20 @@ case "$cmd" in
     sync)
         do_sync
         ;;
+    boot)
+        # Login: com preferência "quickshell", não sobe o mako junto (ele
+        # podia pegar o nome no D-Bus antes e o Quickshell não tenta de novo).
+        # Espera até 15 s o Quickshell assumir; se não assumir, sobe o mako.
+        if [ "$(get_pref_provider)" = "mako" ]; then
+            start_mako
+        else
+            for _ in $(seq 1 30); do
+                [ "$(get_dbus_owner)" = "quickshell" ] && exit 0
+                sleep 0.5
+            done
+            [ "$(get_dbus_owner)" = "none" ] && start_mako
+        fi
+        ;;
     check|fallback)
         do_check
         ;;
@@ -169,7 +183,7 @@ with open(path, 'w') as f: json.dump(d, f, indent=2)
         do_sync
         ;;
     *)
-        echo "Uso: rice-notif-daemon [sync|check|fallback|watch|status|set-provider <quickshell|mako>]" >&2
+        echo "Uso: rice-notif-daemon [boot|sync|check|fallback|watch|status|set-provider <quickshell|mako>]" >&2
         exit 1
         ;;
 esac

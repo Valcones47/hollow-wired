@@ -1614,5 +1614,14 @@
   "polkit.disabled_toast": "Polkit-KDE restored",
   "polkit.status_label": "Agent Status",
   "polkit.status_native": "Quickshell agent active",
-  "polkit.status_kde": "polkit-kde-authentication-agent-1 active (Secure default)"
+  "polkit.status_kde": "polkit-kde-authentication-agent-1 active (Secure default)",
+  "notif.more": "+%1",
+  "session.pick": "Choose an action (Enter confirms, Esc closes)",
+  "session.in_seconds": "%1 in %2 s (Esc cancels)",
+  "session.group": "Ctrl + Alt + Del",
+  "session.cad_title": "What the shortcut opens",
+  "session.cad_sub": "A centered screen with suspend, restart, shut down and log out, or the power sidebar",
+  "session.cad_dialog": "Centered screen",
+  "session.cad_sidebar": "Sidebar",
+  "bar.item_weather": "Weather"
 }

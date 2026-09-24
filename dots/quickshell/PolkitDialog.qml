@@ -31,19 +31,30 @@ PanelWindow {
         onLoadFailed: root.enabledByPref = false
     }
 
-    // Instancia o PolkitAgent apenas se habilitado pelo usuário
-    property PolkitAgent agent: PolkitAgent {
-        id: polkitAgent
-        // Não registra se desligado nas preferências
-        Component.onCompleted: {
-            if (!root.enabledByPref) {
-                console.log("PolkitDialog: agente nativo desativado (usando polkit-kde-agent padrão)");
+    // O PolkitAgent só existe com a opção ligada. Antes ele era criado sempre
+    // e disputava o registro com o polkit-kde-agent: se ganhasse com a opção
+    // desligada, o pedido de senha ficava esperando uma janela invisível.
+    LazyLoader {
+        id: agentLoader
+        active: root.enabledByPref
+        PolkitAgent {}
+    }
+    readonly property var agent: agentLoader.item
+    readonly property bool active: root.enabledByPref && !!agent && agent.isActive && agent.flow !== null
+    readonly property var currentFlow: agent ? agent.flow : null
+
+    // Ligado mas não registrou (outro agente segurando a sessão, módulo com
+    // problema): sobe o polkit-kde-agent de novo para nunca ficar sem agente.
+    Timer {
+        interval: 5000
+        running: root.enabledByPref
+        onTriggered: {
+            if (!root.agent || !root.agent.isActive) {
+                console.log("PolkitDialog: agente nativo não registrou; voltando ao polkit-kde-agent");
+                Quickshell.execDetached(["rice-polkit-daemon", "fallback"]);
             }
         }
     }
-
-    readonly property bool active: root.enabledByPref && agent.isActive && agent.flow !== null
-    readonly property var currentFlow: agent.flow
 
     // Dimensões de tela cheia para modal overlay
     anchors.top: true

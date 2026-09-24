@@ -35,10 +35,14 @@ PanelWindow {
         { key: "logout",   icon: "󰍃", label: Theme.t("session.logout", "Sair"),        desc: Theme.t("session.desc_logout", "Encerrar sessão") }
     ]
 
-    function openDialog(defaultAction) {
-        selectedAction = defaultAction || "logout";
+    // Abrir não arma nada: antes abria com "Sair" já contando, e quem apertasse
+    // Ctrl+Alt+Del e saísse de perto perdia a sessão em 10 s. A contagem só
+    // começa ao escolher (clique ou Enter); pelos atalhos de IPC com ação
+    // (suspend, reboot...) ela já vem armada, porque o pedido foi explícito.
+    function openDialog(defaultAction, armed) {
+        selectedAction = defaultAction || "suspend";
         countdown = 10;
-        countdownActive = true;
+        countdownActive = !!armed;
         open = true;
         sessionScope.forceActiveFocus();
     }
@@ -64,7 +68,12 @@ PanelWindow {
         idx = (idx + delta + actions.length) % actions.length;
         selectedAction = actions[idx].key;
         countdown = 10;
-        countdownActive = true;
+        countdownActive = false;
+    }
+
+    function confirmOrArm() {
+        if (countdownActive) executeAction();
+        else { countdown = 10; countdownActive = true; }
     }
 
     Timer {
@@ -90,15 +99,13 @@ PanelWindow {
         Keys.onEscapePressed: sessionDialog.closeDialog()
         Keys.onLeftPressed: sessionDialog.selectByIndex(-1)
         Keys.onRightPressed: sessionDialog.selectByIndex(1)
-        Keys.onReturnPressed: sessionDialog.executeAction()
-        Keys.onEnterPressed: sessionDialog.executeAction()
+        Keys.onReturnPressed: sessionDialog.confirmOrArm()
+        Keys.onEnterPressed: sessionDialog.confirmOrArm()
 
         // Fundo escuro com desfoque condicional (respeita o perfil de desempenho leve)
         Rectangle {
             anchors.fill: parent
-            color: Theme.perfMode === "light"
-                ? "#e00a0a0f"
-                : Theme.withAlpha(Theme.background, 0.88)
+            color: Theme.withAlpha(Theme.background, 0.88)
 
             // Clicar fora do card fecha/cancela a tela
             MouseArea {
@@ -230,7 +237,7 @@ PanelWindow {
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: {
-                                    if (sessionDialog.selectedAction === modelData.key) {
+                                    if (sessionDialog.selectedAction === modelData.key && sessionDialog.countdownActive) {
                                         sessionDialog.executeAction();
                                     } else {
                                         sessionDialog.selectedAction = modelData.key;
@@ -256,8 +263,9 @@ PanelWindow {
                                 break;
                             }
                         }
-                        return Theme.t("session.action_in", "Executando ") + actName.toLowerCase() + " " +
-                               Theme.t("session.seconds", "em %1 segundos...").replace("%1", sessionDialog.countdown);
+                        if (!sessionDialog.countdownActive)
+                            return Theme.t("session.pick", "Escolha uma ação (Enter confirma, Esc fecha)");
+                        return Theme.t("session.in_seconds", "%1 em %2 s (Esc cancela)").arg(actName).arg(sessionDialog.countdown);
                     }
                     font.family: Theme.fontFamily
                     font.pixelSize: 12
@@ -269,8 +277,9 @@ PanelWindow {
                     Layout.alignment: Qt.AlignHCenter
                     spacing: 16
 
-                    // Botão Confirmar
+                    // Botão Confirmar (só com uma ação escolhida)
                     Rectangle {
+                        visible: sessionDialog.countdownActive
                         Layout.preferredWidth: 90
                         Layout.preferredHeight: 32
                         radius: 16
@@ -324,27 +333,45 @@ PanelWindow {
         }
     }
 
+    // Painel → Sistema → Ctrl + Alt + Del: tela central ou barra lateral.
+    property string ctrlAltDelMode: "dialog"
+    FileView {
+        path: Quickshell.env("HOME") + "/.config/hollow-wired/session.json"
+        watchChanges: true
+        printErrors: false
+        onFileChanged: reload()
+        onLoaded: {
+            try { sessionDialog.ctrlAltDelMode = (JSON.parse(text()) || {}).ctrl_alt_del === "sidebar" ? "sidebar" : "dialog"; }
+            catch (e) { sessionDialog.ctrlAltDelMode = "dialog"; }
+        }
+        onLoadFailed: sessionDialog.ctrlAltDelMode = "dialog"
+    }
+
     IpcHandler {
         target: "session"
 
         function open(): void {
-            sessionDialog.openDialog("logout");
+            if (sessionDialog.ctrlAltDelMode === "sidebar") {
+                Quickshell.execDetached(["qs", "ipc", "call", "sidebar", "toggle"]);
+                return;
+            }
+            sessionDialog.openDialog("suspend", false);
         }
 
         function suspend(): void {
-            sessionDialog.openDialog("suspend");
+            sessionDialog.openDialog("suspend", true);
         }
 
         function reboot(): void {
-            sessionDialog.openDialog("reboot");
+            sessionDialog.openDialog("reboot", true);
         }
 
         function poweroff(): void {
-            sessionDialog.openDialog("poweroff");
+            sessionDialog.openDialog("poweroff", true);
         }
 
         function logout(): void {
-            sessionDialog.openDialog("logout");
+            sessionDialog.openDialog("logout", true);
         }
 
         function hide(): void {
@@ -353,7 +380,7 @@ PanelWindow {
 
         function toggle(): void {
             if (sessionDialog.open) sessionDialog.closeDialog();
-            else sessionDialog.openDialog("logout");
+            else sessionDialog.openDialog("suspend", false);
         }
     }
 }

@@ -1614,5 +1614,14 @@
   "polkit.disabled_toast": "Polkit-KDE restaurado",
   "polkit.status_label": "Status do Agente",
   "polkit.status_native": "Agente Quickshell ativo",
-  "polkit.status_kde": "polkit-kde-authentication-agent-1 ativo (Padrão seguro)"
+  "polkit.status_kde": "polkit-kde-authentication-agent-1 ativo (Padrão seguro)",
+  "notif.more": "+%1",
+  "session.pick": "Escolha uma ação (Enter confirma, Esc fecha)",
+  "session.in_seconds": "%1 em %2 s (Esc cancela)",
+  "session.group": "Ctrl + Alt + Del",
+  "session.cad_title": "O que o atalho abre",
+  "session.cad_sub": "Tela central com suspender, reiniciar, desligar e sair, ou a barra lateral de energia",
+  "session.cad_dialog": "Tela central",
+  "session.cad_sidebar": "Barra lateral",
+  "bar.item_weather": "Clima"
 }

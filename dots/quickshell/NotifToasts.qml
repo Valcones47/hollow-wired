@@ -49,6 +49,12 @@ PanelWindow {
                 border.width: modelData.urgency === 2 ? 1.5 : 1
                 border.color: modelData.urgency === 2 ? Theme.critical : Theme.border
 
+                // Arrastar para a direita dispensa (o layout controla o x, então
+                // o deslocamento vai num Translate).
+                property real dragX: 0
+                transform: Translate { x: card.dragX }
+                opacity: 1 - Math.min(0.8, card.dragX / 300)
+
                 // Pausa o fechamento automático enquanto o cursor estiver sobre a notificação
                 Timer {
                     id: dismissTimer
@@ -63,7 +69,20 @@ PanelWindow {
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
+                    property real pressX: 0
+                    property bool swiped: false
+                    onPressed: mouse => { pressX = mouse.x; swiped = false; }
+                    onPositionChanged: mouse => {
+                        if (!pressed) return;
+                        card.dragX = Math.max(0, mouse.x - pressX);
+                        if (card.dragX > 8) swiped = true;
+                    }
+                    onReleased: {
+                        if (card.dragX > 120) NotifService.dismissToast(card.modelData.id);
+                        else card.dragX = 0;
+                    }
                     onClicked: {
+                        if (swiped) return;
                         // Se houver ação default, dispara
                         if (card.modelData.actions && card.modelData.actions.length > 0) {
                             const def = card.modelData.actions.find(a => a.identifier === "default");
@@ -135,7 +154,9 @@ PanelWindow {
                                 }
 
                                 Text {
-                                    text: Theme.t("notif.just_now", "Agora")
+                                    text: (card.modelData.count || 1) > 1
+                                        ? Theme.t("notif.more", "+%1").arg(card.modelData.count - 1)
+                                        : Theme.t("notif.just_now", "Agora")
                                     font.family: Theme.fontFamily
                                     font.pixelSize: 10
                                     color: Theme.subtext

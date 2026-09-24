@@ -50,8 +50,11 @@ case "$cmd" in
 EOF
         ;;
     enable)
-        echo '{"enabled": true}' > "$CONF_FILE"
+        # Primeiro solta o registro do KDE, depois liga: o Quickshell registra
+        # o agente assim que lê o arquivo.
         stop_kde
+        sleep 0.3
+        echo '{"enabled": true}' > "$CONF_FILE"
         echo "Agente Polkit Quickshell ativado."
         ;;
     disable)
@@ -66,6 +69,11 @@ EOF
             "$0" enable
         fi
         ;;
+    fallback)
+        # Chamado pelo Quickshell quando o agente dele não registrou: volta o
+        # KDE sem mudar a preferência.
+        start_kde
+        ;;
     ensure)
         # Garante que o polkit-kde-agent esteja rodando se o Quickshell polkit não estiver habilitado
         if ! is_enabled; then
@@ -73,7 +81,7 @@ EOF
         fi
         ;;
     *)
-        echo "Uso: rice-polkit-daemon [status|enable|disable|toggle|ensure]" >&2
+        echo "Uso: rice-polkit-daemon [status|enable|disable|toggle|ensure|fallback]" >&2
         exit 1
         ;;
 esac

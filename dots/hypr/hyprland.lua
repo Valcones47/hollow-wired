@@ -294,8 +294,13 @@ hl.on("hyprland.start", function()
     -- reativa ao sair. Evita gastar ~70% da Intel UHD com blur inútil em jogo.
     -- (os.execute com & porque hl.exec_cmd não mantém scripts de longa duração)
     os.execute(home .. "/.config/hypr/scripts/blur-fullscreen-toggle.sh &")
-    hl.exec_cmd("/usr/lib/polkit-kde-authentication-agent-1")
-    hl.exec_cmd("mako")
+    -- rice-polkit-daemon ensure: sobe o polkit-kde-agent, a não ser que o
+    -- agente do Quickshell esteja ligado no painel (ele volta ao KDE sozinho
+    -- se o do Quickshell não registrar).
+    hl.exec_cmd("sh -c 'command -v rice-polkit-daemon >/dev/null && exec rice-polkit-daemon ensure || exec /usr/lib/polkit-kde-authentication-agent-1'")
+    -- Notificações: o servidor do Quickshell por padrão; o mako só sobe se a
+    -- preferência for ele ou se o Quickshell não assumir (rice-notif-daemon).
+    hl.exec_cmd("sh -c 'command -v rice-notif-daemon >/dev/null && exec rice-notif-daemon boot || exec mako'")
     hl.exec_cmd("hypridle")
     -- waybar substituída pela barra do Quickshell (TopBar.qml) em 2026-09-15;
     -- config dela continua em ~/.config/waybar pra voltar se precisar.
@@ -442,6 +447,11 @@ hl.layer_rule({ match = { namespace = "quickshell-visualconfig" }, blur = blurBi
 hl.layer_rule({ match = { namespace = "quickshell-clipboard" }, blur = blurBigPanels, ignore_alpha = 0.3 })
 hl.layer_rule({ match = { namespace = "quickshell-cheatsheet" }, blur = blurBigPanels, ignore_alpha = 0.3 })
 hl.layer_rule({ match = { namespace = "quickshell-overview" }, blur = blurBigPanels, ignore_alpha = 0.3 })
+-- Tela de sessão (Ctrl+Alt+Del) e senha do polkit: tela inteira, então seguem
+-- o nível de desfoque dos painéis grandes (sem blur no perfil leve).
+hl.layer_rule({ match = { namespace = "quickshell-session" }, blur = blurBigPanels, ignore_alpha = 0.3 })
+hl.layer_rule({ match = { namespace = "quickshell-polkit" }, blur = blurBigPanels, ignore_alpha = 0.3 })
+hl.layer_rule({ match = { namespace = "quickshell-notifications" }, blur = true, ignore_alpha = 0.3 })
 hl.layer_rule({ match = { namespace = "quickshell-desktop-widgets" }, blur = false })
 
 -- Beziers customizados (não usa só os presets padrão)

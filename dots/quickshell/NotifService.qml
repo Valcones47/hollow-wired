@@ -167,6 +167,9 @@ QtObject {
 
     function handleNotification(notif) {
         if (!notif) return;
+        // Sem tracked = true o Quickshell descarta a notificação assim que este
+        // handler termina: os botões de ação e o "fechar" ficavam sem efeito.
+        notif.tracked = true;
 
         const id = notif.id || (Date.now() % 1000000);
         const appName = notif.appName || "Sistema";
@@ -211,7 +214,19 @@ QtObject {
 
         // Se NÃO estiver em modo Não Perturbe, adiciona à fila de Toasts flutuantes
         if (!root.dnd) {
-            activeToasts = activeToasts.concat([notifData]);
+            // Agrupa por app: a notificação nova do mesmo app substitui o
+            // cartão que ainda está na tela e soma na contagem dele.
+            const prev = activeToasts.find(t => t.appName === appName);
+            if (prev) {
+                notifData.count = (prev.count || 1) + 1;
+                if (prev.ref && prev.ref !== notif) {
+                    try { prev.ref.dismiss(); } catch (e) {}
+                }
+                activeToasts = activeToasts.filter(t => t !== prev).concat([notifData]);
+            } else {
+                notifData.count = 1;
+                activeToasts = activeToasts.concat([notifData]);
+            }
 
             // Som suave de notificação se ativado
             if (root.soundEnabled) {

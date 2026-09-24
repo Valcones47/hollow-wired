@@ -1306,6 +1306,17 @@ PanelWindow {
     }
 
     property bool polkitNativeEnabled: false
+    // Ctrl+Alt+Del: "dialog" (SessionDialog) ou "sidebar" (EnergySidebar).
+    property string ctrlAltDelMode: "dialog"
+    FileView {
+        id: sessionPrefFile
+        path: Quickshell.env("HOME") + "/.config/hollow-wired/session.json"
+        printErrors: false
+        onLoaded: {
+            try { win.ctrlAltDelMode = (JSON.parse(text()) || {}).ctrl_alt_del === "sidebar" ? "sidebar" : "dialog"; }
+            catch (e) { win.ctrlAltDelMode = "dialog"; }
+        }
+    }
 
     Process {
         id: loadPolkitStatusProc
@@ -9559,6 +9570,26 @@ PanelWindow {
                                     OptionRow {
                                         title: Theme.t("polkit.status_label", "Status do Agente")
                                         subtitle: win.polkitNativeEnabled ? Theme.t("polkit.status_native", "Agente Quickshell ativo") : Theme.t("polkit.status_kde", "polkit-kde-authentication-agent-1 ativo (Padrão seguro)")
+                                    }
+                                }
+
+                                // ==================== CTRL + ALT + DEL ====================
+                                GroupLabel { text: Theme.t("session.group", "Ctrl + Alt + Del") }
+                                OptionGroup {
+                                    OptionRow {
+                                        title: Theme.t("session.cad_title", "O que o atalho abre")
+                                        subtitle: Theme.t("session.cad_sub", "Tela central com suspender, reiniciar, desligar e sair, ou a barra lateral de energia")
+                                        Segmented {
+                                            options: [
+                                                { value: "dialog", label: Theme.t("session.cad_dialog", "Tela central") },
+                                                { value: "sidebar", label: Theme.t("session.cad_sidebar", "Barra lateral") }
+                                            ]
+                                            current: win.ctrlAltDelMode
+                                            onPicked: value => {
+                                                win.ctrlAltDelMode = value;
+                                                sessionPrefFile.setText(JSON.stringify({ ctrl_alt_del: value }) + "\n");
+                                            }
+                                        }
                                     }
                                 }
                             }

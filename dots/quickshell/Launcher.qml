@@ -308,13 +308,16 @@ PanelWindow {
                 open = false;
             }
         } else if (item.itemType === "emoji") {
-            Quickshell.execDetached(["wl-copy", item.char]);
+            // Copia e cola direto no campo em foco (rice-paste, como o Super+V).
+            Quickshell.execDetached(["sh", "-c", "wl-copy -- \"$1\" && exec rice-paste", "_", item.char]);
             open = false;
         } else if (item.itemType === "cmd") {
             if (isShift) {
                 Quickshell.execDetached(["bash", "-c", item.cmd]);
             } else {
-                Quickshell.execDetached(["kitty", "-e", "bash", "-c", item.cmd]);
+                // --hold: sem ele a janela fechava assim que o comando terminava
+                // (um "ls" piscava e sumia).
+                Quickshell.execDetached(["kitty", "--hold", "-e", "bash", "-c", item.cmd]);
             }
             open = false;
         } else if (item.itemType === "path") {
