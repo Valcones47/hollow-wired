@@ -1522,6 +1522,20 @@ PanelWindow {
                             onIconClicked: if (modelData.audio) modelData.audio.muted = !modelData.audio.muted
                         }
                     }
+                    // Mesmo interruptor da aba Áudio das configurações (AudioPrefs).
+                    PopAction {
+                        Layout.topMargin: 4
+                        icon: Theme.icons.volHigh
+                        label: Theme.t("mixer.boost", "Permitir até 150%")
+                        detail: Theme.t("mixer.boost_sub", "Pode distorcer o som")
+                        selected: AudioPrefs.maxVolume > 1
+                        onActivated: {
+                            const on = AudioPrefs.maxVolume <= 1;
+                            AudioPrefs.setMax(on ? 150 : 100);
+                            if (!on) for (const n of bar.streams.concat([bar.sink]))
+                                if (n && n.audio && n.audio.volume > 1) n.audio.volume = 1;
+                        }
+                    }
                 }
 
                 // ---------- conta-gotas ----------

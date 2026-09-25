@@ -255,7 +255,7 @@ QtObject {
         tune: "\u{F062E}", palette: "\u{F03D8}", eyedropper: "\u{F020A}", file: "\u{F0224}", ethernet: "\u{F0200}", webcam: "\u{F05A0}", screenShare: "\u{F1483}", settings: "\u{F08B8}",
         check: "\u{F012C}",
         calendar: "\u{F00ED}", timer: "\u{F051B}", quote: "\u{F0281}", speed: "\u{F04C5}",
-        equalizer: "\u{F0EA2}", mixer: "\u{F062E}", album: "\u{F0025}", bezier: "\u{F0AE8}"
+        equalizer: "\u{F0EA2}", mixer: "\u{F066A}", album: "\u{F0025}", bezier: "\u{F0AE8}"
     })
 
     property FileView colorFile: FileView {

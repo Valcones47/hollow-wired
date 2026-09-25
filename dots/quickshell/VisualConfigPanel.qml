@@ -5,6 +5,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Widgets
+import Quickshell.Services.Pipewire
 import "."
 
 // Painel de Configurações Visuais do Rice (Rice Control Center):
@@ -277,6 +278,14 @@ PanelWindow {
     }
 
     // Áudio
+    // Volume da saída direto do PipeWire: acompanha a barra, o OSD e o mixer
+    // na hora. Enquanto arrasta, vale o valor local (o PipeWire devolve o antigo).
+    readonly property PwNode pwSink: Pipewire.defaultAudioSink
+    PwObjectTracker { objects: [win.pwSink] }
+    property real sinkLocal: -1
+    Timer { id: sinkSettle; interval: 800; onTriggered: win.sinkLocal = -1 }
+    readonly property real sinkShown: sinkLocal >= 0 ? sinkLocal
+        : (pwSink && pwSink.audio ? Math.round(pwSink.audio.volume * 100) : (audioData.sink_volume || 0))
     property var audioData: ({ sinks: [], sources: [], sink_volume: 100, source_volume: 80, sink_muted: false, source_muted: false })
 
     // Teclado & Mouse
@@ -3998,14 +4007,11 @@ PanelWindow {
 
                                 CfgSlider {
                                     title: Theme.t("audio.vol_out", "Volume Geral da Saída Padrão")
-                                    minVal: 0; maxVal: Math.round(AudioPrefs.maxVolume * 100); value: win.audioData.sink_volume || 0; unit: "%"
+                                    minVal: 0; maxVal: Math.round(AudioPrefs.maxVolume * 100); value: win.sinkShown; unit: "%"
                                     onChanged: newVal => {
-                                        // Reatribui o objeto: mudar só o campo não avisa o binding e o
-                                        // slider ficava parado no valor antigo.
-                                        win.audioData = Object.assign({}, win.audioData, { sink_volume: Math.round(newVal) });
-                                        debounceTimer.exec(() => {
-                                            Quickshell.execDetached(["rice-audio", "set-sink-volume", String(win.audioData.sink_volume)]);
-                                        });
+                                        win.sinkLocal = Math.round(newVal);
+                                        sinkSettle.restart();
+                                        if (win.pwSink && win.pwSink.audio) win.pwSink.audio.volume = win.sinkLocal / 100;
                                     }
                                 }
 
@@ -4016,10 +4022,8 @@ PanelWindow {
                                         checked: AudioPrefs.maxVolume > 1
                                         onToggled: nv => {
                                             AudioPrefs.setMax(nv ? 150 : 100);
-                                            if (!nv && win.audioData.sink_volume > 100) {
-                                                win.audioData = Object.assign({}, win.audioData, { sink_volume: 100 });
-                                                Quickshell.execDetached(["rice-audio", "set-sink-volume", "100"]);
-                                            }
+                                            if (!nv && win.pwSink && win.pwSink.audio && win.pwSink.audio.volume > 1)
+                                                win.pwSink.audio.volume = 1;
                                         }
                                     }
                                 }

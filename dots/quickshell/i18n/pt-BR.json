@@ -1713,5 +1713,7 @@
   "audio.boost_sub": "Vai até 150%. Acima de 100% o som é amplificado por software: pode distorcer e, no volume alto, forçar os alto-falantes do notebook.",
   "mixer.title": "Volume dos apps",
   "mixer.empty": "Nenhum app tocando som agora",
-  "bar.item_mixer": "Volume dos apps"
+  "bar.item_mixer": "Volume dos apps",
+  "mixer.boost": "Permitir até 150%",
+  "mixer.boost_sub": "Pode distorcer o som"
 }

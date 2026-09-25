@@ -1713,5 +1713,7 @@
   "audio.boost_sub": "Goes up to 150%. Above 100% the sound is amplified in software: it may distort and, at high volume, strain laptop speakers.",
   "mixer.title": "App volume",
   "mixer.empty": "No app is playing sound",
-  "bar.item_mixer": "App volume"
+  "bar.item_mixer": "App volume",
+  "mixer.boost": "Allow up to 150%",
+  "mixer.boost_sub": "May distort the sound"
 }
