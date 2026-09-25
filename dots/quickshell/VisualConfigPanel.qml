@@ -1353,7 +1353,35 @@ PanelWindow {
         // Senha recusada: relê e a chave volta para o estado real.
         onExited: powersaveGetProc.running = true
     }
-    onCurrentTabChanged: if (currentTab === 11) powersaveGetProc.running = true
+    onCurrentTabChanged: if (currentTab === 11) { powersaveGetProc.running = true; remoteGetProc.running = true; }
+
+    // Acesso remoto (rice-remote: Sunshine + Moonlight pelo IP da VPN).
+    property var remote: null
+    Process {
+        id: remoteGetProc
+        command: ["rice-remote", "status"]
+        stdout: StdioCollector {
+            onStreamFinished: { try { win.remote = JSON.parse(text); } catch (e) {} }
+        }
+    }
+    Process {
+        id: remoteSetProc
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const t = text.trim();
+                if (t.startsWith("ERRO:")) showToast(t.slice(5).trim());
+                else if (remoteSetProc.pinning) { showToast(Theme.t("remote.paired", "Aparelho pareado")); remotePin.text = ""; }
+            }
+        }
+        property bool pinning: false
+        onExited: remoteGetProc.running = true
+    }
+    function remoteRun(args, pinning) {
+        if (remoteSetProc.running) return;
+        remoteSetProc.pinning = pinning === true;
+        remoteSetProc.command = ["rice-remote"].concat(args);
+        remoteSetProc.running = true;
+    }
 
     // Ctrl+Alt+Del: "dialog" (SessionDialog) ou "sidebar" (EnergySidebar).
     property string ctrlAltDelMode: "dialog"
@@ -6595,6 +6623,101 @@ PanelWindow {
                                             win.wifiPowersave = nv;
                                             powersaveSetProc.command = ["rice-network", "powersave", nv ? "on" : "off"];
                                             powersaveSetProc.running = true;
+                                        }
+                                    }
+                                }
+
+                                // Acesso remoto: o amigo abre o Moonlight, adiciona o endereço
+                                // abaixo e digita aqui o PIN que aparece para ele.
+                                GroupLabel {
+                                    visible: win.remote !== null && win.remote.installed
+                                    text: Theme.t("remote.title", "Acesso remoto")
+                                }
+                                OptionGroup {
+                                    visible: win.remote !== null && win.remote.installed
+                                    OptionToggle {
+                                        title: Theme.t("remote.on", "Permitir acesso a este PC")
+                                        subtitle: Theme.t("remote.on_sub", "Quem estiver pareado vê a tela e controla o mouse e o teclado pelo Moonlight.")
+                                        checked: win.remote !== null && win.remote.running
+                                        onToggled: nv => win.remoteRun([nv ? "on" : "off"])
+                                    }
+                                    RowDivider {}
+                                    OptionToggle {
+                                        title: Theme.t("remote.boot", "Ligar ao entrar na sessão")
+                                        checked: win.remote !== null && win.remote.boot
+                                        onToggled: nv => win.remoteRun(["boot", nv ? "on" : "off"])
+                                    }
+                                    RowDivider { visible: win.remote !== null && win.remote.running }
+                                    OptionRow {
+                                        visible: win.remote !== null && win.remote.running
+                                        title: Theme.t("remote.address", "Endereço para o Moonlight")
+                                        subtitle: {
+                                            if (!win.remote) return "";
+                                            const v = (win.remote.vpn || []).map(x => x.ip + " (" + x.name + ")");
+                                            if (win.remote.lan) v.push(win.remote.lan + " (" + Theme.t("remote.lan", "mesma rede") + ")");
+                                            return v.join("  ·  ");
+                                        }
+                                    }
+                                    RowDivider { visible: win.remote !== null && win.remote.running }
+                                    OptionRow {
+                                        visible: win.remote !== null && win.remote.running
+                                        title: Theme.t("remote.pin", "Parear um aparelho")
+                                        subtitle: Theme.t("remote.pin_sub", "Digite o PIN de 4 números que o Moonlight mostrou.")
+                                        RowLayout {
+                                            spacing: 8
+                                            Rectangle {
+                                                implicitWidth: 84
+                                                implicitHeight: 34
+                                                radius: 8
+                                                color: Theme.tile
+                                                border.width: 1
+                                                border.color: remotePin.activeFocus ? Theme.primary : Theme.withAlpha(Theme.outline, 0.2)
+                                                TextInput {
+                                                    id: remotePin
+                                                    anchors.fill: parent
+                                                    anchors.margins: 6
+                                                    horizontalAlignment: TextInput.AlignHCenter
+                                                    verticalAlignment: TextInput.AlignVCenter
+                                                    font.family: Theme.fontFamily
+                                                    font.pixelSize: 15
+                                                    font.letterSpacing: 3
+                                                    color: Theme.textColor
+                                                    maximumLength: 4
+                                                    inputMethodHints: Qt.ImhDigitsOnly
+                                                    validator: RegularExpressionValidator { regularExpression: /[0-9]{0,4}/ }
+                                                    onAccepted: if (text.length === 4) win.remoteRun(["pin", text], true)
+                                                }
+                                            }
+                                            ActionBtn {
+                                                minWidth: 0
+                                                text: Theme.t("remote.pair_btn", "Parear")
+                                                primary: remotePin.text.length === 4
+                                                onClicked: if (remotePin.text.length === 4) win.remoteRun(["pin", remotePin.text], true)
+                                            }
+                                        }
+                                    }
+                                    RowDivider { visible: win.remote !== null && win.remote.running && win.remote.clients.length > 0 }
+                                    OptionRow {
+                                        visible: win.remote !== null && win.remote.running && win.remote.clients.length > 0
+                                        title: Theme.t("remote.clients", "Aparelhos pareados")
+                                        subtitle: win.remote ? win.remote.clients.join(", ") : ""
+                                        ActionBtn {
+                                            minWidth: 0
+                                            text: Theme.t("remote.unpair", "Esquecer todos")
+                                            onClicked: win.remoteRun(["unpair-all"])
+                                        }
+                                    }
+                                    RowDivider {}
+                                    OptionRow {
+                                        title: Theme.t("remote.client", "Acessar outro PC")
+                                        subtitle: win.remote && win.remote.moonlight
+                                            ? Theme.t("remote.client_sub", "Abre o Moonlight. O outro PC precisa do Sunshine ligado.")
+                                            : Theme.t("remote.client_missing", "Instale o Moonlight: flatpak install flathub com.moonlight_stream.Moonlight")
+                                        ActionBtn {
+                                            visible: win.remote !== null && win.remote.moonlight
+                                            minWidth: 0
+                                            text: Theme.t("remote.client_btn", "Abrir Moonlight")
+                                            onClicked: Quickshell.execDetached(["rice-remote", "client"])
                                         }
                                     }
                                 }

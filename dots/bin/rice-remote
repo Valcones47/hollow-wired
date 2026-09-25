@@ -1,0 +1,190 @@
+#!/usr/bin/env python3
+"""rice-remote — acesso remoto ao PC pelo Sunshine (servidor) + Moonlight (cliente).
+
+Esconde a parte confusa do Sunshine: a senha da interface web é gerada aqui e
+guardada em ~/.config/hollow-wired/remote.json (permissão 600); o pareamento é
+só digitar no painel o PIN de 4 dígitos que o Moonlight do amigo mostra.
+Pela internet, usa o IP da VPN (NetBird ou Tailscale), sem abrir porta no roteador.
+
+Uso:
+  rice-remote status             JSON: ligado, na inicialização, IPs, aparelhos pareados
+  rice-remote on | off           liga/desliga agora
+  rice-remote boot on|off        liga junto com a sessão
+  rice-remote pin <PIN> [nome]   aceita o pareamento pedido pelo Moonlight
+  rice-remote unpair-all         esquece todos os aparelhos
+  rice-remote client [host]      abre o Moonlight (para acessar outro PC)
+"""
+
+import base64
+import json
+import os
+import secrets
+import shutil
+import ssl
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.request
+
+HOME = os.path.expanduser("~")
+CFG = os.environ.get("XDG_CONFIG_HOME", os.path.join(HOME, ".config"))
+CREDS = os.path.join(CFG, "hollow-wired", "remote.json")
+UNIT = "app-dev.lizardbyte.app.Sunshine.service"
+API = "https://localhost:47990"
+MOONLIGHT_FLATPAK = "com.moonlight_stream.Moonlight"
+
+
+def sh(*cmd):
+    return subprocess.run(cmd, capture_output=True, text=True)
+
+
+def active():
+    return sh("systemctl", "--user", "is-active", UNIT).stdout.strip() == "active"
+
+
+def creds():
+    """Usuário e senha da API; cria na primeira vez (substitui a senha antiga do Sunshine)."""
+    try:
+        with open(CREDS) as f:
+            d = json.load(f)
+        if d.get("user") and d.get("password"):
+            return d
+    except (OSError, ValueError):
+        pass
+    d = {"user": "hollow", "password": secrets.token_urlsafe(18)}
+    if not shutil.which("sunshine"):
+        return d
+    was = active()
+    if was:
+        sh("systemctl", "--user", "stop", UNIT)
+    sh("sunshine", "--creds", d["user"], d["password"])
+    os.makedirs(os.path.dirname(CREDS), exist_ok=True)
+    fd = os.open(CREDS, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
+        json.dump(d, f)
+    if was:
+        start()
+    return d
+
+
+def api(method, path, body=None):
+    c = creds()
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE  # certificado autoassinado do próprio Sunshine, só em localhost
+    auth = base64.b64encode(("%s:%s" % (c["user"], c["password"])).encode()).decode()
+    req = urllib.request.Request(API + path, method=method,
+                                 data=json.dumps(body).encode() if body is not None else None,
+                                 headers={"Authorization": "Basic " + auth, "Content-Type": "application/json"})
+    with urllib.request.urlopen(req, context=ctx, timeout=5) as r:
+        txt = r.read().decode()
+    return json.loads(txt) if txt.strip() else {}
+
+
+def start():
+    sh("systemctl", "--user", "start", UNIT)
+    # ExecStartPre dorme 5 s; espera a API responder.
+    for _ in range(30):
+        time.sleep(0.5)
+        try:
+            api("GET", "/api/clients/list")
+            return True
+        except Exception:
+            pass
+    return False
+
+
+def vpn_ips():
+    out = []
+    for name, cmd in (("NetBird", ["netbird", "status"]), ("Tailscale", ["tailscale", "ip", "-4"])):
+        if not shutil.which(cmd[0]):
+            continue
+        r = sh(*cmd)
+        for line in r.stdout.splitlines():
+            line = line.strip()
+            if name == "NetBird" and line.startswith("NetBird IP:"):
+                out.append({"name": name, "ip": line.split(":", 1)[1].strip().split("/")[0]})
+            elif name == "Tailscale" and line.count(".") == 3:
+                out.append({"name": name, "ip": line})
+    return out
+
+
+def lan_ip():
+    r = sh("ip", "-4", "route", "get", "1.1.1.1")
+    parts = r.stdout.split()
+    return parts[parts.index("src") + 1] if "src" in parts else ""
+
+
+def clients():
+    try:
+        return [c.get("name", "") for c in api("GET", "/api/clients/list").get("named_certs", [])]
+    except Exception:
+        return []
+
+
+def moonlight_cmd():
+    if shutil.which("moonlight"):
+        return ["moonlight"]
+    if shutil.which("flatpak") and sh("flatpak", "info", MOONLIGHT_FLATPAK).returncode == 0:
+        return ["flatpak", "run", MOONLIGHT_FLATPAK]
+    return None
+
+
+def main():
+    a = sys.argv[1:]
+    cmd = a[0] if a else "status"
+    if cmd == "status":
+        on = active()
+        print(json.dumps({
+            "installed": bool(shutil.which("sunshine")),
+            "running": on,
+            "boot": sh("systemctl", "--user", "is-enabled", UNIT).stdout.strip() == "enabled",
+            "lan": lan_ip(),
+            "vpn": vpn_ips(),
+            "clients": clients() if on else [],
+            "moonlight": moonlight_cmd() is not None,
+        }, ensure_ascii=False))
+    elif cmd == "on":
+        creds()
+        print("OK" if start() else "ERRO: o Sunshine não respondeu (veja journalctl --user -u %s)" % UNIT)
+    elif cmd == "off":
+        sh("systemctl", "--user", "stop", UNIT)
+    elif cmd == "boot" and len(a) > 1:
+        sh("systemctl", "--user", "enable" if a[1] == "on" else "disable", UNIT)
+    elif cmd == "pin" and len(a) > 1:
+        pin = a[1].strip()
+        if not (pin.isdigit() and len(pin) == 4):
+            print("ERRO: o PIN tem 4 números")
+            return 1
+        if not active():
+            start()
+        try:
+            r = api("POST", "/api/pin", {"pin": pin, "name": a[2] if len(a) > 2 else "Moonlight"})
+        except Exception as e:
+            print("ERRO: %s" % e)
+            return 1
+        ok = str(r.get("status", "")).lower() == "true"
+        print("OK" if ok else "ERRO: nenhum pedido com esse PIN (confira se o Moonlight ainda está mostrando ele)")
+        return 0 if ok else 1
+    elif cmd == "unpair-all":
+        try:
+            api("POST", "/api/clients/unpair-all", {})
+        except Exception as e:
+            print("ERRO: %s" % e)
+            return 1
+    elif cmd == "client":
+        m = moonlight_cmd()
+        if not m:
+            print("ERRO: Moonlight não instalado (flatpak install flathub %s)" % MOONLIGHT_FLATPAK)
+            return 1
+        subprocess.Popen(m + a[1:2], start_new_session=True,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    else:
+        print(__doc__.strip(), file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

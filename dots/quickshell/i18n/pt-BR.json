@@ -1692,5 +1692,21 @@
   "net.powersave": "Economia de energia do Wi-Fi",
   "net.powersave_sub": "Ligada gasta menos bateria, mas deixa o Wi-Fi mais lento e instável. Pede a senha.",
   "theme.apps_title": "Cores do wallpaper nos apps",
-  "theme.apps_sub": "Apps KDE e GTK (Dolphin, Filelight, janelas de senha) usam a mesma paleta. Desligado, volta o esquema de cores que estava antes."
+  "theme.apps_sub": "Apps KDE e GTK (Dolphin, Filelight, janelas de senha) usam a mesma paleta. Desligado, volta o esquema de cores que estava antes.",
+  "remote.paired": "Aparelho pareado",
+  "remote.title": "Acesso remoto",
+  "remote.on": "Permitir acesso a este PC",
+  "remote.on_sub": "Quem estiver pareado vê a tela e controla o mouse e o teclado pelo Moonlight.",
+  "remote.boot": "Ligar ao entrar na sessão",
+  "remote.address": "Endereço para o Moonlight",
+  "remote.lan": "mesma rede",
+  "remote.pin": "Parear um aparelho",
+  "remote.pin_sub": "Digite o PIN de 4 números que o Moonlight mostrou.",
+  "remote.pair_btn": "Parear",
+  "remote.clients": "Aparelhos pareados",
+  "remote.unpair": "Esquecer todos",
+  "remote.client": "Acessar outro PC",
+  "remote.client_sub": "Abre o Moonlight. O outro PC precisa do Sunshine ligado.",
+  "remote.client_missing": "Instale o Moonlight: flatpak install flathub com.moonlight_stream.Moonlight",
+  "remote.client_btn": "Abrir Moonlight"
 }

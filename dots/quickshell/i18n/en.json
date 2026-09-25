@@ -1692,5 +1692,21 @@
   "net.powersave": "Wi-Fi power saving",
   "net.powersave_sub": "On uses less battery but makes Wi-Fi slower and less stable. Asks for your password.",
   "theme.apps_title": "Wallpaper colors in apps",
-  "theme.apps_sub": "KDE and GTK apps (Dolphin, Filelight, password dialogs) use the same palette. Off restores the color scheme you had before."
+  "theme.apps_sub": "KDE and GTK apps (Dolphin, Filelight, password dialogs) use the same palette. Off restores the color scheme you had before.",
+  "remote.paired": "Device paired",
+  "remote.title": "Remote access",
+  "remote.on": "Allow access to this PC",
+  "remote.on_sub": "Paired devices see the screen and control mouse and keyboard through Moonlight.",
+  "remote.boot": "Start with the session",
+  "remote.address": "Address for Moonlight",
+  "remote.lan": "same network",
+  "remote.pin": "Pair a device",
+  "remote.pin_sub": "Type the 4-digit PIN Moonlight showed.",
+  "remote.pair_btn": "Pair",
+  "remote.clients": "Paired devices",
+  "remote.unpair": "Forget all",
+  "remote.client": "Access another PC",
+  "remote.client_sub": "Opens Moonlight. The other PC needs Sunshine running.",
+  "remote.client_missing": "Install Moonlight: flatpak install flathub com.moonlight_stream.Moonlight",
+  "remote.client_btn": "Open Moonlight"
 }
