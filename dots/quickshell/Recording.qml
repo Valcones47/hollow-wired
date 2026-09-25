@@ -470,7 +470,7 @@ Item {
             spacing: Theme.gap + 2
 
             // ------------------------------------------
-            // COLUNA DA ESQUERDA: CONFIGURAÇÕES DE VÍDEO E ÁUDIO
+            // COLUNA DA ESQUERDA: VÍDEO
             // ------------------------------------------
             Rectangle {
                 Layout.fillWidth: true
@@ -813,11 +813,23 @@ Item {
                         }
                     }
 
-                    Rectangle {
-                        Layout.fillWidth: true
-                        height: 1
-                        color: Theme.withAlpha(Theme.outline, 0.25)
-                    }
+                    Item { Layout.fillHeight: true }
+                }
+            }
+
+            // COLUNA DA DIREITA: ÁUDIO
+            Rectangle {
+                Layout.preferredWidth: 300
+                Layout.fillHeight: true
+                radius: Theme.tileRadius
+                color: Theme.tile
+                border.color: Theme.withAlpha(Theme.outline, 0.25)
+                border.width: 1
+
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: Theme.gap + 4
+                    spacing: 8
 
                     // Seção de Áudio
                     Text {
