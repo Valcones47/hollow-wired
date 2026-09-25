@@ -135,7 +135,9 @@ PanelWindow {
     readonly property var sources: Pipewire.nodes.values.filter(n => n.audio && !n.isStream && !n.isSink
         && (n.properties["media.class"] || "") === "Audio/Source")
     readonly property var streams: Pipewire.nodes.values.filter(n => n.audio && n.isStream
-        && (n.properties["media.class"] || "") === "Stream/Output/Audio")
+        && (n.properties["media.class"] || "") === "Stream/Output/Audio"
+        // Fluxos virtuais (loopback, saída do equalizador) não são apps.
+        && String(n.properties["node.virtual"] || "") !== "true")
     PwObjectTracker { objects: [bar.sink, bar.source].concat(bar.sinks, bar.sources, bar.streams) }
 
     function nodeName(n) {
@@ -209,8 +211,8 @@ PanelWindow {
         if (!sink || !sink.audio) return;
         const steps = wheelSteps(d);
         if (steps === 0) return;
-        const base = volTarget >= 0 ? volTarget : Math.min(1, sink.audio.volume);
-        volTarget = Math.max(0, Math.min(1, Math.round((base + steps * 0.05) * 20) / 20));
+        const base = volTarget >= 0 ? volTarget : Math.min(AudioPrefs.maxVolume, sink.audio.volume);
+        volTarget = Math.max(0, Math.min(AudioPrefs.maxVolume, Math.round((base + steps * 0.05) * 20) / 20));
         volSettle.restart();
         sink.audio.volume = volTarget;
     }
@@ -698,6 +700,23 @@ PanelWindow {
                 }
             }
 
+            // ---------- mixer: à direita do relógio ----------
+            // Volume de cada app que está tocando som (streams do PipeWire).
+            Module {
+                id: mixerMod
+                anchors.left: clockMod.visible ? clockMod.right : parent.horizontalCenter
+                anchors.leftMargin: 6
+                anchors.verticalCenter: parent.verticalCenter
+                kind: "mixer"
+                editKey: "mixer"
+                visible: ShellLayout.barHas("mixer")
+                onClicked: bar.showPopNow("mixer", mixerMod)
+                BarIcon {
+                    text: Theme.icons.mixer
+                    color: bar.streams.length > 0 ? Theme.textColor : Theme.subtext
+                }
+            }
+
             // Equalizador: ícone pequeno colado no relógio. Ele saiu da aba
             // Mídia do hub, que ficava apertada demais com ele dentro. Fica
             // colorido enquanto o equalizador está ligado.
@@ -1078,7 +1097,7 @@ PanelWindow {
                 width: implicitWidth
                 height: implicitHeight
                 // Arrastando um slider: não fecha nem se o mouse escapar do popup.
-                readonly property bool busy: audioPop.dragging || EqService.dragging || mediaPop.dragging
+                readonly property bool busy: audioPop.dragging || mixerPop.dragging || EqService.dragging || mediaPop.dragging
                 readonly property Item current: {
                     switch (bar.pop) {
                     case "audio": return audioPop;
@@ -1087,6 +1106,7 @@ PanelWindow {
                     case "media": return mediaPop;
                     case "picker": return pickerPop;
                     case "privacy": return privacyPop;
+                    case "mixer": return mixerPop;
                     }
                     return null;
                 }
@@ -1419,6 +1439,7 @@ PanelWindow {
                     PopTitle { text: Theme.t("topbar.output", "Saída") }
                     PopSlider {
                         id: outSlider
+                        max: AudioPrefs.maxVolume
                         icon: bar.volIcon(bar.sink)
                         label: bar.nodeName(bar.sink)
                         value: bar.sink && bar.sink.audio ? bar.sink.audio.volume : 0
@@ -1463,10 +1484,40 @@ PanelWindow {
                         model: bar.streams
                         delegate: PopSlider {
                             required property var modelData
+                            max: AudioPrefs.maxVolume
                             icon: bar.volIcon(modelData)
                             label: bar.nodeName(modelData)
                             value: modelData.audio ? modelData.audio.volume : 0
                             dimmed: modelData.audio ? modelData.audio.muted : true
+                            onMoved: v => { if (modelData.audio) modelData.audio.volume = v; }
+                            onIconClicked: if (modelData.audio) modelData.audio.muted = !modelData.audio.muted
+                        }
+                    }
+                }
+
+                // ---------- mixer (volume por app) ----------
+                ColumnLayout {
+                    id: mixerPop
+                    visible: popContent.current === mixerPop
+                    width: 320
+                    spacing: 6
+                    property bool dragging: false
+
+                    PopTitle { text: Theme.t("mixer.title", "Volume dos apps") }
+                    PopText {
+                        visible: bar.streams.length === 0
+                        text: Theme.t("mixer.empty", "Nenhum app tocando som agora")
+                    }
+                    Repeater {
+                        model: bar.streams
+                        delegate: PopSlider {
+                            required property var modelData
+                            max: AudioPrefs.maxVolume
+                            icon: bar.volIcon(modelData)
+                            label: bar.nodeName(modelData)
+                            value: modelData.audio ? modelData.audio.volume : 0
+                            dimmed: modelData.audio ? modelData.audio.muted : true
+                            onDraggingChanged: mixerPop.dragging = dragging
                             onMoved: v => { if (modelData.audio) modelData.audio.volume = v; }
                             onIconClicked: if (modelData.audio) modelData.audio.muted = !modelData.audio.muted
                         }
@@ -1664,7 +1715,7 @@ PanelWindow {
                 bar.showPopNow("media", mediaMod);
                 return;
             }
-            const m = { audio: ctlMod, wifi: wifiMod, picker: pickMod, privacy: privMod }[kind];
+            const m = { audio: ctlMod, wifi: wifiMod, picker: pickMod, privacy: privMod, mixer: mixerMod }[kind];
             if (m) bar.showPopNow(kind, m);
         }
         function hide(): void { bar.pop = ""; }

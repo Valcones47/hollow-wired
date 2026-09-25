@@ -126,10 +126,12 @@ PanelWindow {
         if (!sink || !sink.audio) return;
         osdType = "volume";
         isMuted = sink.audio.muted;
-        osdValue = Math.max(0, Math.min(1, sink.audio.volume));
-        osdIcon = volIcon(osdValue, isMuted);
+        // A barra do OSD vai até o máximo escolhido; o texto mostra o volume real.
+        const vol = Math.max(0, Math.min(AudioPrefs.maxVolume, sink.audio.volume));
+        osdValue = vol / AudioPrefs.maxVolume;
+        osdIcon = volIcon(vol, isMuted);
         osdTitle = isMuted ? Theme.t("osd.audio_muted", "Áudio Mutado") : Theme.t("osd.volume", "Volume");
-        osdValueText = isMuted ? Theme.t("osd.muted", "Mudo") : Math.round(osdValue * 100) + "%";
+        osdValueText = isMuted ? Theme.t("osd.muted", "Mudo") : Math.round(vol * 100) + "%";
         open = true;
         hideTimer.restart();
     }
@@ -207,7 +209,7 @@ PanelWindow {
         function volumeUp(): void {
             if (!osdWindow.sink || !osdWindow.sink.audio) return;
             osdWindow.sink.audio.muted = false;
-            osdWindow.sink.audio.volume = Math.min(1.0, Math.round((osdWindow.sink.audio.volume + 0.05) * 100) / 100);
+            osdWindow.sink.audio.volume = Math.min(AudioPrefs.maxVolume, Math.round((osdWindow.sink.audio.volume + 0.05) * 100) / 100);
             osdWindow.showVolume();
         }
 

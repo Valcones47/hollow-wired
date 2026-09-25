@@ -577,6 +577,7 @@ PanelWindow {
                         PopSlider {
                             Layout.fillWidth: true
                             icon: cc.volIcon(cc.sink)
+                            max: AudioPrefs.maxVolume
                             value: cc.sink && cc.sink.audio ? cc.sink.audio.volume : 0
                             dimmed: cc.sink && cc.sink.audio ? cc.sink.audio.muted : true
                             onMoved: v => { if (cc.sink) cc.sink.audio.volume = v; }
@@ -643,6 +644,7 @@ PanelWindow {
                             required property var modelData
                             Layout.fillWidth: true
                             icon: cc.volIcon(modelData)
+                            max: AudioPrefs.maxVolume
                             label: cc.nodeName(modelData)
                             value: modelData.audio ? modelData.audio.volume : 0
                             dimmed: modelData.audio ? modelData.audio.muted : true

@@ -694,7 +694,7 @@ PanelWindow {
                         onWheel: w => {
                             if (!vbar.sink || !vbar.sink.audio) return;
                             const step = w.angleDelta.y > 0 ? 0.02 : -0.02;
-                            vbar.sink.audio.volume = Math.max(0, Math.min(1, vbar.sink.audio.volume + step));
+                            vbar.sink.audio.volume = Math.max(0, Math.min(AudioPrefs.maxVolume, vbar.sink.audio.volume + step));
                         }
                     }
                 }

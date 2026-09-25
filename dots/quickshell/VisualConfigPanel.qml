@@ -3998,12 +3998,29 @@ PanelWindow {
 
                                 CfgSlider {
                                     title: Theme.t("audio.vol_out", "Volume Geral da Saída Padrão")
-                                    minVal: 0; maxVal: 150; value: win.audioData.sink_volume || 100; unit: "%"
+                                    minVal: 0; maxVal: Math.round(AudioPrefs.maxVolume * 100); value: win.audioData.sink_volume || 0; unit: "%"
                                     onChanged: newVal => {
-                                        win.audioData.sink_volume = Math.round(newVal);
+                                        // Reatribui o objeto: mudar só o campo não avisa o binding e o
+                                        // slider ficava parado no valor antigo.
+                                        win.audioData = Object.assign({}, win.audioData, { sink_volume: Math.round(newVal) });
                                         debounceTimer.exec(() => {
                                             Quickshell.execDetached(["rice-audio", "set-sink-volume", String(win.audioData.sink_volume)]);
                                         });
+                                    }
+                                }
+
+                                OptionGroup {
+                                    OptionToggle {
+                                        title: Theme.t("audio.boost", "Permitir volume acima de 100%")
+                                        subtitle: Theme.t("audio.boost_sub", "Vai até 150%. Acima de 100% o som é amplificado por software: pode distorcer e, no volume alto, forçar os alto-falantes do notebook.")
+                                        checked: AudioPrefs.maxVolume > 1
+                                        onToggled: nv => {
+                                            AudioPrefs.setMax(nv ? 150 : 100);
+                                            if (!nv && win.audioData.sink_volume > 100) {
+                                                win.audioData = Object.assign({}, win.audioData, { sink_volume: 100 });
+                                                Quickshell.execDetached(["rice-audio", "set-sink-volume", "100"]);
+                                            }
+                                        }
                                     }
                                 }
 
@@ -4093,9 +4110,9 @@ PanelWindow {
 
                                 CfgSlider {
                                     title: Theme.t("audio.vol_in", "Volume / Sensibilidade do Microfone")
-                                    minVal: 0; maxVal: 150; value: win.audioData.source_volume || 80; unit: "%"
+                                    minVal: 0; maxVal: 150; value: win.audioData.source_volume || 0; unit: "%"
                                     onChanged: newVal => {
-                                        win.audioData.source_volume = Math.round(newVal);
+                                        win.audioData = Object.assign({}, win.audioData, { source_volume: Math.round(newVal) });
                                         debounceTimer.exec(() => {
                                             Quickshell.execDetached(["rice-audio", "set-source-volume", String(win.audioData.source_volume)]);
                                         });

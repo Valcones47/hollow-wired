@@ -90,14 +90,14 @@ QtObject {
     //   tray     apps em segundo plano
     //   control  bloco brilho/som/bateria → central de controle
     readonly property var barCatalog: ["media", "weather", "tray", "updates", "notifications", "network", "control",
-        "night", "caffeine", "record", "screenshot", "clipboard", "picker", "gpu", "lock", "settings", "power"]
+        "night", "caffeine", "record", "screenshot", "clipboard", "picker", "gpu", "lock", "settings", "power", "mixer"]
     // Ponto de privacidade (microfone/câmera/tela em uso): fora do catálogo
     // porque só aparece enquanto algo está em uso; desliga no painel.
     readonly property bool barPrivacy: get("bar", "privacy", true)
     readonly property var barItemsDefault: ({
         // "media" em cima substitui o ícone fixo do equalizador que existia
         // ao lado do relógio (o equalizador é uma aba do popup da mídia).
-        top: ["media", "weather", "notifications", "network", "control"],
+        top: ["media", "mixer", "weather", "notifications", "network", "control"],
         side: ["media", "tray", "notifications", "network", "control", "power"]
     })
     function barItemsFor(kind) {

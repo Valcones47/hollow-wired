@@ -8,6 +8,8 @@ import "."
 RowLayout {
     id: root
     property real value: 0
+    // Teto do slider (1 = 100%). Volume de saída usa AudioPrefs.maxVolume (até 1.5).
+    property real max: 1
     property string icon: ""
     property string label: ""
     property bool dimmed: false
@@ -19,10 +21,10 @@ RowLayout {
     // local. Antes cada passo da roda partia do valor antigo ainda não
     // atualizado, e o slider "voltava" para trás.
     property real localValue: -1
-    readonly property real shown: localValue >= 0 ? localValue : Math.max(0, Math.min(1, value))
+    readonly property real shown: localValue >= 0 ? localValue : Math.max(0, Math.min(root.max, value))
     property real wheelAcc: 0
     function setLocal(v) {
-        localValue = Math.max(0, Math.min(1, v));
+        localValue = Math.max(0, Math.min(root.max, v));
         settleTimer.restart();
         moved(localValue);
     }
@@ -91,14 +93,14 @@ RowLayout {
                 radius: 3
                 color: Theme.withAlpha(Theme.primary, 0.2)
                 Rectangle {
-                    width: parent.width * Math.max(0, Math.min(1, root.shown))
+                    width: parent.width * Math.max(0, Math.min(1, root.shown / root.max))
                     height: parent.height
                     radius: 3
                     color: root.dimmed ? Theme.subtext : Theme.primary
                 }
             }
             Rectangle {
-                x: (track.width - width) * Math.max(0, Math.min(1, root.shown))
+                x: (track.width - width) * Math.max(0, Math.min(1, root.shown / root.max))
                 anchors.verticalCenter: parent.verticalCenter
                 width: area.pressed || area.containsMouse ? 16 : 12
                 height: width
@@ -113,7 +115,7 @@ RowLayout {
                 hoverEnabled: true
                 preventStealing: true
                 cursorShape: Qt.PointingHandCursor
-                function set(mx) { root.setLocal((mx - 4) / track.width); }
+                function set(mx) { root.setLocal((mx - 4) / track.width * root.max); }
                 onPressed: mouse => set(mouse.x)
                 onPositionChanged: mouse => { if (pressed) set(mouse.x); }
                 onReleased: settleTimer.restart()

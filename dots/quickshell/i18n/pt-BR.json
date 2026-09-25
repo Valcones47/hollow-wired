@@ -1708,5 +1708,10 @@
   "remote.client": "Acessar outro PC",
   "remote.client_sub": "Abre o Moonlight. O outro PC precisa do Sunshine ligado.",
   "remote.client_missing": "Instale o Moonlight: flatpak install flathub com.moonlight_stream.Moonlight",
-  "remote.client_btn": "Abrir Moonlight"
+  "remote.client_btn": "Abrir Moonlight",
+  "audio.boost": "Permitir volume acima de 100%",
+  "audio.boost_sub": "Vai até 150%. Acima de 100% o som é amplificado por software: pode distorcer e, no volume alto, forçar os alto-falantes do notebook.",
+  "mixer.title": "Volume dos apps",
+  "mixer.empty": "Nenhum app tocando som agora",
+  "bar.item_mixer": "Volume dos apps"
 }

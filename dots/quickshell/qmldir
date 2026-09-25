@@ -68,3 +68,4 @@ singleton TodoService 1.0 TodoService.qml
 Agenda 1.0 Agenda.qml
 singleton SettingsIndex 1.0 SettingsIndex.qml
 AiSidebar 1.0 AiSidebar.qml
+singleton AudioPrefs 1.0 AudioPrefs.qml

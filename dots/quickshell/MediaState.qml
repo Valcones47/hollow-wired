@@ -175,7 +175,7 @@ Singleton {
     readonly property bool muted: streams.length > 0 && streams[0].audio ? streams[0].audio.muted : false
 
     function setVolume(v) {
-        v = Math.max(0, Math.min(1, v));
+        v = Math.max(0, Math.min(streams.length > 0 ? AudioPrefs.maxVolume : 1, v));
         if (streams.length > 0) {
             for (const s of streams) if (s.audio) s.audio.volume = v;
         } else if (mprisVolume) {
@@ -198,7 +198,7 @@ Singleton {
         if (steps === 0) return;
         wheelAcc -= steps * 120;
         const base = wheelTarget >= 0 ? wheelTarget : volume;
-        wheelTarget = Math.max(0, Math.min(1, Math.round((base + steps * 0.05) * 20) / 20));
+        wheelTarget = Math.max(0, Math.min(streams.length > 0 ? AudioPrefs.maxVolume : 1, Math.round((base + steps * 0.05) * 20) / 20));
         wheelSettle.restart();
         setVolume(wheelTarget);
     }
