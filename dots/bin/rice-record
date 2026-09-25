@@ -412,6 +412,57 @@ EOF
     echo "{\"status\": \"started\", \"pid\": $rec_pid, \"file\": \"$outfile\"}"
 }
 
+do_compress() {
+    local input="$1"
+    if [ -z "$input" ] || [ ! -f "$input" ]; then
+        echo "{\"status\": \"error\", \"message\": \"Arquivo não encontrado\"}"
+        exit 1
+    fi
+
+    local dir base output
+    dir="$(dirname "$input")"
+    base="$(basename "$input" .mp4)"
+
+    if [[ "$base" == *"_whatsapp"* ]] || [[ "$base" == *"_wa"* ]]; then
+        output="${dir}/${base}_otimizado.mp4"
+    else
+        output="${dir}/${base}_whatsapp.mp4"
+    fi
+
+    notify-send -a "Gravação" -i media-record -t 3000 "Otimizando vídeo…" "Comprimindo para envio no WhatsApp…" 2>/dev/null || true
+
+    local enc="libx264"
+    local -a vextra=(-c:v libx264 -crf 26 -preset fast)
+
+    if ffmpeg -encoders 2>/dev/null | grep -q h264_nvenc && { [ -e /dev/nvidiactl ] || [ -d /proc/driver/nvidia ]; }; then
+        enc="h264_nvenc"
+        vextra=(-c:v h264_nvenc -b:v 5M -maxrate 6M -bufsize 10M -preset p4)
+    fi
+
+    local success=0
+    if [ "$enc" = "h264_nvenc" ]; then
+        if ffmpeg -y -i "$input" "${vextra[@]}" -c:a aac -b:a 128k -pix_fmt yuv420p -movflags +faststart "$output" 2>/dev/null; then
+            success=1
+        else
+            # Fallback para CPU caso a GPU falhe
+            ffmpeg -y -i "$input" -c:v libx264 -crf 26 -preset fast -c:a aac -b:a 128k -pix_fmt yuv420p -movflags +faststart "$output" 2>/dev/null && success=1
+        fi
+    else
+        ffmpeg -y -i "$input" "${vextra[@]}" -c:a aac -b:a 128k -pix_fmt yuv420p -movflags +faststart "$output" 2>/dev/null && success=1
+    fi
+
+    if [ "$success" -eq 1 ] && [ -f "$output" ]; then
+        local size
+        size=$(ls -lh "$output" 2>/dev/null | awk '{print $5}')
+        notify-send -a "Gravação" -i media-record -t 4500 "Compressão concluída!" "Salvo: $(basename "$output") ($size)" 2>/dev/null || true
+        echo "{\"status\": \"compressed\", \"file\": \"$output\", \"size\": \"$size\"}"
+    else
+        notify-send -a "Gravação" -i dialog-error -t 4500 "Erro na compressão" "Não foi possível comprimir o vídeo." 2>/dev/null || true
+        echo "{\"status\": \"error\", \"message\": \"Falha ao codificar vídeo\"}"
+        exit 1
+    fi
+}
+
 # --- Roteamento de Subcomandos ---
 cmd="${1:-toggle}"
 case "$cmd" in
@@ -443,6 +494,10 @@ case "$cmd" in
             xdg-open "$1" >/dev/null 2>&1 &
         fi
         ;;
+    compress)
+        shift
+        do_compress "$@"
+        ;;
     delete)
         shift
         if [ -n "$1" ]; then
@@ -470,7 +525,7 @@ case "$cmd" in
         fi
         ;;
     *)
-        echo "Uso: rice-record {start|stop|status|list|list-windows|select-geom|open-folder|play <file>|delete <file>|toggle|full}"
+        echo "Uso: rice-record {start|stop|status|list|list-windows|select-geom|open-folder|play <file>|compress <file>|delete <file>|toggle|full}"
         exit 1
         ;;
 esac

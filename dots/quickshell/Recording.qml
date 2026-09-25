@@ -172,6 +172,21 @@ Item {
 
     // Processo de Ações com Arquivos
     Process { id: openFolderProc; command: ["rice-record", "open-folder"] }
+
+    // Processo de Compressão para WhatsApp
+    property string compressingPath: ""
+    Process {
+        id: compressProc
+        property string targetPath: ""
+        command: ["rice-record", "compress", targetPath]
+        onStarted: {
+            root.compressingPath = targetPath;
+        }
+        onExited: {
+            root.compressingPath = "";
+            listProc.running = true;
+        }
+    }
     // Chamado de dentro dos componentes da lista, que não enxergam o id do timer.
     function scheduleRefresh() { recRefreshTimer.restart(); }
     Timer {
@@ -922,8 +937,7 @@ Item {
                                     cursorShape: Qt.PointingHandCursor
                                     acceptedButtons: Qt.LeftButton
                                     onDoubleClicked: {
-                                        playProc.command = ["rice-record", "play", modelData.path];
-                                        playProc.running = true;
+                                        Quickshell.execDetached(["rice-record", "play", modelData.path]);
                                     }
                                 }
 
@@ -1008,6 +1022,43 @@ Item {
                                             cursorShape: Qt.PointingHandCursor
                                             onClicked: {
                                                 Quickshell.execDetached(["rice-record", "play", modelData.path]);
+                                            }
+                                        }
+                                    }
+
+                                    // Botão Comprimir para WhatsApp
+                                    Rectangle {
+                                        Layout.preferredWidth: 30
+                                        Layout.preferredHeight: 30
+                                        radius: 15
+                                        readonly property bool isThisCompressing: root.compressingPath === modelData.path
+                                        color: isThisCompressing ? Theme.withAlpha(Theme.primary, 0.25) : (compBtnArea.containsMouse ? Theme.primary : Theme.tileHigh)
+
+                                        Text {
+                                            id: compIcon
+                                            anchors.centerIn: parent
+                                            text: parent.isThisCompressing ? Theme.icons.refresh : Theme.icons.compress
+                                            font.family: Theme.iconFontFamily
+                                            font.pixelSize: 13
+                                            color: parent.isThisCompressing ? Theme.primary : (compBtnArea.containsMouse ? Theme.background : Theme.textColor)
+
+                                            SequentialAnimation on opacity {
+                                                running: compIcon.parent.isThisCompressing
+                                                loops: Animation.Infinite
+                                                NumberAnimation { to: 0.3; duration: 400 }
+                                                NumberAnimation { to: 1.0; duration: 400 }
+                                            }
+                                        }
+
+                                        MouseArea {
+                                            id: compBtnArea
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            enabled: root.compressingPath === ""
+                                            onClicked: {
+                                                compressProc.targetPath = modelData.path;
+                                                compressProc.running = true;
                                             }
                                         }
                                     }

@@ -154,6 +154,8 @@
   "hub.rec_audio_sys": "Áudio do Sistema",
   "hub.rec_audio_mic": "Microfone",
   "hub.rec_recent": "Gravações Recentes",
+  "hub.rec_compress": "Comprimir para WhatsApp",
+  "hub.rec_compressing": "Comprimindo...",
   "hub.rec_empty": "Nenhuma gravação recente",
   "hub.perf_real_ram": "RAM Real em Uso",
   "hub.perf_cache_clean": "Limpar Caches & Otimizar",
