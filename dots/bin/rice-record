@@ -222,10 +222,15 @@ geom_to_gsr() {
 }
 
 start_gsr() {
-    local mode="$1" geom="$2" audio_desktop="$3" audio_mic="$4" fps="${5:-60}"
+    local mode="$1" geom="$2" audio_desktop="$3" audio_mic="$4" fps="${5:-60}" kbps="${6:-0}"
     # AAC em vez do Opus padrão: MP4 com Opus não abre em todo lugar (prévia
-    # do WhatsApp, alguns editores).
+    # de mensageiros, alguns editores).
     local args=(-f "$fps" -cursor yes -k auto -ac aac)
+    # Bitrate fixo (kbps) escolhido no Hub; 0 = qualidade constante (padrão do
+    # gpu-screen-recorder, arquivo grande em cena com muito movimento).
+    if [ "${kbps:-0}" -gt 0 ] 2>/dev/null; then
+        args+=(-bm cbr -q "$kbps")
+    fi
 
     if [ "$mode" = "region" ] || [ "$mode" = "window" ]; then
         if [ -z "$geom" ]; then
@@ -286,6 +291,7 @@ do_start() {
     local audio_desktop="1"
     local audio_mic="0"
     local fps="60"
+    local kbps="0"
     # "auto" resolve pro melhor encoder da máquina em detect_codec(). O padrão
     # antigo era h264_nvenc fixo: em PC sem NVIDIA (a maioria) o wf-recorder
     # abortava na hora e a gravação simplesmente não acontecia, sem erro visível.
@@ -298,6 +304,7 @@ do_start() {
             --audio-desktop) audio_desktop="$2"; shift 2 ;;
             --audio-mic) audio_mic="$2"; shift 2 ;;
             --fps) fps="$2"; shift 2 ;;
+            --bitrate) kbps="$2"; shift 2 ;;
             --codec) codec="$2"; shift 2 ;;
             full) mode="screen"; shift ;;
             *) shift ;;
@@ -310,7 +317,7 @@ do_start() {
     # --codec explícito (h264_vaapi etc.) é opção do ffmpeg: fica no wf-recorder.
     if command -v gpu-screen-recorder >/dev/null 2>&1 && [ "$codec" = "auto" ] \
         && [ "${RICE_RECORDER:-}" != "wf-recorder" ]; then
-        start_gsr "$mode" "$geom" "$audio_desktop" "$audio_mic" "$fps"
+        start_gsr "$mode" "$geom" "$audio_desktop" "$audio_mic" "$fps" "$kbps"
         return 0
     fi
 
@@ -386,6 +393,11 @@ do_start() {
     local outfile="$DIR/${timestamp}.mp4"
     wf_args+=(-f "$outfile")
 
+    # Bitrate escolhido no Hub (opção "b" do codificador do ffmpeg).
+    if [ "${kbps:-0}" -gt 0 ] 2>/dev/null; then
+        wf_args+=(-p "b=${kbps}k")
+    fi
+
     # Inicia wf-recorder
     wf-recorder "${wf_args[@]}" >/dev/null 2>&1 &
     local rec_pid=$!
@@ -412,53 +424,76 @@ EOF
     echo "{\"status\": \"started\", \"pid\": $rec_pid, \"file\": \"$outfile\"}"
 }
 
+# compress <arquivo> [MB]: reencoda para caber no tamanho pedido (padrão 25 MB).
+# O bitrate sai da duração (tamanho alvo ÷ segundos, menos o áudio); quando ele
+# fica baixo demais para a resolução, a imagem é reduzida (720p, 480p), porque
+# bitrate pouco em 1080p vira borrão de blocos. O bitrate fixo antigo (5 Mbit/s)
+# deixava um vídeo de 300 MiB em 64 MiB, grande demais para mandar.
 do_compress() {
-    local input="$1"
+    local input="$1" target_mb="${2:-25}"
     if [ -z "$input" ] || [ ! -f "$input" ]; then
-        echo "{\"status\": \"error\", \"message\": \"Arquivo não encontrado\"}"
+        echo '{"status": "error", "message": "Arquivo não encontrado"}'
         exit 1
+    fi
+    [[ "$target_mb" =~ ^[0-9]+$ ]] && [ "$target_mb" -ge 2 ] || target_mb=25
+
+    local dur height
+    dur=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$input" 2>/dev/null)
+    height=$(ffprobe -v error -select_streams v:0 -show_entries stream=height -of csv=p=0 "$input" 2>/dev/null)
+    dur=${dur%.*}; [ -n "$dur" ] && [ "$dur" -gt 0 ] 2>/dev/null || dur=1
+    height=${height:-1080}
+
+    local abr=96
+    # 8192 kbit por MB, 5% de folga para o contêiner.
+    local vbr=$(( target_mb * 8192 * 95 / 100 / dur - abr ))
+    [ "$vbr" -gt 8000 ] && vbr=8000
+    if [ "$vbr" -lt 150 ]; then
+        echo "{\"status\": \"error\", \"message\": \"Vídeo longo demais para ${target_mb} MB\"}"
+        notify-send -a "Gravação" -i dialog-error -t 4500 "Não dá para comprimir tanto" \
+            "Com $((dur / 60)) min, ${target_mb} MB deixaria a imagem ilegível. Escolha um tamanho maior." 2>/dev/null || true
+        exit 1
+    fi
+
+    local scale=""
+    if [ "$vbr" -lt 900 ] && [ "$height" -gt 480 ]; then scale="scale=-2:480"
+    elif [ "$vbr" -lt 2500 ] && [ "$height" -gt 720 ]; then scale="scale=-2:720"
     fi
 
     local dir base output
     dir="$(dirname "$input")"
     base="$(basename "$input" .mp4)"
+    output="${dir}/${base}_${target_mb}MB.mp4"
 
-    if [[ "$base" == *"_whatsapp"* ]] || [[ "$base" == *"_wa"* ]]; then
-        output="${dir}/${base}_otimizado.mp4"
-    else
-        output="${dir}/${base}_whatsapp.mp4"
+    notify-send -a "Gravação" -i media-record -t 3000 "Comprimindo vídeo…" \
+        "Alvo: ${target_mb} MB · ${vbr} kbit/s${scale:+ · ${scale##*:}p}" 2>/dev/null || true
+
+    local -a vf=()
+    [ -n "$scale" ] && vf=(-vf "$scale")
+    local -a common=(-c:a aac -b:a "${abr}k" -pix_fmt yuv420p -movflags +faststart)
+    local ok=0
+    if ffmpeg -hide_banner -encoders 2>/dev/null | grep -q h264_nvenc && [ -e /dev/nvidiactl ]; then
+        ffmpeg -y -v error -i "$input" "${vf[@]}" -c:v h264_nvenc -preset p5 -rc vbr \
+            -b:v "${vbr}k" -maxrate "$(( vbr * 3 / 2 ))k" -bufsize "$(( vbr * 2 ))k" \
+            "${common[@]}" "$output" && ok=1
+    fi
+    if [ "$ok" -eq 0 ]; then
+        # CPU em duas passadas: acerta o tamanho bem melhor que uma só.
+        local log="${XDG_RUNTIME_DIR:-/tmp}/rice-compress-$$"
+        ffmpeg -y -v error -i "$input" "${vf[@]}" -c:v libx264 -preset medium -b:v "${vbr}k" \
+            -pass 1 -passlogfile "$log" -an -f mp4 /dev/null \
+        && ffmpeg -y -v error -i "$input" "${vf[@]}" -c:v libx264 -preset medium -b:v "${vbr}k" \
+            -pass 2 -passlogfile "$log" "${common[@]}" "$output" && ok=1
+        rm -f "$log"*
     fi
 
-    notify-send -a "Gravação" -i media-record -t 3000 "Otimizando vídeo…" "Comprimindo para envio no WhatsApp…" 2>/dev/null || true
-
-    local enc="libx264"
-    local -a vextra=(-c:v libx264 -crf 26 -preset fast)
-
-    if ffmpeg -encoders 2>/dev/null | grep -q h264_nvenc && { [ -e /dev/nvidiactl ] || [ -d /proc/driver/nvidia ]; }; then
-        enc="h264_nvenc"
-        vextra=(-c:v h264_nvenc -b:v 5M -maxrate 6M -bufsize 10M -preset p4)
-    fi
-
-    local success=0
-    if [ "$enc" = "h264_nvenc" ]; then
-        if ffmpeg -y -i "$input" "${vextra[@]}" -c:a aac -b:a 128k -pix_fmt yuv420p -movflags +faststart "$output" 2>/dev/null; then
-            success=1
-        else
-            # Fallback para CPU caso a GPU falhe
-            ffmpeg -y -i "$input" -c:v libx264 -crf 26 -preset fast -c:a aac -b:a 128k -pix_fmt yuv420p -movflags +faststart "$output" 2>/dev/null && success=1
-        fi
-    else
-        ffmpeg -y -i "$input" "${vextra[@]}" -c:a aac -b:a 128k -pix_fmt yuv420p -movflags +faststart "$output" 2>/dev/null && success=1
-    fi
-
-    if [ "$success" -eq 1 ] && [ -f "$output" ]; then
+    if [ "$ok" -eq 1 ] && [ -f "$output" ]; then
         local size
-        size=$(ls -lh "$output" 2>/dev/null | awk '{print $5}')
-        notify-send -a "Gravação" -i media-record -t 4500 "Compressão concluída!" "Salvo: $(basename "$output") ($size)" 2>/dev/null || true
+        size=$(du -h "$output" | cut -f1)
+        notify-send -a "Gravação" -i media-record -t 4500 "Vídeo comprimido" "$(basename "$output") · $size" 2>/dev/null || true
         echo "{\"status\": \"compressed\", \"file\": \"$output\", \"size\": \"$size\"}"
     else
         notify-send -a "Gravação" -i dialog-error -t 4500 "Erro na compressão" "Não foi possível comprimir o vídeo." 2>/dev/null || true
-        echo "{\"status\": \"error\", \"message\": \"Falha ao codificar vídeo\"}"
+        echo '{"status": "error", "message": "Falha ao codificar vídeo"}'
         exit 1
     fi
 }
@@ -525,7 +560,7 @@ case "$cmd" in
         fi
         ;;
     *)
-        echo "Uso: rice-record {start|stop|status|list|list-windows|select-geom|open-folder|play <file>|compress <file>|delete <file>|toggle|full}"
+        echo "Uso: rice-record {start|stop|status|list|list-windows|select-geom|open-folder|play <file>|compress <file> [MB]|delete <file>|toggle|full}"
         exit 1
         ;;
 esac

@@ -36,14 +36,29 @@ Item {
     }
     readonly property bool codecIsHardware: effectiveCodec !== "libx264"
     readonly property string codecBadgeText: {
-        const prefix = selectedCodec === "auto" ? "⚙ " : "";
-        if (effectiveCodec === "h264_nvenc") return prefix + "⚡ NVENC (" + SysStats.gpuName + ")";
-        if (effectiveCodec === "h264_vaapi") return prefix + "🎮 GPU (VAAPI)";
-        return prefix + "💻 CPU";
+        const auto = selectedCodec === "auto" ? Theme.t("rec.codec_auto", "Automático") + " · " : "";
+        if (effectiveCodec === "h264_nvenc") return auto + "NVENC" + (SysStats.gpuName ? " · " + SysStats.gpuName : "");
+        if (effectiveCodec === "h264_vaapi") return auto + "VAAPI";
+        return auto + "CPU";
     }
     property bool audioDesktop: true
     property bool audioMic: false
     property int fpsRate: 60
+    // Bitrate da gravação em kbps (0 = qualidade constante). Lembrado em
+    // ~/.config/hollow-wired/record.json.
+    property int bitrateKbps: 0
+    function setBitrate(k) {
+        bitrateKbps = k;
+        recPrefs.setText(JSON.stringify({ bitrate_kbps: k }) + "\n");
+    }
+    FileView {
+        id: recPrefs
+        path: Quickshell.env("HOME") + "/.config/hollow-wired/record.json"
+        printErrors: false
+        onLoaded: {
+            try { root.bitrateKbps = Math.max(0, parseInt((JSON.parse(text()) || {}).bitrate_kbps) || 0); } catch (e) {}
+        }
+    }
     property var recentRecordings: []
     property var openWindows: []
 
@@ -173,12 +188,21 @@ Item {
     // Processo de Ações com Arquivos
     Process { id: openFolderProc; command: ["rice-record", "open-folder"] }
 
-    // Processo de Compressão para WhatsApp
+    // Compressão para um tamanho final (rice-record compress <arquivo> <MB>)
     property string compressingPath: ""
+    property string compressMenuPath: ""
+    function compress(path, mb) {
+        if (compressProc.running) return;
+        compressMenuPath = "";
+        compressProc.targetPath = path;
+        compressProc.targetMb = mb;
+        compressProc.running = true;
+    }
     Process {
         id: compressProc
         property string targetPath: ""
-        command: ["rice-record", "compress", targetPath]
+        property int targetMb: 25
+        command: ["rice-record", "compress", targetPath, String(targetMb)]
         onStarted: {
             root.compressingPath = targetPath;
         }
@@ -210,6 +234,7 @@ Item {
             args.push("--audio-desktop", audioDesktop ? "1" : "0");
             args.push("--audio-mic", audioMic ? "1" : "0");
             args.push("--fps", String(fpsRate));
+            args.push("--bitrate", String(bitrateKbps));
             args.push("--codec", selectedCodec);
 
             startProc.procArgs = args;
@@ -239,15 +264,15 @@ Item {
             Layout.preferredHeight: 84
             radius: Theme.tileRadius
             color: Theme.tile
-            border.color: root.isRecording ? "#ef4444" : Theme.withAlpha(Theme.outline, 0.3)
+            border.color: root.isRecording ? Theme.critical : Theme.withAlpha(Theme.outline, 0.3)
             border.width: root.isRecording ? 2 : 1
 
             // Animação de pulso quando gravando
             SequentialAnimation on border.color {
                 running: root.isRecording
                 loops: Animation.Infinite
-                ColorAnimation { to: "#b91c1c"; duration: 700 }
-                ColorAnimation { to: "#ef4444"; duration: 700 }
+                ColorAnimation { to: Theme.withAlpha(Theme.critical, 0.6); duration: 700 }
+                ColorAnimation { to: Theme.critical; duration: 700 }
             }
 
             RowLayout {
@@ -260,14 +285,14 @@ Item {
                     Layout.preferredWidth: 48
                     Layout.preferredHeight: 48
                     radius: 24
-                    color: root.isRecording ? Theme.withAlpha("#ef4444", 0.25) : Theme.withAlpha(Theme.primary, 0.15)
+                    color: root.isRecording ? Theme.withAlpha(Theme.critical, 0.25) : Theme.withAlpha(Theme.primary, 0.15)
 
                     Text {
                         anchors.centerIn: parent
                         text: root.isRecording ? Theme.icons.record : Theme.icons.camera
                         font.family: Theme.iconFontFamily
                         font.pixelSize: 22
-                        color: root.isRecording ? "#ef4444" : Theme.primary
+                        color: root.isRecording ? Theme.critical : Theme.primary
                     }
                 }
 
@@ -282,7 +307,7 @@ Item {
                             width: 8
                             height: 8
                             radius: 4
-                            color: root.isRecording ? "#ef4444" : "#10b981"
+                            color: root.isRecording ? Theme.critical : Theme.subtext
                             SequentialAnimation on opacity {
                                 running: root.isRecording
                                 loops: Animation.Infinite
@@ -295,7 +320,7 @@ Item {
                             font.family: Theme.fontFamily
                             font.pixelSize: 11
                             font.weight: Font.DemiBold
-                            color: root.isRecording ? "#ef4444" : Theme.subtext
+                            color: root.isRecording ? Theme.critical : Theme.subtext
                         }
 
                         // Badge da GPU em uso
@@ -303,9 +328,7 @@ Item {
                             height: 18
                             implicitWidth: gpuBadgeRow.implicitWidth + 12
                             radius: 9
-                            color: root.codecIsHardware ? Theme.withAlpha("#10b981", 0.2) : Theme.withAlpha(Theme.primary, 0.2)
-                            border.width: 1
-                            border.color: root.codecIsHardware ? "#10b981" : Theme.primary
+                            color: root.codecIsHardware ? "transparent" : Theme.withAlpha(Theme.primary, 0.2)
 
                             RowLayout {
                                 id: gpuBadgeRow
@@ -316,7 +339,7 @@ Item {
                                     font.family: Theme.fontFamily
                                     font.pixelSize: 9
                                     font.weight: Font.Bold
-                                    color: root.codecIsHardware ? "#10b981" : Theme.primary
+                                    color: root.codecIsHardware ? Theme.subtext : Theme.primary
                                 }
                             }
                         }
@@ -378,7 +401,7 @@ Item {
                     Layout.preferredWidth: 165
                     radius: Theme.tileRadius
                     color: root.isRecording
-                        ? (recBtnArea.containsMouse ? "#dc2626" : "#ef4444")
+                        ? (recBtnArea.containsMouse ? Theme.critical : Theme.critical)
                         : (recBtnArea.containsMouse ? Qt.lighter(Theme.primary, 1.1) : Theme.primary)
 
                     RowLayout {
@@ -388,14 +411,14 @@ Item {
                             text: root.isRecording ? "\u{F04DB}" : Theme.icons.record
                             font.family: Theme.iconFontFamily
                             font.pixelSize: 18
-                            color: root.isRecording ? "#ffffff" : Theme.background
+                            color: root.isRecording ? Theme.background : Theme.background
                         }
                         Text {
                             text: root.isRecording ? "Parar Gravação" : "Iniciar Gravação"
                             font.family: Theme.fontFamily
                             font.pixelSize: 13
                             font.weight: Font.Bold
-                            color: root.isRecording ? "#ffffff" : Theme.background
+                            color: root.isRecording ? Theme.background : Theme.background
                         }
                     }
 
@@ -436,7 +459,7 @@ Item {
 
                     // Seção de Vídeo
                     Text {
-                        text: "FONTE DE VÍDEO"
+                        text: Theme.t("rec.source", "FONTE DE VÍDEO")
                         font.family: Theme.fontFamily
                         font.pixelSize: 11
                         font.weight: Font.Bold
@@ -525,7 +548,7 @@ Item {
                                 }
                                 Item { Layout.fillWidth: true }
                                 Text {
-                                    text: "Selecionar na Tela"
+                                    text: Theme.t("rec.pick_screen", "Selecionar na Tela")
                                     font.family: Theme.fontFamily
                                     font.pixelSize: 11
                                     font.weight: Font.DemiBold
@@ -604,7 +627,7 @@ Item {
                         spacing: 6
 
                         Text {
-                            text: "GPU / Encoder:"
+                            text: Theme.t("rec.encoder", "Codificador")
                             font.family: Theme.fontFamily
                             font.pixelSize: 11
                             color: Theme.subtext
@@ -652,7 +675,7 @@ Item {
                         Layout.fillWidth: true
                         spacing: 8
                         Text {
-                            text: "Taxa de Quadros:"
+                            text: Theme.t("rec.fps", "Quadros por segundo")
                             font.family: Theme.fontFamily
                             font.pixelSize: 11
                             color: Theme.subtext
@@ -690,6 +713,78 @@ Item {
                         }
                     }
 
+                    // Bitrate: tamanho x qualidade do arquivo. Fixo (CBR) nos níveis;
+                    // "Constante" deixa o codificador decidir (o antigo, arquivo grande).
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 6
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Text {
+                                text: Theme.t("rec.bitrate", "Bitrate")
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 11
+                                color: Theme.subtext
+                            }
+                            Item { Layout.fillWidth: true }
+                            Text {
+                                text: root.bitrateKbps > 0
+                                    ? Theme.t("rec.bitrate_per_min", "até ~%1 MB por minuto").replace("%1", Math.round(root.bitrateKbps * 60 / 8192 + 1))
+                                    : Theme.t("rec.bitrate_var", "tamanho varia com o movimento")
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 10
+                                color: Theme.subtext
+                            }
+                        }
+                        Flow {
+                            Layout.fillWidth: true
+                            spacing: 6
+                            Repeater {
+                                model: [
+                                    { kbps: 4000, label: Theme.t("rec.br_low", "Baixo") },
+                                    { kbps: 8000, label: Theme.t("rec.br_mid", "Médio") },
+                                    { kbps: 16000, label: Theme.t("rec.br_high", "Alto") },
+                                    { kbps: 30000, label: Theme.t("rec.br_vhigh", "Muito alto") },
+                                    { kbps: 50000, label: Theme.t("rec.br_max", "Máximo") },
+                                    { kbps: 0, label: Theme.t("rec.br_const", "Constante") }
+                                ]
+                                delegate: Rectangle {
+                                    required property var modelData
+                                    readonly property bool sel: root.bitrateKbps === modelData.kbps
+                                    height: 26
+                                    width: brRow.implicitWidth + 16
+                                    radius: 6
+                                    color: sel ? Theme.primary : (brArea.containsMouse ? Theme.withAlpha(Theme.textColor, 0.1) : Theme.tileHigh)
+                                    Row {
+                                        id: brRow
+                                        anchors.centerIn: parent
+                                        spacing: 5
+                                        Text {
+                                            text: modelData.label
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: 11
+                                            font.weight: Font.DemiBold
+                                            color: sel ? Theme.background : Theme.textColor
+                                        }
+                                        Text {
+                                            text: modelData.kbps > 0 ? (modelData.kbps / 1000) + " Mbps" : Theme.t("rec.br_const_q", "qualidade fixa")
+                                            font.family: Theme.monoFamily
+                                            font.pixelSize: 10
+                                            color: sel ? Theme.withAlpha(Theme.background, 0.8) : Theme.subtext
+                                        }
+                                    }
+                                    MouseArea {
+                                        id: brArea
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: root.setBitrate(modelData.kbps)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     Rectangle {
                         Layout.fillWidth: true
                         height: 1
@@ -698,7 +793,7 @@ Item {
 
                     // Seção de Áudio
                     Text {
-                        text: "ÁUDIO & FONTES (PIPEWIRE)"
+                        text: Theme.t("rec.audio", "ÁUDIO")
                         font.family: Theme.fontFamily
                         font.pixelSize: 11
                         font.weight: Font.Bold
@@ -730,14 +825,14 @@ Item {
                                 Layout.fillWidth: true
                                 spacing: 1
                                 Text {
-                                    text: "Áudio do Sistema (Desktop)"
+                                    text: Theme.t("rec.audio_sys", "Áudio do sistema")
                                     font.family: Theme.fontFamily
                                     font.pixelSize: 11
                                     font.weight: Font.Medium
                                     color: Theme.textColor
                                 }
                                 Text {
-                                    text: "Jogos, navegador, música e mídias"
+                                    text: Theme.t("rec.audio_sys_sub", "Jogos, navegador, música e vídeos")
                                     font.family: Theme.fontFamily
                                     font.pixelSize: 10
                                     color: Theme.subtext
@@ -794,14 +889,14 @@ Item {
                                 Layout.fillWidth: true
                                 spacing: 1
                                 Text {
-                                    text: "Microfone (Voz)"
+                                    text: Theme.t("rec.audio_mic", "Microfone")
                                     font.family: Theme.fontFamily
                                     font.pixelSize: 11
                                     font.weight: Font.Medium
                                     color: Theme.textColor
                                 }
                                 Text {
-                                    text: "Entrada de voz padrão do sistema"
+                                    text: Theme.t("rec.audio_mic_sub", "O microfone padrão do sistema")
                                     font.family: Theme.fontFamily
                                     font.pixelSize: 10
                                     color: Theme.subtext
@@ -859,7 +954,7 @@ Item {
                         spacing: 8
 
                         Text {
-                            text: "GRAVAÇÕES RECENTES"
+                            text: Theme.t("rec.recent", "GRAVAÇÕES RECENTES")
                             font.family: Theme.fontFamily
                             font.pixelSize: 11
                             font.weight: Font.Bold
@@ -924,7 +1019,8 @@ Item {
 
                             delegate: Rectangle {
                                 width: recView.width
-                                height: 54
+                                readonly property bool sizeMenu: root.compressMenuPath === modelData.path
+                                height: 54 + (sizeMenu ? 38 : 0)
                                 radius: 8
                                 color: recItemArea.containsMouse ? Theme.tileHigh : Theme.withAlpha(Theme.background, 0.45)
                                 border.color: Theme.withAlpha(Theme.outline, 0.25)
@@ -941,10 +1037,57 @@ Item {
                                     }
                                 }
 
+                                // Tamanho final da compressão: aparece ao clicar em Comprimir.
                                 RowLayout {
                                     z: 2
-                                    anchors.fill: parent
+                                    visible: parent.sizeMenu
+                                    anchors.left: parent.left
+                                    anchors.right: parent.right
+                                    anchors.bottom: parent.bottom
                                     anchors.margins: 8
+                                    height: 28
+                                    spacing: 6
+                                    Text {
+                                        text: Theme.t("rec.compress_to", "Comprimir para")
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 11
+                                        color: Theme.subtext
+                                    }
+                                    Item { Layout.fillWidth: true }
+                                    Repeater {
+                                        model: [10, 25, 50, 100]
+                                        delegate: Rectangle {
+                                            required property int modelData
+                                            Layout.preferredHeight: 26
+                                            Layout.preferredWidth: szText.implicitWidth + 16
+                                            radius: 6
+                                            color: szArea.containsMouse ? Theme.withAlpha(Theme.textColor, 0.1) : Theme.tileHigh
+                                            Text {
+                                                id: szText
+                                                anchors.centerIn: parent
+                                                text: modelData + " MB"
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: 11
+                                                color: Theme.textColor
+                                            }
+                                            MouseArea {
+                                                id: szArea
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: root.compress(root.compressMenuPath, modelData)
+                                            }
+                                        }
+                                    }
+                                }
+
+                                RowLayout {
+                                    z: 2
+                                    anchors.left: parent.left
+                                    anchors.right: parent.right
+                                    anchors.top: parent.top
+                                    anchors.margins: 8
+                                    height: 38
                                     spacing: 10
 
                                     // Ícone de Vídeo
@@ -1026,7 +1169,7 @@ Item {
                                         }
                                     }
 
-                                    // Botão Comprimir para WhatsApp
+                                    // Botão Comprimir
                                     Rectangle {
                                         Layout.preferredWidth: 30
                                         Layout.preferredHeight: 30
@@ -1056,10 +1199,7 @@ Item {
                                             hoverEnabled: true
                                             cursorShape: Qt.PointingHandCursor
                                             enabled: root.compressingPath === ""
-                                            onClicked: {
-                                                compressProc.targetPath = modelData.path;
-                                                compressProc.running = true;
-                                            }
+                                            onClicked: root.compressMenuPath = root.compressMenuPath === modelData.path ? "" : modelData.path
                                         }
                                     }
 
@@ -1068,14 +1208,14 @@ Item {
                                         Layout.preferredWidth: 30
                                         Layout.preferredHeight: 30
                                         radius: 15
-                                        color: delBtnArea.containsMouse ? Theme.withAlpha("#ef4444", 0.25) : "transparent"
+                                        color: delBtnArea.containsMouse ? Theme.withAlpha(Theme.critical, 0.25) : "transparent"
 
                                         Text {
                                             anchors.centerIn: parent
                                             text: Theme.icons.trash
                                             font.family: Theme.iconFontFamily
                                             font.pixelSize: 13
-                                            color: delBtnArea.containsMouse ? "#ef4444" : Theme.subtext
+                                            color: delBtnArea.containsMouse ? Theme.critical : Theme.subtext
                                         }
 
                                         MouseArea {
@@ -1114,7 +1254,7 @@ Item {
                             }
                             Text {
                                 Layout.alignment: Qt.AlignHCenter
-                                text: "Nenhuma gravação recente"
+                                text: Theme.t("rec.empty", "Nenhuma gravação recente")
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 13
                                 font.weight: Font.Medium
@@ -1122,7 +1262,7 @@ Item {
                             }
                             Text {
                                 Layout.alignment: Qt.AlignHCenter
-                                text: "Grave sua tela ou jogos e seus vídeos aparecerão aqui."
+                                text: Theme.t("rec.empty_sub", "As gravações aparecem aqui.")
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 11
                                 color: Theme.withAlpha(Theme.subtext, 0.7)
