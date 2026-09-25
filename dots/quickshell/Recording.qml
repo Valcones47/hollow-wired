@@ -16,6 +16,12 @@ Item {
     id: root
 
     property bool isRecording: false
+    property string view: "record"   // "record" | "library"
+    // `qs ipc call recording view library` (testes e atalhos).
+    IpcHandler {
+        target: "recording"
+        function view(v: string): void { if (v === "record" || v === "library") root.view = v; }
+    }
     property int elapsedSeconds: 0
     property string recordingFile: ""
     property string captureMode: "screen" // "screen", "window", "region"
@@ -72,6 +78,7 @@ Item {
     function refresh() {
         statusProc.running = true;
         listProc.running = true;
+        if (view === "library") library.refresh();
         windowsProc.running = true;
     }
 
@@ -188,29 +195,6 @@ Item {
     // Processo de Ações com Arquivos
     Process { id: openFolderProc; command: ["rice-record", "open-folder"] }
 
-    // Compressão para um tamanho final (rice-record compress <arquivo> <MB>)
-    property string compressingPath: ""
-    property string compressMenuPath: ""
-    function compress(path, mb) {
-        if (compressProc.running) return;
-        compressMenuPath = "";
-        compressProc.targetPath = path;
-        compressProc.targetMb = mb;
-        compressProc.running = true;
-    }
-    Process {
-        id: compressProc
-        property string targetPath: ""
-        property int targetMb: 25
-        command: ["rice-record", "compress", targetPath, String(targetMb)]
-        onStarted: {
-            root.compressingPath = targetPath;
-        }
-        onExited: {
-            root.compressingPath = "";
-            listProc.running = true;
-        }
-    }
     // Chamado de dentro dos componentes da lista, que não enxergam o id do timer.
     function scheduleRefresh() { recRefreshTimer.restart(); }
     Timer {
@@ -436,7 +420,51 @@ Item {
         // ==========================================
         // 2. CORPO DIVIDIDO: CONFIGURAÇÕES & HISTÓRICO
         // ==========================================
+        // Subabas: gravar (configurações) e gerenciar as gravações.
         RowLayout {
+            Layout.fillWidth: true
+            spacing: 4
+            Repeater {
+                model: [
+                    { k: "record", label: Theme.t("rec.tab_record", "Gravar") },
+                    { k: "library", label: Theme.t("rec.tab_library", "Gravações") + (root.recentRecordings.length ? "  " + root.recentRecordings.length : "") }
+                ]
+                delegate: Rectangle {
+                    id: st
+                    required property var modelData
+                    readonly property bool on: root.view === st.modelData.k
+                    Layout.fillWidth: true
+                    implicitHeight: 32
+                    radius: 9
+                    color: st.on ? Theme.tileHigh : (stArea.containsMouse ? Theme.withAlpha(Theme.tileHigh, 0.5) : Theme.withAlpha(Theme.tile, 0.5))
+                    Text {
+                        anchors.centerIn: parent
+                        text: st.modelData.label
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 12
+                        font.weight: st.on ? Font.DemiBold : Font.Normal
+                        color: st.on ? Theme.textColor : Theme.subtext
+                    }
+                    MouseArea {
+                        id: stArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.view = st.modelData.k
+                    }
+                }
+            }
+        }
+
+        RecordingLibrary {
+            id: library
+            visible: root.view === "library"
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+        }
+
+        RowLayout {
+            visible: root.view === "record"
             Layout.fillWidth: true
             Layout.fillHeight: true
             spacing: Theme.gap + 2
@@ -445,7 +473,7 @@ Item {
             // COLUNA DA ESQUERDA: CONFIGURAÇÕES DE VÍDEO E ÁUDIO
             // ------------------------------------------
             Rectangle {
-                Layout.preferredWidth: 400
+                Layout.fillWidth: true
                 Layout.fillHeight: true
                 radius: Theme.tileRadius
                 color: Theme.tile
@@ -932,345 +960,6 @@ Item {
                 }
             }
 
-            // ------------------------------------------
-            // COLUNA DA DIREITA: GRAVAÇÕES RECENTES
-            // ------------------------------------------
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                radius: Theme.tileRadius
-                color: Theme.tile
-                border.color: Theme.withAlpha(Theme.outline, 0.25)
-                border.width: 1
-
-                ColumnLayout {
-                    anchors.fill: parent
-                    anchors.margins: Theme.gap + 4
-                    spacing: Theme.gap
-
-                    // Cabeçalho da Galeria
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 8
-
-                        Text {
-                            text: Theme.t("rec.recent", "GRAVAÇÕES RECENTES")
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 11
-                            font.weight: Font.Bold
-                            color: Theme.primary
-                        }
-
-                        Rectangle {
-                            Layout.preferredHeight: 18
-                            Layout.preferredWidth: countText.implicitWidth + 12
-                            radius: 9
-                            color: Theme.withAlpha(Theme.primary, 0.15)
-                            border.color: Theme.withAlpha(Theme.primary, 0.35)
-                            border.width: 1
-
-                            Text {
-                                id: countText
-                                anchors.centerIn: parent
-                                text: String(root.recentRecordings.length)
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 10
-                                font.weight: Font.Bold
-                                color: Theme.primary
-                            }
-                        }
-
-                        Item { Layout.fillWidth: true }
-
-                        // Botão Recarregar
-                        Rectangle {
-                            Layout.preferredWidth: 28
-                            Layout.preferredHeight: 28
-                            radius: 14
-                            color: refRecArea.containsMouse ? Theme.tileHigh : "transparent"
-                            Text {
-                                anchors.centerIn: parent
-                                text: Theme.icons.refresh
-                                font.family: Theme.iconFontFamily
-                                font.pixelSize: 14
-                                color: Theme.subtext
-                            }
-                            MouseArea {
-                                id: refRecArea
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: listProc.running = true
-                            }
-                        }
-                    }
-
-                    // Lista de Vídeos Recentes
-                    Item {
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
-
-                        ListView {
-                            id: recView
-                            anchors.fill: parent
-                            clip: true
-                            spacing: 6
-                            model: root.recentRecordings
-
-                            delegate: Rectangle {
-                                width: recView.width
-                                readonly property bool sizeMenu: root.compressMenuPath === modelData.path
-                                height: 54 + (sizeMenu ? 38 : 0)
-                                radius: 8
-                                color: recItemArea.containsMouse ? Theme.tileHigh : Theme.withAlpha(Theme.background, 0.45)
-                                border.color: Theme.withAlpha(Theme.outline, 0.25)
-                                border.width: 1
-
-                                MouseArea {
-                                    id: recItemArea
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    acceptedButtons: Qt.LeftButton
-                                    onDoubleClicked: {
-                                        Quickshell.execDetached(["rice-record", "play", modelData.path]);
-                                    }
-                                }
-
-                                // Tamanho final da compressão: aparece ao clicar em Comprimir.
-                                RowLayout {
-                                    z: 2
-                                    visible: parent.sizeMenu
-                                    anchors.left: parent.left
-                                    anchors.right: parent.right
-                                    anchors.bottom: parent.bottom
-                                    anchors.margins: 8
-                                    height: 28
-                                    spacing: 6
-                                    Text {
-                                        text: Theme.t("rec.compress_to", "Comprimir para")
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: 11
-                                        color: Theme.subtext
-                                    }
-                                    Item { Layout.fillWidth: true }
-                                    Repeater {
-                                        model: [10, 25, 50, 100]
-                                        delegate: Rectangle {
-                                            required property int modelData
-                                            Layout.preferredHeight: 26
-                                            Layout.preferredWidth: szText.implicitWidth + 16
-                                            radius: 6
-                                            color: szArea.containsMouse ? Theme.withAlpha(Theme.textColor, 0.1) : Theme.tileHigh
-                                            Text {
-                                                id: szText
-                                                anchors.centerIn: parent
-                                                text: modelData + " MB"
-                                                font.family: Theme.fontFamily
-                                                font.pixelSize: 11
-                                                color: Theme.textColor
-                                            }
-                                            MouseArea {
-                                                id: szArea
-                                                anchors.fill: parent
-                                                hoverEnabled: true
-                                                cursorShape: Qt.PointingHandCursor
-                                                onClicked: root.compress(root.compressMenuPath, modelData)
-                                            }
-                                        }
-                                    }
-                                }
-
-                                RowLayout {
-                                    z: 2
-                                    anchors.left: parent.left
-                                    anchors.right: parent.right
-                                    anchors.top: parent.top
-                                    anchors.margins: 8
-                                    height: 38
-                                    spacing: 10
-
-                                    // Ícone de Vídeo
-                                    Rectangle {
-                                        Layout.preferredWidth: 34
-                                        Layout.preferredHeight: 34
-                                        radius: 6
-                                        color: Theme.withAlpha(Theme.primary, 0.15)
-                                        Text {
-                                            anchors.centerIn: parent
-                                            text: Theme.icons.record
-                                            font.family: Theme.iconFontFamily
-                                            font.pixelSize: 15
-                                            color: Theme.primary
-                                        }
-                                    }
-
-                                    // Nome, data e tamanho
-                                    ColumnLayout {
-                                        Layout.fillWidth: true
-                                        spacing: 2
-
-                                        Text {
-                                            Layout.fillWidth: true
-                                            text: modelData.name
-                                            font.family: Theme.fontFamily
-                                            font.pixelSize: 11
-                                            font.weight: Font.Medium
-                                            color: Theme.textColor
-                                            elide: Text.ElideMiddle
-                                        }
-
-                                        RowLayout {
-                                            spacing: 8
-                                            Text {
-                                                text: modelData.date
-                                                font.family: Theme.fontFamily
-                                                font.pixelSize: 10
-                                                color: Theme.subtext
-                                            }
-                                            Text {
-                                                text: "•"
-                                                font.pixelSize: 10
-                                                color: Theme.subtext
-                                            }
-                                            Text {
-                                                text: modelData.size
-                                                font.family: Theme.fontFamily
-                                                font.pixelSize: 10
-                                                color: Theme.subtext
-                                            }
-                                        }
-                                    }
-
-                                    // Botão Reproduzir
-                                    Rectangle {
-                                        Layout.preferredWidth: 30
-                                        Layout.preferredHeight: 30
-                                        radius: 15
-                                        color: playBtnArea.containsMouse ? Theme.primary : Theme.tileHigh
-
-                                        Text {
-                                            anchors.centerIn: parent
-                                            anchors.horizontalCenterOffset: 1
-                                            text: Theme.icons.play
-                                            font.family: Theme.iconFontFamily
-                                            font.pixelSize: 13
-                                            color: playBtnArea.containsMouse ? Theme.background : Theme.textColor
-                                        }
-
-                                        MouseArea {
-                                            id: playBtnArea
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            cursorShape: Qt.PointingHandCursor
-                                            onClicked: {
-                                                Quickshell.execDetached(["rice-record", "play", modelData.path]);
-                                            }
-                                        }
-                                    }
-
-                                    // Botão Comprimir
-                                    Rectangle {
-                                        Layout.preferredWidth: 30
-                                        Layout.preferredHeight: 30
-                                        radius: 15
-                                        readonly property bool isThisCompressing: root.compressingPath === modelData.path
-                                        color: isThisCompressing ? Theme.withAlpha(Theme.primary, 0.25) : (compBtnArea.containsMouse ? Theme.primary : Theme.tileHigh)
-
-                                        Text {
-                                            id: compIcon
-                                            anchors.centerIn: parent
-                                            text: parent.isThisCompressing ? Theme.icons.refresh : Theme.icons.compress
-                                            font.family: Theme.iconFontFamily
-                                            font.pixelSize: 13
-                                            color: parent.isThisCompressing ? Theme.primary : (compBtnArea.containsMouse ? Theme.background : Theme.textColor)
-
-                                            SequentialAnimation on opacity {
-                                                running: compIcon.parent.isThisCompressing
-                                                loops: Animation.Infinite
-                                                NumberAnimation { to: 0.3; duration: 400 }
-                                                NumberAnimation { to: 1.0; duration: 400 }
-                                            }
-                                        }
-
-                                        MouseArea {
-                                            id: compBtnArea
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            cursorShape: Qt.PointingHandCursor
-                                            enabled: root.compressingPath === ""
-                                            onClicked: root.compressMenuPath = root.compressMenuPath === modelData.path ? "" : modelData.path
-                                        }
-                                    }
-
-                                    // Botão Excluir
-                                    Rectangle {
-                                        Layout.preferredWidth: 30
-                                        Layout.preferredHeight: 30
-                                        radius: 15
-                                        color: delBtnArea.containsMouse ? Theme.withAlpha(Theme.critical, 0.25) : "transparent"
-
-                                        Text {
-                                            anchors.centerIn: parent
-                                            text: Theme.icons.trash
-                                            font.family: Theme.iconFontFamily
-                                            font.pixelSize: 13
-                                            color: delBtnArea.containsMouse ? Theme.critical : Theme.subtext
-                                        }
-
-                                        MouseArea {
-                                            id: delBtnArea
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            cursorShape: Qt.PointingHandCursor
-                                            onClicked: {
-                                                // Tirar o item da lista destrói este delegate no meio
-                                                // do clique: tudo que vier depois roda sem contexto
-                                                // ("root is not defined"). Por isso a lista muda por último.
-                                                const pathToDelete = modelData.path;
-                                                const r = root;
-                                                Quickshell.execDetached(["rice-record", "delete", pathToDelete]);
-                                                r.scheduleRefresh();
-                                                r.recentRecordings = r.recentRecordings.filter(function(item) { return item.path !== pathToDelete; });
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        // Estado vazio se não houver vídeos
-                        ColumnLayout {
-                            anchors.centerIn: parent
-                            visible: root.recentRecordings.length === 0
-                            spacing: 8
-
-                            Text {
-                                Layout.alignment: Qt.AlignHCenter
-                                text: Theme.icons.record
-                                font.family: Theme.iconFontFamily
-                                font.pixelSize: 36
-                                color: Theme.withAlpha(Theme.subtext, 0.4)
-                            }
-                            Text {
-                                Layout.alignment: Qt.AlignHCenter
-                                text: Theme.t("rec.empty", "Nenhuma gravação recente")
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 13
-                                font.weight: Font.Medium
-                                color: Theme.subtext
-                            }
-                            Text {
-                                Layout.alignment: Qt.AlignHCenter
-                                text: Theme.t("rec.empty_sub", "As gravações aparecem aqui.")
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 11
-                                color: Theme.withAlpha(Theme.subtext, 0.7)
-                            }
-                        }
-                    }
-                }
-            }
         }
     }
 }

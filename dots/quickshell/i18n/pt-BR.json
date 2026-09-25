@@ -1740,5 +1740,10 @@
   "rec.br_vhigh": "Muito alto",
   "rec.br_max": "Máximo",
   "rec.br_const": "Constante",
-  "rec.br_const_q": "qualidade fixa"
+  "rec.br_const_q": "qualidade fixa",
+  "rec.tab_record": "Gravar",
+  "rec.tab_library": "Gravações",
+  "rec.lib_count": "%1 gravações · %2",
+  "rec.c_720": "720p, mesma qualidade",
+  "rec.lib_hint": "Dois cliques abre o vídeo. Apagar manda para a lixeira."
 }

@@ -1740,5 +1740,10 @@
   "rec.br_vhigh": "Very high",
   "rec.br_max": "Maximum",
   "rec.br_const": "Constant",
-  "rec.br_const_q": "fixed quality"
+  "rec.br_const_q": "fixed quality",
+  "rec.tab_record": "Record",
+  "rec.tab_library": "Recordings",
+  "rec.lib_count": "%1 recordings · %2",
+  "rec.c_720": "720p, same quality",
+  "rec.lib_hint": "Double-click opens the video. Delete moves it to the trash."
 }

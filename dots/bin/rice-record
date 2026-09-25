@@ -181,20 +181,28 @@ EOF
 EOF
 }
 
+# list [N]: gravações mais recentes (padrão 20; "all" = todas), com duração,
+# altura do vídeo e bytes para a aba Gravações do Hub.
 do_list() {
+    local limit="${1:-20}"
+    [ "$limit" = "all" ] && limit=100000
     local files_json="[]"
     if compgen -G "$DIR/*.mp4" > /dev/null; then
-        files_json=$(ls -t "$DIR"/*.mp4 2>/dev/null | head -20 | while read -r f; do
-            local name size date_str
-            name=$(basename "$f")
-            size=$(ls -lh "$f" 2>/dev/null | awk '{print $5}')
-            date_str=$(date -r "$f" "+%d/%m %H:%M" 2>/dev/null || echo "")
+        files_json=$(ls -t "$DIR"/*.mp4 2>/dev/null | head -n "$limit" | while read -r f; do
+            local probe dur h
+            probe=$(ffprobe -v error -select_streams v:0 -show_entries stream=height:format=duration \
+                -of default=nw=1 "$f" 2>/dev/null)
+            dur=$(printf '%s\n' "$probe" | sed -n 's/^duration=//p' | cut -d. -f1)
+            h=$(printf '%s\n' "$probe" | sed -n 's/^height=//p')
             jq -n \
-                --arg n "$name" \
+                --arg n "$(basename "$f")" \
                 --arg p "$f" \
-                --arg s "$size" \
-                --arg d "$date_str" \
-                '{name: $n, path: $p, size: $s, date: $d}'
+                --arg s "$(du -h "$f" 2>/dev/null | cut -f1)" \
+                --argjson b "$(stat -c %s "$f" 2>/dev/null || echo 0)" \
+                --arg d "$(date -r "$f" "+%d/%m %H:%M" 2>/dev/null || echo "")" \
+                --argjson dur "${dur:-0}" \
+                --argjson h "${h:-0}" \
+                '{name: $n, path: $p, size: $s, bytes: $b, date: $d, duration: $dur, height: $h}'
         done | jq -s '.')
     fi
     echo "$files_json"
@@ -435,6 +443,20 @@ do_compress() {
         echo '{"status": "error", "message": "Arquivo não encontrado"}'
         exit 1
     fi
+    # "720p": só reduz a resolução, com qualidade constante (tamanho livre).
+    if [ "$target_mb" = "720p" ]; then
+        local out="${input%.mp4}_720p.mp4"
+        notify-send -a "Gravação" -i media-record -t 3000 "Comprimindo vídeo…" "720p, mesma qualidade" 2>/dev/null || true
+        if ffmpeg -y -v error -i "$input" -vf "scale=-2:'min(720,ih)'" -c:v libx264 -preset medium -crf 23 \
+            -c:a aac -b:a 128k -pix_fmt yuv420p -movflags +faststart "$out"; then
+            local sz; sz=$(du -h "$out" | cut -f1)
+            notify-send -a "Gravação" -i media-record -t 4500 "Vídeo comprimido" "$(basename "$out") · $sz" 2>/dev/null || true
+            echo "{\"status\": \"compressed\", \"file\": \"$out\", \"size\": \"$sz\"}"
+            return 0
+        fi
+        echo '{"status": "error", "message": "Falha ao codificar vídeo"}'
+        exit 1
+    fi
     [[ "$target_mb" =~ ^[0-9]+$ ]] && [ "$target_mb" -ge 2 ] || target_mb=25
 
     local dur height
@@ -512,7 +534,8 @@ case "$cmd" in
         do_status
         ;;
     list)
-        do_list
+        shift
+        do_list "$@"
         ;;
     list-windows)
         do_list_windows
@@ -535,9 +558,27 @@ case "$cmd" in
         ;;
     delete)
         shift
-        if [ -n "$1" ]; then
-            rm -f "$1"
+        # Vai para a lixeira (dá para recuperar); rm só se não houver gio.
+        if [ -n "$1" ] && [ -f "$1" ]; then
+            gio trash "$1" 2>/dev/null || rm -f "$1"
             echo "{\"status\": \"deleted\"}"
+        fi
+        ;;
+    reveal)
+        shift
+        # Abre a pasta com o arquivo selecionado (Dolphin, Nautilus...).
+        if [ -n "$1" ] && [ -f "$1" ]; then
+            gdbus call --session --dest org.freedesktop.FileManager1 --object-path /org/freedesktop/FileManager1 \
+                --method org.freedesktop.FileManager1.ShowItems "['file://$1']" "" >/dev/null 2>&1 \
+                || xdg-open "$(dirname "$1")" >/dev/null 2>&1 &
+        fi
+        ;;
+    copy)
+        shift
+        # Copia o arquivo (não o caminho): cola em chat, navegador, gerenciador de arquivos.
+        if [ -n "$1" ] && [ -f "$1" ]; then
+            printf 'file://%s\n' "$1" | wl-copy --type text/uri-list
+            notify-send -a "Gravação" -i edit-copy -t 2500 "Vídeo copiado" "$(basename "$1")" 2>/dev/null || true
         fi
         ;;
     toggle)
@@ -560,7 +601,7 @@ case "$cmd" in
         fi
         ;;
     *)
-        echo "Uso: rice-record {start|stop|status|list|list-windows|select-geom|open-folder|play <file>|compress <file> [MB]|delete <file>|toggle|full}"
+        echo "Uso: rice-record {start|stop|status|list|list-windows|select-geom|open-folder|play <file>|compress <file> [MB|720p]|reveal <file>|copy <file>|delete <file>|toggle|full}"
         exit 1
         ;;
 esac
