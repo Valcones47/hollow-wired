@@ -1690,5 +1690,7 @@
   "ai.copy": "Copy",
   "cheatsheet.desc_ai": "AI assistant (chat and translation)",
   "net.powersave": "Wi-Fi power saving",
-  "net.powersave_sub": "On uses less battery but makes Wi-Fi slower and less stable. Asks for your password."
+  "net.powersave_sub": "On uses less battery but makes Wi-Fi slower and less stable. Asks for your password.",
+  "theme.apps_title": "Wallpaper colors in apps",
+  "theme.apps_sub": "KDE and GTK apps (Dolphin, Filelight, password dialogs) use the same palette. Off restores the color scheme you had before."
 }

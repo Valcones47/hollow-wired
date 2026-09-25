@@ -1325,6 +1325,18 @@ PanelWindow {
         }
     }
 
+    // Cores do wallust nos apps Qt/KDE e GTK (rice-app-colors; ~/.config/hollow-wired/app-colors.json).
+    property bool appColorsEnabled: true
+    FileView {
+        path: Quickshell.env("HOME") + "/.config/hollow-wired/app-colors.json"
+        watchChanges: true
+        printErrors: false
+        onFileChanged: reload()
+        onLoaded: {
+            try { win.appColorsEnabled = (JSON.parse(text()) || {}).enabled !== false; } catch (e) {}
+        }
+    }
+
     // Economia de energia do Wi-Fi: null = sem placa Wi-Fi (a opção some).
     property var wifiPowersave: null
     Process {
@@ -5164,6 +5176,16 @@ PanelWindow {
                                                 win.themeMode = v;
                                                 Quickshell.execDetached(["rice-theme-mode", "set", v]);
                                             }
+                                        }
+                                    }
+                                    RowDivider {}
+                                    OptionToggle {
+                                        title: Theme.t("theme.apps_title", "Cores do wallpaper nos apps")
+                                        subtitle: Theme.t("theme.apps_sub", "Apps KDE e GTK (Dolphin, Filelight, janelas de senha) usam a mesma paleta. Desligado, volta o esquema de cores que estava antes.")
+                                        checked: win.appColorsEnabled
+                                        onToggled: v => {
+                                            win.appColorsEnabled = v;
+                                            Quickshell.execDetached(["rice-app-colors", v ? "on" : "off"]);
                                         }
                                     }
                                     RowDivider { visible: win.themeMode === "auto" }

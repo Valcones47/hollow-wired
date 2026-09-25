@@ -328,6 +328,9 @@ def reload_apps():
                 ["hyprctl", "reload"]):
         if shutil.which(cmd[0]):
             subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    # Apps Qt/KDE e GTK (kdeglobals + gtk.css); ele mesmo respeita o interruptor.
+    if shutil.which("rice-app-colors"):
+        subprocess.run(["rice-app-colors", "apply"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 def apply(quiet=False):

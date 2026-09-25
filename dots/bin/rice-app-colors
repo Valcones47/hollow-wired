@@ -1,0 +1,304 @@
+#!/usr/bin/env python3
+"""rice-app-colors — leva as cores do wallust para os apps Qt/KDE e GTK.
+
+Fora do Plasma ninguém atualiza o esquema de cores do KDE: os apps KDE
+(Filelight, Dolphin, janela de senha...) ficavam com o esquema escolhido no
+Plasma, ou com o Breeze claro padrão em quem nunca abriu o Plasma. Aqui:
+  - Qt/KDE: gera ~/.local/share/color-schemes/HollowWired.colors, copia os
+    grupos [Colors:*] para o kdeglobals e avisa os apps abertos (KGlobalSettings);
+  - GTK 3/4: gera ~/.config/gtk-{3.0,4.0}/hollow-wired-colors.css e importa no
+    gtk.css (nomes do Breeze-GTK, do GTK clássico e do libadwaita).
+Na primeira vez guarda o kdeglobals e os gtk.css originais em *.antes-hollow-wired;
+`off` devolve esses originais.
+
+Uso: rice-app-colors apply | on | off | status
+Chamado pelo rice-colors a cada troca de paleta.
+"""
+
+import configparser
+import json
+import os
+import shutil
+import subprocess
+import sys
+
+HOME = os.path.expanduser("~")
+CFG = os.environ.get("XDG_CONFIG_HOME", os.path.join(HOME, ".config"))
+PREF = os.path.join(CFG, "hollow-wired", "app-colors.json")
+KDEGLOBALS = os.path.join(CFG, "kdeglobals")
+SCHEME = os.path.join(HOME, ".local/share/color-schemes/HollowWired.colors")
+GTK_DIRS = [os.path.join(CFG, "gtk-3.0"), os.path.join(CFG, "gtk-4.0")]
+CSS_NAME = "hollow-wired-colors.css"
+IMPORT = "@import '%s';" % CSS_NAME
+BACKUP = ".antes-hollow-wired"
+
+
+def enabled():
+    try:
+        with open(PREF) as f:
+            return json.load(f).get("enabled", True) is not False
+    except (OSError, ValueError):
+        return True
+
+
+def set_enabled(on):
+    os.makedirs(os.path.dirname(PREF), exist_ok=True)
+    with open(PREF, "w") as f:
+        json.dump({"enabled": bool(on)}, f)
+        f.write("\n")
+
+
+def rgb(h):
+    h = h.lstrip("#")
+    return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
+
+
+def mix(a, b, t):
+    """Mistura a -> b (t = 0..1), em hex."""
+    ra, rb = rgb(a), rgb(b)
+    return "#%02x%02x%02x" % tuple(round(x + (y - x) * t) for x, y in zip(ra, rb))
+
+
+def lum(h):
+    r, g, b = (c / 255 for c in rgb(h))
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
+def palette():
+    out = subprocess.run(["rice-colors", "get"], capture_output=True, text=True).stdout
+    d = json.loads(out)
+    p = d["effective"]
+    acc = d.get("overrides", {}).get("accent1") or p["color4"]
+    bg, fg = p["background"], p["foreground"]
+    light = lum(bg) > 0.5
+    return {
+        "light": light,
+        "bg": bg,
+        "fg": fg,
+        "alt": mix(bg, fg, 0.04),
+        "view": mix(bg, "#000000" if not light else "#ffffff", 0.25),
+        "button": mix(bg, fg, 0.10),
+        "header": mix(bg, fg, 0.06),
+        "border": mix(bg, fg, 0.18),
+        "inactive": mix(fg, bg, 0.40),
+        "disabled": mix(fg, bg, 0.60),
+        "accent": acc,
+        "on_accent": "#000000" if lum(acc) > 0.55 else "#ffffff",
+        "link": p["color12"],
+        "visited": p["color13"],
+        "negative": p["color1"],
+        "neutral": p["color3"],
+        "positive": p["color2"],
+    }
+
+
+def kde_rgb(h):
+    return ",".join(str(c) for c in rgb(h))
+
+
+def kde_scheme(c):
+    def group(bg, alt, fg):
+        return {
+            "BackgroundNormal": kde_rgb(bg), "BackgroundAlternate": kde_rgb(alt),
+            "ForegroundNormal": kde_rgb(fg), "ForegroundInactive": kde_rgb(c["inactive"]),
+            "ForegroundActive": kde_rgb(c["accent"]), "ForegroundLink": kde_rgb(c["link"]),
+            "ForegroundVisited": kde_rgb(c["visited"]), "ForegroundNegative": kde_rgb(c["negative"]),
+            "ForegroundNeutral": kde_rgb(c["neutral"]), "ForegroundPositive": kde_rgb(c["positive"]),
+            "DecorationFocus": kde_rgb(c["accent"]), "DecorationHover": kde_rgb(c["accent"]),
+        }
+    s = {
+        "Colors:Window": group(c["bg"], c["alt"], c["fg"]),
+        "Colors:View": group(c["view"], c["alt"], c["fg"]),
+        "Colors:Button": group(c["button"], c["alt"], c["fg"]),
+        "Colors:Header": group(c["header"], c["alt"], c["fg"]),
+        "Colors:Header][Inactive": group(c["bg"], c["alt"], c["fg"]),
+        "Colors:Tooltip": group(c["header"], c["alt"], c["fg"]),
+        "Colors:Complementary": group(c["view"], c["alt"], c["fg"]),
+        "Colors:Selection": group(c["accent"], c["accent"], c["on_accent"]),
+        "WM": {"activeBackground": kde_rgb(c["header"]), "activeForeground": kde_rgb(c["fg"]),
+               "inactiveBackground": kde_rgb(c["bg"]), "inactiveForeground": kde_rgb(c["inactive"])},
+    }
+    s["Colors:Selection"]["ForegroundInactive"] = kde_rgb(c["on_accent"])
+    return s
+
+
+def gtk_css(c):
+    names = {
+        # GTK clássico / temas que seguem as cores nomeadas
+        "theme_bg_color": c["bg"], "theme_fg_color": c["fg"],
+        "theme_base_color": c["view"], "theme_text_color": c["fg"],
+        "theme_selected_bg_color": c["accent"], "theme_selected_fg_color": c["on_accent"],
+        "insensitive_bg_color": c["bg"], "insensitive_fg_color": c["disabled"],
+        "insensitive_base_color": c["view"], "borders": c["border"], "unfocused_borders": c["border"],
+        "theme_unfocused_bg_color": c["bg"], "theme_unfocused_fg_color": c["fg"],
+        "theme_unfocused_base_color": c["view"], "theme_unfocused_text_color": c["fg"],
+        "theme_unfocused_selected_bg_color": c["accent"], "theme_unfocused_selected_fg_color": c["on_accent"],
+        "link_color": c["link"], "error_color": c["negative"], "warning_color": c["neutral"],
+        "success_color": c["positive"],
+        # libadwaita (GTK4)
+        "window_bg_color": c["bg"], "window_fg_color": c["fg"],
+        "view_bg_color": c["view"], "view_fg_color": c["fg"],
+        "headerbar_bg_color": c["header"], "headerbar_fg_color": c["fg"],
+        "headerbar_backdrop_color": c["bg"],
+        "sidebar_bg_color": c["alt"], "sidebar_fg_color": c["fg"],
+        "card_bg_color": c["button"], "card_fg_color": c["fg"],
+        "dialog_bg_color": c["header"], "dialog_fg_color": c["fg"],
+        "popover_bg_color": c["header"], "popover_fg_color": c["fg"],
+        "accent_color": c["accent"], "accent_bg_color": c["accent"], "accent_fg_color": c["on_accent"],
+    }
+    # Breeze-GTK lê as mesmas cores com sufixo _breeze.
+    breeze = {
+        "theme_bg_color": c["bg"], "theme_fg_color": c["fg"], "theme_base_color": c["view"],
+        "theme_text_color": c["fg"], "content_view_bg": c["view"],
+        "theme_selected_bg_color": c["accent"], "theme_selected_fg_color": c["on_accent"],
+        "theme_hovering_selected_bg_color": c["accent"],
+        "theme_button_background_normal": c["button"], "theme_button_foreground_normal": c["fg"],
+        "theme_button_foreground_active": c["on_accent"],
+        "theme_button_decoration_focus": c["accent"], "theme_button_decoration_hover": c["accent"],
+        "theme_header_background": c["header"], "theme_header_foreground": c["fg"],
+        "theme_header_background_backdrop": c["bg"],
+        "theme_titlebar_background": c["header"], "theme_titlebar_foreground": c["fg"],
+        "theme_titlebar_background_backdrop": c["bg"], "theme_titlebar_foreground_backdrop": c["inactive"],
+        "theme_unfocused_bg_color": c["bg"], "theme_unfocused_fg_color": c["fg"],
+        "theme_unfocused_base_color": c["view"], "theme_unfocused_text_color": c["fg"],
+        "theme_unfocused_view_bg_color": c["view"], "theme_unfocused_view_text_color": c["fg"],
+        "theme_unfocused_selected_bg_color": c["accent"], "theme_unfocused_selected_fg_color": c["on_accent"],
+        "theme_view_hover_decoration_color": c["accent"], "theme_view_active_decoration_color": c["accent"],
+        "borders": c["border"], "unfocused_borders": c["border"],
+        "insensitive_bg_color": c["bg"], "insensitive_fg_color": c["disabled"],
+        "insensitive_base_color": c["view"], "insensitive_base_fg_color": c["disabled"],
+        "tooltip_background": c["header"], "tooltip_text": c["fg"], "tooltip_border": c["border"],
+        "link_color": c["link"], "link_visited_color": c["visited"],
+        "error_color": c["negative"], "warning_color": c["neutral"], "success_color": c["positive"],
+    }
+    lines = ["/* Gerado pelo rice-app-colors (cores do wallust). Não edite. */"]
+    lines += ["@define-color %s %s;" % kv for kv in names.items()]
+    lines += ["@define-color %s_breeze %s;" % kv for kv in breeze.items()]
+    return "\n".join(lines) + "\n"
+
+
+def backup_once(path):
+    b = path + BACKUP
+    if os.path.exists(path) and not os.path.exists(b):
+        shutil.copy2(path, b)
+
+
+def read_ini(path):
+    ini = configparser.RawConfigParser(strict=False, interpolation=None)
+    ini.optionxform = str
+    try:
+        ini.read(path, encoding="utf-8")
+    except configparser.Error:
+        pass
+    return ini
+
+
+def write_ini(ini, path):
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        ini.write(f, space_around_delimiters=False)
+    os.replace(tmp, path)
+
+
+def notify_kde():
+    # Mesmo sinal que o Plasma manda: apps KDE abertos relêem a paleta.
+    if shutil.which("dbus-send"):
+        subprocess.run(["dbus-send", "--session", "--type=signal", "/KGlobalSettings",
+                        "org.kde.KGlobalSettings.notifyChange", "int32:0", "int32:0"],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def apply():
+    if not enabled():
+        return 0
+    c = palette()
+    scheme = kde_scheme(c)
+
+    os.makedirs(os.path.dirname(SCHEME), exist_ok=True)
+    sc = configparser.RawConfigParser(interpolation=None)
+    sc.optionxform = str
+    sc["General"] = {"Name": "Hollow Wired", "ColorScheme": "HollowWired"}
+    for k, v in scheme.items():
+        sc[k] = v
+    write_ini(sc, SCHEME)
+
+    backup_once(KDEGLOBALS)
+    kg = read_ini(KDEGLOBALS)
+    for k, v in scheme.items():
+        if not kg.has_section(k):
+            kg.add_section(k)
+        for kk, vv in v.items():
+            kg.set(k, kk, vv)
+    if not kg.has_section("General"):
+        kg.add_section("General")
+    kg.set("General", "ColorScheme", "HollowWired")
+    kg.remove_option("General", "ColorSchemeHash")
+    write_ini(kg, KDEGLOBALS)
+    notify_kde()
+
+    css = gtk_css(c)
+    for d in GTK_DIRS:
+        os.makedirs(d, exist_ok=True)
+        with open(os.path.join(d, CSS_NAME), "w", encoding="utf-8") as f:
+            f.write(css)
+        g = os.path.join(d, "gtk.css")
+        cur = open(g, encoding="utf-8").read() if os.path.exists(g) else ""
+        if IMPORT not in cur:
+            backup_once(g)
+            # Vem por último para ganhar do colors.css antigo do Plasma.
+            with open(g, "w", encoding="utf-8") as f:
+                f.write(cur.rstrip("\n") + ("\n" if cur.strip() else "") + IMPORT + "\n")
+    return 0
+
+
+def off():
+    set_enabled(False)
+    b = KDEGLOBALS + BACKUP
+    if os.path.exists(b):
+        # Só as cores voltam; o resto do kdeglobals pode ter mudado depois.
+        old, kg = read_ini(b), read_ini(KDEGLOBALS)
+        for k in list(kde_scheme(palette()).keys()):
+            if kg.has_section(k):
+                kg.remove_section(k)
+            if old.has_section(k):
+                kg.add_section(k)
+                for kk, vv in old.items(k):
+                    kg.set(k, kk, vv)
+        if not kg.has_section("General"):
+            kg.add_section("General")
+        for key in ("ColorScheme", "ColorSchemeHash"):
+            if old.has_option("General", key):
+                kg.set("General", key, old.get("General", key))
+            else:
+                kg.remove_option("General", key)
+        write_ini(kg, KDEGLOBALS)
+        notify_kde()
+    for d in GTK_DIRS:
+        g = os.path.join(d, "gtk.css")
+        if os.path.exists(g + BACKUP):
+            shutil.copy2(g + BACKUP, g)
+        elif os.path.exists(g):
+            txt = open(g, encoding="utf-8").read().replace(IMPORT + "\n", "").replace(IMPORT, "")
+            with open(g, "w", encoding="utf-8") as f:
+                f.write(txt)
+    return 0
+
+
+def main():
+    cmd = sys.argv[1] if len(sys.argv) > 1 else "status"
+    if cmd == "apply":
+        return apply()
+    if cmd == "on":
+        set_enabled(True)
+        return apply()
+    if cmd == "off":
+        return off()
+    if cmd == "status":
+        print(json.dumps({"enabled": enabled()}))
+        return 0
+    print(__doc__.strip(), file=sys.stderr)
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
