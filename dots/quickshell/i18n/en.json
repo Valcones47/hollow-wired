@@ -1790,5 +1790,11 @@
   "cc.item_blur": "Blur",
   "cc.item_night": "Night light",
   "layout.ws_icons": "App icon on workspaces",
-  "layout.ws_icons_sub": "Off, occupied workspaces show as dots."
+  "layout.ws_icons_sub": "Off, occupied workspaces show as dots.",
+  "power.lock": "Lock",
+  "power.suspend": "Suspend",
+  "power.logout": "Log out",
+  "power.reboot": "Restart",
+  "power.off": "Shut down",
+  "power.confirm": "Click again: %1"
 }

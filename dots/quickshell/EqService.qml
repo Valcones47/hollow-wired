@@ -13,6 +13,13 @@ QtObject {
     readonly property var presets: ["flat", "bass", "treble", "vocal", "pop", "rock", "jazz", "classic"]
     readonly property real limit: 12
 
+    // `qs ipc call eq preset <flat|bass|…>` (atalhos e testes)
+    property IpcHandler ipc: IpcHandler {
+        target: "eq"
+        function preset(id: string): void { if (root.presets.includes(id)) root.applyPreset(id); }
+        function current(): string { return root.preset; }
+    }
+
     property bool enabled: false
     property string preset: "flat"
     property var gains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]

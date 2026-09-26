@@ -251,6 +251,8 @@ ShellRoot {
     NotifToasts {}
     PolkitDialog {}
     EditMode {}
+    PowerMenu { id: powerMenu }
+
     ControlCenter {
         id: controlCenter
         onSettingsRequested: visualConfig.open = true
@@ -521,33 +523,60 @@ ShellRoot {
                         }
                     }
 
+                    // Abas lado a lado: trocar desliza, e dá para arrastar com o
+                    // mouse (a aba acompanha o dedo; passou de ~18% da largura,
+                    // troca). Nas pontas o arraste tem resistência.
                     Item {
+                        id: tabStage
                         Layout.fillWidth: true
                         Layout.fillHeight: true
+                        clip: true
+                        property real dragOff: 0
+                        function place(i) { return (i - card.currentTab) * width + dragOff; }
+
+                        DragHandler {
+                            id: swipe
+                            target: null
+                            yAxis.enabled: false
+                            dragThreshold: 18
+                            onTranslationChanged: {
+                                let d = translation.x;
+                                const last = card.tabs.length - 1;
+                                if ((card.currentTab === 0 && d > 0) || (card.currentTab === last && d < 0)) d *= 0.3;
+                                tabStage.dragOff = d;
+                            }
+                            onActiveChanged: {
+                                if (active) return;
+                                const d = tabStage.dragOff, lim = tabStage.width * 0.18;
+                                if (d < -lim && card.currentTab < card.tabs.length - 1) card.currentTab++;
+                                else if (d > lim && card.currentTab > 0) card.currentTab--;
+                                tabStage.dragOff = 0;
+                            }
+                        }
 
                         Dashboard {
-                            anchors.fill: parent
-                            opacity: card.currentTab === 0 ? 1 : 0
-                            visible: opacity > 0
-                            Behavior on opacity { NumberAnimation { duration: Theme.ms(140) } }
+                            width: tabStage.width; height: tabStage.height
+                            x: tabStage.place(0)
+                            visible: Math.abs(x) < width
+                            Behavior on x { enabled: !swipe.active; NumberAnimation { duration: Theme.ms(300); easing.type: Easing.OutCubic } }
                         }
                         Media {
-                            anchors.fill: parent
-                            opacity: card.currentTab === 1 ? 1 : 0
-                            visible: opacity > 0
-                            Behavior on opacity { NumberAnimation { duration: Theme.ms(140) } }
+                            width: tabStage.width; height: tabStage.height
+                            x: tabStage.place(1)
+                            visible: Math.abs(x) < width
+                            Behavior on x { enabled: !swipe.active; NumberAnimation { duration: Theme.ms(300); easing.type: Easing.OutCubic } }
                         }
                         Monitoring {
-                            anchors.fill: parent
-                            opacity: card.currentTab === 2 ? 1 : 0
-                            visible: opacity > 0
-                            Behavior on opacity { NumberAnimation { duration: Theme.ms(140) } }
+                            width: tabStage.width; height: tabStage.height
+                            x: tabStage.place(2)
+                            visible: Math.abs(x) < width
+                            Behavior on x { enabled: !swipe.active; NumberAnimation { duration: Theme.ms(300); easing.type: Easing.OutCubic } }
                         }
                         Recording {
-                            anchors.fill: parent
-                            opacity: card.currentTab === 3 && hub.visible ? 1 : 0
-                            visible: opacity > 0
-                            Behavior on opacity { NumberAnimation { duration: Theme.ms(140) } }
+                            width: tabStage.width; height: tabStage.height
+                            x: tabStage.place(3)
+                            visible: Math.abs(x) < width && hub.visible
+                            Behavior on x { enabled: !swipe.active; NumberAnimation { duration: Theme.ms(300); easing.type: Easing.OutCubic } }
                         }
                     }
                 }

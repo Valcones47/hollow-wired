@@ -16,11 +16,20 @@ Item {
     property var fromGains: EqService.gains
     property var shown: EqService.gains
     property real mix: 1
+    // Troca de preset "eletrizando" da esquerda para a direita: cada banda
+    // só começa a andar quando a frente da onda chega nela (front = posição
+    // da frente, em bandas).
+    readonly property real front: mix * (EqService.gains.length + 1.5)
+    readonly property bool sweeping: mixAnim.running && !EqService.dragging
+    function bandT(i) {
+        const t = Math.max(0, Math.min(1, root.front - i));
+        return 1 - Math.pow(1 - t, 3);
+    }
     function blend() {
         const out = [];
         for (let i = 0; i < EqService.gains.length; i++) {
             const a = root.fromGains[i] || 0;
-            out.push(a + ((EqService.gains[i] || 0) - a) * root.mix);
+            out.push(a + ((EqService.gains[i] || 0) - a) * root.bandT(i));
         }
         root.shown = out;
     }
@@ -31,8 +40,8 @@ Item {
         property: "mix"
         from: 0
         to: 1
-        duration: 320
-        easing.type: Easing.OutCubic
+        duration: 760
+        easing.type: Easing.Linear
     }
     Connections {
         target: EqService
@@ -200,12 +209,64 @@ Item {
                 onHeightChanged: requestPaint()
             }
 
+            // Faíscas da frente da onda: raio em zigue-zague descendo pelo
+            // trilho da banda que está "carregando" e arco até o knob vizinho.
+            Canvas {
+                id: sparks
+                anchors.fill: parent
+                z: 3
+                visible: root.sweeping
+                onPaint: {
+                    const c = getContext("2d");
+                    c.reset();
+                    if (!root.sweeping) return;
+                    const n = bandsArea.count;
+                    c.lineCap = "round";
+                    for (let i = 0; i < n; i++) {
+                        const d = root.front - i - 0.5;
+                        if (d < -0.6 || d > 0.8) continue;
+                        const a = 1 - Math.min(1, Math.abs(d) / 0.8);
+                        const x = bandsArea.colX(i);
+                        const top = bandsArea.trackTop, bot = bandsArea.trackTop + bandsArea.trackH;
+                        c.beginPath();
+                        c.moveTo(x, top);
+                        const seg = 9;
+                        for (let k = 1; k < seg; k++)
+                            c.lineTo(x + (Math.random() - 0.5) * 9, top + (bot - top) * k / seg);
+                        c.lineTo(x, bot);
+                        c.lineWidth = 1.6;
+                        c.strokeStyle = Theme.withAlpha(root.accent, 0.85 * a);
+                        c.stroke();
+                        if (i > 0) {
+                            const x0 = bandsArea.colX(i - 1), y0 = bandsArea.knobY(root.shown[i - 1] || 0);
+                            const y1 = bandsArea.knobY(root.shown[i] || 0);
+                            c.beginPath();
+                            c.moveTo(x0, y0);
+                            for (let k = 1; k < 5; k++) {
+                                const t = k / 5;
+                                c.lineTo(x0 + (x - x0) * t, y0 + (y1 - y0) * t + (Math.random() - 0.5) * 12);
+                            }
+                            c.lineTo(x, y1);
+                            c.lineWidth = 1.2;
+                            c.strokeStyle = Theme.withAlpha(Theme.foreground, 0.7 * a);
+                            c.stroke();
+                        }
+                    }
+                }
+                Connections {
+                    target: root
+                    function onFrontChanged() { sparks.requestPaint(); }
+                }
+            }
+
             Repeater {
                 model: bandsArea.count
                 delegate: Item {
                     id: band
                     required property int index
                     readonly property real db: root.shown[index] || 0
+                    // 0..1: quanto a frente da onda está em cima desta banda.
+                    readonly property real charge: root.sweeping ? Math.max(0, 1 - Math.abs(root.front - index - 0.5) / 0.9) : 0
                     x: bandsArea.colW * index
                     width: bandsArea.colW
                     height: bandsArea.height
@@ -242,7 +303,18 @@ Item {
                         color: Theme.foreground
                         border.width: 2
                         border.color: root.accent
-                        scale: bandMouse.pressed || bandMouse.containsMouse ? 1.2 : 1
+                        scale: bandMouse.pressed || bandMouse.containsMouse ? 1.2 : 1 + band.charge * 0.35
+                        // Brilho em volta do knob quando a onda passa.
+                        Rectangle {
+                            anchors.centerIn: parent
+                            width: parent.width + 12
+                            height: parent.height + 12
+                            radius: height / 2
+                            color: "transparent"
+                            border.width: 3
+                            border.color: Theme.withAlpha(root.accent, 0.45 * band.charge)
+                            visible: band.charge > 0
+                        }
                         Behavior on scale { NumberAnimation { duration: 90 } }
                     }
 

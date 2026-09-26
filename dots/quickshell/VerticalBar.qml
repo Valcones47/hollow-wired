@@ -818,7 +818,7 @@ PanelWindow {
                     visible: ShellLayout.barHas("power")
                     icon: Theme.icons.power
                     iconColor: Theme.secondary
-                    onActivated: Quickshell.execDetached(["quickshell", "ipc", "call", "sidebar", "toggle"])
+                    onActivated: Quickshell.execDetached(["qs", "ipc", "call", "power", "toggle"])
                 }
             }
         }

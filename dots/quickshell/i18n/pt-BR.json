@@ -1790,5 +1790,11 @@
   "cc.item_blur": "Desfoque",
   "cc.item_night": "Luz noturna",
   "layout.ws_icons": "Ícone do app nas áreas de trabalho",
-  "layout.ws_icons_sub": "Desligado, as áreas ocupadas aparecem como bolinhas."
+  "layout.ws_icons_sub": "Desligado, as áreas ocupadas aparecem como bolinhas.",
+  "power.lock": "Bloquear",
+  "power.suspend": "Suspender",
+  "power.logout": "Sair da sessão",
+  "power.reboot": "Reiniciar",
+  "power.off": "Desligar",
+  "power.confirm": "Clique de novo: %1"
 }

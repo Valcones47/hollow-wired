@@ -1173,7 +1173,7 @@ PanelWindow {
                     kind: ""
                     editKey: "power"
                     visible: ShellLayout.barHas("power")
-                    onClicked: Quickshell.execDetached(["quickshell", "ipc", "call", "sidebar", "toggle"])
+                    onClicked: Quickshell.execDetached(["qs", "ipc", "call", "power", "toggle"])
                     BarIcon { text: Theme.icons.power; font.pixelSize: 15; color: Theme.secondary }
                 }
             }
@@ -1231,49 +1231,13 @@ PanelWindow {
                     spacing: 10
                     readonly property bool dragging: seekArea.pressed || volArea.pressed
 
-                    // abas largas, dividindo a largura
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 4
-                        Repeater {
-                            model: [
-                                { k: "media", label: Theme.t("topbar.media_tab", "Mídia") },
-                                { k: "eq", label: Theme.t("topbar.eq_tab", "Equalizador") }
-                            ]
-                            delegate: Rectangle {
-                                id: mt
-                                required property var modelData
-                                readonly property bool on: bar.mediaTab === mt.modelData.k
-                                Layout.fillWidth: true
-                                implicitHeight: 32
-                                radius: 9
-                                color: mt.on ? Theme.tileHigh : (mtArea.containsMouse ? Theme.withAlpha(Theme.tileHigh, 0.5) : Theme.withAlpha(Theme.tile, 0.5))
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: mt.modelData.label
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: 12
-                                    font.weight: mt.on ? Font.DemiBold : Font.Normal
-                                    color: mt.on ? Theme.textColor : Theme.subtext
-                                }
-                                MouseArea {
-                                    id: mtArea
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: bar.mediaTab = mt.modelData.k
-                                }
-                            }
-                        }
-                    }
-
                     // --- mídia ---
                     PopText {
-                        visible: bar.mediaTab === "media" && !MediaState.player
+                        visible: !MediaState.player
                         text: Theme.t("topbar.nothing_playing", "Nada tocando agora.")
                     }
                     RowLayout {
-                        visible: bar.mediaTab === "media" && MediaState.player !== null
+                        visible: MediaState.player !== null
                         Layout.fillWidth: true
                         spacing: 14
 
@@ -1516,11 +1480,16 @@ PanelWindow {
                         }
                     }
 
-                    // --- equalizador ---
-                    Item {
-                        visible: bar.mediaTab === "eq"
+                    // --- equalizador: junto da mídia, num painel só (sem abas) ---
+                    Rectangle {
                         Layout.fillWidth: true
-                        implicitHeight: 270
+                        Layout.topMargin: 2
+                        implicitHeight: 1
+                        color: Theme.withAlpha(Theme.outline, 0.25)
+                    }
+                    Item {
+                        Layout.fillWidth: true
+                        implicitHeight: 250
                         Equalizer {
                             anchors.fill: parent
                             compact: true
