@@ -83,6 +83,16 @@ PanelWindow {
     }
 
     // Cada passo é um "e no Windows era assim" → "aqui é assim".
+    property string wpPickerStyle: "classic"
+    FileView {
+        id: welcomePickerFile
+        path: Quickshell.env("HOME") + "/.config/hollow-wired/wallpaper-picker.json"
+        watchChanges: true
+        printErrors: false
+        onFileChanged: reload()
+        onLoaded: { try { welcomeWindow.wpPickerStyle = (JSON.parse(text()) || {}).style === "skew" ? "skew" : "classic"; } catch (e) {} }
+    }
+
     readonly property var steps: [
         {
             icon: Theme.icons.arch,
@@ -1274,6 +1284,52 @@ PanelWindow {
                                             Quickshell.execDetached(["quickshell", "ipc", "call", "visualconfig", "toggle"]);
                                         else if (actBtn.modelData.action === "wallpaper")
                                             Quickshell.execDetached(["sh", "-c", "if flatpak info org.waywallen.waywallen >/dev/null 2>&1; then exec waywallen-switcher; else exec rice-wallpaper-set; fi"]);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Estilo do seletor de papel de parede (o mesmo do painel).
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 8
+                        Text {
+                            Layout.fillWidth: true
+                            text: Theme.t("wp.style_title", "Estilo do seletor de papel de parede")
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 12
+                            color: welcomeWindow.uvText
+                        }
+                        Repeater {
+                            model: [
+                                { value: "classic", label: Theme.t("wp.style_classic", "Clássico") },
+                                { value: "skew", label: Theme.t("wp.style_skew", "Inclinado") }
+                            ]
+                            delegate: Rectangle {
+                                id: wsBtn
+                                required property var modelData
+                                readonly property bool on: welcomeWindow.wpPickerStyle === modelData.value
+                                implicitWidth: wsTxt.implicitWidth + 24
+                                implicitHeight: 30
+                                radius: 8
+                                color: on ? welcomeWindow.uvPrimary : (wsArea.containsMouse ? welcomeWindow.uvTileHigh : welcomeWindow.uvTile)
+                                Text {
+                                    id: wsTxt
+                                    anchors.centerIn: parent
+                                    text: wsBtn.modelData.label
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 12
+                                    color: wsBtn.on ? Theme.background : welcomeWindow.uvText
+                                }
+                                MouseArea {
+                                    id: wsArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        welcomeWindow.wpPickerStyle = wsBtn.modelData.value;
+                                        welcomePickerFile.setText(JSON.stringify({ style: wsBtn.modelData.value }) + "\n");
                                     }
                                 }
                             }

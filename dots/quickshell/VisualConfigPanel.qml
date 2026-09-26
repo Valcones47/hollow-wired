@@ -1354,6 +1354,16 @@ PanelWindow {
     readonly property color cardBg: bgThemed || lightUi ? Theme.mix(Theme.background, "#0a0a12", lightUi ? 0 : 0.4) : "#202125"
     readonly property color sideBg: bgThemed || lightUi ? Theme.withAlpha(Theme.mix(Theme.background, "#000000", lightUi ? 0.04 : 0.35), 0.75) : "#1a1b1e"
 
+    property string wpPickerStyle: "classic"
+    FileView {
+        id: wpPickerFile
+        path: Quickshell.env("HOME") + "/.config/hollow-wired/wallpaper-picker.json"
+        watchChanges: true
+        printErrors: false
+        onFileChanged: reload()
+        onLoaded: { try { win.wpPickerStyle = (JSON.parse(text()) || {}).style === "skew" ? "skew" : "classic"; } catch (e) {} }
+    }
+
     // Economia de energia do Wi-Fi: null = sem placa Wi-Fi (a opção some).
     property var wifiPowersave: null
     Process {
@@ -5861,6 +5871,26 @@ PanelWindow {
                                     }
 
                                     Item { Layout.fillWidth: true }
+                                }
+
+                                // Estilo do seletor do Super + S (waywallen-switcher lê
+                                // ~/.config/hollow-wired/wallpaper-picker.json).
+                                OptionGroup {
+                                    OptionRow {
+                                        title: Theme.t("wp.style_title", "Estilo do seletor de papel de parede")
+                                        subtitle: Theme.t("wp.style_sub", "Clássico: carrossel embaixo. Inclinado: cartões grandes no meio da tela, com busca.")
+                                        Segmented {
+                                            options: [
+                                                { value: "classic", label: Theme.t("wp.style_classic", "Clássico") },
+                                                { value: "skew", label: Theme.t("wp.style_skew", "Inclinado") }
+                                            ]
+                                            current: win.wpPickerStyle
+                                            onPicked: v => {
+                                                win.wpPickerStyle = v;
+                                                wpPickerFile.setText(JSON.stringify({ style: v }) + "\n");
+                                            }
+                                        }
+                                    }
                                 }
 
                                 RowLayout {

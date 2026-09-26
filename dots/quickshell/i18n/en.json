@@ -1796,5 +1796,9 @@
   "power.logout": "Log out",
   "power.reboot": "Restart",
   "power.off": "Shut down",
-  "power.confirm": "Click again: %1"
+  "power.confirm": "Click again: %1",
+  "wp.style_title": "Wallpaper picker style",
+  "wp.style_sub": "Classic: carousel at the bottom. Slanted: large cards in the middle of the screen, with search.",
+  "wp.style_classic": "Classic",
+  "wp.style_skew": "Slanted"
 }

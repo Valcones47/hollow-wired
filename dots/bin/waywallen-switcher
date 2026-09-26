@@ -74,6 +74,30 @@ DISAPPEAR_S = 0.13
 APPEAR_RISE = 10  # px the panel rises while fading in
 GIF_DELAY_MS = 180  # wait for the carousel to settle before decoding a GIF
 
+# Estilo do seletor: "classic" (carrossel embaixo) ou "skew" (cartões
+# inclinados no meio da tela, estilo serpantinum). Escolhido no painel e no
+# guia; `--style skew|classic` força para testar.
+PREFS_PATH = os.path.expanduser("~/.config/hollow-wired/wallpaper-picker.json")
+
+
+def picker_style():
+    for i, a in enumerate(sys.argv):
+        if a == "--style" and i + 1 < len(sys.argv):
+            return sys.argv[i + 1]
+    try:
+        with open(PREFS_PATH) as f:
+            return json.load(f).get("style", "classic")
+    except (OSError, ValueError):
+        return "classic"
+
+
+SKEW_H = 300          # altura do cartão do centro
+SKEW_W = (380, 160, 112, 86, 70)  # largura por distância do centro (0, 1, 2, 3, 4+)
+SKEW_GAP = 10
+SKEW_ANGLE = -11      # graus de inclinação
+SKEW_STAGE_W = 1560
+SKEW_STAGE_H = SKEW_H + 40
+
 CSS = b"""
 window.switcher {
     background: transparent;
@@ -102,6 +126,37 @@ window.switcher {
 .hint {
     color: rgba(255, 255, 255, 0.4);
     font-size: 11px;
+}
+.panel.skew {
+    background-color: transparent;
+    border: none;
+    box-shadow: none;
+}
+.skew .card {
+    border-radius: 10px;
+    border-width: 0;
+}
+.skew .card.selected {
+    border-width: 3px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+}
+.toolbar {
+    background-color: rgba(18, 18, 24, 0.86);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 4px 6px;
+}
+.toolbar entry {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    color: white;
+    min-width: 220px;
+}
+.toolbar .count {
+    color: rgba(255, 255, 255, 0.55);
+    font-size: 11px;
+    margin: 0 8px;
 }
 """
 
@@ -383,6 +438,73 @@ class Stage(Gtk.Widget):
             self.snapshot_child(card.widget, snapshot)
 
 
+def skew_width(t):
+    """Largura contínua pela distância t (>= 0) do centro."""
+    i = int(t)
+    if i >= len(SKEW_W) - 1:
+        return SKEW_W[-1]
+    f = t - i
+    return SKEW_W[i] + (SKEW_W[i + 1] - SKEW_W[i]) * f
+
+
+def skew_offset(t):
+    """Distância do centro até o centro do cartão em t: integral das larguras
+    (assim o espaço entre vizinhos acompanha o tamanho deles)."""
+    steps = max(1, int(t * 12))
+    acc, h = 0.0, t / steps
+    for k in range(steps):
+        acc += skew_width((k + 0.5) * h) * h
+    return acc + SKEW_GAP * t
+
+
+class SkewStage(Gtk.Widget):
+    """Carrossel inclinado: o cartão do centro largo, os vizinhos cada vez
+    mais estreitos, todos em paralelogramo. Mesma `position` contínua do
+    Stage, então a animação de troca é a mesma (cartões deslizam e mudam de
+    largura juntos)."""
+
+    def __init__(self, cards):
+        super().__init__()
+        self.cards = cards
+        self.position = 0.0
+        self.set_overflow(Gtk.Overflow.HIDDEN)
+        for card in cards:
+            card.widget.set_parent(self)
+
+    def do_measure(self, orientation, _for_size):
+        size = SKEW_STAGE_W if orientation == Gtk.Orientation.HORIZONTAL else SKEW_STAGE_H
+        return size, size, -1, -1
+
+    def do_size_allocate(self, width, height, _baseline):
+        cx, cy = width / 2, height / 2
+        for i, card in enumerate(self.cards):
+            d = i - self.position
+            dist = abs(d)
+            x = cx + math.copysign(skew_offset(dist), d)
+            w = skew_width(dist)
+            shown = dist < 7 and -w < x < width + w
+            card.widget.set_child_visible(shown)
+            if not shown:
+                continue
+            h = SKEW_H - 30 * clamp01(dist)
+            card.widget.set_opacity(clamp01(1.0 - 0.12 * dist) * clamp01((7 - dist) / 1.5))
+            transform = (
+                Gsk.Transform.new()
+                .translate(Graphene.Point().init(x, cy))
+                .skew(SKEW_ANGLE, 0)
+                .translate(Graphene.Point().init(-w / 2, -h / 2))
+            )
+            card.widget.allocate(int(w), int(h), -1, transform)
+
+    def do_snapshot(self, snapshot):
+        order = sorted(
+            (c for c in self.cards if c.widget.get_child_visible()),
+            key=lambda c: -abs(self.cards.index(c) - self.position),
+        )
+        for card in order:
+            self.snapshot_child(card.widget, snapshot)
+
+
 class RiseBin(Gtk.Widget):
     """Single-child container that offsets its child vertically without
     affecting layout, for the open/close animation."""
@@ -429,8 +551,11 @@ class SwitcherWindow(Gtk.ApplicationWindow):
         Gtk4LayerShell.init_for_window(self)
         Gtk4LayerShell.set_layer(self, Gtk4LayerShell.Layer.OVERLAY)
         Gtk4LayerShell.set_keyboard_mode(self, Gtk4LayerShell.KeyboardMode.EXCLUSIVE)
-        Gtk4LayerShell.set_anchor(self, Gtk4LayerShell.Edge.BOTTOM, True)
-        Gtk4LayerShell.set_margin(self, Gtk4LayerShell.Edge.BOTTOM, BOTTOM_GAP - SHADOW)
+        self.style = picker_style()
+        if self.style != "skew":
+            # Clássico: embaixo. Inclinado: no meio da tela (sem âncora).
+            Gtk4LayerShell.set_anchor(self, Gtk4LayerShell.Edge.BOTTOM, True)
+            Gtk4LayerShell.set_margin(self, Gtk4LayerShell.Edge.BOTTOM, BOTTOM_GAP - SHADOW)
         Gtk4LayerShell.set_exclusive_zone(self, -1)
 
         self.cards = [Card(wp) for wp in wallpapers]
@@ -439,7 +564,7 @@ class SwitcherWindow(Gtk.ApplicationWindow):
             click.connect("released", lambda *_a, i=idx: self.on_card_clicked(i))
             card.widget.add_controller(click)
 
-        self.stage = Stage(self.cards)
+        self.stage = SkewStage(self.cards) if self.style == "skew" else Stage(self.cards)
         self.stage.position = float(self.selected)
         self.stage.set_margin_top(8)
 
@@ -464,6 +589,23 @@ class SwitcherWindow(Gtk.ApplicationWindow):
 
         self.panel = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         self.panel.add_css_class("panel")
+        if self.style == "skew":
+            # Barra de cima: digitar acha o wallpaper pelo nome.
+            self.panel.add_css_class("skew")
+            bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+            bar.add_css_class("toolbar")
+            bar.set_halign(Gtk.Align.CENTER)
+            bar.set_margin_bottom(14)
+            self.search = Gtk.SearchEntry()
+            self.search.set_placeholder_text("Buscar wallpaper")
+            self.search.connect("search-changed", self.on_search)
+            self.search.set_key_capture_widget(self)
+            bar.append(self.search)
+            self.count_label = Gtk.Label()
+            self.count_label.add_css_class("count")
+            bar.append(self.count_label)
+            self.panel.append(bar)
+            self._update_count()
         self.panel.append(self.stage)
         self.panel.append(self.title_stack)
         self.panel.append(hint)
@@ -474,6 +616,8 @@ class SwitcherWindow(Gtk.ApplicationWindow):
         self.set_child(self.rise)
 
         key_ctrl = Gtk.EventControllerKey()
+        # Captura: setas/Enter/Esc chegam aqui antes do campo de busca.
+        key_ctrl.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
         key_ctrl.connect("key-pressed", self.on_key)
         self.add_controller(key_ctrl)
 
@@ -630,11 +774,25 @@ class SwitcherWindow(Gtk.ApplicationWindow):
             Gtk.StackTransitionType.NONE if immediate else Gtk.StackTransitionType.CROSSFADE,
         )
 
+    def _update_count(self):
+        if getattr(self, "count_label", None) is not None:
+            self.count_label.set_text(f"{self.selected + 1} / {len(self.cards)}")
+
+    def on_search(self, entry):
+        q = entry.get_text().strip().lower()
+        if not q:
+            return
+        for i, wp in enumerate(self.wallpapers):
+            if q in wp["name"].lower():
+                self.select(i)
+                return
+
     def select(self, idx):
         idx = max(0, min(len(self.cards) - 1, idx))
         if idx == self.selected or self.closing:
             return
         self.selected = idx
+        self._update_count()
         self.update_selected_class()
         self.set_title_text()
         self.schedule_gif()
@@ -952,4 +1110,5 @@ class SwitcherApp(Gtk.Application):
 
 if __name__ == "__main__":
     app = SwitcherApp()
-    sys.exit(app.run(sys.argv))
+    # --style é nosso (lido em picker_style); o GTK recusaria a opção.
+    sys.exit(app.run(sys.argv[:1]))

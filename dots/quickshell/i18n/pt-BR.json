@@ -1796,5 +1796,9 @@
   "power.logout": "Sair da sessão",
   "power.reboot": "Reiniciar",
   "power.off": "Desligar",
-  "power.confirm": "Clique de novo: %1"
+  "power.confirm": "Clique de novo: %1",
+  "wp.style_title": "Estilo do seletor de papel de parede",
+  "wp.style_sub": "Clássico: carrossel embaixo. Inclinado: cartões grandes no meio da tela, com busca.",
+  "wp.style_classic": "Clássico",
+  "wp.style_skew": "Inclinado"
 }
