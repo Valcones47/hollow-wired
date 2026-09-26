@@ -10389,6 +10389,12 @@ PanelWindow {
                                         onToggled: nv => ShellLayout.set("bar", "privacy", nv)
                                     }
                                     RowDivider {}
+                                    OptionToggle {
+                                        title: Theme.t("layout.ws_icons", "Ícone do app nas áreas de trabalho")
+                                        subtitle: Theme.t("layout.ws_icons_sub", "Desligado, as áreas ocupadas aparecem como bolinhas.")
+                                        checked: ShellLayout.get("bar", "wsIcons", true)
+                                        onToggled: nv => ShellLayout.set("bar", "wsIcons", nv)
+                                    }                                    RowDivider {}
                                     OptionRow {
                                         title: Theme.t("layout.ws_count", "Botões de área de trabalho")
                                         subtitle: Theme.t("layout.ws_count_short", "Fixos, aparecem mesmo sem janela aberta.")

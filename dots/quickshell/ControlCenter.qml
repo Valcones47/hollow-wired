@@ -66,13 +66,7 @@ PanelWindow {
         function show(): void { cc.open = true; }
         function hide(): void { cc.open = false; }
         // `qs ipc call control page wifi|bt` (atalhos e testes)
-        function page(m: string): void {
-            if (m !== "wifi" && m !== "bt") return;
-            cc.hoverMode = false;
-            cc.open = true;
-            connPage.mode = m;
-            cc.page = m;
-        }
+        function page(m: string): void { cc.openPage(m); }
         function scan(): void { if (cc.page !== "") connPage.orbitMode = true; }
     }
 
@@ -207,6 +201,14 @@ PanelWindow {
 
     // --- mídia (estado e comandos no MediaState) ---
     readonly property var player: MediaState.player
+
+    function openPage(m) {
+        if (m !== "wifi" && m !== "bt") return;
+        cc.hoverMode = false;
+        cc.open = true;
+        connPage.mode = m;
+        cc.page = m;
+    }
 
     // --- seções que abrem ---
     property bool btOpen: false
@@ -486,7 +488,7 @@ PanelWindow {
                         sub: !Networking.wifiEnabled ? Theme.t("cc.off", "Desligado")
                             : cc.activeNetwork ? cc.activeNetwork.name : Theme.t("cc.not_connected", "Sem conexão")
                         active: Networking.wifiEnabled
-                        visible: cc.wifiDevice !== null
+                        visible: cc.wifiDevice !== null && ShellLayout.ccHas("wifi")
                         more: true
                         onToggled: Networking.wifiEnabled = !Networking.wifiEnabled
                         onMoreClicked: { connPage.mode = "wifi"; cc.page = "wifi"; }
@@ -496,7 +498,7 @@ PanelWindow {
                         label: "VPN"
                         sub: cc.activeVpn ? cc.activeVpn.name : Theme.t("cc.off", "Desligado")
                         active: cc.activeVpn !== null
-                        visible: cc.vpns.length > 0
+                        visible: cc.vpns.length > 0 && ShellLayout.ccHas("vpn")
                         more: true
                         expanded: cc.vpnOpen
                         // Com uma VPN só, o bloco liga e desliga ela; com mais, abre a lista.
@@ -513,7 +515,7 @@ PanelWindow {
                         sub: !cc.btAdapter || !cc.btAdapter.enabled ? Theme.t("cc.off", "Desligado")
                             : cc.btConnectedDev ? (cc.btConnectedDev.name || cc.btConnectedDev.address) : Theme.t("cc.not_connected", "Sem conexão")
                         active: cc.btAdapter !== null && cc.btAdapter.enabled
-                        visible: cc.btAdapter !== null
+                        visible: cc.btAdapter !== null && ShellLayout.ccHas("bluetooth")
                         more: true
                         onToggled: cc.btAdapter.enabled = !cc.btAdapter.enabled
                         onMoreClicked: { connPage.mode = "bt"; cc.page = "bt"; }
@@ -523,6 +525,7 @@ PanelWindow {
                         label: Theme.t("cc.dnd", "Não perturbe")
                         sub: NotifService.dnd ? Theme.t("cc.on", "Ligado") : Theme.t("cc.off", "Desligado")
                         active: NotifService.dnd
+                        visible: ShellLayout.ccHas("dnd")
                         onToggled: NotifService.toggleDnd()
                     }
                     Tile {
@@ -530,6 +533,7 @@ PanelWindow {
                         label: Theme.t("cc.game", "Modo jogo")
                         sub: GameMode.active ? Theme.t("cc.on", "Ligado") : Theme.t("cc.off", "Desligado")
                         active: GameMode.active
+                        visible: ShellLayout.ccHas("game")
                         onToggled: GameMode.manual = !GameMode.manual
                     }
                     Tile {
@@ -537,6 +541,7 @@ PanelWindow {
                         label: Theme.t("cc.blur", "Desfoque")
                         sub: cc.blurEnabled ? Theme.t("cc.on", "Ligado") : Theme.t("cc.off", "Desligado")
                         active: cc.blurEnabled
+                        visible: ShellLayout.ccHas("blur")
                         onToggled: if (!blurToggle.running) blurToggle.running = true
                     }
                     Tile {
@@ -544,6 +549,7 @@ PanelWindow {
                         label: Theme.t("cc.night", "Luz noturna")
                         sub: cc.nightLight ? Theme.t("cc.on", "Ligado") : Theme.t("cc.off", "Desligado")
                         active: cc.nightLight
+                        visible: ShellLayout.ccHas("night")
                         onToggled: if (!nightToggle.running) nightToggle.running = true
                     }
                 }

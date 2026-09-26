@@ -27,6 +27,7 @@ PanelWindow {
     signal notifClicked()
     signal visualConfigClicked()
     signal controlClicked()
+    signal btPageRequested()
     signal controlHovered(bool on)
     // A sidebar (EnergySidebar): estados e ações dos itens do catálogo (updates,
     // luz noturna, café, GPU) moram nela; ligada no shell.qml.
@@ -254,6 +255,9 @@ PanelWindow {
 
     // --- bluetooth ---
     readonly property var btAdapter: Bluetooth.defaultAdapter
+    readonly property var btDevices: btAdapter ? btAdapter.devices.values.filter(d => d.paired || d.connected)
+        .sort((a, b) => (b.connected - a.connected) || (a.name || "").localeCompare(b.name || "")) : []
+    readonly property var btConnected: btDevices.find(d => d.connected) || null
 
     // ================= componentes =================
     component BarText: Text {
@@ -276,7 +280,7 @@ PanelWindow {
         // outros (relógio) continuam ligando/desligando no clique.
         property string editKey: ""
         readonly property bool editable: ShellLayout.editing && mod.editKey !== ""
-        readonly property bool inCatalog: ShellLayout.barCatalog.includes(mod.editKey)
+        readonly property bool inCatalog: ShellLayout.barCatalogCurrent.includes(mod.editKey)
         // Deixa cliques chegarem aos filhos (ícones da bandeja) fora do modo edição.
         property bool passClicks: false
         opacity: mod.editKey !== "" && !mod.inCatalog && !ShellLayout.barModule(mod.editKey) ? 0.35 : 1
@@ -300,9 +304,8 @@ PanelWindow {
             anchors.centerIn: parent
             spacing: 5
         }
-        // Só os indicadores do lado direito mudam de ordem.
-        // A mídia fica fixa à esquerda do relógio: não entra na ordem.
-        readonly property bool reorderable: mod.editable && mod.inCatalog && mod.editKey !== "media"
+        // Qualquer item do catálogo muda de lugar (e de zona) arrastando.
+        readonly property bool reorderable: mod.editable && mod.inCatalog
         property bool dragging: false
         property real pressX: 0
         z: dragging ? 5 : 0
@@ -325,10 +328,10 @@ PanelWindow {
                 bar.leavePop();
                 mod.hoverOut();
             }
-            onPressed: mouse => mod.pressX = mapToItem(rightRow, mouse.x, 0).x
+            onPressed: mouse => mod.pressX = mapToItem(root, mouse.x, 0).x
             onPositionChanged: mouse => {
                 if (!pressed || !mod.reorderable) return;
-                const x = mapToItem(rightRow, mouse.x, 0).x;
+                const x = mapToItem(root, mouse.x, 0).x;
                 if (!mod.dragging && Math.abs(x - mod.pressX) > 8) {
                     mod.dragging = true;
                     bar.dragOrder = ShellLayout.barItems.slice();
@@ -371,38 +374,44 @@ PanelWindow {
     // Enquanto arrasta, dragOrder guarda a ordem ao vivo e só é gravada ao soltar.
     property var dragOrder: null
     function barModuleItems() {
-        return { weather: weatherMod, notifications: notifMod, network: wifiMod, control: ctlMod, tray: trayMod,
+        return { workspaces: wsMod, clock: clockMod, media: mediaMod, mixer: mixerMod, bluetooth: btMod, weather: weatherMod, notifications: notifMod, network: wifiMod, control: ctlMod, tray: trayMod,
                  updates: updMod, night: nightMod, caffeine: cafMod, record: recMod, screenshot: shotMod,
                  clipboard: clipMod, picker: pickMod, gpu: gpuMod, lock: lockMod, settings: setMod, power: powMod };
     }
     function applyBarOrder() {
         const items = bar.barModuleItems();
+        let target = leftRow;
         for (const k of (bar.dragOrder || ShellLayout.barItems)) {
+            if (k === "::center") { target = centerRow; continue; }
+            if (k === "::right") { target = rightRow; continue; }
             const it = items[k];
             if (!it) continue;
             it.parent = orderParking;
-            it.parent = rightRow;
+            it.parent = target;
         }
     }
-    // Troca só quando o ponteiro passa do meio do vizinho: com larguras
-    // diferentes, trocar ao encostar fazia os dois ficarem pulando.
+    // Arrastar: a zona sai de onde o ponteiro está (terço esquerdo, meio ou
+    // terço direito da barra); dentro dela, a posição é contada pelos vizinhos
+    // cujo meio fica à esquerda do ponteiro.
     function dragModuleTo(key, x) {
         const items = bar.barModuleItems();
-        const order = bar.dragOrder;
-        const from = order.indexOf(key);
-        for (let i = 0; i < order.length; i++) {
+        const cur = bar.dragOrder;
+        const order = cur.filter(k => k !== key);
+        const zone = x < root.width / 3 ? 0 : x > root.width * 2 / 3 ? 2 : 1;
+        const ci = order.indexOf("::center"), ri = order.indexOf("::right");
+        const start = zone === 0 ? 0 : zone === 1 ? ci + 1 : ri + 1;
+        const end = zone === 0 ? ci : zone === 1 ? ri : order.length;
+        let pos = start;
+        for (let i = start; i < end; i++) {
             const it = items[order[i]];
-            if (i === from || !it || !it.visible) continue;
-            const mid = it.x + it.width / 2;
-            if ((i > from && x > mid) || (i < from && x < mid)) {
-                const next = order.slice();
-                next.splice(from, 1);
-                next.splice(i, 0, key);
-                bar.dragOrder = next;
-                bar.applyBarOrder();
-                return;
-            }
+            if (!it || !it.visible) { pos = i + 1; continue; }
+            const mid = it.mapToItem(root, it.width / 2, 0).x;
+            if (mid < x) pos = i + 1;
         }
+        order.splice(pos, 0, key);
+        if (JSON.stringify(order) === JSON.stringify(cur)) return;
+        bar.dragOrder = order;
+        bar.applyBarOrder();
     }
     Connections {
         target: ShellLayout
@@ -505,137 +514,183 @@ PanelWindow {
                 onClicked: ShellLayout.editing = !ShellLayout.editing
             }
 
-            // ---------- esquerda: workspaces + janela ativa ----------
+            // ---------- três zonas: esquerda, centro, direita ----------
+            // Os módulos são distribuídos por applyBarOrder() conforme a lista
+            // do ShellLayout (com os marcadores ::center e ::right).
             RowLayout {
+                id: leftRow
                 anchors.left: parent.left
                 anchors.leftMargin: Theme.frameThickness + 6
                 anchors.verticalCenter: parent.verticalCenter
-                spacing: 10
+                spacing: 2
 
-                Rectangle {
-                    implicitWidth: wsRow.implicitWidth + 16
-                    implicitHeight: bar.barH - 10
-                    radius: height / 2
-                    color: Theme.tile
+                // Workspaces + área especial + título da janela: um bloco só.
+                Module {
+                    id: wsMod
+                    kind: ""
+                    editKey: "workspaces"
+                    passClicks: true
+                    color: "transparent"
+                    visible: ShellLayout.barHas("workspaces")
+                    RowLayout {
+                        spacing: 10
 
-                    Row {
-                        id: wsRow
-                        anchors.centerIn: parent
-                        spacing: 6
-                        Repeater {
-                            model: bar.wsModel
-                            delegate: Rectangle {
-                                id: wsDot
-                                required property var modelData
-                                readonly property bool active: Hyprland.focusedWorkspace
-                                    && Hyprland.focusedWorkspace.id === modelData.id
-                                anchors.verticalCenter: parent.verticalCenter
-                                // Área vazia fica menor e mais apagada: dá para
-                                // ver que existe sem competir com as ocupadas.
-                                width: active ? 26 : (modelData.occupied ? 10 : 7)
-                                height: modelData.occupied || active ? 10 : 7
-                                radius: height / 2
-                                color: active ? Theme.primary
-                                    : modelData.urgent ? Theme.critical
-                                    : wsArea.containsMouse ? Theme.textColor
-                                    : Theme.withAlpha(Theme.subtext, modelData.occupied ? 0.55 : 0.28)
-                                Behavior on width { NumberAnimation { duration: Theme.ms(220); easing.type: Easing.OutCubic } }
-                                Behavior on height { NumberAnimation { duration: Theme.ms(220); easing.type: Easing.OutCubic } }
-                                Behavior on color { ColorAnimation { duration: Theme.ms(160) } }
-                                MouseArea {
-                                    id: wsArea
-                                    anchors.fill: parent
-                                    anchors.margins: -4
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    // activate() usa a sintaxe antiga de dispatch,
-                                    // que quebra com o config em Lua.
-                                    onClicked: Hyprland.dispatch("hl.dsp.focus({ workspace = " + wsDot.modelData.id + " })")
+                        Rectangle {
+                            implicitWidth: wsRow.implicitWidth + 16
+                            implicitHeight: bar.barH - 10
+                            radius: height / 2
+                            color: Theme.tile
+
+                            Row {
+                                id: wsRow
+                                anchors.centerIn: parent
+                                spacing: 6
+                                Repeater {
+                                    model: bar.wsModel
+                                    delegate: Rectangle {
+                                        id: wsDot
+                                        required property var modelData
+                                        readonly property bool active: Hyprland.focusedWorkspace
+                                            && Hyprland.focusedWorkspace.id === modelData.id
+                                        // Ícone do app da área (a janela em foco, se estiver
+                                        // nela; senão a primeira). Opcional: bar.wsIcons.
+                                        readonly property string appIcon: {
+                                            if (!ShellLayout.get("bar", "wsIcons", true) || !modelData.ws) return "";
+                                            const tops = modelData.ws.toplevels.values;
+                                            if (!tops.length) return "";
+                                            const at = Hyprland.activeToplevel;
+                                            const t = at && tops.includes(at) ? at : tops[0];
+                                            const id = (t.wayland && t.wayland.appId) || (t.lastIpcObject && t.lastIpcObject.class) || "";
+                                            if (!id) return "";
+                                            const e = DesktopEntries.byId(id) || DesktopEntries.heuristicLookup(id);
+                                            return Quickshell.iconPath(e ? e.icon : id, "application-x-executable");
+                                        }
+                                        readonly property bool showIcon: appIcon !== ""
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        // Área vazia fica menor e mais apagada: dá para
+                                        // ver que existe sem competir com as ocupadas.
+                                        width: showIcon ? (active ? 34 : 22) : active ? 26 : (modelData.occupied ? 10 : 7)
+                                        height: showIcon ? 20 : modelData.occupied || active ? 10 : 7
+                                        radius: height / 2
+                                        color: showIcon ? (active ? Theme.primary : wsArea.containsMouse ? Theme.tileHigh : "transparent")
+                                            : active ? Theme.primary
+                                            : modelData.urgent ? Theme.critical
+                                            : wsArea.containsMouse ? Theme.textColor
+                                            : Theme.withAlpha(Theme.subtext, modelData.occupied ? 0.55 : 0.28)
+                                        border.width: showIcon && modelData.urgent ? 1.5 : 0
+                                        border.color: Theme.critical
+                                        Behavior on width { NumberAnimation { duration: Theme.ms(220); easing.type: Easing.OutCubic } }
+                                        Behavior on height { NumberAnimation { duration: Theme.ms(220); easing.type: Easing.OutCubic } }
+                                        Behavior on color { ColorAnimation { duration: Theme.ms(160) } }
+                                        IconImage {
+                                            visible: wsDot.showIcon
+                                            anchors.centerIn: parent
+                                            implicitSize: 14
+                                            source: wsDot.appIcon
+                                            opacity: wsDot.active ? 1 : 0.8
+                                        }
+                                        MouseArea {
+                                            id: wsArea
+                                            anchors.fill: parent
+                                            anchors.margins: -4
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            // activate() usa a sintaxe antiga de dispatch,
+                                            // que quebra com o config em Lua.
+                                            onClicked: Hyprland.dispatch("hl.dsp.focus({ workspace = " + wsDot.modelData.id + " })")
+                                        }
+                                    }
+                                }
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                acceptedButtons: Qt.NoButton
+                                onWheel: w => Hyprland.dispatch("hl.dsp.focus({ workspace = \"" + (w.angleDelta.y > 0 ? "e-1" : "e+1") + "\" })")
+                            }
+                        }
+
+                        // Área especial (Super + A): um workspace "escondido" que abre
+                        // por cima do atual. Colorido enquanto está aberta; o número é
+                        // quantas janelas estão guardadas nela.
+                        Rectangle {
+                            id: specialBtn
+                            property bool open: false
+                            readonly property var ws: Hyprland.workspaces.values.find(w => w.name === "special:magic") || null
+                            readonly property int count: ws && ws.toplevels ? ws.toplevels.values.length : 0
+                            implicitWidth: specialRow.implicitWidth + 16
+                            implicitHeight: bar.barH - 10
+                            radius: height / 2
+                            color: open ? Theme.withAlpha(Theme.primary, 0.3)
+                                 : specialArea.containsMouse ? Theme.tileHigh : Theme.tile
+                            border.width: open ? 1 : 0
+                            border.color: Theme.primary
+                            Behavior on color { ColorAnimation { duration: Theme.ms(140) } }
+
+                            Row {
+                                id: specialRow
+                                anchors.centerIn: parent
+                                spacing: 4
+                                Text {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: specialBtn.open ? Theme.icons.star : Theme.icons.starOutline
+                                    font.family: Theme.iconFontFamily
+                                    font.pixelSize: 12
+                                    color: specialBtn.open ? Theme.primary : Theme.subtext
+                                }
+                                Text {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    visible: specialBtn.count > 0
+                                    text: specialBtn.count
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 10
+                                    color: specialBtn.open ? Theme.primary : Theme.subtext
+                                }
+                            }
+                            MouseArea {
+                                id: specialArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: Hyprland.dispatch('hl.dsp.workspace.toggle_special("magic")')
+                            }
+                            // Aberta ou fechada: vem do evento do Hyprland, que também
+                            // cobre quem usa o atalho em vez do botão.
+                            Connections {
+                                target: Hyprland
+                                function onRawEvent(event) {
+                                    if (event.name === "activespecial")
+                                        specialBtn.open = String(event.data).split(",")[0] === "special:magic";
+                                }
+                            }
+                            Process {
+                                running: true
+                                command: ["hyprctl", "monitors", "-j"]
+                                stdout: StdioCollector {
+                                    onStreamFinished: {
+                                        try {
+                                            specialBtn.open = JSON.parse(text).some(m => m.specialWorkspace && m.specialWorkspace.name === "special:magic");
+                                        } catch (e) {}
+                                    }
                                 }
                             }
                         }
-                    }
-                    MouseArea {
-                        anchors.fill: parent
-                        acceptedButtons: Qt.NoButton
-                        onWheel: w => Hyprland.dispatch("hl.dsp.focus({ workspace = \"" + (w.angleDelta.y > 0 ? "e-1" : "e+1") + "\" })")
-                    }
-                }
 
-                // Área especial (Super + A): um workspace "escondido" que abre
-                // por cima do atual. Colorido enquanto está aberta; o número é
-                // quantas janelas estão guardadas nela.
-                Rectangle {
-                    id: specialBtn
-                    property bool open: false
-                    readonly property var ws: Hyprland.workspaces.values.find(w => w.name === "special:magic") || null
-                    readonly property int count: ws && ws.toplevels ? ws.toplevels.values.length : 0
-                    implicitWidth: specialRow.implicitWidth + 16
-                    implicitHeight: bar.barH - 10
-                    radius: height / 2
-                    color: open ? Theme.withAlpha(Theme.primary, 0.3)
-                         : specialArea.containsMouse ? Theme.tileHigh : Theme.tile
-                    border.width: open ? 1 : 0
-                    border.color: Theme.primary
-                    Behavior on color { ColorAnimation { duration: Theme.ms(140) } }
-
-                    Row {
-                        id: specialRow
-                        anchors.centerIn: parent
-                        spacing: 4
-                        Text {
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: specialBtn.open ? Theme.icons.star : Theme.icons.starOutline
-                            font.family: Theme.iconFontFamily
+                        BarText {
+                            Layout.maximumWidth: 420
+                            text: Hyprland.activeToplevel && Hyprland.activeToplevel.workspace === Hyprland.focusedWorkspace
+                                ? Hyprland.activeToplevel.title : ""
+                            elide: Text.ElideRight
+                            color: Theme.subtext
                             font.pixelSize: 12
-                            color: specialBtn.open ? Theme.primary : Theme.subtext
-                        }
-                        Text {
-                            anchors.verticalCenter: parent.verticalCenter
-                            visible: specialBtn.count > 0
-                            text: specialBtn.count
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 10
-                            color: specialBtn.open ? Theme.primary : Theme.subtext
-                        }
-                    }
-                    MouseArea {
-                        id: specialArea
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: Hyprland.dispatch('hl.dsp.workspace.toggle_special("magic")')
-                    }
-                    // Aberta ou fechada: vem do evento do Hyprland, que também
-                    // cobre quem usa o atalho em vez do botão.
-                    Connections {
-                        target: Hyprland
-                        function onRawEvent(event) {
-                            if (event.name === "activespecial")
-                                specialBtn.open = String(event.data).split(",")[0] === "special:magic";
-                        }
-                    }
-                    Process {
-                        running: true
-                        command: ["hyprctl", "monitors", "-j"]
-                        stdout: StdioCollector {
-                            onStreamFinished: {
-                                try {
-                                    specialBtn.open = JSON.parse(text).some(m => m.specialWorkspace && m.specialWorkspace.name === "special:magic");
-                                } catch (e) {}
-                            }
                         }
                     }
                 }
+            }
 
-                BarText {
-                    Layout.maximumWidth: 420
-                    text: Hyprland.activeToplevel && Hyprland.activeToplevel.workspace === Hyprland.focusedWorkspace
-                        ? Hyprland.activeToplevel.title : ""
-                    elide: Text.ElideRight
-                    color: Theme.subtext
-                    font.pixelSize: 12
-                }
+            RowLayout {
+                id: centerRow
+                anchors.centerIn: parent
+                spacing: 2
             }
 
             // O cava leve do disco só roda com o disco à mostra.
@@ -651,9 +706,6 @@ PanelWindow {
             // app e a aba do equalizador (que antes tinha um ícone próprio).
             Module {
                 id: mediaMod
-                anchors.right: clockMod.visible ? clockMod.left : parent.horizontalCenter
-                anchors.rightMargin: 6
-                anchors.verticalCenter: parent.verticalCenter
                 kind: "media"
                 editKey: "media"
                 visible: ShellLayout.barHas("media")
@@ -683,8 +735,7 @@ PanelWindow {
                 id: clockMod
                 kind: ""
                 editKey: "clock"
-                visible: ShellLayout.showModule("clock")
-                anchors.centerIn: parent
+                visible: ShellLayout.barHas("clock")
                 onClicked: bar.clockClicked()
 
                 property date now: new Date()
@@ -704,9 +755,6 @@ PanelWindow {
             // Volume de cada app que está tocando som (streams do PipeWire).
             Module {
                 id: mixerMod
-                anchors.left: clockMod.visible ? clockMod.right : parent.horizontalCenter
-                anchors.leftMargin: 6
-                anchors.verticalCenter: parent.verticalCenter
                 kind: "mixer"
                 editKey: "mixer"
                 visible: ShellLayout.barHas("mixer")
@@ -867,6 +915,22 @@ PanelWindow {
                     editKey: "network"
                     visible: (bar.wifiDevice !== null || bar.wiredDevice !== null) && ShellLayout.barHas("network")
                     BarIcon { text: bar.wiredDevice ? Theme.icons.ethernet : bar.wifiIcon() }
+                }
+
+                // Bluetooth na barra (opcional, pelo modo edição): popup com os
+                // aparelhos, igual ao da rede. "Mais opções" abre a página do
+                // painel de controle.
+                Module {
+                    id: btMod
+                    kind: "bluetooth"
+                    editKey: "bluetooth"
+                    visible: bar.btAdapter !== null && ShellLayout.barHas("bluetooth")
+                    onClicked: bar.btPageRequested()
+                    BarIcon {
+                        text: !bar.btAdapter || !bar.btAdapter.enabled ? Theme.icons.btOff
+                            : bar.btConnected ? Theme.icons.btConnected : Theme.icons.bt
+                        color: bar.btConnected ? Theme.primary : Theme.textColor
+                    }
                 }
 
                 // Brilho, som e bateria num bloco só: o clique abre a central
@@ -1107,6 +1171,7 @@ PanelWindow {
                     case "picker": return pickerPop;
                     case "privacy": return privacyPop;
                     case "mixer": return mixerPop;
+                    case "bluetooth": return btPop;
                     case "notifs": return notifsPop;
                     }
                     return null;
@@ -1493,6 +1558,63 @@ PanelWindow {
                             onMoved: v => { if (modelData.audio) modelData.audio.volume = v; }
                             onIconClicked: if (modelData.audio) modelData.audio.muted = !modelData.audio.muted
                         }
+                    }
+                }
+
+                // ---------- bluetooth ----------
+                ColumnLayout {
+                    id: btPop
+                    visible: popContent.current === btPop
+                    width: 300
+                    spacing: 4
+                    RowLayout {
+                        Layout.fillWidth: true
+                        PopTitle {
+                            Layout.fillWidth: true
+                            text: !bar.btAdapter || !bar.btAdapter.enabled ? Theme.t("bt.off", "Bluetooth desligado")
+                                : bar.btConnected ? (bar.btConnected.name || bar.btConnected.address) : "Bluetooth"
+                        }
+                        Rectangle {
+                            implicitWidth: 40
+                            implicitHeight: 22
+                            radius: 11
+                            readonly property bool on: bar.btAdapter !== null && bar.btAdapter.enabled
+                            color: on ? Theme.primary : Theme.tileHigh
+                            Rectangle {
+                                width: 16; height: 16; radius: 8
+                                anchors.verticalCenter: parent.verticalCenter
+                                x: parent.on ? parent.width - width - 3 : 3
+                                color: Theme.textColor
+                                Behavior on x { NumberAnimation { duration: Theme.ms(140) } }
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: if (bar.btAdapter) bar.btAdapter.enabled = !bar.btAdapter.enabled
+                            }
+                        }
+                    }
+                    PopText {
+                        visible: bar.btAdapter !== null && bar.btAdapter.enabled && bar.btDevices.length === 0
+                        text: Theme.t("bt.none_paired", "Nenhum aparelho pareado")
+                    }
+                    Repeater {
+                        model: bar.btAdapter && bar.btAdapter.enabled ? bar.btDevices.slice(0, 8) : []
+                        delegate: PopAction {
+                            required property var modelData
+                            icon: modelData.connected ? Theme.icons.btConnected : Theme.icons.bt
+                            label: modelData.name || modelData.address
+                            detail: modelData.state === BluetoothDeviceState.Connecting ? Theme.t("wifi.connecting", "conectando…")
+                                : modelData.connected ? (modelData.batteryAvailable ? Math.round(modelData.battery * 100) + "%" : Theme.t("cc.connected", "conectado")) : ""
+                            selected: modelData.connected
+                            onActivated: modelData.connected ? modelData.disconnect() : modelData.connect()
+                        }
+                    }
+                    PopAction {
+                        Layout.topMargin: 4
+                        icon: Theme.icons.chevronRight
+                        label: Theme.t("bt.more", "Buscar e mais opções")
+                        onActivated: { bar.pop = ""; bar.btPageRequested(); }
                     }
                 }
 

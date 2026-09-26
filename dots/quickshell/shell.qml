@@ -197,6 +197,7 @@ ShellRoot {
         onVisualConfigClicked: visualConfig.open = !visualConfig.open
         onControlClicked: controlCenter.clickToggle()
         onControlHovered: on => on ? controlCenter.hoverEnter() : controlCenter.hoverLeave()
+        onBtPageRequested: controlCenter.openPage("bt")
         onStopRecording: Quickshell.execDetached(["rice-record", "stop"])
     }
 

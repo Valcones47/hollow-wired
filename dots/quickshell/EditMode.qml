@@ -397,7 +397,8 @@ PanelWindow {
                         Repeater {
                             model: [
                                 { k: "bar", label: ShellLayout.barVertical ? Theme.t("edit.target_side_bar", "Barra lateral") : Theme.t("edit.target_top_bar", "Barra de cima") },
-                                { k: "side", label: Theme.t("edit.target_sidebar", "Central de ações") }
+                                { k: "side", label: Theme.t("edit.target_sidebar", "Central de ações") },
+                                { k: "control", label: Theme.t("edit.target_control", "Painel de controle") }
                             ].concat(ShellLayout.dockFullWidth
                                 ? [{ k: "dock", label: Theme.t("edit.target_dock", "Dock") }] : [])
                             delegate: Rectangle {
@@ -432,12 +433,14 @@ PanelWindow {
                     Layout.fillWidth: true
                     spacing: 6
                     Repeater {
-                        model: itemsSec.target === "bar" ? ShellLayout.barCatalog
+                        model: itemsSec.target === "bar" ? ShellLayout.barCatalogCurrent
+                            : itemsSec.target === "control" ? ShellLayout.ccCatalog
                             : itemsSec.target === "dock" ? ShellLayout.dockCatalog : ShellLayout.sidebarCatalog
                         delegate: Rectangle {
                             id: chip
                             required property string modelData
                             readonly property bool on: itemsSec.target === "bar" ? ShellLayout.barItems.includes(chip.modelData)
+                                : itemsSec.target === "control" ? ShellLayout.ccHas(chip.modelData)
                                 : itemsSec.target === "dock" ? ShellLayout.dockItems.includes(chip.modelData)
                                 : ShellLayout.sidebarHas(chip.modelData)
                             width: chipRow.implicitWidth + 20
@@ -457,7 +460,7 @@ PanelWindow {
                                 }
                                 Text {
                                     anchors.verticalCenter: parent.verticalCenter
-                                    text: Theme.t((itemsSec.target === "bar" ? "bar.item_" : "side.item_") + chip.modelData, chip.modelData)
+                                    text: Theme.t((itemsSec.target === "bar" ? "bar.item_" : itemsSec.target === "control" ? "cc.item_" : "side.item_") + chip.modelData, chip.modelData)
                                     font.family: Theme.fontFamily
                                     font.pixelSize: 12
                                     color: chip.on ? Theme.textColor : Theme.subtext
@@ -470,12 +473,26 @@ PanelWindow {
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: {
                                     if (itemsSec.target === "bar") ShellLayout.toggleBarItem(chip.modelData);
+                                    else if (itemsSec.target === "control") ShellLayout.toggleCcItem(chip.modelData);
                                     else if (itemsSec.target === "dock") ShellLayout.toggleDockItem(chip.modelData);
                                     else ShellLayout.toggleSidebarItem(chip.modelData);
                                 }
                             }
                         }
                     }
+                }
+
+                Text {
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    visible: itemsSec.target === "bar" || itemsSec.target === "control"
+                    text: itemsSec.target === "control"
+                        ? Theme.t("edit.control_hint", "Escolha os blocos do painel de controle. O Bluetooth também pode ir para a barra.")
+                        : ShellLayout.barVertical ? Theme.t("edit.bar_hint_side", "Arraste os itens na barra para mudar a ordem.")
+                        : Theme.t("edit.bar_hint_top", "Arraste os itens na barra para mudar de lugar, inclusive entre esquerda, centro e direita.")
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 11
+                    color: Theme.subtext
                 }
             }
 

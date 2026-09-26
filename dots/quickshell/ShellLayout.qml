@@ -89,26 +89,42 @@ QtObject {
     //   media    música tocando (na lateral fica no meio da barra)
     //   tray     apps em segundo plano
     //   control  bloco brilho/som/bateria → central de controle
-    readonly property var barCatalog: ["media", "weather", "tray", "updates", "notifications", "network", "control",
+    readonly property var barCatalog: ["media", "weather", "tray", "updates", "notifications", "network", "bluetooth", "control",
         "night", "caffeine", "record", "screenshot", "clipboard", "picker", "gpu", "lock", "settings", "power", "mixer"]
+    // Só na barra de cima: blocos que antes eram fixos e agora mudam de lugar.
+    readonly property var barTopExtra: ["workspaces", "clock"]
+    function barCatalogFor(kind) { return kind === "top" ? root.barTopExtra.concat(root.barCatalog) : root.barCatalog; }
+    readonly property var barCatalogCurrent: barCatalogFor(barKind)
     // Ponto de privacidade (microfone/câmera/tela em uso): fora do catálogo
     // porque só aparece enquanto algo está em uso; desliga no painel.
     readonly property bool barPrivacy: get("bar", "privacy", true)
+    // Barra de cima em três zonas: a lista guarda os marcadores "::center" e
+    // "::right"; o que vem antes do primeiro é a esquerda. Arrastar no modo
+    // edição move entre as zonas.
+    readonly property var zoneMarks: ["::center", "::right"]
     readonly property var barItemsDefault: ({
-        // "media" em cima substitui o ícone fixo do equalizador que existia
-        // ao lado do relógio (o equalizador é uma aba do popup da mídia).
-        top: ["media", "mixer", "weather", "notifications", "network", "control"],
+        top: ["workspaces", "::center", "media", "clock", "mixer", "::right", "weather", "notifications", "network", "control"],
         side: ["media", "tray", "notifications", "network", "control", "power"]
     })
     function barItemsFor(kind) {
         const saved = (get("bar", "items", {}) || {})[kind];
+        const cat = root.barCatalogFor(kind);
         if (Array.isArray(saved)) {
             const out = [];
-            for (const k of saved) if (root.barCatalog.includes(k) && !out.includes(k)) out.push(k);
+            for (const k of saved)
+                if ((cat.includes(k) || (kind === "top" && root.zoneMarks.includes(k))) && !out.includes(k)) out.push(k);
+            // Lista salva antes das zonas: tudo era da direita, com as
+            // workspaces fixas à esquerda e mídia/relógio/mixer no centro.
+            if (kind === "top" && !out.includes("::center")) {
+                const center = ["media", "clock", "mixer"].filter(k => k === "clock" ? root.barModule("clock") : out.includes(k));
+                const right = out.filter(k => !["media", "mixer", "workspaces", "clock"].includes(k));
+                return ["workspaces", "::center"].concat(center, ["::right"], right);
+            }
+            if (kind === "top" && !out.includes("::right")) out.push("::right");
             return out;
         }
         // Antes do catálogo, notificações e rede se escondiam por bar.modules.
-        return root.barItemsDefault[kind].filter(k => root.barModule(k));
+        return root.barItemsDefault[kind].filter(k => root.zoneMarks.includes(k) || root.barModule(k));
     }
     readonly property var barItemsTop: barItemsFor("top")
     readonly property var barItemsSide: barItemsFor("side")
@@ -120,6 +136,20 @@ QtObject {
         m[root.barKind] = list.slice();
         root.set("bar", "items", m);
     }
+    // Blocos do painel de controle (modo edição → Painel de controle).
+    readonly property var ccCatalog: ["wifi", "vpn", "bluetooth", "dnd", "game", "blur", "night"]
+    readonly property var ccItems: {
+        const saved = get("control", "items", null);
+        return Array.isArray(saved) ? saved.filter(k => root.ccCatalog.includes(k)) : root.ccCatalog;
+    }
+    function ccHas(key) { return root.ccItems.includes(key); }
+    function toggleCcItem(key) {
+        const list = root.ccItems.slice();
+        const i = list.indexOf(key);
+        if (i >= 0) list.splice(i, 1); else list.push(key);
+        root.set("control", "items", root.ccCatalog.filter(k => list.includes(k)));
+    }
+
     function toggleBarItem(key) {
         const list = root.barItems.slice();
         const i = list.indexOf(key);
