@@ -80,7 +80,12 @@ GIF_DELAY_MS = 180  # wait for the carousel to settle before decoding a GIF
 PREFS_PATH = os.path.expanduser("~/.config/hollow-wired/wallpaper-picker.json")
 
 
+STYLE_OVERRIDE = None  # troca feita pelo botão do próprio seletor
+
+
 def picker_style():
+    if STYLE_OVERRIDE:
+        return STYLE_OVERRIDE
     for i, a in enumerate(sys.argv):
         if a == "--style" and i + 1 < len(sys.argv):
             return sys.argv[i + 1]
@@ -152,6 +157,18 @@ window.switcher {
     box-shadow: none;
     color: white;
     min-width: 220px;
+}
+.stylebtn {
+    background-color: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.85);
+    border-radius: 8px;
+    border: none;
+    padding: 2px 10px;
+    font-size: 11px;
+    min-height: 0;
+}
+.stylebtn:hover {
+    background-color: rgba(255, 255, 255, 0.14);
 }
 .toolbar .count {
     color: rgba(255, 255, 255, 0.55);
@@ -529,6 +546,7 @@ class RiseBin(Gtk.Widget):
 class SwitcherWindow(Gtk.ApplicationWindow):
     def __init__(self, app, proxy, wallpapers, current_id):
         super().__init__(application=app)
+        self.app = app
         self.add_css_class("switcher")
         self.proxy = proxy
         self.wallpapers = wallpapers
@@ -604,11 +622,21 @@ class SwitcherWindow(Gtk.ApplicationWindow):
             self.count_label = Gtk.Label()
             self.count_label.add_css_class("count")
             bar.append(self.count_label)
+            bar.append(self._style_button())
             self.panel.append(bar)
             self._update_count()
         self.panel.append(self.stage)
         self.panel.append(self.title_stack)
-        self.panel.append(hint)
+        if self.style == "skew":
+            self.panel.append(hint)
+        else:
+            row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+            row.set_halign(Gtk.Align.CENTER)
+            row.set_margin_bottom(10)
+            hint.set_margin_bottom(0)
+            row.append(hint)
+            row.append(self._style_button())
+            self.panel.append(row)
         for setter in ("set_margin_top", "set_margin_bottom", "set_margin_start", "set_margin_end"):
             getattr(self.panel, setter)(SHADOW)
 
@@ -773,6 +801,29 @@ class SwitcherWindow(Gtk.ApplicationWindow):
             "ab"[self._title_slot],
             Gtk.StackTransitionType.NONE if immediate else Gtk.StackTransitionType.CROSSFADE,
         )
+
+    def _style_button(self):
+        other = "Clássico" if self.style == "skew" else "Inclinado"
+        btn = Gtk.Button(label=f"Estilo: {other} (Tab)")
+        btn.add_css_class("stylebtn")
+        btn.set_focus_on_click(False)
+        btn.set_valign(Gtk.Align.CENTER)
+        btn.connect("clicked", lambda *_a: self.toggle_style())
+        return btn
+
+    def toggle_style(self):
+        """Grava o outro estilo e refaz a janela na hora, no mesmo wallpaper."""
+        global STYLE_OVERRIDE
+        new = "classic" if self.style == "skew" else "skew"
+        STYLE_OVERRIDE = new
+        try:
+            os.makedirs(os.path.dirname(PREFS_PATH), exist_ok=True)
+            with open(PREFS_PATH, "w") as f:
+                json.dump({"style": new}, f)
+                f.write("\n")
+        except OSError:
+            pass
+        self.app.restyle(self.wallpapers[self.selected]["id"])
 
     def _update_count(self):
         if getattr(self, "count_label", None) is not None:
@@ -1062,6 +1113,8 @@ class SwitcherWindow(Gtk.ApplicationWindow):
             self.apply()
         elif name == "Escape":
             self.close_animated()
+        elif name in ("Tab", "ISO_Left_Tab"):
+            self.toggle_style()
         else:
             return False
         return True
@@ -1104,8 +1157,24 @@ class SwitcherApp(Gtk.Application):
             Gdk.Display.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
         )
 
+        self._proxy, self._wallpapers = proxy, wallpapers
         self.window = SwitcherWindow(self, proxy, wallpapers, get_current_id(proxy))
         self.window.present()
+
+    def restyle(self, selected_id):
+        old = self.window
+        # A janela nova nasce antes de a velha sumir: sem janela o app sairia.
+        self.window = SwitcherWindow(self, self._proxy, self._wallpapers, selected_id)
+        self.window.appear = 1.0
+        self.window.apply_appear()
+        self.window.present()
+        old.closing = True
+        if old._tick_id is not None:
+            old.remove_tick_callback(old._tick_id)
+            old._tick_id = None
+        old._stop_gif()
+        old.pool.shutdown(wait=False, cancel_futures=True)
+        old.destroy()
 
 
 if __name__ == "__main__":
