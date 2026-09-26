@@ -1758,5 +1758,18 @@
   "wifi.restart": "Restart network",
   "theme.panel_bg": "Settings background follows the theme",
   "theme.panel_bg_sub": "Off, the panel uses a neutral dark grey.",
-  "notif.clear": "Clear"
+  "notif.clear": "Clear",
+  "conn.tap_on": "click to turn on",
+  "conn.searching": "searching…",
+  "conn.scan": "Scan",
+  "conn.forget": "Forget",
+  "conn.wifi_pick": "Click a network to connect",
+  "conn.bt_pick": "Click a device to connect",
+  "conn.center_back": "the center to go back",
+  "conn.center_scan": "the center to search more",
+  "conn.tap_scan": "click to search",
+  "cc.tip_lock": "Lock",
+  "cc.tip_sleep": "Suspend",
+  "cc.tip_reboot": "Restart",
+  "cc.tip_off": "Shut down"
 }

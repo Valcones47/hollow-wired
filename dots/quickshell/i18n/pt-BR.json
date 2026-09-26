@@ -1758,5 +1758,18 @@
   "wifi.restart": "Reiniciar rede",
   "theme.panel_bg": "Fundo das configurações segue o tema",
   "theme.panel_bg_sub": "Desligado, o painel usa um cinza escuro neutro.",
-  "notif.clear": "Limpar"
+  "notif.clear": "Limpar",
+  "conn.tap_on": "clique para ligar",
+  "conn.searching": "procurando…",
+  "conn.scan": "Buscar",
+  "conn.forget": "Esquecer",
+  "conn.wifi_pick": "Clique numa rede para conectar",
+  "conn.bt_pick": "Clique num aparelho para conectar",
+  "conn.center_back": "no centro para voltar",
+  "conn.center_scan": "no centro para buscar mais",
+  "conn.tap_scan": "clique para buscar",
+  "cc.tip_lock": "Bloquear",
+  "cc.tip_sleep": "Suspender",
+  "cc.tip_reboot": "Reiniciar",
+  "cc.tip_off": "Desligar"
 }

@@ -71,3 +71,5 @@ AiSidebar 1.0 AiSidebar.qml
 singleton AudioPrefs 1.0 AudioPrefs.qml
 RecordingLibrary 1.0 RecordingLibrary.qml
 WifiList 1.0 WifiList.qml
+RadialHub 1.0 RadialHub.qml
+ConnectPage 1.0 ConnectPage.qml

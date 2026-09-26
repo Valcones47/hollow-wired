@@ -65,6 +65,15 @@ PanelWindow {
         function toggle(): void { cc.clickToggle(); }
         function show(): void { cc.open = true; }
         function hide(): void { cc.open = false; }
+        // `qs ipc call control page wifi|bt` (atalhos e testes)
+        function page(m: string): void {
+            if (m !== "wifi" && m !== "bt") return;
+            cc.hoverMode = false;
+            cc.open = true;
+            connPage.mode = m;
+            cc.page = m;
+        }
+        function scan(): void { if (cc.page !== "") connPage.orbitMode = true; }
     }
 
     onOpenChanged: {
@@ -77,6 +86,7 @@ PanelWindow {
         } else {
             cc.hoverMode = false;
             cc.btOpen = false;
+            cc.page = "";
             cc.wifiOpen = false;
             cc.vpnOpen = false;
             cc.audioOpen = false;
@@ -200,6 +210,8 @@ PanelWindow {
 
     // --- seções que abrem ---
     property bool btOpen: false
+    // Página de Wi-Fi / Bluetooth ("" = tela principal).
+    property string page: ""
 
     // --- VPN e redes salvas (rice-network → nmcli), lidos ao abrir ---
     property bool wifiOpen: false
@@ -249,8 +261,23 @@ PanelWindow {
         Layout.fillWidth: true
         implicitHeight: 58
         radius: 14
-        color: tile.active ? Theme.primary : (mainArea.containsMouse ? Theme.tileHigh : Theme.tile)
+        clip: true
+        color: tile.active ? Theme.primary : Theme.tile
         Behavior on color { ColorAnimation { duration: Theme.ms(140) } }
+        scale: mainArea.pressed ? 0.97 : 1
+        Behavior on scale { NumberAnimation { duration: Theme.ms(90) } }
+
+        // Hover: o bloco "enche" da esquerda para a direita (como nas páginas
+        // de Wi-Fi e Bluetooth).
+        Rectangle {
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            anchors.left: parent.left
+            radius: parent.radius
+            width: mainArea.containsMouse ? parent.width : 0
+            color: tile.active ? Theme.withAlpha(Theme.background, 0.14) : Theme.withAlpha(Theme.primary, 0.22)
+            Behavior on width { NumberAnimation { duration: mainArea.containsMouse ? Theme.ms(600) : Theme.ms(160); easing.type: Easing.OutQuad } }
+        }
 
         RowLayout {
             anchors.fill: parent
@@ -325,6 +352,7 @@ PanelWindow {
     component RoundBtn: Rectangle {
         id: rb
         property string icon: ""
+        property string tip: ""
         property color tint: Theme.textColor
         property bool armed: false
         signal activated()
@@ -347,6 +375,25 @@ PanelWindow {
             cursorShape: Qt.PointingHandCursor
             onClicked: rb.activated()
         }
+        // Dica em cima do botão (só ícone não diz o que faz).
+        Rectangle {
+            visible: rb.tip !== "" && rbArea.containsMouse
+            anchors.bottom: parent.top
+            anchors.bottomMargin: 6
+            anchors.horizontalCenter: parent.horizontalCenter
+            width: tipText.implicitWidth + 14
+            height: 22
+            radius: 6
+            color: Theme.tileHigh
+            Text {
+                id: tipText
+                anchors.centerIn: parent
+                text: rb.tip
+                font.family: Theme.fontFamily
+                font.pixelSize: 10
+                color: Theme.textColor
+            }
+        }
     }
 
     // ================= conteúdo =================
@@ -363,8 +410,10 @@ PanelWindow {
         readonly property bool onRight: ShellLayout.barEnabled && ShellLayout.barPosition === "right"
         readonly property bool side: onLeft || onRight
 
-        width: 380
-        height: Math.min(col.implicitHeight + 28, cc.height - 20)
+        width: cc.page !== "" ? 500 : 380
+        height: cc.page !== "" ? Math.min(560, cc.height - 20) : Math.min(col.implicitHeight + 28, cc.height - 20)
+        Behavior on width { NumberAnimation { duration: Theme.ms(220); easing.type: Easing.OutCubic } }
+        Behavior on height { NumberAnimation { duration: Theme.ms(220); easing.type: Easing.OutCubic } }
         x: onLeft ? stripW + 8 : cc.width - width - (onRight ? stripW : Theme.frameThickness) - 8
         y: side ? cc.height - height - 10 : Theme.waybarHeight + 6
         radius: Theme.radius + 4
@@ -380,7 +429,7 @@ PanelWindow {
         Behavior on scale { NumberAnimation { duration: Theme.ms(200); easing.type: Easing.OutCubic } }
 
         focus: true
-        Keys.onEscapePressed: cc.open = false
+        Keys.onEscapePressed: cc.page !== "" ? cc.page = "" : cc.open = false
 
         // engole cliques dentro do cartão (senão o de fora fecha)
         MouseArea { anchors.fill: parent }
@@ -389,9 +438,29 @@ PanelWindow {
             onHoveredChanged: hovered ? closeTimer.stop() : (cc.hoverMode ? closeTimer.restart() : undefined)
         }
 
+        // Página de Wi-Fi / Bluetooth: entra deslizando da direita.
+        ConnectPage {
+            id: connPage
+            width: 500 - 28
+            height: parent.height - 28
+            y: 14
+            x: cc.page !== "" ? 14 : parent.width + 20
+            opacity: cc.page !== "" ? 1 : 0
+            visible: opacity > 0
+            Behavior on x { NumberAnimation { duration: Theme.ms(260); easing.type: Easing.OutCubic } }
+            Behavior on opacity { NumberAnimation { duration: Theme.ms(180) } }
+            onBack: cc.page = ""
+            onModeChanged: if (cc.page !== "") cc.page = mode
+        }
+
         Flickable {
+            id: mainFlick
             anchors.fill: parent
             anchors.margins: 14
+            x: cc.page !== "" ? -card.width : 0
+            opacity: cc.page !== "" ? 0 : 1
+            visible: opacity > 0
+            Behavior on opacity { NumberAnimation { duration: Theme.ms(160) } }
             contentHeight: col.implicitHeight
             clip: true
             boundsBehavior: Flickable.StopAtBounds
@@ -418,10 +487,9 @@ PanelWindow {
                             : cc.activeNetwork ? cc.activeNetwork.name : Theme.t("cc.not_connected", "Sem conexão")
                         active: Networking.wifiEnabled
                         visible: cc.wifiDevice !== null
-                        more: cc.savedWifi.length > 0
-                        expanded: cc.wifiOpen
+                        more: true
                         onToggled: Networking.wifiEnabled = !Networking.wifiEnabled
-                        onMoreClicked: cc.wifiOpen = !cc.wifiOpen
+                        onMoreClicked: { connPage.mode = "wifi"; cc.page = "wifi"; }
                     }
                     Tile {
                         icon: Theme.icons.lock
@@ -447,9 +515,8 @@ PanelWindow {
                         active: cc.btAdapter !== null && cc.btAdapter.enabled
                         visible: cc.btAdapter !== null
                         more: true
-                        expanded: cc.btOpen
                         onToggled: cc.btAdapter.enabled = !cc.btAdapter.enabled
-                        onMoreClicked: cc.btOpen = !cc.btOpen
+                        onMoreClicked: { connPage.mode = "bt"; cc.page = "bt"; }
                     }
                     Tile {
                         icon: NotifService.dnd ? Theme.icons.bellOff : Theme.icons.bell
@@ -481,38 +548,6 @@ PanelWindow {
                     }
                 }
 
-                // ---------- redes Wi-Fi ----------
-                WifiList {
-                    Layout.fillWidth: true
-                    visible: cc.wifiOpen
-                    device: cc.wifiDevice
-                }
-                Binding {
-                    target: cc.wifiDevice
-                    property: "scannerEnabled"
-                    value: cc.wifiOpen
-                    when: cc.wifiDevice !== null && cc.wifiOpen
-                }
-
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    visible: cc.wifiOpen && cc.savedWifi.length > 0
-                    spacing: 4
-                    PopTitle { text: Theme.t("cc.saved_networks", "Redes salvas"); Layout.topMargin: 6 }
-                    PopText { text: Theme.t("cc.forget_hint", "Clique duas vezes para esquecer a rede (a senha salva é apagada).") }
-                    Repeater {
-                        model: cc.wifiOpen ? cc.savedWifi : []
-                        delegate: PopAction {
-                            required property var modelData
-                            icon: Theme.icons.trash
-                            label: modelData.name
-                            detail: modelData.active ? Theme.t("cc.connected", "conectado") : ""
-                            needsConfirm: true
-                            onActivated: cc.runNet(["forget", modelData.uuid])
-                        }
-                    }
-                }
-
                 // ---------- VPN ----------
                 ColumnLayout {
                     Layout.fillWidth: true
@@ -528,46 +563,6 @@ PanelWindow {
                             selected: modelData.active
                             onActivated: cc.runNet([modelData.active ? "vpn-down" : "vpn-up", modelData.uuid])
                         }
-                    }
-                }
-
-                // ---------- dispositivos bluetooth ----------
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    visible: cc.btOpen && cc.btAdapter !== null
-                    spacing: 4
-                    PopText {
-                        visible: !cc.btAdapter || !cc.btAdapter.enabled
-                        text: Theme.t("cc.bt_turn_on", "Ligue o Bluetooth para ver os aparelhos.")
-                    }
-                    PopText {
-                        visible: cc.btAdapter && cc.btAdapter.enabled && cc.btDevices.length === 0
-                        text: Theme.t("topbar.no_devices", "Nenhum dispositivo")
-                    }
-                    Repeater {
-                        model: cc.btAdapter && cc.btAdapter.enabled
-                            ? cc.btDevices.filter(d => d.paired || d.connected || cc.btAdapter.discovering).slice(0, 8) : []
-                        delegate: PopAction {
-                            required property var modelData
-                            icon: modelData.connected ? Theme.icons.btConnected : Theme.icons.bt
-                            label: modelData.name || modelData.address
-                            detail: modelData.pairing ? Theme.t("cc.pairing", "pareando…") : modelData.connected
-                                ? (modelData.batteryAvailable ? Math.round(modelData.battery * 100) + "%" : Theme.t("cc.connected", "conectado"))
-                                : modelData.paired ? "" : Theme.t("cc.new", "novo")
-                            selected: modelData.connected
-                            onActivated: {
-                                if (modelData.connected) modelData.disconnect();
-                                else if (modelData.paired) modelData.connect();
-                                else modelData.pair();
-                            }
-                        }
-                    }
-                    PopAction {
-                        visible: cc.btAdapter && cc.btAdapter.enabled
-                        icon: Theme.icons.magnify
-                        label: cc.btAdapter && cc.btAdapter.discovering ? Theme.t("cc.bt_searching", "Procurando… (clique para parar)")
-                            : Theme.t("cc.bt_search", "Procurar aparelhos")
-                        onActivated: cc.btAdapter.discovering = !cc.btAdapter.discovering
                     }
                 }
 
@@ -895,6 +890,7 @@ PanelWindow {
                     }
                     RoundBtn {
                         icon: Theme.icons.lock
+                        tip: Theme.t("cc.tip_lock", "Bloquear")
                         onActivated: {
                             cc.open = false;
                             Quickshell.execDetached(["rice-session-action", "lock"]);
@@ -902,6 +898,7 @@ PanelWindow {
                     }
                     RoundBtn {
                         icon: Theme.icons.sleep
+                        tip: Theme.t("cc.tip_sleep", "Suspender")
                         onActivated: {
                             cc.open = false;
                             Quickshell.execDetached(["rice-session-action", "suspend"]);
@@ -909,11 +906,13 @@ PanelWindow {
                     }
                     RoundBtn {
                         icon: Theme.icons.restart
+                        tip: Theme.t("cc.tip_reboot", "Reiniciar")
                         armed: powerRow.armed === "reboot"
                         onActivated: powerRow.arm("reboot")
                     }
                     RoundBtn {
                         icon: Theme.icons.power
+                        tip: Theme.t("cc.tip_off", "Desligar")
                         tint: Theme.critical
                         armed: powerRow.armed === "poweroff"
                         onActivated: powerRow.arm("poweroff")
