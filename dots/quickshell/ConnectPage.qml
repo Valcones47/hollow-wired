@@ -184,12 +184,17 @@ Item {
             }
 
             orbit: {
+                // Ordem fixa (conectada, salvas, depois por nome) e sem o ícone de
+                // sinal: o scanner muda o sinal o tempo todo, e reordenar por ele
+                // fazia as redes pularem de lugar na órbita.
                 if (pg.mode === "wifi")
-                    return pg.wifiNets.map(n => ({
-                        key: n.name, strong: n.connected || n.known,
-                        icon: n.connected ? Theme.icons.check : (pg.secured(n) && !n.known ? Theme.icons.lock : pg.sigIcon(n.signalStrength)),
-                        label: n.name
-                    }));
+                    return pg.wifiNets.slice()
+                        .sort((a, b) => (b.connected - a.connected) || (b.known - a.known) || a.name.localeCompare(b.name))
+                        .map(n => ({
+                            key: n.name, strong: n.connected || n.known,
+                            icon: n.connected ? Theme.icons.check : (pg.secured(n) && !n.known ? Theme.icons.lock : Theme.icons.wifi3),
+                            label: n.name
+                        }));
                 return pg.btDevs.filter(d => d.name || d.paired).slice(0, 14).map(d => ({
                     key: d.address, strong: d.connected || d.paired,
                     icon: d.connected ? Theme.icons.check : pg.btIcon(d),

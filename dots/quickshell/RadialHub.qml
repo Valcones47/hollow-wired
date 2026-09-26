@@ -20,6 +20,13 @@ Item {
     property bool centerActive: true
     property var nodes: []
     property var orbit: []
+    // Só troca o modelo da órbita quando o conteúdo muda de verdade:
+    // reatribuir o array recria os itens e eles "pulam".
+    property var shownOrbit: []
+    onOrbitChanged: {
+        const a = JSON.stringify(orbit), b = JSON.stringify(shownOrbit);
+        if (a !== b) shownOrbit = orbit.slice();
+    }
     property bool orbitMode: false
     property string orbitHint: ""
 
@@ -243,12 +250,12 @@ Item {
 
     // ---------- órbita ----------
     Repeater {
-        model: rh.orbitMode ? rh.orbit : []
+        model: rh.orbitMode ? rh.shownOrbit : []
         delegate: Item {
             id: oi
             required property var modelData
             required property int index
-            readonly property int n: rh.orbit.length
+            readonly property int n: rh.shownOrbit.length
             // Duas órbitas (interna e externa) para caber mais itens sem encostar.
             readonly property bool outer: n > 7 && index % 2 === 1
             readonly property real a: (index * 360 / Math.max(1, n) + rh.spin * (outer ? -1 : 1) - 90) * Math.PI / 180
