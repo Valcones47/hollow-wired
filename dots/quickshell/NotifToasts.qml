@@ -57,15 +57,25 @@ PanelWindow {
 
                 // Arrastar para a direita dispensa (o layout controla o x, então
                 // o deslocamento vai num Translate).
+                // Arrastar para baixo expande (texto inteiro, para de sumir
+                // sozinha); para cima recolhe. A direção sai dos primeiros 8 px.
                 property real dragX: 0
-                transform: Translate { x: card.dragX }
+                property real dragY: 0
+                property bool expanded: false
+                transform: Translate { x: card.dragX; y: card.dragY * 0.4 }
                 opacity: 1 - Math.min(0.8, card.dragX / 300)
+                Behavior on dragX { enabled: !hoverArea.pressed; NumberAnimation { duration: Theme.ms(180); easing.type: Easing.OutCubic } }
+                Behavior on dragY { enabled: !hoverArea.pressed; NumberAnimation { duration: Theme.ms(180); easing.type: Easing.OutCubic } }
+                Behavior on Layout.preferredHeight { NumberAnimation { duration: Theme.ms(200); easing.type: Easing.OutCubic } }
+                // Dispensar desliza para fora antes de sumir.
+                Timer { id: goAway; interval: 170; onTriggered: NotifService.dismissToast(card.modelData.id) }
+                function swipeAway() { card.dragX = 440; goAway.start(); }
 
                 // Pausa o fechamento automático enquanto o cursor estiver sobre a notificação
                 Timer {
                     id: dismissTimer
                     interval: modelData.expireTimeout > 0 ? modelData.expireTimeout : (modelData.urgency === 2 ? 15000 : NotifService.defaultTimeout)
-                    running: !hoverArea.containsMouse
+                    running: !hoverArea.containsMouse && !card.expanded
                     repeat: false
                     onTriggered: NotifService.dismissToast(card.modelData.id)
                 }
@@ -76,16 +86,29 @@ PanelWindow {
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     property real pressX: 0
+                    property real pressY: 0
+                    property string dir: ""
                     property bool swiped: false
-                    onPressed: mouse => { pressX = mouse.x; swiped = false; }
+                    onPressed: mouse => { pressX = mouse.x; pressY = mouse.y; dir = ""; swiped = false; }
                     onPositionChanged: mouse => {
                         if (!pressed) return;
-                        card.dragX = Math.max(0, mouse.x - pressX);
-                        if (card.dragX > 8) swiped = true;
+                        const dx = mouse.x - pressX, dy = mouse.y - pressY;
+                        if (dir === "" && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+                            dir = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+                            swiped = true;
+                        }
+                        if (dir === "x") card.dragX = Math.max(0, dx);
+                        else if (dir === "y") card.dragY = Math.max(-50, Math.min(80, dy));
                     }
                     onReleased: {
-                        if (card.dragX > 120) NotifService.dismissToast(card.modelData.id);
-                        else card.dragX = 0;
+                        if (dir === "x") {
+                            if (card.dragX > 120) card.swipeAway();
+                            else card.dragX = 0;
+                        } else if (dir === "y") {
+                            if (card.dragY > 30) card.expanded = true;
+                            else if (card.dragY < -20) card.expanded = false;
+                            card.dragY = 0;
+                        }
                     }
                     onClicked: {
                         if (swiped) return;
@@ -204,17 +227,19 @@ PanelWindow {
                                 font.bold: true
                                 color: Theme.textColor
                                 elide: Text.ElideRight
+                                wrapMode: card.expanded ? Text.Wrap : Text.NoWrap
                                 Layout.fillWidth: true
                                 visible: text.length > 0
                             }
 
                             Text {
+                                id: bodyText
                                 text: card.modelData.body || ""
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 12
                                 color: Theme.subtext
                                 wrapMode: Text.Wrap
-                                maximumLineCount: 4
+                                maximumLineCount: card.expanded ? 40 : 3
                                 elide: Text.ElideRight
                                 textFormat: Text.StyledText
                                 Layout.fillWidth: true
@@ -261,6 +286,28 @@ PanelWindow {
                             height: parent.height
                             radius: 2
                             color: Theme.primary
+                        }
+                    }
+
+                    // Setinha: há texto cortado (ou já está expandida). Clique ou
+                    // arraste para baixo/cima.
+                    Text {
+                        Layout.alignment: Qt.AlignHCenter
+                        Layout.topMargin: -4
+                        visible: bodyText.truncated || card.expanded
+                        text: Theme.icons.chevronRight
+                        rotation: card.expanded ? -90 : 90
+                        Behavior on rotation { NumberAnimation { duration: Theme.ms(160) } }
+                        font.family: Theme.iconFontFamily
+                        font.pixelSize: 16
+                        color: chevArea.containsMouse ? Theme.textColor : Theme.subtext
+                        MouseArea {
+                            id: chevArea
+                            anchors.fill: parent
+                            anchors.margins: -6
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: card.expanded = !card.expanded
                         }
                     }
 

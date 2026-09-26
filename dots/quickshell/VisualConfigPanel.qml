@@ -2123,8 +2123,9 @@ PanelWindow {
         // ficava apertado demais (listas de 3 itens por vez, textos cortados) e
         // em telas maiores desperdiçava espaço. Mantém um piso pra não quebrar
         // o layout em telas pequenas.
-        width: Math.max(1100, Math.min(1660, win.width * 0.92))
-        height: Math.max(660, Math.min(1000, win.height * 0.92))
+        // Um pouco menor que antes (0,92 → 0,84): ocupava a tela quase toda.
+        width: Math.max(1060, Math.min(1480, win.width * 0.84))
+        height: Math.max(640, Math.min(920, win.height * 0.86))
         anchors.centerIn: parent
         radius: 20
         color: win.cardBg
@@ -8444,26 +8445,13 @@ PanelWindow {
                                                                     Layout.fillWidth: true
                                                                     spacing: 6
 
-                                                                    Rectangle {
-                                                                        implicitHeight: 20
-                                                                        implicitWidth: keyTxt.implicitWidth + 12
-                                                                        radius: 6
-                                                                        color: Theme.background
-                                                                        border.width: 1
-                                                                        border.color: Theme.withAlpha(Theme.primary, 0.4)
-                                                                        Text {
-                                                                            id: keyTxt
-                                                                            anchors.centerIn: parent
-                                                                            // Só troca o texto quando a combinação
-                                                                            // foi realmente alterada: senão o guia
-                                                                            // perderia a grafia amigável.
-                                                                            text: guideBind.changed ? guideBind.info.current
-                                                                                                    : guideBind.modelData.key
-                                                                            font.family: Theme.monoFamily
-                                                                            font.pixelSize: 10
-                                                                            font.weight: Font.Bold
-                                                                            color: Theme.primary
-                                                                        }
+                                                                    // Teclas desenhadas (KeyCombo). Só troca o
+                                                                    // texto quando a combinação foi realmente
+                                                                    // alterada: senão perderia a grafia amigável.
+                                                                    KeyCombo {
+                                                                        combo: guideBind.changed ? guideBind.info.current
+                                                                                                 : guideBind.modelData.key
+                                                                        accent: guideBind.changed
                                                                     }
 
                                                                     Item { Layout.fillWidth: true }
