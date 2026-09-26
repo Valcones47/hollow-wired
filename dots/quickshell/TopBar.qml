@@ -309,8 +309,6 @@ PanelWindow {
         property bool dragging: false
         property real pressX: 0
         z: dragging ? 5 : 0
-        scale: dragging ? 1.08 : 1
-        Behavior on scale { NumberAnimation { duration: Theme.ms(120) } }
 
         MouseArea {
             id: modArea
@@ -335,12 +333,17 @@ PanelWindow {
                 if (!mod.dragging && Math.abs(x - mod.pressX) > 8) {
                     mod.dragging = true;
                     bar.dragOrder = ShellLayout.barItems.slice();
+                    bar.dragItem = mod;
                 }
-                if (mod.dragging) bar.dragModuleTo(mod.editKey, x);
+                if (mod.dragging) {
+                    bar.dragX = x;
+                    bar.dragModuleTo(mod.editKey, x);
+                }
             }
             onReleased: {
                 if (!mod.dragging) return;
                 mod.dragging = false;
+                bar.dragItem = null;
                 const order = bar.dragOrder;
                 bar.dragOrder = null;
                 ShellLayout.setBarItems(order);
@@ -348,6 +351,7 @@ PanelWindow {
             onCanceled: {
                 if (!mod.dragging) return;
                 mod.dragging = false;
+                bar.dragItem = null;
                 bar.dragOrder = null;
                 bar.applyBarOrder();
             }
@@ -373,6 +377,12 @@ PanelWindow {
     // filhos, e o RowLayout segue essa lista). stackAfter() não existe no QML.
     // Enquanto arrasta, dragOrder guarda a ordem ao vivo e só é gravada ao soltar.
     property var dragOrder: null
+    // Arraste visível: uma cópia do item segue o ponteiro (ShaderEffectSource
+    // com hideSource, então o lugar dele vira um espaço vazio que mostra onde
+    // vai cair) e as três zonas aparecem enquanto arrasta.
+    property Item dragItem: null
+    property real dragX: 0
+    readonly property int dragZone: dragX < root.width / 3 ? 0 : dragX > root.width * 2 / 3 ? 2 : 1
     function barModuleItems() {
         return { workspaces: wsMod, clock: clockMod, media: mediaMod, mixer: mixerMod, bluetooth: btMod, weather: weatherMod, notifications: notifMod, network: wifiMod, control: ctlMod, tray: trayMod,
                  updates: updMod, night: nightMod, caffeine: cafMod, record: recMod, screenshot: shotMod,
@@ -512,6 +522,39 @@ PanelWindow {
                 anchors.fill: parent
                 acceptedButtons: Qt.RightButton
                 onClicked: ShellLayout.editing = !ShellLayout.editing
+            }
+
+            // Zonas destacadas durante o arraste (a do ponteiro fica mais forte).
+            Repeater {
+                model: 3
+                delegate: Rectangle {
+                    required property int index
+                    visible: bar.dragItem !== null
+                    x: root.width * index / 3 + 3
+                    width: root.width / 3 - 6
+                    anchors.verticalCenter: parent.verticalCenter
+                    height: bar.barH - 6
+                    radius: height / 2
+                    color: Theme.withAlpha(Theme.primary, bar.dragZone === index ? 0.14 : 0.04)
+                    border.width: 1
+                    border.color: Theme.withAlpha(Theme.primary, bar.dragZone === index ? 0.5 : 0.15)
+                    Behavior on color { ColorAnimation { duration: Theme.ms(120) } }
+                }
+            }
+
+            ShaderEffectSource {
+                id: dragGhost
+                z: 50
+                visible: bar.dragItem !== null
+                sourceItem: bar.dragItem
+                hideSource: true
+                live: true
+                width: bar.dragItem ? bar.dragItem.width : 0
+                height: bar.dragItem ? bar.dragItem.height : 0
+                x: bar.dragX - width / 2
+                anchors.verticalCenter: parent.verticalCenter
+                scale: 1.1
+                opacity: 0.92
             }
 
             // ---------- três zonas: esquerda, centro, direita ----------
@@ -725,7 +768,7 @@ PanelWindow {
                 }
                 BarIcon {
                     visible: MediaState.player === null
-                    text: Theme.icons.equalizer
+                    text: Theme.icons.music
                     color: EqService.enabled ? Theme.primary : Theme.textColor
                 }
             }

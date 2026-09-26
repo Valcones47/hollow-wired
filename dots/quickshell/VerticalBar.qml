@@ -226,8 +226,6 @@ PanelWindow {
         property bool dragging: false
         property real pressY: 0
         z: dragging ? 5 : 0
-        scale: dragging ? 1.1 : 1
-        Behavior on scale { NumberAnimation { duration: Theme.ms(120) } }
 
         MouseArea {
             id: bbArea
@@ -245,12 +243,17 @@ PanelWindow {
                 if (!bb.dragging && Math.abs(y - bb.pressY) > 8) {
                     bb.dragging = true;
                     vbar.dragOrder = ShellLayout.barItems.slice();
+                    vbar.dragItem = bb;
                 }
-                if (bb.dragging) vbar.dragModuleTo(bb.editKey, y);
+                if (bb.dragging) {
+                    vbar.dragY = y;
+                    vbar.dragModuleTo(bb.editKey, y);
+                }
             }
             onReleased: {
                 if (!bb.dragging) return;
                 bb.dragging = false;
+                vbar.dragItem = null;
                 const order = vbar.dragOrder;
                 vbar.dragOrder = null;
                 ShellLayout.setBarItems(order);
@@ -258,6 +261,7 @@ PanelWindow {
             onCanceled: {
                 if (!bb.dragging) return;
                 bb.dragging = false;
+                vbar.dragItem = null;
                 vbar.dragOrder = null;
                 vbar.applyBarOrder();
             }
@@ -278,6 +282,10 @@ PanelWindow {
     // voltam na ordem da lista, embaixo (depois do espaço flexível). A mídia não
     // entra: ela fica sempre no meio da barra.
     property var dragOrder: null
+    // Arraste visível (como na TopBar): a cópia segue o ponteiro e o lugar do
+    // item fica vazio, mostrando onde ele vai cair.
+    property Item dragItem: null
+    property real dragY: 0
     function barModuleItems() {
         return { notifications: vNotif, network: vNet, control: vCtl, tray: vTray, updates: vUpd,
                  night: vNight, caffeine: vCaf, record: vRec, screenshot: vShot, clipboard: vClip,
@@ -350,6 +358,20 @@ PanelWindow {
                 anchors.fill: parent
                 acceptedButtons: Qt.RightButton
                 onClicked: ShellLayout.editing = !ShellLayout.editing
+            }
+
+            ShaderEffectSource {
+                z: 50
+                visible: vbar.dragItem !== null
+                sourceItem: vbar.dragItem
+                hideSource: true
+                live: true
+                width: vbar.dragItem ? vbar.dragItem.width : 0
+                height: vbar.dragItem ? vbar.dragItem.height : 0
+                anchors.horizontalCenter: parent.horizontalCenter
+                y: mainCol.y + vbar.dragY - height / 2
+                scale: 1.12
+                opacity: 0.92
             }
 
             ColumnLayout {
