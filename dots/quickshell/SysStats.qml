@@ -52,6 +52,35 @@ QtObject {
     // Antes: um bash com `sleep 1` e o `sensors` a cada 2,5 s. Agora /proc/stat
     // e o hwmon da CPU (coretemp/k10temp, achado uma vez) são lidos direto; o
     // uso é a diferença desde a leitura anterior.
+    // Rede (soma das interfaces menos lo), em bytes/s: /proc/net/dev a cada 1,5 s.
+    property real netDown: 0
+    property real netUp: 0
+    property var _netPrev: null
+    property FileView netFile: FileView { path: "/proc/net/dev"; blockLoading: true; printErrors: false }
+    property Timer netTimer: Timer {
+        interval: 1500
+        running: root.active
+        repeat: true
+        triggeredOnStart: true
+        onTriggered: {
+            root.netFile.reload();
+            let rx = 0, tx = 0;
+            for (const line of root.netFile.text().split("\n").slice(2)) {
+                const m = line.trim().split(/[:\s]+/);
+                if (m.length < 10 || m[0] === "lo") continue;
+                rx += Number(m[1]) || 0;
+                tx += Number(m[9]) || 0;
+            }
+            const now = Date.now();
+            if (root._netPrev) {
+                const dt = Math.max(0.1, (now - root._netPrev.t) / 1000);
+                root.netDown = Math.max(0, (rx - root._netPrev.rx) / dt);
+                root.netUp = Math.max(0, (tx - root._netPrev.tx) / dt);
+            }
+            root._netPrev = { t: now, rx: rx, tx: tx };
+        }
+    }
+
     property Timer cpuTimer: Timer {
         interval: 2500
         running: root.active

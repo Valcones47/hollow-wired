@@ -1215,49 +1215,116 @@ Item {
             }
             Behavior on opacity { DefEffects {} }
 
-            Resource {
-                id: cpuRes
-                icon: Theme.icons.speed
-                frac: SysStats.cpuUsage
-                shape: "pentagon"
-                valueColor: view.pri
-                shapeColor: Theme.withAlpha(view.pri, 0.22)
-                fillColor: Theme.withAlpha(view.sec, 0.3)
-
-                Rectangle {
-                    visible: SysStats.cpuTemp > 0
-                    width: tempTxt.implicitHeight * 2
-                    height: width
-                    radius: width / 2
-                    x: parent.width - width * 0.85
-                    y: -height * 0.12
-                    color: SysStats.cpuTemp > 90 ? Theme.withAlpha(view.errorColor, 0.9) : Theme.mix(Theme.background, view.sec, 0.35)
-                    Text {
-                        id: tempTxt
-                        anchors.centerIn: parent
-                        text: Math.round(SysStats.cpuTemp) + "°C"
-                        color: SysStats.cpuTemp > 90 ? Theme.background : view.sec
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 12 * view.s
-                        font.weight: Font.DemiBold
+            // Medidores no estilo "líquido": o nível sobe de baixo com a borda
+            // ondulando, o valor grande no canto. Embaixo, disco e rede.
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: 10 * view.s
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 10 * view.s
+                    LiquidMeter {
+                        label: "CPU"
+                        icon: Theme.icons.speed
+                        frac: SysStats.cpuUsage
+                        value: Math.round(SysStats.cpuUsage * 100) + "%"
+                        tint: view.pri
+                    }
+                    LiquidMeter {
+                        label: "RAM"
+                        icon: Theme.icons.memory
+                        frac: SysStats.ramFrac
+                        value: SysStats.ramRealGiB.toFixed(1).replace(".", ",") + "G"
+                        tint: view.ter
+                    }
+                    LiquidMeter {
+                        label: Theme.t("lock.temp", "Temp")
+                        icon: Theme.icons.temp || Theme.icons.speed
+                        frac: Math.max(0, Math.min(1, (SysStats.cpuTemp - 25) / 75))
+                        value: SysStats.cpuTemp > 0 ? Math.round(SysStats.cpuTemp) + "°" : "--"
+                        tint: SysStats.cpuTemp > 90 ? view.errorColor : view.sec
                     }
                 }
-            }
-            Resource {
-                icon: Theme.icons.memory
-                frac: SysStats.ramFrac
-                shape: "slanted"
-                valueColor: view.ter
-                shapeColor: Theme.withAlpha(view.ter, 0.3)
-                fillColor: Theme.withAlpha(view.ter, 0.3)
-            }
-            Resource {
-                icon: Theme.icons.disk
-                frac: SysStats.diskFrac
-                shape: "gem"
-                valueColor: view.sec
-                shapeColor: Theme.withAlpha(view.sec, 0.22)
-                fillColor: Theme.withAlpha(view.sec, 0.4)
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 10 * view.s
+                    // Disco: barra horizontal com o espaço usado.
+                    Rectangle {
+                        Layout.fillWidth: true
+                        implicitHeight: 64 * view.s
+                        radius: 16 * view.s
+                        color: Theme.withAlpha(view.sec, 0.08)
+                        clip: true
+                        Rectangle {
+                            anchors.left: parent.left
+                            anchors.top: parent.top
+                            anchors.bottom: parent.bottom
+                            width: parent.width * SysStats.diskFrac
+                            color: Theme.withAlpha(view.sec, 0.28)
+                            Behavior on width { NumberAnimation { duration: 600; easing.type: Easing.OutCubic } }
+                        }
+                        Text {
+                            anchors.left: parent.left
+                            anchors.top: parent.top
+                            anchors.margins: 12 * view.s
+                            text: Theme.icons.disk + "  " + Theme.t("lock.disk", "Disco")
+                            font.family: Theme.iconFontFamily
+                            font.pixelSize: 11 * view.s
+                            color: Theme.withAlpha(view.sec, 0.9)
+                        }
+                        Text {
+                            anchors.right: parent.right
+                            anchors.bottom: parent.bottom
+                            anchors.margins: 10 * view.s
+                            text: Math.round(SysStats.diskUsedGiB) + " / " + Math.round(SysStats.diskTotalGiB) + " G"
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 15 * view.s
+                            font.weight: Font.DemiBold
+                            color: view.sec
+                        }
+                    }
+                    // Rede: velocidade agora.
+                    Rectangle {
+                        Layout.fillWidth: true
+                        implicitHeight: 64 * view.s
+                        radius: 16 * view.s
+                        color: Theme.withAlpha(view.pri, 0.08)
+                        function speed(b) {
+                            return b >= 1048576 ? (b / 1048576).toFixed(1).replace(".", ",") + " MB/s"
+                                 : Math.round(b / 1024) + " KB/s";
+                        }
+                        Text {
+                            anchors.left: parent.left
+                            anchors.top: parent.top
+                            anchors.margins: 12 * view.s
+                            text: Theme.icons.wifi4 + "  " + Theme.t("lock.net", "Rede")
+                            font.family: Theme.iconFontFamily
+                            font.pixelSize: 11 * view.s
+                            color: Theme.withAlpha(view.pri, 0.9)
+                        }
+                        Column {
+                            anchors.right: parent.right
+                            anchors.bottom: parent.bottom
+                            anchors.margins: 10 * view.s
+                            spacing: 0
+                            Text {
+                                anchors.right: parent.right
+                                text: "↓ " + parent.parent.speed(SysStats.netDown)
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 13 * view.s
+                                font.weight: Font.DemiBold
+                                color: view.pri
+                            }
+                            Text {
+                                anchors.right: parent.right
+                                text: "↑ " + parent.parent.speed(SysStats.netUp)
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 11 * view.s
+                                color: Theme.withAlpha(view.pri, 0.75)
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -1318,6 +1385,73 @@ Item {
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
             onClicked: view.ctl.sessionAction(sb.action)
+        }
+    }
+
+    // Cartão com "líquido": o nível (frac) sobe de baixo e a borda de cima
+    // ondula devagar. Nome no alto, valor grande embaixo à direita.
+    component LiquidMeter: Rectangle {
+        id: lm
+        property string label: ""
+        property string icon: ""
+        property real frac: 0
+        property string value: ""
+        property color tint: view.pri
+        Layout.fillWidth: true
+        implicitHeight: 118 * view.s
+        radius: 16 * view.s
+        color: Theme.withAlpha(tint, 0.08)
+        clip: true
+        Behavior on frac { NumberAnimation { duration: 700; easing.type: Easing.OutCubic } }
+
+        property real phase: 0
+        NumberAnimation on phase { from: 0; to: Math.PI * 2; duration: 2600; loops: Animation.Infinite; running: lm.visible }
+        Canvas {
+            id: liquid
+            anchors.fill: parent
+            onPaint: {
+                const c = getContext("2d");
+                c.reset();
+                const top = height * (1 - Math.max(0.02, Math.min(1, lm.frac)));
+                const amp = 3 * view.s;
+                c.beginPath();
+                c.moveTo(0, height);
+                for (let x = 0; x <= width; x += 4)
+                    c.lineTo(x, top + Math.sin(x / width * Math.PI * 2 + lm.phase) * amp);
+                c.lineTo(width, height);
+                c.closePath();
+                c.fillStyle = Theme.withAlpha(lm.tint, 0.35);
+                c.fill();
+                c.beginPath();
+                for (let x = 0; x <= width; x += 4) {
+                    const y = top + Math.sin(x / width * Math.PI * 2 + lm.phase) * amp;
+                    if (x === 0) c.moveTo(x, y); else c.lineTo(x, y);
+                }
+                c.lineWidth = 2;
+                c.strokeStyle = Theme.withAlpha(lm.tint, 0.8);
+                c.stroke();
+            }
+        }
+        onPhaseChanged: liquid.requestPaint()
+        onFracChanged: liquid.requestPaint()
+        Text {
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.margins: 12 * view.s
+            text: lm.icon + "  " + lm.label
+            font.family: Theme.iconFontFamily
+            font.pixelSize: 11 * view.s
+            color: Theme.withAlpha(lm.tint, 0.95)
+        }
+        Text {
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            anchors.margins: 10 * view.s
+            text: lm.value
+            font.family: Theme.fontFamily
+            font.pixelSize: 22 * view.s
+            font.weight: Font.DemiBold
+            color: Theme.foreground
         }
     }
 

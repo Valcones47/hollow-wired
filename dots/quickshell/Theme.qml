@@ -224,7 +224,7 @@ QtObject {
         account: "\u{F0009}", arch: "\u{F08C7}", monitor: "\u{F0379}", clock: "\u{F0150}",
         prev: "\u{F04AE}", play: "\u{F040A}", pause: "\u{F03E4}", next: "\u{F04AD}",
         lyrics: "\u{F0B77}", coffee: "\u{F0176}", coffeeOff: "\u{F0178}", shuffle: "\u{F049D}", repeat: "\u{F0456}", repeatOne: "\u{F0458}", repeatOff: "\u{F0457}",
-        cpu: "\u{F0EE0}", memory: "\u{F035B}", disk: "\u{F02CA}", gpu: "\u{F08AE}",
+        cpu: "\u{F0EE0}", temp: "\u{F050F}", memory: "\u{F035B}", disk: "\u{F02CA}", gpu: "\u{F08AE}",
         music: "\u{F0387}", confirm: "\u{F012C}",
         sunny: "\u{F0599}", night: "\u{F0594}", partly: "\u{F0595}", cloudy: "\u{F0590}",
         thermometer: "\u{F050F}", humidity: "\u{F058E}", wind: "\u{F059D}",
