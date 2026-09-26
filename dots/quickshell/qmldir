@@ -70,3 +70,4 @@ singleton SettingsIndex 1.0 SettingsIndex.qml
 AiSidebar 1.0 AiSidebar.qml
 singleton AudioPrefs 1.0 AudioPrefs.qml
 RecordingLibrary 1.0 RecordingLibrary.qml
+WifiList 1.0 WifiList.qml

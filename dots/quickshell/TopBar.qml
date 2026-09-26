@@ -122,6 +122,7 @@ PanelWindow {
         popAnchorX = anchorItem.mapToItem(root, anchorItem.width / 2, 0).x;
         pop = kind;
     }
+    function openNotifs(): void { showPopNow("notifs", notifMod); }
     function leavePop(): void {
         popShow.stop();
         popHide.restart();
@@ -249,7 +250,6 @@ PanelWindow {
         const s = activeNetwork.signalStrength;
         return s > 0.75 ? Theme.icons.wifi4 : s > 0.5 ? Theme.icons.wifi3 : s > 0.25 ? Theme.icons.wifi2 : Theme.icons.wifi1;
     }
-    Process { id: nmtuiProc; property string ssid: ""; command: ["kitty", "--class", "rice-nmtui", "-e", "nmtui-connect", ssid] }
     Process { id: netRestart; command: ["bash", "-c", "nmcli networking off && sleep 2 && nmcli networking on"] }
 
     // --- bluetooth ---
@@ -831,7 +831,7 @@ PanelWindow {
                     kind: ""
                     editKey: "notifications"
                     visible: ShellLayout.barHas("notifications")
-                    onClicked: bar.notifClicked()
+                    onClicked: bar.pop === "notifs" ? bar.pop = "" : bar.showPopNow("notifs", notifMod)
                     onRightClicked: NotifService.toggleDnd()
 
                     BarIcon {
@@ -1107,6 +1107,7 @@ PanelWindow {
                     case "picker": return pickerPop;
                     case "privacy": return privacyPop;
                     case "mixer": return mixerPop;
+                    case "notifs": return notifsPop;
                     }
                     return null;
                 }
@@ -1495,6 +1496,15 @@ PanelWindow {
                     }
                 }
 
+                // ---------- notificações (histórico, não perturbe) ----------
+                Item {
+                    id: notifsPop
+                    visible: popContent.current === notifsPop
+                    width: 400
+                    implicitHeight: notifsView.wantedHeight
+                    Notifications { id: notifsView; anchors.fill: parent; visible: notifsPop.visible }
+                }
+
                 // ---------- mixer (volume por app) ----------
                 ColumnLayout {
                     id: mixerPop
@@ -1681,36 +1691,16 @@ PanelWindow {
                             }
                         }
                     }
-                    PopText { text: Theme.t("topbar.wifi_hint", "Clique numa rede para conectar"); visible: Networking.wifiEnabled }
-
-                    Repeater {
-                        model: !bar.wifiDevice || !Networking.wifiEnabled ? [] : bar.wifiDevice.networks.values
-                            .slice().sort((a, b) => (b.connected - a.connected) || (b.known - a.known) || (b.signalStrength - a.signalStrength))
-                            .slice(0, 8)
-                        delegate: PopAction {
-                            required property var modelData
-                            icon: modelData.signalStrength > 0.75 ? Theme.icons.wifi4 : modelData.signalStrength > 0.5 ? Theme.icons.wifi3
-                                : modelData.signalStrength > 0.25 ? Theme.icons.wifi2 : Theme.icons.wifi1
-                            label: modelData.name
-                            detail: modelData.connected ? "conectado" : modelData.stateChanging ? "..." : modelData.known ? "salva" : ""
-                            selected: modelData.connected
-                            onActivated: {
-                                if (modelData.connected) return;
-                                if (modelData.known) {
-                                    modelData.connect();
-                                } else {
-                                    nmtuiProc.ssid = modelData.name;
-                                    nmtuiProc.running = true;
-                                    bar.pop = "";
-                                }
-                            }
-                        }
+                    
+                    WifiList {
+                        Layout.fillWidth: true
+                        device: bar.wifiDevice
                     }
 
                     PopAction {
                         Layout.topMargin: 6
                         icon: Theme.icons.refresh
-                        label: "Reiniciar rede"
+                        label: Theme.t("wifi.restart", "Reiniciar rede")
                         needsConfirm: true
                         onActivated: netRestart.running = true
                     }

@@ -15,6 +15,8 @@ import "."
 // O mako também não guarda horário das notificações.
 Item {
     id: root
+    // Altura que o conteúdo pede (usada pelos popups das barras).
+    readonly property real wantedHeight: 70 + (items.length ? Math.min(list.contentHeight + 8, 560) : 20)
 
     property var items: []
     property int clearedUpTo: NotifService.clearedUpTo
@@ -97,7 +99,12 @@ Item {
                 spacing: 0
                 PopTitle { text: root.items.length === 0 ? Theme.t("notif.empty", "Nenhuma notificação") : root.items.length + (root.items.length === 1 ? Theme.t("notif.single", " notificação") : Theme.t("notif.plural", " notificações")) }
                 PopText {
-                    text: root.dnd ? Theme.t("notif.dnd_sub", "Não perturbe ligado — elas chegam aqui, mas não aparecem na tela") : (NotifService.currentOwner === "quickshell" ? Theme.t("notif.sub_native", "Servidor nativo com horário e suporte a ações") : Theme.t("notif.sub_mako", "Histórico do mako"))
+                    // Só o que muda o comportamento; o texto técnico sobre o
+                    // servidor alargava o cabeçalho e cortava os botões.
+                    visible: root.dnd
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    text: Theme.t("notif.dnd_sub", "Não perturbe ligado — elas chegam aqui, mas não aparecem na tela")
                     font.pixelSize: 11
                 }
             }
@@ -105,7 +112,7 @@ Item {
             PopAction {
                 Layout.fillWidth: false
                 icon: root.dnd ? Theme.icons.bellOff : Theme.icons.bell
-                label: root.dnd ? Theme.t("notif.dnd_on", "Não perturbe: ligado") : Theme.t("notif.dnd_btn", "Não perturbe")
+                label: Theme.t("notif.dnd_btn", "Não perturbe")
                 selected: root.dnd
                 onActivated: NotifService.toggleDnd()
             }
@@ -113,7 +120,7 @@ Item {
                 Layout.fillWidth: false
                 visible: root.items.length > 0
                 icon: Theme.icons.trash
-                label: "Limpar"
+                label: Theme.t("notif.clear", "Limpar")
                 onActivated: root.setCleared(Math.max(...root.items.map(n => n.id)))
             }
         }

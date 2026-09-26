@@ -41,6 +41,12 @@ PanelWindow {
                 id: card
                 required property var modelData
                 required property int index
+                readonly property string imageSource: {
+                    const im = modelData.image || "";
+                    if (!im || !(im.includes("/") || /\.(png|jpe?g|webp)$/i.test(im))) return "";
+                    return im.startsWith("/") ? "file://" + im : im;
+                }
+                readonly property bool hasImage: imageSource !== ""
 
                 Layout.preferredWidth: 380
                 Layout.preferredHeight: contentCol.implicitHeight + 24
@@ -107,19 +113,46 @@ PanelWindow {
                         Layout.fillWidth: true
                         spacing: 12
 
-                        // Ícone do Aplicativo
-                        ClippingRectangle {
-                            Layout.preferredWidth: 36
-                            Layout.preferredHeight: 36
+                        // Quadrado da esquerda: a imagem da notificação (capa, print,
+                        // prévia) recortada; sem imagem, o ícone do app. Antes a
+                        // imagem vinha esticada embaixo do texto.
+                        Item {
+                            Layout.preferredWidth: card.hasImage ? 48 : 36
+                            Layout.preferredHeight: card.hasImage ? 48 : 36
                             Layout.alignment: Qt.AlignTop
+
+                        ClippingRectangle {
+                            visible: card.hasImage
+                            anchors.fill: parent
                             radius: 8
+                            color: Theme.tileHigh
+                            Image {
+                                anchors.fill: parent
+                                fillMode: Image.PreserveAspectCrop
+                                asynchronous: true
+                                sourceSize.width: 96
+                                sourceSize.height: 96
+                                source: card.imageSource
+                            }
+                        }
+
+                        ClippingRectangle {
+                            // Com imagem, o ícone do app vira um selo no canto.
+                            width: card.hasImage ? 20 : parent.width
+                            height: width
+                            anchors.right: parent.right
+                            anchors.bottom: parent.bottom
+                            anchors.rightMargin: card.hasImage ? -4 : 0
+                            anchors.bottomMargin: card.hasImage ? -4 : 0
+                            visible: !card.hasImage || notifIcon.visible
+                            radius: card.hasImage ? 6 : 8
                             color: Theme.tileHigh
 
                             IconImage {
                                 id: notifIcon
                                 anchors.centerIn: parent
-                                width: 24
-                                height: 24
+                                width: card.hasImage ? 16 : 24
+                                height: width
                                 source: NotifService.iconSource(card.modelData)
                                 visible: status === Image.Ready
                             }
@@ -132,6 +165,7 @@ PanelWindow {
                                 font.pixelSize: 18
                                 color: card.modelData.urgency === 2 ? Theme.critical : Theme.primary
                             }
+                        }
                         }
 
                         // Textos (App, Título, Mensagem)
@@ -212,15 +246,6 @@ PanelWindow {
                                 onClicked: NotifService.dismissToast(card.modelData.id)
                             }
                         }
-                    }
-
-                    // Imagem anexa (se presente e for arquivo de imagem)
-                    Image {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 120
-                        fillMode: Image.PreserveAspectCrop
-                        source: card.modelData.image ? (card.modelData.image.startsWith("/") ? "file://" + card.modelData.image : card.modelData.image) : ""
-                        visible: card.modelData.image && (card.modelData.image.includes("/") || card.modelData.image.match(/\.(png|jpg|jpeg|webp)$/i))
                     }
 
                     // Barra de progresso (se fornecida via hint "value")

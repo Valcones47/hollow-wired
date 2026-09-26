@@ -256,7 +256,7 @@ QtObject {
         check: "\u{F012C}",
         calendar: "\u{F00ED}", timer: "\u{F051B}", quote: "\u{F0281}", speed: "\u{F04C5}",
         equalizer: "\u{F0EA2}", mixer: "\u{F066A}", album: "\u{F0025}", bezier: "\u{F0AE8}",
-        compress: "\u{F066}", copy: "\u{F018F}"
+        compress: "\u{F066}", copy: "\u{F018F}", eye: "\u{F0208}", eyeOff: "\u{F0209}"
     })
 
     property FileView colorFile: FileView {

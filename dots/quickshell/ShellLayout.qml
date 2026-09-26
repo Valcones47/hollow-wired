@@ -37,7 +37,7 @@ QtObject {
             enabled: true,
             position: "top",      // top | bottom | left | right
             autohide: false,
-            workspaceCount: 0,    // 0 = só as áreas que existem; 1..10 = fixas
+            workspaceCount: 9,    // 0 = só as áreas que existem; 1..10 = fixas (padrão 9)
             showTitle: true
         },
         dock: {
@@ -67,7 +67,7 @@ QtObject {
     readonly property bool barEnabled: get("bar", "enabled", true)
     readonly property bool barAutohide: get("bar", "autohide", false)
     readonly property bool barVertical: barPosition === "left" || barPosition === "right"
-    readonly property int workspaceCount: get("bar", "workspaceCount", 0)
+    readonly property int workspaceCount: get("bar", "workspaceCount", 9)
     readonly property bool barShowTitle: get("bar", "showTitle", true)
 
     // Quais indicadores a barra mostra. Tudo ligado por padrão: a pessoa
@@ -207,7 +207,7 @@ QtObject {
     // ajustar depois cai no "custom" sozinho.
     readonly property var presets: ({
         topbar: {
-            bar: { enabled: true, position: "top", autohide: false, workspaceCount: 0, showTitle: true },
+            bar: { enabled: true, position: "top", autohide: false, workspaceCount: 9, showTitle: true },
             dock: { enabled: true, position: "bottom", autohide: true, fullWidth: false },
             sidebar: { enabled: true, position: "right", autohide: true }
         },

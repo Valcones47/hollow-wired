@@ -194,10 +194,6 @@ ShellRoot {
         launcherOpen: shellRoot.launcherOpen
         recording: sidebar.recording
         onClockClicked: hub.open = !hub.open
-        onNotifClicked: {
-            card.currentTab = 5;
-            hub.open = true;
-        }
         onVisualConfigClicked: visualConfig.open = !visualConfig.open
         onControlClicked: controlCenter.clickToggle()
         onControlHovered: on => on ? controlCenter.hoverEnter() : controlCenter.hoverLeave()
@@ -211,10 +207,6 @@ ShellRoot {
         energy: sidebar
         launcherOpen: shellRoot.launcherOpen
         onClockClicked: hub.open = !hub.open
-        onNotifClicked: {
-            card.currentTab = 5;
-            hub.open = true;
-        }
         onVisualConfigClicked: visualConfig.open = !visualConfig.open
         onControlClicked: controlCenter.clickToggle()
         onControlHovered: on => on ? controlCenter.hoverEnter() : controlCenter.hoverLeave()
@@ -426,11 +418,7 @@ ShellRoot {
                     { icon: Theme.icons.dashboard, label: Theme.t("hub.tab_dashboard", "Dashboard") },
                     { icon: Theme.icons.media, label: Theme.t("hub.tab_media", "Mídia") },
                     { icon: Theme.icons.performance, label: Theme.t("hub.tab_performance", "Performance") },
-                    { icon: Theme.icons.workspaces, label: Theme.t("hub.tab_workspaces", "Workspaces") },
-                    { icon: Theme.icons.tune, label: Theme.t("hub.tab_appearance", "Aparência") },
-                    { icon: Theme.icons.bell, label: Theme.t("hub.tab_notifications", "Notificações") },
-                    { icon: Theme.icons.record, label: Theme.t("hub.tab_recording", "Gravação") },
-                    { icon: Theme.icons.calendar, label: Theme.t("hub.tab_agenda", "Agenda") }
+                    { icon: Theme.icons.record, label: Theme.t("hub.tab_recording", "Gravação") }
                 ]
 
                 ColumnLayout {
@@ -554,33 +542,9 @@ ShellRoot {
                             visible: opacity > 0
                             Behavior on opacity { NumberAnimation { duration: Theme.ms(140) } }
                         }
-                        Workspaces {
-                            anchors.fill: parent
-                            opacity: card.currentTab === 3 ? 1 : 0
-                            visible: opacity > 0
-                            Behavior on opacity { NumberAnimation { duration: Theme.ms(140) } }
-                        }
-                        Appearance {
-                            anchors.fill: parent
-                            opacity: card.currentTab === 4 ? 1 : 0
-                            visible: opacity > 0
-                            Behavior on opacity { NumberAnimation { duration: Theme.ms(140) } }
-                        }
-                        Notifications {
-                            anchors.fill: parent
-                            opacity: card.currentTab === 5 && hub.visible ? 1 : 0
-                            visible: opacity > 0
-                            Behavior on opacity { NumberAnimation { duration: Theme.ms(140) } }
-                        }
                         Recording {
                             anchors.fill: parent
-                            opacity: card.currentTab === 6 && hub.visible ? 1 : 0
-                            visible: opacity > 0
-                            Behavior on opacity { NumberAnimation { duration: Theme.ms(140) } }
-                        }
-                        Agenda {
-                            anchors.fill: parent
-                            opacity: card.currentTab === 7 && hub.visible ? 1 : 0
+                            opacity: card.currentTab === 3 && hub.visible ? 1 : 0
                             visible: opacity > 0
                             Behavior on opacity { NumberAnimation { duration: Theme.ms(140) } }
                         }
@@ -611,8 +575,8 @@ ShellRoot {
             function count(): string { return String(NotifService.unreadCount); }
             function clear(): void { NotifService.setCleared(NotifService.maxId); }
             function open(): void {
-                card.currentTab = 5;
-                hub.open = true;
+                if (ShellLayout.barVertical) vbar.openNotifs();
+                else topbar.openNotifs();
             }
         }
     }

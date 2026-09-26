@@ -1745,5 +1745,18 @@
   "rec.tab_library": "Recordings",
   "rec.lib_count": "%1 recordings · %2",
   "rec.c_720": "720p, same quality",
-  "rec.lib_hint": "Double-click opens the video. Delete moves it to the trash."
+  "rec.lib_hint": "Double-click opens the video. Delete moves it to the trash.",
+  "wifi.psk_short": "The password has at least 8 characters",
+  "wifi.wrong_psk": "Wrong password",
+  "wifi.failed": "Could not connect",
+  "wifi.connecting": "connecting…",
+  "wifi.saved": "saved",
+  "wifi.psk": "Password",
+  "wifi.connect": "Connect",
+  "wifi.disconnect": "Disconnect",
+  "wifi.forget": "Forget network",
+  "wifi.restart": "Restart network",
+  "theme.panel_bg": "Settings background follows the theme",
+  "theme.panel_bg_sub": "Off, the panel uses a neutral dark grey.",
+  "notif.clear": "Clear"
 }

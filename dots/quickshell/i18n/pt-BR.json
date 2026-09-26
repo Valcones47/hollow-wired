@@ -1745,5 +1745,18 @@
   "rec.tab_library": "Gravações",
   "rec.lib_count": "%1 gravações · %2",
   "rec.c_720": "720p, mesma qualidade",
-  "rec.lib_hint": "Dois cliques abre o vídeo. Apagar manda para a lixeira."
+  "rec.lib_hint": "Dois cliques abre o vídeo. Apagar manda para a lixeira.",
+  "wifi.psk_short": "A senha tem pelo menos 8 caracteres",
+  "wifi.wrong_psk": "Senha incorreta",
+  "wifi.failed": "Não foi possível conectar",
+  "wifi.connecting": "conectando…",
+  "wifi.saved": "salva",
+  "wifi.psk": "Senha",
+  "wifi.connect": "Conectar",
+  "wifi.disconnect": "Desconectar",
+  "wifi.forget": "Esquecer rede",
+  "wifi.restart": "Reiniciar rede",
+  "theme.panel_bg": "Fundo das configurações segue o tema",
+  "theme.panel_bg_sub": "Desligado, o painel usa um cinza escuro neutro.",
+  "notif.clear": "Limpar"
 }

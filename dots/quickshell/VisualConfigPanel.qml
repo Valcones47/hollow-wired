@@ -1346,6 +1346,14 @@ PanelWindow {
         }
     }
 
+    // Fundo do painel. Padrão: cinza escuro neutro (o fundo tirado do tema,
+    // misturado com preto, ficava quase preto). "Fundo segue o tema" volta ao
+    // antigo. No tema claro sempre segue o tema.
+    readonly property bool bgThemed: ShellLayout.get("panel", "themedBg", false)
+    readonly property bool lightUi: Theme.background.hslLightness > 0.5
+    readonly property color cardBg: bgThemed || lightUi ? Theme.mix(Theme.background, "#0a0a12", lightUi ? 0 : 0.4) : "#202125"
+    readonly property color sideBg: bgThemed || lightUi ? Theme.withAlpha(Theme.mix(Theme.background, "#000000", lightUi ? 0.04 : 0.35), 0.75) : "#1a1b1e"
+
     // Economia de energia do Wi-Fi: null = sem placa Wi-Fi (a opção some).
     property var wifiPowersave: null
     Process {
@@ -2119,7 +2127,7 @@ PanelWindow {
         height: Math.max(660, Math.min(1000, win.height * 0.92))
         anchors.centerIn: parent
         radius: 20
-        color: Theme.mix(Theme.background, "#0a0a12", 0.4)
+        color: win.cardBg
         border.width: 1.5
         border.color: Theme.withAlpha(Theme.primary, 0.4)
         focus: win.open
@@ -2331,7 +2339,7 @@ PanelWindow {
                 Layout.fillHeight: true
                 topLeftRadius: 20
                 bottomLeftRadius: 20
-                color: Theme.withAlpha(Theme.mix(Theme.background, "#000000", 0.35), 0.75)
+                color: win.sideBg
 
                 ColumnLayout {
                     anchors.fill: parent
@@ -5226,6 +5234,13 @@ PanelWindow {
                                                 Quickshell.execDetached(["rice-theme-mode", "set", v]);
                                             }
                                         }
+                                    }
+                                    RowDivider {}
+                                    OptionToggle {
+                                        title: Theme.t("theme.panel_bg", "Fundo das configurações segue o tema")
+                                        subtitle: Theme.t("theme.panel_bg_sub", "Desligado, o painel usa um cinza escuro neutro.")
+                                        checked: win.bgThemed
+                                        onToggled: v => ShellLayout.set("panel", "themedBg", v)
                                     }
                                     RowDivider {}
                                     OptionToggle {

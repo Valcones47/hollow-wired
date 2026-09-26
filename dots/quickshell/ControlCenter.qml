@@ -481,12 +481,24 @@ PanelWindow {
                     }
                 }
 
-                // ---------- redes Wi-Fi salvas ----------
-                ColumnLayout {
+                // ---------- redes Wi-Fi ----------
+                WifiList {
                     Layout.fillWidth: true
                     visible: cc.wifiOpen
+                    device: cc.wifiDevice
+                }
+                Binding {
+                    target: cc.wifiDevice
+                    property: "scannerEnabled"
+                    value: cc.wifiOpen
+                    when: cc.wifiDevice !== null && cc.wifiOpen
+                }
+
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    visible: cc.wifiOpen && cc.savedWifi.length > 0
                     spacing: 4
-                    PopTitle { text: Theme.t("cc.saved_networks", "Redes salvas") }
+                    PopTitle { text: Theme.t("cc.saved_networks", "Redes salvas"); Layout.topMargin: 6 }
                     PopText { text: Theme.t("cc.forget_hint", "Clique duas vezes para esquecer a rede (a senha salva é apagada).") }
                     Repeater {
                         model: cc.wifiOpen ? cc.savedWifi : []

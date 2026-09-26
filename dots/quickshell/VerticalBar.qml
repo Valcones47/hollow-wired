@@ -78,6 +78,7 @@ PanelWindow {
         vbar.pop = kind;
     }
     function leavePop() { popHide.restart(); }
+    function openNotifs() { showPop("notifs", vNotif); }
     Timer { id: popHide; interval: 280; onTriggered: if (!popBox.busy) vbar.pop = "" }
     Timer { id: showDelay; interval: 60; onTriggered: vbar.barHovered = true }
 
@@ -600,7 +601,7 @@ PanelWindow {
                         : (NotifService.unreadCount > 0 ? Theme.primary : Theme.textColor)
                     badge: NotifService.unreadCount > 0
                         ? (NotifService.unreadCount > 99 ? "99+" : String(NotifService.unreadCount)) : ""
-                    onActivated: vbar.notifClicked()
+                    onActivated: vbar.pop === "notifs" ? vbar.pop = "" : vbar.showPop("notifs", vNotif)
                     onSecondary: NotifService.toggleDnd()
                 }
 
@@ -932,6 +933,14 @@ PanelWindow {
                 item: vbar.pop === "tray" ? vbar.popTray : null
                 maxWidth: popBox.width - 28
                 onTriggered: vbar.pop = ""
+            }
+
+            // ---- notificações ----
+            Item {
+                visible: vbar.pop === "notifs"
+                Layout.fillWidth: true
+                Layout.preferredHeight: vNotifsView.wantedHeight
+                Notifications { id: vNotifsView; anchors.fill: parent; visible: parent.visible }
             }
 
             // ---- rede ----
