@@ -427,6 +427,10 @@ PYFF
         cp -a "$REPO_DIR/dots/mako" "$HOME/.config/"
     fi
     [ -d "$REPO_DIR/dots/applications" ] && cp -a "$REPO_DIR/dots/applications/"* "$HOME/.local/share/applications/" 2>/dev/null || true
+    if [ -d "$REPO_DIR/dots/dbus-services" ]; then
+        mkdir -p "$HOME/.local/share/dbus-1/services"
+        cp -a "$REPO_DIR/dots/dbus-services/"*.service "$HOME/.local/share/dbus-1/services/" 2>/dev/null || true
+    fi
 
     # [fix] Antes era um `cp -a` direto na pasta inteira. Quando um dos binários
     # estava EM EXECUÇÃO (o caso clássico é o waywallen-layer-shell, que fica

@@ -1,0 +1,361 @@
+#!/usr/bin/env python3
+"""rice-jobs — progresso de cópias, extrações e compactações dos apps KDE.
+
+O Ark, o Dolphin e os outros apps KDE mandam o andamento dos trabalhos longos
+(extrair, compactar, copiar, mover) para o serviço D-Bus org.kde.JobViewServer,
+que só o Plasma fornece. Fora do Plasma ninguém respondia e o progresso sumia.
+Este script faz esse papel: recebe o andamento e o grava em
+$XDG_RUNTIME_DIR/rice-jobs.json, que o Quickshell mostra (JobProgress.qml).
+
+Sobe sozinho por ativação D-Bus (~/.local/share/dbus-1/services/
+org.kde.JobViewServer.service) quando um app pede, e sai depois de um tempo
+sem trabalhos.
+
+Protocolos atendidos (ver /usr/share/dbus-1/interfaces/kf6_org.kde.JobView*):
+  - org.kde.JobViewServerV2.requestView(desktopEntry, capabilities, hints)
+    -> view org.kde.JobViewV3 (update(a{sv}), terminate(u, s, a{sv}))  [KF6]
+  - org.kde.JobViewServer.requestView(appName, icon, capabilities)
+    -> view org.kde.JobViewV2 (setPercent, setSpeed, ...)             [antigo]
+
+Uso:
+  rice-jobs              roda o serviço (normalmente pela ativação D-Bus)
+  rice-jobs cancel <id>  pede para cancelar o trabalho <id>
+"""
+
+import json
+import os
+import sys
+import time
+
+import dbus
+import dbus.service
+from dbus.mainloop.glib import DBusGMainLoop
+from gi.repository import GLib
+
+BUS_NAME = "org.kde.JobViewServer"
+SERVER_PATH = "/JobViewServer"
+CTRL_IFACE = "org.hollowwired.Jobs"
+STATE = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "rice-jobs.json")
+IDLE_EXIT_S = 120          # sem trabalhos por esse tempo: sai (a ativação traz de volta)
+KEEP_FINISHED_S = 6        # quanto tempo um trabalho terminado fica na lista
+
+
+def plain(v):
+    """dbus.* -> tipos Python simples (para o JSON)."""
+    if isinstance(v, (dbus.Boolean,)):
+        return bool(v)
+    if isinstance(v, (dbus.Byte, dbus.Int16, dbus.Int32, dbus.Int64,
+                      dbus.UInt16, dbus.UInt32, dbus.UInt64)):
+        return int(v)
+    if isinstance(v, dbus.Double):
+        return float(v)
+    if isinstance(v, (dbus.String, dbus.ObjectPath, dbus.Signature)):
+        return str(v)
+    if isinstance(v, (dbus.Array, list, tuple)):
+        return [plain(x) for x in v]
+    if isinstance(v, (dbus.Dictionary, dict)):
+        return {str(k): plain(x) for k, x in v.items()}
+    return v
+
+
+def app_label(entry):
+    """'org.kde.ark' -> nome do .desktop ('Ark'), senão o próprio id."""
+    entry = str(entry or "")
+    for base in (os.path.expanduser("~/.local/share/applications"), "/usr/share/applications"):
+        p = os.path.join(base, entry + ".desktop")
+        try:
+            with open(p, encoding="utf-8") as f:
+                for line in f:
+                    if line.startswith("Name="):
+                        return line[5:].strip()
+        except OSError:
+            continue
+    return entry.split(".")[-1].capitalize() if entry else ""
+
+
+class Server(dbus.service.Object):
+    def __init__(self, bus):
+        self.bus = bus
+        self.jobs = {}          # id -> dict (estado)
+        self.views = {}         # id -> View
+        self.next_id = 1
+        self.dirty = False
+        self.last_active = time.time()
+        super().__init__(bus, SERVER_PATH)
+        self.write()
+        GLib.timeout_add(250, self.flush)
+        GLib.timeout_add_seconds(2, self.housekeep)
+
+    # ---------- servidor V2 (KF6) ----------
+    @dbus.service.method("org.kde.JobViewServerV2", in_signature="sia{sv}", out_signature="o",
+                         sender_keyword="sender")
+    def requestView(self, desktop_entry, capabilities, hints, sender=None):
+        return self._new_view(3, desktop_entry, "", capabilities, hints, sender)
+
+    # ---------- servidor V1 (antigo) ----------
+    # Mesmo nome de método em outra interface. O dbus-python registra pelo
+    # __name__ da função, então o atributo Python tem outro nome e o
+    # __name__ é o do D-Bus.
+    def _request_view_v1(self, app_name, icon, capabilities, sender=None):
+        return self._new_view(2, app_name, icon, capabilities, {}, sender)
+    _request_view_v1.__name__ = "requestView"
+    requestView_v1 = dbus.service.method("org.kde.JobViewServer", in_signature="ssi", out_signature="o",
+                                         sender_keyword="sender")(_request_view_v1)
+
+    # ---------- o que o KIO pergunta antes de usar o servidor ----------
+    # KDynamicJobTracker (kio/src/widgets/kdynamicjobtracker.cpp): faz
+    # Introspect em org.kde.kuiserver /JobViewServer procurando a interface
+    # JobViewServerV2 e chama requiresJobTracker(); sem resposta válida (ou
+    # com true) ele desiste do servidor e o progresso não chega aqui.
+    @dbus.service.method("org.kde.kuiserver", in_signature="", out_signature="b")
+    def requiresJobTracker(self):
+        return False
+
+    @dbus.service.signal("org.kde.kuiserver", signature="b")
+    def requiresJobTrackerChanged(self, value):
+        pass
+
+    # ---------- controle (Quickshell) ----------
+    @dbus.service.method(CTRL_IFACE, in_signature="u", out_signature="b")
+    def Cancel(self, job_id):
+        v = self.views.get(int(job_id))
+        if not v:
+            return False
+        v.cancelRequested()
+        return True
+
+    @dbus.service.method(CTRL_IFACE, in_signature="u", out_signature="")
+    def Dismiss(self, job_id):
+        j = self.jobs.get(int(job_id))
+        if j and j["state"] != "running":
+            self.jobs.pop(int(job_id), None)
+            self.dirty = True
+
+    def _new_view(self, version, entry, icon, capabilities, hints, sender):
+        jid = self.next_id
+        self.next_id += 1
+        self.jobs[jid] = {
+            "id": jid, "app": app_label(entry), "entry": str(entry), "icon": str(icon or entry),
+            "title": "", "info": "", "label1": "", "value1": "", "label2": "", "value2": "",
+            "percent": -1, "processed": 0, "total": 0, "files": 0, "totalFiles": 0,
+            "speed": 0, "suspended": False, "state": "running", "error": "",
+            "cancelable": bool(int(capabilities) & 1), "started": time.time(), "ended": 0,
+        }
+        view = View(self, jid, version, sender)
+        self.views[jid] = view
+        if hints:
+            self.apply(jid, plain(hints))
+        self.last_active = time.time()
+        self.dirty = True
+        return dbus.ObjectPath(view.path)
+
+    # Aplica as propriedades do update() da V3.
+    def apply(self, jid, props):
+        j = self.jobs.get(jid)
+        if not j:
+            return
+        m = {"title": "title", "infoMessage": "info",
+             "descriptionLabel1": "label1", "descriptionValue1": "value1",
+             "descriptionLabel2": "label2", "descriptionValue2": "value2",
+             "suspended": "suspended"}
+        for k, dst in m.items():
+            if k in props:
+                j[dst] = props[k]
+        if "percent" in props:
+            j["percent"] = int(props["percent"])
+        if "speed" in props:
+            j["speed"] = int(props["speed"])
+        if "processedAmount-bytes" in props:
+            j["processed"] = int(props["processedAmount-bytes"])
+        if "totalAmount-bytes" in props:
+            j["total"] = int(props["totalAmount-bytes"])
+        if "processedAmount-files" in props:
+            j["files"] = int(props["processedAmount-files"])
+        if "totalAmount-files" in props:
+            j["totalFiles"] = int(props["totalAmount-files"])
+        self.last_active = time.time()
+        self.dirty = True
+
+    def finish(self, jid, code, message):
+        j = self.jobs.get(jid)
+        if j:
+            # 1 = KJob::KilledJobError (cancelado): não é erro para mostrar.
+            j["state"] = "error" if code not in (0, 1) else ("canceled" if code == 1 else "done")
+            j["error"] = str(message or "")
+            if j["state"] == "done" and j["percent"] >= 0:
+                j["percent"] = 100
+            j["ended"] = time.time()
+        v = self.views.pop(jid, None)
+        if v:
+            GLib.timeout_add_seconds(1, lambda: (v.remove_from_connection(), False)[1])
+        self.last_active = time.time()
+        self.dirty = True
+
+    def sender_gone(self, sender):
+        for jid, v in list(self.views.items()):
+            if v.sender == sender:
+                self.finish(jid, 0, "")
+
+    def housekeep(self):
+        now = time.time()
+        for jid, j in list(self.jobs.items()):
+            if j["state"] != "running" and now - j["ended"] > KEEP_FINISHED_S:
+                self.jobs.pop(jid)
+                self.dirty = True
+        if not self.jobs and now - self.last_active > IDLE_EXIT_S:
+            loop.quit()
+            return False
+        return True
+
+    def flush(self):
+        if self.dirty:
+            self.write()
+        return True
+
+    def write(self):
+        self.dirty = False
+        data = {"updated": time.time(), "jobs": sorted(self.jobs.values(), key=lambda j: j["id"])}
+        tmp = STATE + ".tmp"
+        try:
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False)
+            os.replace(tmp, STATE)
+        except OSError:
+            pass
+
+
+class View(dbus.service.Object):
+    def __init__(self, server, jid, version, sender):
+        self.server = server
+        self.jid = jid
+        self.version = version
+        self.sender = str(sender or "")
+        self.path = "/JobViewServer/JobView_%d" % jid
+        super().__init__(server.bus, self.path)
+        if self.sender:
+            # App que fechou ou travou sem terminar o trabalho: some da lista.
+            self._watch = server.bus.watch_name_owner(self.sender, self._owner_changed)
+
+    def _owner_changed(self, owner):
+        if not owner:
+            self.server.sender_gone(self.sender)
+
+    # ---------- V3 (KF6) ----------
+    @dbus.service.method("org.kde.JobViewV3", in_signature="a{sv}", out_signature="")
+    def update(self, props):
+        self.server.apply(self.jid, plain(props))
+
+    @dbus.service.method("org.kde.JobViewV3", in_signature="usa{sv}", out_signature="")
+    def terminate(self, code, message, hints):
+        if hints:
+            self.server.apply(self.jid, plain(hints))
+        self.server.finish(self.jid, int(code), str(message))
+
+    @dbus.service.signal("org.kde.JobViewV3")
+    def cancelRequested(self):
+        pass
+
+    @dbus.service.signal("org.kde.JobViewV3")
+    def suspendRequested(self):
+        pass
+
+    @dbus.service.signal("org.kde.JobViewV3")
+    def resumeRequested(self):
+        pass
+
+    # ---------- V2 (antigo) ----------
+    def _set(self, **kw):
+        self.server.apply(self.jid, kw)
+
+    def _terminate_v2(self, message):
+        self.server.finish(self.jid, 2 if message else 0, str(message))
+    _terminate_v2.__name__ = "terminate"
+    terminate_v2 = dbus.service.method("org.kde.JobViewV2", in_signature="s", out_signature="")(_terminate_v2)
+
+    @dbus.service.method("org.kde.JobViewV2", in_signature="b", out_signature="")
+    def setSuspended(self, s):
+        self._set(suspended=bool(s))
+
+    @dbus.service.method("org.kde.JobViewV2", in_signature="ts", out_signature="")
+    def setTotalAmount(self, amount, unit):
+        self._set(**{"totalAmount-" + str(unit): int(amount)})
+
+    @dbus.service.method("org.kde.JobViewV2", in_signature="ts", out_signature="")
+    def setProcessedAmount(self, amount, unit):
+        self._set(**{"processedAmount-" + str(unit): int(amount)})
+
+    @dbus.service.method("org.kde.JobViewV2", in_signature="u", out_signature="")
+    def setPercent(self, p):
+        self._set(percent=int(p))
+
+    @dbus.service.method("org.kde.JobViewV2", in_signature="t", out_signature="")
+    def setSpeed(self, s):
+        self._set(speed=int(s))
+
+    @dbus.service.method("org.kde.JobViewV2", in_signature="t", out_signature="")
+    def setElapsedTime(self, t):
+        pass
+
+    @dbus.service.method("org.kde.JobViewV2", in_signature="s", out_signature="")
+    def setInfoMessage(self, m):
+        self._set(infoMessage=str(m), title=self.server.jobs.get(self.jid, {}).get("title") or str(m))
+
+    @dbus.service.method("org.kde.JobViewV2", in_signature="uss", out_signature="b")
+    def setDescriptionField(self, n, name, value):
+        n = int(n) + 1
+        if n in (1, 2):
+            self._set(**{"descriptionLabel%d" % n: str(name), "descriptionValue%d" % n: str(value)})
+        return True
+
+    @dbus.service.method("org.kde.JobViewV2", in_signature="u", out_signature="")
+    def clearDescriptionField(self, n):
+        pass
+
+    @dbus.service.method("org.kde.JobViewV2", in_signature="v", out_signature="")
+    def setDestUrl(self, url):
+        pass
+
+    @dbus.service.method("org.kde.JobViewV2", in_signature="u", out_signature="")
+    def setError(self, code):
+        pass
+
+
+def ctl(method, jid):
+    bus = dbus.SessionBus()
+    obj = bus.get_object(BUS_NAME, SERVER_PATH)
+    return obj.get_dbus_method(method, CTRL_IFACE)(dbus.UInt32(int(jid)))
+
+
+if __name__ == "__main__":
+    args = sys.argv[1:]
+    if args and args[0] in ("cancel", "dismiss"):
+        if len(args) < 2:
+            print("uso: rice-jobs cancel|dismiss <id>", file=sys.stderr)
+            sys.exit(2)
+        try:
+            ctl("Cancel" if args[0] == "cancel" else "Dismiss", args[1])
+        except dbus.DBusException as e:
+            print(e, file=sys.stderr)
+            sys.exit(1)
+        sys.exit(0)
+    if args and args[0] in ("-h", "--help"):
+        print(__doc__)
+        sys.exit(0)
+
+    DBusGMainLoop(set_as_default=True)
+    bus = dbus.SessionBus()
+    name = dbus.service.BusName(BUS_NAME, bus, do_not_queue=True)
+    # Nome antigo que a KJobWidgets tenta ativar quando não acha o servidor.
+    try:
+        old_name = dbus.service.BusName("org.kde.kuiserver", bus, do_not_queue=True)
+    except dbus.DBusException:
+        old_name = None
+    server = Server(bus)
+    loop = GLib.MainLoop()
+    try:
+        loop.run()
+    finally:
+        try:
+            os.remove(STATE)
+        except OSError:
+            pass

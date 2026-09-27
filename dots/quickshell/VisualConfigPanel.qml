@@ -3331,6 +3331,18 @@ PanelWindow {
                                             Quickshell.execDetached(["bash", "-c", "python3 -c \"import json, os; p=os.path.expanduser('~/.config/hollow-wired/notifications.json'); d=json.load(open(p)) if os.path.exists(p) else {}; d['lock_content']=" + (nextVal ? "True" : "False") + "; json.dump(d, open(p, 'w'), indent=2)\""]);
                                         }
                                     }
+
+                                    RowDivider {}
+
+                                    OptionToggle {
+                                        title: Theme.t("notif.job_progress", "Mostrar progresso de cópias e extrações")
+                                        subtitle: Theme.t("notif.job_progress_sub", "Ark, Dolphin e outros apps KDE: porcentagem, velocidade, tempo restante e botão de cancelar.")
+                                        checked: NotifService.jobProgress
+                                        onToggled: nextVal => {
+                                            NotifService.jobProgress = nextVal;
+                                            Quickshell.execDetached(["bash", "-c", "python3 -c \"import json, os; p=os.path.expanduser('~/.config/hollow-wired/notifications.json'); d=json.load(open(p)) if os.path.exists(p) else {}; d['job_progress']=" + (nextVal ? "True" : "False") + "; json.dump(d, open(p, 'w'), indent=2)\""]);
+                                        }
+                                    }
                                 }
 
                                 Rectangle {

@@ -1919,5 +1919,13 @@
   "sysinfo.external": "external",
   "autostart.enabled_toast": "Enabled: ",
   "autostart.disabled_toast": "Disabled: ",
-  "snap.type": "Type: %1"
+  "snap.type": "Type: %1",
+  "notif.job_progress": "Show copy and extraction progress",
+  "notif.job_progress_sub": "Ark, Dolphin and other KDE apps: percentage, speed, time left and a cancel button.",
+  "jobs.done": "Done",
+  "jobs.canceled": "Canceled",
+  "jobs.failed": "Failed",
+  "jobs.files": "%1 of %2 files",
+  "jobs.remaining": "%1 left",
+  "jobs.cancel": "Cancel"
 }

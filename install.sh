@@ -459,6 +459,12 @@ fi
 # 4. Cópia dos atalhos .desktop e binários
 gear_msg "Instalando utilitários do rice em ~/.local/bin/..."
 [ -d "$SCRIPT_DIR/dots/applications" ] && cp -a "$SCRIPT_DIR/dots/applications/"* "$HOME/.local/share/applications/" 2>/dev/null || true
+# Serviços D-Bus ativados sob demanda (rice-jobs: progresso de cópias e
+# extrações dos apps KDE, no lugar do servidor do Plasma).
+if [ -d "$SCRIPT_DIR/dots/dbus-services" ]; then
+    mkdir -p "$HOME/.local/share/dbus-1/services"
+    cp -a "$SCRIPT_DIR/dots/dbus-services/"*.service "$HOME/.local/share/dbus-1/services/" 2>/dev/null || true
+fi
 cp -a --remove-destination "$SCRIPT_DIR/dots/bin/"* "$HOME/.local/bin/"
 chmod +x "$HOME/.local/bin/"*
 

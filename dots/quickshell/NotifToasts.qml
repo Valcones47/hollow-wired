@@ -24,7 +24,9 @@ PanelWindow {
     focusable: false
 
     // Só fica visível enquanto houver toasts ativos e o DND estiver desligado
-    visible: NotifService.activeToasts.length > 0 && !NotifService.dnd
+    // O progresso de cópias/extrações aparece mesmo no Não Perturbe: foi a
+    // própria pessoa que pediu o trabalho.
+    visible: (NotifService.activeToasts.length > 0 && !NotifService.dnd) || NotifService.visibleJobs.length > 0
 
     implicitWidth: 380
     implicitHeight: toastList.implicitHeight
@@ -33,6 +35,177 @@ PanelWindow {
         id: toastList
         width: parent.width
         spacing: 10
+
+        // ---------- progresso de cópias, extrações e compactações ----------
+        Repeater {
+            model: NotifService.visibleJobs
+            delegate: Rectangle {
+                id: job
+                required property var modelData
+                readonly property var j: NotifService.jobMap[modelData] || ({ state: "done", percent: -1 })
+                readonly property bool running: j.state === "running"
+                readonly property real frac: j.percent >= 0 ? Math.min(1, j.percent / 100)
+                                           : (j.total > 0 ? Math.min(1, j.processed / j.total) : -1)
+                function fmtBytes(b) {
+                    const u = ["B", "KB", "MB", "GB", "TB"];
+                    let i = 0, v = b;
+                    while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; }
+                    return (i === 0 ? v : v.toFixed(v < 10 ? 1 : 0)) + " " + u[i];
+                }
+                function fmtTime(s) {
+                    s = Math.round(s);
+                    if (s < 60) return s + " s";
+                    if (s < 3600) return Math.floor(s / 60) + " min " + (s % 60) + " s";
+                    return Math.floor(s / 3600) + " h " + Math.floor((s % 3600) / 60) + " min";
+                }
+                readonly property string fileName: {
+                    const v = j.value1 || j.value2 || "";
+                    const cut = v.replace(/\/+$/, "").split("/");
+                    return cut[cut.length - 1] || v;
+                }
+                readonly property string detail: {
+                    if (j.state === "done") return Theme.t("jobs.done", "Concluído");
+                    if (j.state === "canceled") return Theme.t("jobs.canceled", "Cancelado");
+                    if (j.state === "error") return j.error || Theme.t("jobs.failed", "Falhou");
+                    const parts = [];
+                    if (j.total > 0) parts.push(fmtBytes(j.processed) + " / " + fmtBytes(j.total));
+                    else if (j.totalFiles > 0) parts.push(Theme.t("jobs.files", "%1 de %2 arquivos").replace("%1", j.files).replace("%2", j.totalFiles));
+                    if (j.speed > 0) {
+                        parts.push(fmtBytes(j.speed) + "/s");
+                        if (j.total > j.processed)
+                            parts.push(Theme.t("jobs.remaining", "faltam %1").replace("%1", fmtTime((j.total - j.processed) / j.speed)));
+                    }
+                    return parts.join(" · ");
+                }
+
+                Layout.preferredWidth: 380
+                Layout.preferredHeight: jobCol.implicitHeight + 24
+                radius: Theme.tileRadius
+                color: Theme.tile
+                border.width: 1
+                border.color: j.state === "error" ? Theme.critical : Theme.border
+
+                ColumnLayout {
+                    id: jobCol
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: 12
+                    spacing: 8
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 10
+                        IconImage {
+                            implicitSize: 28
+                            source: Quickshell.iconPath(job.j.icon || job.j.entry || "", "preferences-system-windows")
+                        }
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 1
+                            Text {
+                                Layout.fillWidth: true
+                                text: job.j.title || job.j.app
+                                elide: Text.ElideRight
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 13
+                                font.weight: Font.DemiBold
+                                color: Theme.textColor
+                            }
+                            Text {
+                                Layout.fillWidth: true
+                                visible: text !== ""
+                                text: job.fileName
+                                elide: Text.ElideMiddle
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 11
+                                color: Theme.subtext
+                            }
+                        }
+                        Text {
+                            visible: job.frac >= 0
+                            text: Math.round(job.frac * 100) + "%"
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 13
+                            font.weight: Font.DemiBold
+                            color: job.running ? Theme.primary : Theme.subtext
+                        }
+                    }
+
+                    // Barra: sem porcentagem conhecida, um trecho que corre.
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 6
+                        radius: 3
+                        color: Theme.tileHigh
+                        clip: true
+                        Rectangle {
+                            visible: job.frac >= 0
+                            height: parent.height
+                            radius: 3
+                            width: parent.width * Math.max(0, job.frac)
+                            color: job.j.state === "error" ? Theme.critical : Theme.primary
+                            Behavior on width { NumberAnimation { duration: 240 } }
+                        }
+                        Rectangle {
+                            id: indet
+                            visible: job.frac < 0 && job.running
+                            height: parent.height
+                            radius: 3
+                            width: parent.width * 0.3
+                            color: Theme.primary
+                            NumberAnimation on x {
+                                running: indet.visible
+                                from: -indet.width; to: indet.parent.width
+                                duration: 1200; loops: Animation.Infinite
+                            }
+                        }
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 8
+                        Text {
+                            Layout.fillWidth: true
+                            text: job.detail
+                            elide: Text.ElideRight
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 11
+                            color: job.j.state === "error" ? Theme.critical : Theme.subtext
+                        }
+                        Rectangle {
+                            visible: job.running && job.j.cancelable
+                            implicitWidth: cancelTxt.implicitWidth + 18
+                            implicitHeight: 24
+                            radius: 8
+                            color: cancelArea.containsMouse ? Theme.withAlpha(Theme.critical, 0.25) : Theme.tileHigh
+                            Text {
+                                id: cancelTxt
+                                anchors.centerIn: parent
+                                text: Theme.t("jobs.cancel", "Cancelar")
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 11
+                                color: cancelArea.containsMouse ? Theme.critical : Theme.textColor
+                            }
+                            MouseArea {
+                                id: cancelArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: Quickshell.execDetached(["rice-jobs", "cancel", String(job.j.id)])
+                            }
+                        }
+                    }
+                }
+                MouseArea {
+                    // Clique num terminado tira da lista na hora.
+                    anchors.fill: parent
+                    z: -1
+                    enabled: !job.running
+                    onClicked: Quickshell.execDetached(["rice-jobs", "dismiss", String(job.j.id)])
+                }
+            }
+        }
 
         Repeater {
             model: NotifService.activeToasts

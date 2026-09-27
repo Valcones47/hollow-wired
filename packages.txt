@@ -128,6 +128,7 @@ ttf-liberation    # Fontes compatíveis com Arial/Times/Courier (documentos do O
 # Bibliotecas de Interface & Atalhos
 gtk4-layer-shell
 python-gobject
+python-dbus    # rice-jobs: progresso de cópias e extrações dos apps KDE
 python-evdev   # Necessário para gravação direta de atalhos de hardware do Discord
 chafa          # Renderizador de imagens/GIFs em alta fidelidade no terminal
 ttf-opensans      # Fonte condensada do relógio da tela de bloqueio

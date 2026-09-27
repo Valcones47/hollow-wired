@@ -19,6 +19,38 @@ QtObject {
     // Tela de bloqueio mostra título/texto das notificações? Desligado por
     // padrão: com a tela bloqueada, quem passa só vê de qual app e quantas.
     property bool lockContent: false
+    // Cartões de progresso (cópias, extrações, compactações dos apps KDE).
+    property bool jobProgress: true
+
+    // Trabalhos em andamento, gravados pelo rice-jobs (que faz o papel do
+    // servidor de progresso do Plasma: org.kde.JobViewServer).
+    // O arquivo muda várias vezes por segundo. O Repeater usa só a lista de
+    // ids (reatribuída só quando entra ou sai um trabalho) e cada cartão lê
+    // os valores em jobMap — reatribuir a lista inteira recriava os cartões a
+    // cada atualização e a barra de progresso nunca saía do zero.
+    property var jobs: []
+    property var jobMap: ({})
+    property var jobIds: []
+    readonly property var visibleJobs: jobProgress ? jobIds : []
+    function _setJobs(list) {
+        const m = {};
+        for (const j of list) m[j.id] = j;
+        const ids = list.map(j => j.id);
+        if (JSON.stringify(ids) !== JSON.stringify(root.jobIds)) root.jobIds = ids;
+        root.jobMap = m;
+        root.jobs = list;
+    }
+    property FileView jobsFile: FileView {
+        path: Quickshell.env("XDG_RUNTIME_DIR") + "/rice-jobs.json"
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: {
+            try {
+                root._setJobs(JSON.parse(text()).jobs || []);
+            } catch (e) {}
+        }
+        onLoadFailed: root._setJobs([])
+    }
 
     // Estado operacional
     property bool dnd: false
@@ -68,6 +100,7 @@ QtObject {
                 root.position = c.position || "top-right";
                 root.soundEnabled = !!c.sound;
                 root.lockContent = c.lock_content === true;
+                root.jobProgress = c.job_progress !== false;
             } catch (e) {}
         }
     }
