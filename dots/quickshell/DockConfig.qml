@@ -151,7 +151,14 @@ QtObject {
     }
     function iconForWindow(appId, title) {
         const e = entryForWindow(appId, title);
-        return iconSource(e ? e.icon : (/^steam_app_/.test(appId || "") ? "" : appId), appId);
+        if (e) return iconSource(e.icon, appId);
+        if (/^steam_app_/.test(appId || "")) return iconSource("", appId);
+        // Jogo nativo aberto pelo Steam (ex.: "Sludgineers.x86_64"): o Steam
+        // põe SteamAppId no ambiente do processo; com ele, o ícone do cache.
+        const sid = root.classSteamId[appId];
+        if (sid) return iconSource("", "steam_app_" + sid);
+        if (appId && sid === undefined) Qt.callLater(() => root._askClassSteamId(appId));
+        return iconSource(appId, appId);
     }
 
     // Nome para mostrar: o do atalho; sem atalho (jogo do Steam sem .desktop,
@@ -174,7 +181,7 @@ QtObject {
     property Process steamIconProc: Process {
         property string wanted: ""
         property string found: ""
-        command: ["sh", "-c", "for b in \"$HOME/.local/share/Steam\" \"$HOME/.steam/steam\" \"$HOME/.var/app/com.valvesoftware.Steam/data/Steam\"; do d=\"$b/appcache/librarycache/$1\"; [ -d \"$d\" ] || continue; f=$(ls \"$d\" | grep -E '^[0-9a-f]{40}\\.jpg$' | head -n1); [ -n \"$f\" ] && { echo \"$d/$f\"; exit 0; }; done", "sh", wanted]
+        command: ["sh", "-c", "for b in \"$HOME/.local/share/Steam\" \"$HOME/.steam/steam\" \"$HOME/.var/app/com.valvesoftware.Steam/data/Steam\"; do d=\"$b/appcache/librarycache/$1\"; [ -d \"$d\" ] || continue; f=$(find \"$d\" -maxdepth 2 -type f -regextype posix-extended -regex '.*/[0-9a-f]{40}\\.jpg' | head -n1); f=${f#$d/}; [ -n \"$f\" ] && { echo \"$d/$f\"; exit 0; }; done", "sh", wanted]
         stdout: StdioCollector { onStreamFinished: root.steamIconProc.found = text.trim() }
         onExited: {
             if (found !== "") {
@@ -186,6 +193,33 @@ QtObject {
             root._nextSteam();
         }
     }
+    // classe da janela -> SteamAppId ("" = não veio do Steam)
+    property var classSteamId: ({})
+    property var _classQueue: []
+    property Process classSteamProc: Process {
+        property string wanted: ""
+        property string found: ""
+        command: ["sh", "-c", "for p in $(hyprctl clients -j | jq -r --arg c \"$1\" '.[] | select(.class == $c) | .pid'); do id=$(tr '\\0' '\\n' < /proc/$p/environ 2>/dev/null | sed -n 's/^SteamAppId=//p' | head -n1); [ -n \"$id\" ] && [ \"$id\" != 0 ] && { echo \"$id\"; exit 0; }; done", "sh", wanted]
+        stdout: StdioCollector { onStreamFinished: root.classSteamProc.found = text.trim() }
+        onExited: {
+            const m = Object.assign({}, root.classSteamId);
+            m[wanted] = /^\d+$/.test(found) ? found : "";
+            root.classSteamId = m;
+            if (m[wanted]) root._askSteamIcon(m[wanted]);
+            found = "";
+            if (root._classQueue.length) {
+                wanted = root._classQueue.shift();
+                running = true;
+            }
+        }
+    }
+    function _askClassSteamId(cls) {
+        if (root.classSteamId[cls] !== undefined || root._classQueue.indexOf(cls) !== -1 || classSteamProc.wanted === cls && classSteamProc.running) return;
+        if (classSteamProc.running) { root._classQueue.push(cls); return; }
+        classSteamProc.wanted = cls;
+        classSteamProc.running = true;
+    }
+
     function _askSteamIcon(id) {
         if (root._steamAsked[id]) return;
         root._steamAsked[id] = true;
