@@ -199,13 +199,19 @@ def cmd_status(cfg):
 
 
 def cmd_auto(cfg):
+    # Escolha manual (sem agendamento, ou dentro da janela de um toggle
+    # recente) vale como está salva. Antes o `auto` só "não mexia" nesses
+    # casos, e como o estado ligado/desligado não era salvo, o filtro sumia
+    # a cada reinício — o hyprsunset não sobe sozinho.
+    # Config de antes desta versão: adota o estado atual em vez de desligar
+    # o filtro de quem já estava com ele ligado.
+    if "enabled" not in cfg:
+        cfg["enabled"] = running()
+        save(cfg)
+    manual = time.time() < cfg.get("manual_until", 0)
     want = should_be_on(cfg)
-    if want is None:
-        return
-    # Respeita um toggle manual recente: desligar o filtro à noite não pode ser
-    # desfeito pelo agendamento no minuto seguinte.
-    if time.time() < cfg.get("manual_until", 0):
-        return
+    if want is None or manual:
+        want = bool(cfg.get("enabled", False))
     if want and not running():
         apply_on(cfg["temp"])
     elif not want and running():
@@ -233,21 +239,24 @@ def main():
             except ValueError:
                 pass
         cfg["manual_until"] = time.time() + MANUAL_HOLD
+        cfg["enabled"] = True
         save(cfg)
         apply_on(cfg["temp"])
         print("OK")
     elif cmd == "off":
         cfg["manual_until"] = time.time() + MANUAL_HOLD
+        cfg["enabled"] = False
         save(cfg)
         apply_off()
         print("OK")
     elif cmd == "toggle":
         cfg["manual_until"] = time.time() + MANUAL_HOLD
+        cfg["enabled"] = not running()
         save(cfg)
-        if running():
-            apply_off()
-        else:
+        if cfg["enabled"]:
             apply_on(cfg["temp"])
+        else:
+            apply_off()
         print("OK")
     elif cmd == "set":
         try:
