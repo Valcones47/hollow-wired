@@ -97,11 +97,7 @@ PanelWindow {
 
     function entryFor(appId) {
         if (!appId) return null;
-        const clean = appId.endsWith(".desktop") ? appId.slice(0, -8) : appId;
-        return DesktopEntries.byId(clean)
-            || DesktopEntries.byId(appId)
-            || DesktopEntries.heuristicLookup(clean)
-            || DesktopEntries.heuristicLookup(appId);
+        return DockConfig.entryForWindow(appId);
     }
     function windowsOf(key) {
         return ToplevelManager.toplevels.values.filter(t => {
@@ -136,12 +132,8 @@ PanelWindow {
     readonly property int pinnedCount: items.filter(i => i.pinned).length
 
     function iconFor(item) {
-        const name = item.entry ? item.entry.icon : item.appId;
-        if (!name || name === "") return Quickshell.iconPath("application-x-executable");
-        if (name.startsWith("/") || name.startsWith("file://")) {
-            return name.startsWith("file://") ? name : "file://" + name;
-        }
-        return Quickshell.iconPath(name, "application-x-executable");
+        if (item.entry) return DockConfig.iconSource(item.entry.icon, item.appId || "");
+        return DockConfig.iconForWindow(item.appId || "");
     }
     function activateItem(item) {
         const wins = windowsOf(item.key);
@@ -822,7 +814,7 @@ PanelWindow {
                     }
                     PopText {
                         visible: appPop.wins.length === 0
-                        text: appPop.item && appPop.item.pinned ? "Clique para abrir · arraste para reordenar" : "Clique para abrir"
+                        text: appPop.item && appPop.item.pinned ? Theme.t("dock.hint_pinned", "Clique para abrir · arraste para reordenar") : Theme.t("dock.hint", "Clique para abrir")
                     }
 
                     Repeater {

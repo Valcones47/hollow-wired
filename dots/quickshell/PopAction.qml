@@ -40,7 +40,7 @@ Rectangle {
         }
         Text {
             Layout.fillWidth: true
-            text: act.armed ? "Clique de novo para confirmar" : act.label
+            text: act.armed ? Theme.t("common.click_again", "Clique de novo para confirmar") : act.label
             elide: Text.ElideRight
             font.family: Theme.fontFamily
             font.pixelSize: 12

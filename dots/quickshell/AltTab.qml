@@ -168,8 +168,8 @@ PanelWindow {
                     Behavior on scale { NumberAnimation { duration: Theme.ms(140); easing.type: Easing.OutCubic } }
                     Behavior on color { ColorAnimation { duration: Theme.ms(120) } }
 
-                    readonly property var entry: modelData.wayland ? (DesktopEntries.byId(modelData.wayland.appId)
-                        || DesktopEntries.heuristicLookup(modelData.wayland.appId)) : null
+                    readonly property string appId: modelData.wayland ? modelData.wayland.appId : ""
+                    readonly property var entry: appId ? DockConfig.entryForWindow(appId, modelData.title) : null
 
                     ColumnLayout {
                         anchors.fill: parent
@@ -198,7 +198,7 @@ PanelWindow {
                                 anchors.centerIn: parent
                                 visible: !shot.hasContent
                                 implicitSize: 56
-                                source: Quickshell.iconPath(tile.entry ? tile.entry.icon : "", "application-x-executable")
+                                source: tile.entry ? DockConfig.iconSource(tile.entry.icon, tile.appId) : DockConfig.iconForWindow(tile.appId)
                             }
                             // workspace
                             Rectangle {
@@ -225,7 +225,7 @@ PanelWindow {
                             spacing: 6
                             IconImage {
                                 implicitSize: 18
-                                source: Quickshell.iconPath(tile.entry ? tile.entry.icon : "", "application-x-executable")
+                                source: tile.entry ? DockConfig.iconSource(tile.entry.icon, tile.appId) : DockConfig.iconForWindow(tile.appId)
                             }
                             Text {
                                 Layout.fillWidth: true
@@ -260,13 +260,13 @@ PanelWindow {
     GlobalShortcut {
         appid: "quickshell"
         name: "alttab-next"
-        description: "Alt+Tab: próxima janela"
+        description: Theme.t("alttab.desc", "Alt+Tab: próxima janela")
         onPressed: sw.step(1)
     }
     GlobalShortcut {
         appid: "quickshell"
         name: "alttab-prev"
-        description: "Alt+Tab: janela anterior"
+        description: Theme.t("alttab.desc_prev", "Alt+Tab: janela anterior")
         onPressed: sw.step(-1)
     }
 

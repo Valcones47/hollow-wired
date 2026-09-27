@@ -877,7 +877,7 @@ PanelWindow {
                     }
                     PopText {
                         visible: sidebar.updateCount > 0
-                        text: sidebar.repoUpdates + " repositório · " + sidebar.aurUpdates + " AUR" + (sidebar.riceUpdates > 0 ? " · " + sidebar.riceUpdates + " dotfiles" : "")
+                        text: Theme.t("sidebar.updates_split", "%1 repositório · %2 AUR").replace("%1", sidebar.repoUpdates).replace("%2", sidebar.aurUpdates) + (sidebar.riceUpdates > 0 ? " · " + Theme.t("sidebar.updates_rice", "%1 do rice").replace("%1", sidebar.riceUpdates) : "")
                     }
                     // Antes esta ação só aparecia quando havia commits novos.
                     // Como o rice-update também conserta o que ficou pela
@@ -917,7 +917,7 @@ PanelWindow {
                     PopAction {
                         Layout.topMargin: 4
                         icon: Theme.icons.update
-                        label: "Abrir cachy-update"
+                        label: Theme.t("sidebar.open_cachy_update", "Abrir cachy-update")
                         onActivated: {
                             if (!cachyUpdateProc.running)
                                 cachyUpdateProc.running = true;
@@ -926,7 +926,7 @@ PanelWindow {
                     }
                     PopAction {
                         icon: Theme.icons.broom
-                        label: "Limpar cache de pacotes" + (sidebar.cacheSize !== "" ? " (" + sidebar.cacheSize + ")" : "")
+                        label: Theme.t("sidebar.clean_pkg_cache", "Limpar cache de pacotes") + (sidebar.cacheSize !== "" ? " (" + sidebar.cacheSize + ")" : "")
                         needsConfirm: true
                         onActivated: {
                             if (!cleanCacheProc.running)
@@ -978,8 +978,8 @@ PanelWindow {
                     }
                     PopText {
                         text: sidebar.nvidiaState === "suspended" ? Theme.t("sidebar.nvidia_sleeping", "Tudo rodando na Intel (economiza bateria)")
-                            : sidebar.nvidiaApps.length > 0 ? "Usando: " + sidebar.nvidiaApps.join(", ")
-                            : "Nenhum app usando agora"
+                            : sidebar.nvidiaApps.length > 0 ? Theme.t("sidebar.nvidia_using", "Usando: %1").replace("%1", sidebar.nvidiaApps.join(", "))
+                            : Theme.t("sidebar.nvidia_none", "Nenhum app usando agora")
                         wrapMode: Text.Wrap
                         Layout.maximumWidth: Theme.popoutMaxWidth - 40
                     }

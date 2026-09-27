@@ -395,12 +395,12 @@ PanelWindow {
 
     function appIconSource(iconName) {
         if (!iconName || iconName === "") {
-            return Quickshell.iconPath("application-x-executable");
+            return Quickshell.iconPath("preferences-system-windows");
         }
         if (iconName.startsWith("/") || iconName.startsWith("file://")) {
             return iconName.startsWith("file://") ? iconName : "file://" + iconName;
         }
-        return Quickshell.iconPath(iconName, "application-x-executable");
+        return Quickshell.iconPath(iconName, "preferences-system-windows");
     }
 
     // ================= menu do app =================

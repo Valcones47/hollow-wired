@@ -605,8 +605,7 @@ PanelWindow {
                                             const t = at && tops.includes(at) ? at : tops[0];
                                             const id = (t.wayland && t.wayland.appId) || (t.lastIpcObject && t.lastIpcObject.class) || "";
                                             if (!id) return "";
-                                            const e = DesktopEntries.byId(id) || DesktopEntries.heuristicLookup(id);
-                                            return Quickshell.iconPath(e ? e.icon : id, "application-x-executable");
+                                            return DockConfig.iconForWindow(id, t.title);
                                         }
                                         readonly property bool showIcon: appIcon !== ""
                                         anchors.verticalCenter: parent.verticalCenter

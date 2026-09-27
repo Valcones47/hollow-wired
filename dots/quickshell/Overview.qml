@@ -291,8 +291,7 @@ PanelWindow {
         return Theme.t("overview.workspace", "Área de trabalho") + " " + s.name;
     }
     function iconFor(cls) {
-        const e = DesktopEntries.byId(cls) || DesktopEntries.heuristicLookup(cls);
-        return Quickshell.iconPath(e ? e.icon : cls, "application-x-executable");
+        return DockConfig.iconForWindow(cls);
     }
 
     // ================= fundo =================
@@ -753,7 +752,7 @@ PanelWindow {
     GlobalShortcut {
         appid: "quickshell"
         name: "overview"
-        description: "Visão geral das áreas de trabalho (Super+Tab)"
+        description: Theme.t("overview.desc", "Visão geral das áreas de trabalho (Super+Tab)")
         onPressed: ov.open ? ov.step(1) : ov.show()
     }
 

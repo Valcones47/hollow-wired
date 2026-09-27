@@ -71,7 +71,7 @@ PanelWindow {
         notesWindow.notes = [
             {
                 id: Date.now().toString(),
-                title: "Nota rápida",
+                title: Theme.t("notes.quick", "Nota rápida"),
                 content: "Bem-vindo ao Quick Notes!\n\n• Suas notas salvam sozinhas continuamente.\n• Use Super + G para abrir ou fechar de qualquer lugar.\n• Crie novas notas e organize seus rascunhos na barra lateral.",
                 updatedAt: new Date().toISOString()
             }
@@ -104,7 +104,7 @@ PanelWindow {
     function createNote() {
         const newNote = {
             id: Date.now().toString(),
-            title: "Nova nota",
+            title: Theme.t("notes.new", "Nova nota"),
             content: "",
             updatedAt: new Date().toISOString()
         };
@@ -125,7 +125,7 @@ PanelWindow {
         if (copy.length === 0) {
             copy.push({
                 id: Date.now().toString(),
-                title: "Nova nota",
+                title: Theme.t("notes.new", "Nova nota"),
                 content: "",
                 updatedAt: new Date().toISOString()
             });
@@ -160,7 +160,7 @@ PanelWindow {
     }
 
     function extractTitle(content) {
-        if (!content) return "Nova nota";
+        if (!content) return Theme.t("notes.new", "Nova nota");
         const lines = content.trim().split("\n");
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i].trim().replace(/^[#\-*>\s]+/, "");
@@ -168,7 +168,7 @@ PanelWindow {
                 return line.slice(0, 28);
             }
         }
-        return "Nova nota";
+        return Theme.t("notes.new", "Nova nota");
     }
 
     onOpenChanged: {

@@ -150,7 +150,7 @@ PanelWindow {
         },
         {
             icon: Theme.icons.cursor,
-            keys: ["Botão direito"],
+            keys: [Theme.t("welcome.key_rightclick", "Botão direito")],
             title: Theme.t("welcome.step_rightclick_title", "Clique direito na área de trabalho"),
             desc: Theme.t("welcome.step_rightclick_desc", "Atalhos para configurações, tela, terminal, papel de parede e widgets.")
         },

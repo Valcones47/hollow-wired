@@ -20,7 +20,7 @@ RowLayout {
         if (u === "SHIFT") return { icon: "\u{F0636}", text: "Shift" };
         if (u === "ENTER" || u === "RETURN") return { icon: "\u{F0311}", text: "" };
         if (u === "SETAS" || u === "ARROWS") return { icon: "", text: "← ↑ → ↓" };
-        if (u === "ESPAÇO" || u === "SPACE") return { icon: "", text: "Espaço" };
+        if (u === "ESPAÇO" || u === "SPACE") return { icon: "", text: Theme.t("keys.space", "Espaço") };
         return { icon: "", text: k };
     }
 

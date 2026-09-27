@@ -186,7 +186,7 @@ Item {
                 const geom = text.trim();
                 if (geom) {
                     root.selectedWindowGeom = geom;
-                    root.selectedWindowTitle = "Área Selecionada (" + geom + ")";
+                    root.selectedWindowTitle = Theme.t("rec.area_selected", "Área selecionada (%1)").replace("%1", geom);
                 }
             }
         }
@@ -398,7 +398,7 @@ Item {
                             color: root.isRecording ? Theme.background : Theme.background
                         }
                         Text {
-                            text: root.isRecording ? "Parar Gravação" : "Iniciar Gravação"
+                            text: root.isRecording ? Theme.t("rec.stop", "Parar gravação") : Theme.t("rec.start", "Iniciar gravação")
                             font.family: Theme.fontFamily
                             font.pixelSize: 13
                             font.weight: Font.Bold
@@ -501,9 +501,9 @@ Item {
 
                         Repeater {
                             model: [
-                                { mode: "screen", label: "Tela Inteira", icon: Theme.icons.monitor },
-                                { mode: "window", label: "Aplicativo", icon: Theme.icons.laptop },
-                                { mode: "region", label: "Região", icon: Theme.icons.fileCompare }
+                                { mode: "screen", label: Theme.t("rec.mode_screen", "Tela Inteira"), icon: Theme.icons.monitor },
+                                { mode: "window", label: Theme.t("rec.mode_window", "Aplicativo"), icon: Theme.icons.laptop },
+                                { mode: "region", label: Theme.t("rec.mode_region", "Região"), icon: Theme.icons.fileCompare }
                             ]
                             delegate: Rectangle {
                                 Layout.fillWidth: true
@@ -569,7 +569,7 @@ Item {
                             RowLayout {
                                 Layout.fillWidth: true
                                 Text {
-                                    text: root.captureMode === "window" ? "Alvo da Captura:" : "Região Definida:"
+                                    text: root.captureMode === "window" ? Theme.t("rec.target", "Alvo da captura:") : Theme.t("rec.region_set", "Região definida:")
                                     font.family: Theme.fontFamily
                                     font.pixelSize: 11
                                     color: Theme.subtext
@@ -592,7 +592,7 @@ Item {
 
                             Text {
                                 Layout.fillWidth: true
-                                text: root.selectedWindowTitle || (root.selectedWindowGeom ? root.selectedWindowGeom : "Clique em 'Selecionar na Tela'")
+                                text: root.selectedWindowTitle || (root.selectedWindowGeom ? root.selectedWindowGeom : Theme.t("rec.click_select", "Clique em “Selecionar na tela”"))
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 11
                                 font.weight: Font.Medium

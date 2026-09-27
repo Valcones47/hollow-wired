@@ -160,8 +160,8 @@ Item {
                         anchors.fill: parent
                         anchors.margins: 8
                         spacing: 4
-                        PopTitle { text: "Você está rodando o snapshot #" + root.bootedFrom }
-                        PopText { text: "Nada aqui é permanente até restaurar."; color: Theme.textColor }
+                        PopTitle { text: Theme.t("snap.booted_from", "Você está rodando o snapshot #%1").replace("%1", root.bootedFrom) }
+                        PopText { text: Theme.t("snap.not_permanent", "Nada aqui é permanente até restaurar."); color: Theme.textColor }
                         PopAction {
                             icon: Theme.icons.restore
                             label: Theme.t("snapshots.make_permanent", "Tornar este snapshot permanente")
@@ -218,7 +218,7 @@ Item {
 
                 PopText {
                     text: root.loading && root.snaps.length === 0 ? Theme.t("common.loading", "Carregando…")
-                        : root.snaps.length + " snapshots · ícone de boot = aparece no menu do Limine"
+                        : Theme.t("snap.count", "%1 snapshots · ícone de boot = aparece no menu do Limine").replace("%1", root.snaps.length)
                     font.pixelSize: 11
                 }
 
@@ -302,7 +302,7 @@ Item {
             PopText {
                 anchors.centerIn: parent
                 visible: root.selected === null
-                text: "Selecione um snapshot"
+                text: Theme.t("snap.select", "Selecione um snapshot")
             }
 
             Flickable {
@@ -331,20 +331,20 @@ Item {
                     }
                     PopText { text: root.selected ? root.fmtDate(root.selected.date) + " · " + root.selected.kind : "" }
                     PopText {
-                        text: root.changedCount === "" ? "Contando arquivos alterados desde então…"
-                            : root.changedCount + " arquivos mudaram desde então"
+                        text: root.changedCount === "" ? Theme.t("snap.counting", "Contando arquivos alterados desde então…")
+                            : Theme.t("snap.changed", "%1 arquivos mudaram desde então").replace("%1", root.changedCount)
                     }
                     PopText {
                         visible: root.selected !== null && root.selected.pre !== null
                         Layout.fillWidth: true
                         wrapMode: Text.Wrap
-                        text: "Snapshot automático do pacman: o #" + (root.selected ? root.selected.pre : "") + " é o estado antes da instalação."
+                        text: Theme.t("snap.pacman_pair", "Snapshot automático do pacman: o #%1 é o estado antes da instalação.").replace("%1", root.selected ? root.selected.pre : "")
                     }
 
                     PopAction {
                         Layout.topMargin: 8
                         icon: Theme.icons.fileCompare
-                        label: "Ver arquivos alterados"
+                        label: Theme.t("snap.view_changed", "Ver arquivos alterados")
                         onActivated: {
                             diffProc.num = root.selected.pre !== null ? root.selected.pre : root.selected.number;
                             diffProc.running = true;
@@ -352,7 +352,7 @@ Item {
                     }
                     PopAction {
                         icon: Theme.icons.restore
-                        label: "Restaurar este snapshot…"
+                        label: Theme.t("snap.restore", "Restaurar este snapshot…")
                         selected: root.restoreGuide
                         onActivated: root.restoreGuide = !root.restoreGuide
                     }
@@ -369,22 +369,20 @@ Item {
                             anchors.fill: parent
                             anchors.margins: 10
                             spacing: 4
-                            PopTitle { text: root.selected && root.selected.bootable ? "Como restaurar" : "Esse snapshot não está no menu de boot" }
+                            PopTitle { text: root.selected && root.selected.bootable ? Theme.t("snap.how_title", "Como restaurar") : Theme.t("snap.not_bootable", "Esse snapshot não está no menu de boot") }
                             PopText {
                                 Layout.fillWidth: true
                                 wrapMode: Text.Wrap
                                 color: Theme.textColor
                                 text: root.selected && root.selected.bootable
-                                    ? "1. Reinicie e, no menu do Limine, abra “Snapshots” e escolha o #" + (root.selected.pre !== null ? root.selected.pre + " (antes) ou #" + root.selected.number : root.selected.number) + ".\n"
-                                      + "2. Com o sistema aberto nele, volte nesta aba: vai aparecer “Tornar este snapshot permanente”.\n"
-                                      + "3. Reinicie de novo. Pronto."
-                                    : "O Limine só guarda os 8 snapshots mais recentes. Pra voltar a um mais antigo, use o btrfs-assistant (instalado) ou peça ajuda."
+                                    ? Theme.t("snap.how_steps", "1. Reinicie e, no menu do Limine, abra “Snapshots” e escolha o #%1.\\n2. Com o sistema aberto nele, volte nesta aba: vai aparecer “Tornar este snapshot permanente”.\\n3. Reinicie de novo. Pronto.").replace("%1", root.selected.pre !== null ? root.selected.pre + " / #" + root.selected.number : root.selected.number)
+                                    : Theme.t("snap.too_old", "O Limine só guarda os 8 snapshots mais recentes. Para voltar a um mais antigo, use o btrfs-assistant (instalado) ou peça ajuda.")
                             }
                             PopText {
                                 Layout.fillWidth: true
                                 wrapMode: Text.Wrap
                                 font.pixelSize: 11
-                                text: "Obs.: “snapper rollback” não funciona nesse sistema (fstab monta subvol=/@ fixo)."
+                                text: Theme.t("snap.rollback_note", "Obs.: “snapper rollback” não funciona neste sistema (o fstab monta subvol=/@ fixo).")
                             }
                         }
                     }
@@ -392,7 +390,7 @@ Item {
                     PopAction {
                         visible: root.selected !== null && root.selected.number !== Number(root.bootedFrom)
                         icon: Theme.icons.trash
-                        label: root.selected && root.selected.pre !== null ? "Apagar par #" + root.selected.pre + "–#" + root.selected.number : "Apagar snapshot"
+                        label: root.selected && root.selected.pre !== null ? Theme.t("snap.delete_pair", "Apagar par #%1").replace("%1", root.selected.pre + "–#" + root.selected.number) : Theme.t("snap.delete", "Apagar snapshot")
                         needsConfirm: true
                         onActivated: {
                             deleteProc.num = root.selected.number;

@@ -190,7 +190,7 @@ QtObject {
         notif.tracked = true;
 
         const id = notif.id || (Date.now() % 1000000);
-        const appName = notif.appName || "Sistema";
+        const appName = notif.appName || Theme.t("notif.system", "Sistema");
         const hints = notif.hints || {};
 
         // Ignora avisos de faixas de música (já exibidos no OSD de mídia)

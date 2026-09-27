@@ -263,7 +263,7 @@ PanelWindow {
                             model: [
                                 { icon: Theme.icons.arch, text: win.mod("OS") ? win.mod("OS").prettyName : "" },
                                 { icon: Theme.icons.monitor, text: win.mod("WM") ? "Hyprland " + win.mod("WM").version : "" },
-                                { icon: Theme.icons.console, text: "fish · kitty" },
+                                { icon: Theme.icons.console, text: (win.mod("Shell") ? win.mod("Shell").prettyName : "") + (win.mod("Terminal") ? " · " + win.mod("Terminal").prettyName : "") },
                                 { icon: Theme.icons.clock, text: win.mod("Uptime") ? Theme.t("sysinfo.uptime_prefix", "ligado há ") + win.fmtUptime(win.mod("Uptime").uptime) : "" },
                                 { icon: Theme.icons.laptop, text: win.mod("Host") ? win.mod("Host").vendor + " " + win.mod("Host").family : "" }
                             ]
@@ -335,11 +335,11 @@ PanelWindow {
                     Row2 { label: "Distro"; value: win.mod("OS") ? win.mod("OS").prettyName + " (" + (win.mod("OS").buildID || "rolling") + ")" : "" }
                     Row2 { label: "Kernel"; value: win.mod("Kernel") ? win.mod("Kernel").release : "" }
                     Row2 { label: "WM"; value: win.mod("WM") ? win.mod("WM").prettyName + " " + win.mod("WM").version + " (" + win.mod("WM").protocolName + ")" : "" }
-                    Row2 { label: "Shell"; value: "fish" }
-                    Row2 { label: "Terminal"; value: "kitty" }
-                    Row2 { label: "Idioma"; value: win.mod("Locale") || "" }
+                    Row2 { label: "Shell"; value: win.mod("Shell") ? win.mod("Shell").prettyName + " " + (win.mod("Shell").version || "") : "" }
+                    Row2 { label: "Terminal"; value: win.mod("Terminal") ? win.mod("Terminal").prettyName : "" }
+                    Row2 { label: Theme.t("sysinfo.l_lang", "Idioma"); value: win.mod("Locale") || "" }
                     Row2 {
-                        label: "Pacotes"
+                        label: Theme.t("sysinfo.l_pkgs", "Pacotes")
                         value: win.mod("Packages") ? win.mod("Packages").pacman + " pacman · "
                             + (win.mod("Packages").flatpakSystem + win.mod("Packages").flatpakUser) + " flatpak · "
                             + win.mod("Packages").appimage + " appimage" : ""
@@ -349,16 +349,16 @@ PanelWindow {
                 Section {
                     icon: Theme.icons.chip
                     title: Theme.t("sysinfo.cpu_gpu", "Processador e gráficos")
-                    Row2 { label: "CPU"; value: win.mod("CPU") ? win.mod("CPU").cpu.replace("11th Gen ", "").replace("(R)", "").replace("(TM)", "") : "" }
-                    Row2 { label: "Núcleos"; value: win.mod("CPU") ? win.mod("CPU").cores.physical + " núcleos · " + win.mod("CPU").cores.logical + " threads" : "" }
-                    Row2 { label: "Frequência"; value: win.mod("CPU") ? (win.mod("CPU").frequency.base / 1000).toFixed(1) + " – " + (win.mod("CPU").frequency.max / 1000).toFixed(1) + " GHz" : "" }
-                    Row2 { label: "Arquitetura"; value: win.mod("CPU") ? (win.mod("CPU").codeName || "") + " · " + win.mod("CPU").march : "" }
+                    Row2 { label: "CPU"; value: win.mod("CPU") ? win.mod("CPU").cpu.replace(/\d+th Gen /, "").replace("(R)", "").replace("(TM)", "") : "" }
+                    Row2 { label: Theme.t("sysinfo.l_cores", "Núcleos"); value: win.mod("CPU") ? win.mod("CPU").cores.physical + " " + Theme.t("sysinfo.cores_word", "núcleos") + " · " + win.mod("CPU").cores.logical + " threads" : "" }
+                    Row2 { label: Theme.t("sysinfo.l_freq", "Frequência"); value: win.mod("CPU") ? (win.mod("CPU").frequency.base / 1000).toFixed(1) + " – " + (win.mod("CPU").frequency.max / 1000).toFixed(1) + " GHz" : "" }
+                    Row2 { label: Theme.t("sysinfo.l_arch", "Arquitetura"); value: win.mod("CPU") ? (win.mod("CPU").codeName || "") + " · " + win.mod("CPU").march : "" }
                     Repeater {
                         model: win.mod("GPU") || []
                         delegate: Row2 {
                             required property var modelData
                             required property int index
-                            label: modelData.type === "Discrete" ? "GPU dedicada" : "GPU integrada"
+                            label: modelData.type === "Discrete" ? Theme.t("sysinfo.gpu_discrete", "GPU dedicada") : Theme.t("sysinfo.gpu_integrated", "GPU integrada")
                             value: modelData.vendor + " " + modelData.name + " · " + modelData.driver.replace(" (open source)", "")
                         }
                     }
@@ -376,7 +376,7 @@ PanelWindow {
                         model: win.mod("Swap") || []
                         delegate: Bar2 {
                             required property var modelData
-                            label: modelData.name.includes("zram") ? "zram (swap comprimido)" : "Swap"
+                            label: modelData.name.includes("zram") ? Theme.t("sysinfo.zram", "zram (swap comprimido)") : "Swap"
                             value: win.gib(modelData.used) + " / " + win.gib(modelData.total)
                             frac: modelData.total > 0 ? modelData.used / modelData.total : 0
                         }
@@ -385,7 +385,7 @@ PanelWindow {
                         model: (win.mod("Disk") || []).filter(k => k.mountpoint === "/")
                         delegate: Bar2 {
                             required property var modelData
-                            label: "Disco / (" + modelData.filesystem + ", " + modelData.mountFrom.replace("/dev/", "") + ")"
+                            label: Theme.t("sysinfo.l_disk", "Disco") + " / (" + modelData.filesystem + ", " + modelData.mountFrom.replace("/dev/", "") + ")"
                             value: win.gib(modelData.bytes.used) + " / " + win.gib(modelData.bytes.total)
                             frac: modelData.bytes.used / modelData.bytes.total
                         }
@@ -402,18 +402,18 @@ PanelWindow {
                             required property var modelData
                             Layout.fillWidth: true
                             spacing: 5
-                            Row2 { label: "Resolução"; value: modelData.output.width + "×" + modelData.output.height + " @ " + Math.round(modelData.output.refreshRate) + " Hz" }
+                            Row2 { label: Theme.t("sysinfo.l_resolution", "Resolução"); value: modelData.output.width + "×" + modelData.output.height + " @ " + Math.round(modelData.output.refreshRate) + " Hz" }
                             Row2 {
-                                label: "Tamanho"
+                                label: Theme.t("sysinfo.l_size", "Tamanho")
                                 value: modelData.physical && modelData.physical.width > 0
-                                    ? (Math.sqrt(Math.pow(modelData.physical.width, 2) + Math.pow(modelData.physical.height, 2)) / 25.4).toFixed(1) + "\" · " + (modelData.type === "Builtin" ? "tela interna" : "externa")
+                                    ? (Math.sqrt(Math.pow(modelData.physical.width, 2) + Math.pow(modelData.physical.height, 2)) / 25.4).toFixed(1) + "\" · " + (modelData.type === "Builtin" ? Theme.t("sysinfo.builtin", "tela interna") : Theme.t("sysinfo.external", "externa"))
                                     : ""
                             }
-                            Row2 { label: "Painel"; value: modelData.name + (modelData.hdrStatus === "Unsupported" ? " · sem HDR" : "") }
+                            Row2 { label: Theme.t("sysinfo.l_panel", "Painel"); value: modelData.name + (modelData.hdrStatus === "Unsupported" ? " · " + Theme.t("sysinfo.no_hdr", "sem HDR") : "") }
                         }
                     }
-                    Row2 { label: "Áudio"; value: win.mod("Sound") && win.mod("Sound").length ? win.mod("Sound")[0].platformApi : "" }
-                    Row2 { label: "Fonte"; value: win.mod("Font") ? win.mod("Font").fonts.filter(x => x !== "")[0] || "" : "" }
+                    Row2 { label: Theme.t("sysinfo.l_audio", "Áudio"); value: win.mod("Sound") && win.mod("Sound").length ? win.mod("Sound")[0].platformApi : "" }
+                    Row2 { label: Theme.t("sysinfo.l_font", "Fonte"); value: win.mod("Font") ? win.mod("Font").fonts.filter(x => x !== "")[0] || "" : "" }
                     Row2 { label: "Cursor"; value: win.mod("Cursor") ? win.mod("Cursor").theme + " (" + win.mod("Cursor").size + ")" : "" }
                 }
 
@@ -422,24 +422,24 @@ PanelWindow {
                     title: (win.batDesign > 0 || (win.mod("Battery") && win.mod("Battery").length > 0)) ? Theme.t("sysinfo.battery", "Bateria") : Theme.t("sysinfo.power", "Alimentação")
                     Bar2 {
                         visible: win.batDesign > 0
-                        label: "Saúde (capacidade atual vs. de fábrica)"
+                        label: Theme.t("sysinfo.l_health", "Saúde (capacidade atual vs. de fábrica)")
                         value: win.batDesign > 0 ? Math.round(win.batHealth * 100) + "%" : "--"
                         frac: win.batHealth
                     }
                     Row2 {
                         visible: win.batDesign > 0
-                        label: "Capacidade"
+                        label: Theme.t("sysinfo.l_capacity", "Capacidade")
                         value: win.batDesign > 0 ? win.batFull + " / " + win.batDesign + " mAh" : ""
                     }
                     Row2 {
                         visible: win.batDesign === 0 && (!win.mod("Battery") || win.mod("Battery").length === 0)
-                        label: "Tipo"
-                        value: "Computador Desktop (Fonte AC contínua)"
+                        label: Theme.t("sysinfo.l_type", "Tipo")
+                        value: Theme.t("sysinfo.desktop_type", "Computador de mesa (ligado na tomada)")
                     }
                     Row2 {
                         visible: win.batDesign === 0 && (!win.mod("Battery") || win.mod("Battery").length === 0)
-                        label: "Modo"
-                        value: "Alimentação direta de alto desempenho"
+                        label: Theme.t("sysinfo.l_mode", "Modo")
+                        value: Theme.t("sysinfo.desktop_mode", "Sem bateria")
                     }
                     Repeater {
                         model: win.mod("Battery") || []
@@ -447,8 +447,8 @@ PanelWindow {
                             required property var modelData
                             Layout.fillWidth: true
                             spacing: 5
-                            Row2 { label: "Ciclos"; value: modelData.cycleCount + " ciclos de carga" }
-                            Row2 { label: "Modelo"; value: modelData.manufacturer + " " + modelData.modelName + " · " + modelData.technology }
+                            Row2 { label: Theme.t("sysinfo.l_cycles", "Ciclos"); value: Theme.t("sysinfo.cycles_value", "%1 ciclos de carga").replace("%1", modelData.cycleCount) }
+                            Row2 { label: Theme.t("sysinfo.l_model", "Modelo"); value: modelData.manufacturer + " " + modelData.modelName + " · " + modelData.technology }
                         }
                     }
                     Item { Layout.fillHeight: true }
@@ -457,8 +457,8 @@ PanelWindow {
                 Section {
                     icon: Theme.icons.laptop
                     title: Theme.t("sysinfo.board_net", "Placa e rede")
-                    Row2 { label: "Computador"; value: win.mod("Host") ? win.mod("Host").vendor + " " + win.mod("Host").name : "" }
-                    Row2 { label: "Placa-mãe"; value: win.mod("Board") ? win.mod("Board").name + " (" + win.mod("Board").vendor + ")" : "" }
+                    Row2 { label: Theme.t("sysinfo.l_computer", "Computador"); value: win.mod("Host") ? win.mod("Host").vendor + " " + win.mod("Host").name : "" }
+                    Row2 { label: Theme.t("sysinfo.l_board", "Placa-mãe"); value: win.mod("Board") ? win.mod("Board").name + " (" + win.mod("Board").vendor + ")" : "" }
                     Row2 { label: "BIOS"; value: win.mod("BIOS") ? win.mod("BIOS").vendor + " " + win.mod("BIOS").version + " · " + win.mod("BIOS").date + " · " + win.mod("BIOS").type : "" }
                     Repeater {
                         model: win.mod("LocalIp") || []

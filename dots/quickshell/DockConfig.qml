@@ -90,6 +90,62 @@ QtObject {
         return clean;
     }
 
+    // ---------- ícone de uma janela (dock, Alt+Tab, Super+Tab, barra) ----------
+    // Cada tela resolvia do seu jeito e caía na engrenagem (o
+    // application-x-executable do Papirus) em três casos:
+    //  - jogo do Steam pelo Proton: a janela é "steam_app_<id>" e nenhum
+    //    .desktop tem esse nome — o atalho do jogo tem "rungameid/<id>" no Exec;
+    //  - AppImage/emulador com ícone em caminho absoluto: Quickshell.iconPath
+    //    não abre caminho de arquivo;
+    //  - app sem .desktop com o mesmo nome da classe (StartupWMClass resolve).
+    function entryForWindow(appId, title) {
+        if (!appId) return null;
+        const clean = appId.endsWith(".desktop") ? appId.slice(0, -8) : appId;
+        let e = DesktopEntries.byId(clean) || DesktopEntries.byId(appId);
+        if (e) return e;
+        // Atalhos sem ícone não servem: o Discord cria "discord-<id>.desktop"
+        // ocultos, sem Icon, apontando para o rpcs3/eden, e a heurística caía
+        // neles — era a engrenagem nos jogos de emulador.
+        const apps = DesktopEntries.applications.values.filter(a => a.icon);
+        const steam = clean.match(/^steam_app_(\d+)$/);
+        if (steam) {
+            const tag = "rungameid/" + steam[1];
+            const hit = apps.find(a => (a.execString || "").indexOf(tag) !== -1);
+            if (hit) return hit;
+        }
+        const lc = clean.toLowerCase();
+        const byClass = apps.find(a => (a.startupClass || "").toLowerCase() === lc);
+        if (byClass) return byClass;
+        // A heurística casaria "steam_app_…" com o próprio Steam.
+        if (!steam) {
+            e = DesktopEntries.heuristicLookup(clean);
+            if (e && e.icon) return e;
+        }
+        if (title) {
+            const t = String(title).toLowerCase();
+            const byName = apps.find(a => a.name && a.name.toLowerCase() === t);
+            if (byName) return byName;
+        }
+        return null;
+    }
+    function iconSource(name, appId) {
+        const steam = String(appId || "").match(/^steam_app_(\d+)$/);
+        // Reserva: nada de engrenagem (o application-x-executable e o
+        // application-default-icon do Papirus são engrenagens, e pareciam
+        // "configurações"). Jogo sem atalho vira controle; o resto, janela.
+        const game = steam || /\.exe$/i.test(appId || "") || /^gamescope$/i.test(appId || "");
+        const fb = game ? "applications-games" : "preferences-system-windows";
+        if (!name && steam) return Quickshell.iconPath("steam_icon_" + steam[1], fb);
+        if (!name) return Quickshell.iconPath(fb);
+        if (name.startsWith("file://")) return name;
+        if (name.startsWith("/")) return "file://" + name;
+        return Quickshell.iconPath(name, fb);
+    }
+    function iconForWindow(appId, title) {
+        const e = entryForWindow(appId, title);
+        return iconSource(e ? e.icon : (/^steam_app_/.test(appId || "") ? "" : appId), appId);
+    }
+
     function isPinned(id) {
         if (!id) return false;
         const target = canonicalId(id);

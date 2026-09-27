@@ -4512,7 +4512,7 @@ PanelWindow {
                                     onToggled: nv => {
                                         win.numlock = nv;
                                         Quickshell.execDetached(["rice-hypr-prefs", "set", "numlock", String(nv)]);
-                                        win.showToast(nv ? "NumLock ativado por padrão" : "NumLock desativado por padrão");
+                                        win.showToast(nv ? Theme.t("kb.numlock_on", "NumLock ativado por padrão") : Theme.t("kb.numlock_off", "NumLock desativado por padrão"));
                                     }
                                 }
 
@@ -4911,7 +4911,7 @@ PanelWindow {
                                                         onClicked: {
                                                             Quickshell.execDetached(["rice-autostart", "toggle", autoCard.modelData.filename]);
                                                             autoCard.modelData.enabled = !autoCard.modelData.enabled;
-                                                            win.showToast((autoCard.modelData.enabled ? "Ativado: " : "Desativado: ") + autoCard.modelData.name);
+                                                            win.showToast((autoCard.modelData.enabled ? Theme.t("autostart.enabled_toast", "Ativado: ") : Theme.t("autostart.disabled_toast", "Desativado: ")) + autoCard.modelData.name);
                                                         }
                                                     }
                                                 }
@@ -7687,7 +7687,7 @@ PanelWindow {
                                                     color: Theme.subtext
                                                 }
                                                 Text {
-                                                    text: win.gamingData && win.gamingData.gpu && win.gamingData.gpu.driver ? win.gamingData.gpu.driver : "Ativo"
+                                                    text: win.gamingData && win.gamingData.gpu && win.gamingData.gpu.driver ? win.gamingData.gpu.driver : Theme.t("common.active", "Ativo")
                                                     font.family: Theme.fontFamily
                                                     font.pixelSize: 15
                                                     font.weight: Font.Bold
@@ -8887,7 +8887,7 @@ PanelWindow {
                                                         color: win.discordRunning ? "#10b981" : Theme.withAlpha(Theme.subtext, 0.75)
                                                     }
                                                     Text {
-                                                        text: win.discordRunning ? "Em execução" : "Não detectado no momento"
+                                                        text: win.discordRunning ? Theme.t("discord.running", "Em execução") : Theme.t("discord.not_running", "Não detectado no momento")
                                                         font.family: Theme.fontFamily
                                                         font.pixelSize: 11
                                                         color: win.discordRunning ? "#10b981" : Theme.subtext
@@ -9541,7 +9541,7 @@ PanelWindow {
                                                     }
                                                     Text {
                                                         Layout.fillWidth: true
-                                                        text: snapCard.modelData.date + " · Tipo: " + snapCard.modelData.type
+                                                        text: snapCard.modelData.date + " · " + Theme.t("snap.type", "Tipo: %1").replace("%1", snapCard.modelData.type)
                                                         font.family: Theme.fontFamily
                                                         font.pixelSize: 10
                                                         color: Theme.subtext

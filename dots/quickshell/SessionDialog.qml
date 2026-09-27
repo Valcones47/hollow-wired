@@ -169,7 +169,7 @@ PanelWindow {
                 // Nome do usuário
                 Text {
                     Layout.alignment: Qt.AlignHCenter
-                    text: Quickshell.env("USER") || "Usuário"
+                    text: Quickshell.env("USER") || Theme.t("common.user", "Usuário")
                     font.family: Theme.fontFamily
                     font.pixelSize: 16
                     font.weight: Font.DemiBold

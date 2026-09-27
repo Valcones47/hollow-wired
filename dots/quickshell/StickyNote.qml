@@ -203,7 +203,7 @@ PanelWindow {
 
                     Text {
                         Layout.fillWidth: true
-                        text: stickyWindow.currentNote ? (stickyWindow.currentNote.title || "Nota rápida") : "Nota"
+                        text: stickyWindow.currentNote ? (stickyWindow.currentNote.title || Theme.t("notes.quick", "Nota rápida")) : Theme.t("notes.note", "Nota")
                         font.family: Theme.fontFamily
                         font.pixelSize: 12
                         font.weight: Font.DemiBold
@@ -324,7 +324,7 @@ PanelWindow {
                             if (stickyWindow.currentNote.content !== text) {
                                 stickyWindow.currentNote.content = text;
                                 const lines = text.trim().split("\n");
-                                let t = "Nova nota";
+                                let t = Theme.t("notes.new", "Nova nota");
                                 for (let i = 0; i < lines.length; i++) {
                                     const l = lines[i].trim().replace(/^[#\-*>\s]+/, "");
                                     if (l.length > 0) { t = l.slice(0, 28); break; }

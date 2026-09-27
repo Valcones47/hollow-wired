@@ -161,7 +161,7 @@ PanelWindow {
             style: "glass",
             opacity: 0.85,
             accent: "",
-            noteText: type === "notes" ? "Minhas anotações aqui..." : ""
+            noteText: type === "notes" ? Theme.t("widgets.notes_default", "Minhas anotações aqui...") : ""
         };
         allConfig[wsKey].push(newWidget);
         currentList = allConfig[wsKey].slice();
@@ -941,7 +941,7 @@ PanelWindow {
 
                     Text {
                         Layout.fillWidth: true
-                        text: w.player ? (w.player.trackTitle || "Sem título") : "Nenhuma mídia ativa"
+                        text: w.player ? (w.player.trackTitle || Theme.t("media.untitled", "Sem título")) : Theme.t("widgets.no_media", "Nenhuma mídia ativa")
                         font.family: Theme.fontFamily
                         font.pixelSize: 13
                         font.weight: Font.Bold
@@ -951,7 +951,7 @@ PanelWindow {
 
                     Text {
                         Layout.fillWidth: true
-                        text: w.player ? (w.player.trackArtist || "Artista desconhecido") : "Player ocioso"
+                        text: w.player ? (w.player.trackArtist || Theme.t("media.unknown_artist", "Artista desconhecido")) : Theme.t("media.no_media_sub", "Player ocioso")
                         font.family: Theme.fontFamily
                         font.pixelSize: 11
                         color: Theme.subtext
@@ -1152,7 +1152,7 @@ PanelWindow {
                         Text {
                             id: modeText
                             anchors.centerIn: parent
-                            text: w.sortByCpu ? "Ver RAM" : "Ver CPU"
+                            text: w.sortByCpu ? Theme.t("widgets.show_ram", "Ver RAM") : Theme.t("widgets.show_cpu", "Ver CPU")
                             font.family: Theme.fontFamily; font.pixelSize: 10
                             color: Theme.textColor
                         }
@@ -1623,7 +1623,7 @@ PanelWindow {
                         w.remainingSeconds--;
                     } else {
                         w.isRunning = false;
-                        Quickshell.execDetached(["notify-send", "-a", "Pomodoro", "⏰ Tempo Esgotado!", "Hora de fazer uma pausa."]);
+                        Quickshell.execDetached(["notify-send", "-a", "Pomodoro", Theme.t("widgets.pomo_done", "Tempo esgotado"), Theme.t("widgets.pomo_break", "Hora de fazer uma pausa.")]);
                     }
                 }
             }
@@ -1646,7 +1646,7 @@ PanelWindow {
                         font.family: Theme.iconFontFamily; font.pixelSize: 14; color: w.wAccent
                     }
                     Text {
-                        text: "Timer de Foco"
+                        text: Theme.t("widgets.focus_timer", "Timer de Foco")
                         font.family: Theme.fontFamily; font.pixelSize: 12; font.weight: Font.Bold
                         color: Theme.textColor; Layout.fillWidth: true
                     }
@@ -1947,7 +1947,7 @@ PanelWindow {
                         font.family: Theme.iconFontFamily; font.pixelSize: 14; color: w.wAccent
                     }
                     Text {
-                        text: "Frase do Dia"
+                        text: Theme.t("widgets.quote_of_day", "Frase do Dia")
                         font.family: Theme.fontFamily; font.pixelSize: 11; font.weight: Font.Bold
                         color: Theme.subtext; Layout.fillWidth: true
                     }
@@ -2003,7 +2003,7 @@ PanelWindow {
             spacing: 10
 
             Text {
-                text: "✏️ WS " + dwWindow.currentWs
+                text: Theme.t("widgets.edit_ws", "Editando a área %1").replace("%1", dwWindow.currentWs)
                 font.family: Theme.fontFamily; font.pixelSize: 12; font.weight: Font.Bold
                 color: Theme.primary
             }
@@ -2021,7 +2021,7 @@ PanelWindow {
                 Text {
                     id: snapText
                     anchors.centerIn: parent
-                    text: dwWindow.snapToGrid ? "# Grade: 20px" : "# Grade: Livre"
+                    text: "# " + (dwWindow.snapToGrid ? Theme.t("widgets.grid_on", "Grade: 20px") : Theme.t("widgets.grid_off", "Grade: livre"))
                     font.family: Theme.fontFamily; font.pixelSize: 11; font.weight: Font.Medium
                     color: dwWindow.snapToGrid ? Theme.background : Theme.textColor
                 }
@@ -2044,19 +2044,19 @@ PanelWindow {
                     spacing: 6
 
                     readonly property var widgetTypes: [
-                        { label: "+ Relógio", type: "clock" },
-                        { label: "+ Analógico", type: "analog" },
-                        { label: "+ Mídia", type: "media" },
-                        { label: "+ Sistema", type: "sysinfo" },
-                        { label: "+ Top Apps", type: "top" },
-                        { label: "+ Rede", type: "netspeed" },
-                        { label: "+ Calendário", type: "calendar" },
-                        { label: "+ Bateria", type: "battery" },
-                        { label: "+ Disco", type: "storage" },
-                        { label: "+ Pomodoro", type: "pomodoro" },
-                        { label: "+ Notas", type: "notes" },
-                        { label: "+ Clima", type: "weather" },
-                        { label: "+ Citação", type: "quotes" }
+                        { label: "+ " + Theme.t("widgets.add_clock", "Relógio"), type: "clock" },
+                        { label: "+ " + Theme.t("widgets.add_analog", "Analógico"), type: "analog" },
+                        { label: "+ " + Theme.t("widgets.add_media", "Mídia"), type: "media" },
+                        { label: "+ " + Theme.t("widgets.add_sysinfo", "Sistema"), type: "sysinfo" },
+                        { label: "+ " + Theme.t("widgets.add_top", "Top Apps"), type: "top" },
+                        { label: "+ " + Theme.t("widgets.add_netspeed", "Rede"), type: "netspeed" },
+                        { label: "+ " + Theme.t("widgets.add_calendar", "Calendário"), type: "calendar" },
+                        { label: "+ " + Theme.t("widgets.add_battery", "Bateria"), type: "battery" },
+                        { label: "+ " + Theme.t("widgets.add_storage", "Disco"), type: "storage" },
+                        { label: "+ " + Theme.t("widgets.add_pomodoro", "Pomodoro"), type: "pomodoro" },
+                        { label: "+ " + Theme.t("widgets.add_notes", "Notas"), type: "notes" },
+                        { label: "+ " + Theme.t("widgets.add_weather", "Clima"), type: "weather" },
+                        { label: "+ " + Theme.t("widgets.add_quotes", "Citação"), type: "quotes" }
                     ]
 
                     Repeater {
@@ -2242,10 +2242,10 @@ PanelWindow {
                 Row {
                     spacing: 6
                     readonly property var styles: [
-                        { label: "Vidro", val: "glass" },
-                        { label: "Sólido", val: "solid" },
-                        { label: "Glow", val: "glow" },
-                        { label: "Livre", val: "borderless" }
+                        { label: Theme.t("widgets.style_glass", "Vidro"), val: "glass" },
+                        { label: Theme.t("widgets.style_solid", "Sólido"), val: "solid" },
+                        { label: Theme.t("widgets.style_glow", "Glow"), val: "glow" },
+                        { label: Theme.t("widgets.style_borderless", "Livre"), val: "borderless" }
                     ]
                     Repeater {
                         model: parent.styles
@@ -2349,12 +2349,12 @@ PanelWindow {
                 Row {
                     spacing: 8
                     readonly property var colors: [
-                        { name: "Padrão", hex: "" },
-                        { name: "Ciano", hex: "#00f0ff" },
-                        { name: "Rosa", hex: "#ff007f" },
-                        { name: "Esmeralda", hex: "#10b981" },
-                        { name: "Violeta", hex: "#a855f7" },
-                        { name: "Âmbar", hex: "#f59e0b" }
+                        { name: Theme.t("widgets.color_default", "Padrão"), hex: "" },
+                        { name: Theme.t("widgets.color_cyan", "Ciano"), hex: "#00f0ff" },
+                        { name: Theme.t("widgets.color_pink", "Rosa"), hex: "#ff007f" },
+                        { name: Theme.t("widgets.color_emerald", "Esmeralda"), hex: "#10b981" },
+                        { name: Theme.t("widgets.color_violet", "Violeta"), hex: "#a855f7" },
+                        { name: Theme.t("widgets.color_amber", "Âmbar"), hex: "#f59e0b" }
                     ]
                     Repeater {
                         model: parent.colors

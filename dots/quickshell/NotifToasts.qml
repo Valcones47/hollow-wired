@@ -201,7 +201,7 @@ PanelWindow {
                                 spacing: 6
 
                                 Text {
-                                    text: card.modelData.appName || "Sistema"
+                                    text: card.modelData.appName || Theme.t("notif.system", "Sistema")
                                     font.family: Theme.fontFamily
                                     font.pixelSize: 11
                                     font.bold: true
