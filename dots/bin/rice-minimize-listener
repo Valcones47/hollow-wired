@@ -71,6 +71,12 @@ def main():
             listen(path)
         except OSError:
             pass
+        # A sessão acabou (o Hyprland apaga o hyprland.lock ao sair; a pasta
+        # da instância fica): encerra. Antes ficava tentando para sempre e, segurando a trava,
+        # impedia a cópia da sessão seguinte de subir — minimizar parava de
+        # funcionar depois de sair e entrar de novo.
+        if sig and not os.path.exists(os.path.join(RUN, "hypr", sig, "hyprland.lock")):
+            return 0
         # Hyprland reiniciou ou o socket caiu: tenta de novo.
         time.sleep(2)
 

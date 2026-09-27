@@ -34,7 +34,14 @@ restore() {
     printf '%s' "$line" | cliphist decode 2>/dev/null | wl-copy --type "$mime" 2>/dev/null
 }
 
+HYPR_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/hypr/${HYPRLAND_INSTANCE_SIGNATURE:-}"
 while :; do
+    # Sessão encerrada: sai (senão sobrevivia ao logout e acumulava uma cópia
+    # por login, rodando a cada segundo).
+    # (o Hyprland apaga o hyprland.lock ao sair; a pasta da instância fica)
+    if [ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ] && [ ! -e "$HYPR_DIR/hyprland.lock" ]; then
+        exit 0
+    fi
     # --list-types sai com erro quando não há dono da seleção.
     if ! wl-paste --list-types >/dev/null 2>&1; then
         restore

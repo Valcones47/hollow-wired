@@ -122,11 +122,15 @@ def from_hyprpaper():
         return None
     for line in lines:
         line = line.strip()
-        if not line.startswith("wallpaper"):
+        # formato novo (hyprpaper 0.8+): "path = <caminho>" dentro de "wallpaper { }";
+        # antigo: "wallpaper = <monitor>,<caminho>" (o caminho pode vir com "contain:")
+        if line.startswith("path") and "=" in line:
+            path = line.partition("=")[2].strip().lstrip("~")
+        elif line.startswith("wallpaper") and "=" in line:
+            _, _, value = line.partition("=")
+            path = value.split(",", 1)[-1].strip().lstrip("~")
+        else:
             continue
-        # formato: wallpaper = <monitor>,<caminho>   (o caminho pode vir com "contain:")
-        _, _, value = line.partition("=")
-        path = value.split(",", 1)[-1].strip().lstrip("~")
         for prefix in ("contain:", "cover:", "tile:"):
             if path.startswith(prefix):
                 path = path[len(prefix):]

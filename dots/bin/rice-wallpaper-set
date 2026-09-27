@@ -91,12 +91,17 @@ write_hyprpaper_conf() {
     local img="$1"
     mkdir -p "$CONF_DIR"
     {
+        # Formato do hyprpaper 0.8+: o antigo ("preload =" e "wallpaper =
+        # monitor,caminho") é ignorado em silêncio e a tela ficava preta.
         echo "# Gerado por rice-wallpaper-set — não edite à mão."
-        echo "preload = $img"
+        echo "wallpaper {"
         # Sem nome de monitor = vale para todos (inclusive os que forem plugados depois).
-        echo "wallpaper = ,$img"
+        echo "    monitor ="
+        echo "    path = $img"
+        echo "    fit_mode = cover"
+        echo "}"
         echo "splash = false"
-        echo "ipc = on"
+        echo "ipc = true"
     } > "$HYPRPAPER_CONF"
 }
 
@@ -124,9 +129,8 @@ apply_wallpaper() {
             [ -n "$delay" ] && [ "$delay" -gt 0 ] 2>/dev/null &&
                 sleep "$(awk -v ms="$delay" 'BEGIN { printf "%.3f", ms / 1000 }')"
         fi
-        # Troca ao vivo, sem reiniciar o daemon.
-        hyprctl hyprpaper unload all >/dev/null 2>&1
-        hyprctl hyprpaper preload "$img" >/dev/null 2>&1
+        # Troca ao vivo, sem reiniciar o daemon (no 0.8 não há mais
+        # preload/unload: o "wallpaper" carrega sozinho).
         hyprctl hyprpaper wallpaper ",$img" >/dev/null 2>&1
         # A camada do --cover só sai com reveal (senão ficava até o limite de
         # segurança, onda + 2,5 s).
@@ -154,8 +158,24 @@ apply_wallpaper() {
 
 waywallen_active() {
     # Quem usa o Wallpaper Engine não deve ter o hyprpaper brigando pelo fundo.
-    pgrep -f "waywallen" >/dev/null 2>&1
+    # Antes bastava o processo existir: com o Waywallen instalado mas nenhum
+    # wallpaper escolhido ainda (quem não tem o Wallpaper Engine, ou acabou de
+    # instalar), o hyprpaper não subia e a área de trabalho ficava preta, sem
+    # paleta. Agora conta só quando o Waywallen já tem um wallpaper salvo.
+    local cfg="$HOME/.var/app/org.waywallen.waywallen/config/waywallen/config.toml"
+    [ -f "$cfg" ] || return 1
+    python3 - "$cfg" <<'PY' 2>/dev/null
+import sys, tomllib
+d = tomllib.load(open(sys.argv[1], "rb"))
+ok = d.get("global", {}).get("last_wallpaper") or any(
+    isinstance(v, dict) and v.get("last_wallpaper") for v in d.get("display", {}).values())
+sys.exit(0 if ok else 1)
+PY
 }
+
+# Primeiro wallpaper de quem instala: um dos que vêm com o CachyOS
+# (pacote cachyos-wallpapers). Fora do CachyOS, cai no fundo gerado.
+CACHY_DEFAULT="/usr/share/wallpapers/cachyos-wallpapers/CachyOS_Moon.jpg"
 
 MODE="${1:-pick}"
 case "$MODE" in
@@ -170,7 +190,14 @@ case "$MODE" in
         if waywallen_active; then
             exit 0
         fi
+        # Já tem wallpaper salvo: só garante o hyprpaper rodando. Antes saía
+        # aqui sem subir nada, e do segundo boot em diante (sem Waywallen) a
+        # área de trabalho ficava preta.
         if [ -f "$POINTER" ] && [ -f "$(cat "$POINTER" 2>/dev/null)" ]; then
+            [ -f "$HYPRPAPER_CONF" ] || write_hyprpaper_conf "$(cat "$POINTER")"
+            if have hyprpaper && ! pgrep -x hyprpaper >/dev/null 2>&1; then
+                (setsid hyprpaper >/dev/null 2>&1 &)
+            fi
             exit 0
         fi
         EXISTING="$(rice-wallpaper-current 2>/dev/null || true)"
@@ -180,6 +207,10 @@ case "$MODE" in
                 apply_wallpaper "$EXISTING"
                 exit $?
             fi
+        fi
+        if [ -f "$CACHY_DEFAULT" ]; then
+            apply_wallpaper "$CACHY_DEFAULT"
+            exit $?
         fi
         IMG="$(generate_wallpaper)" || exit 1
         apply_wallpaper "$IMG"

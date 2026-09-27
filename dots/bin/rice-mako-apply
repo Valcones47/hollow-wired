@@ -175,6 +175,14 @@ def to_int(value, default):
         return default
 
 
+def notif_provider():
+    try:
+        with open(os.path.expanduser("~/.config/hollow-wired/notifications.json"), encoding="utf-8") as f:
+            return json.load(f).get("provider", "quickshell")
+    except (OSError, ValueError):
+        return "quickshell"
+
+
 def mako_running():
     return subprocess.run(["pgrep", "-x", "mako"], stdout=subprocess.DEVNULL,
                           stderr=subprocess.DEVNULL).returncode == 0
@@ -275,7 +283,10 @@ def diagnose():
     if MUSIC_MARKER not in content:
         problems.append("music_missing")
 
-    if shutil.which("mako") and not mako_running():
+    # Só é problema se o mako for o servidor escolhido: no padrão (Quickshell
+    # nativo) ele fica parado de propósito, e o painel acusava "não está
+    # rodando" em toda instalação — e o "Consertar" subia o mako por cima.
+    if shutil.which("mako") and notif_provider() == "mako" and not mako_running():
         problems.append("not_running")
 
     return problems, True

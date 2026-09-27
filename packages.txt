@@ -103,6 +103,7 @@ gamemode          # Modo jogo
 btop              # Monitor no terminal (plano B do Super + Esc)
 qt5-wayland
 qt6-wayland
+plasma-integration  # Tema dos apps Qt e ícones do Quickshell (QT_QPA_PLATFORMTHEME=kde)
 gnome-keyring     # Guarda senhas de navegador, Discord, VS Code etc.
 
 # Bom ter para quem chega do Windows: abrir o que baixar sem caçar programa

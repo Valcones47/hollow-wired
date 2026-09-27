@@ -1800,5 +1800,8 @@
   "wp.style_title": "Wallpaper picker style",
   "wp.style_sub": "Classic: carousel at the bottom. Slanted: large cards in the middle of the screen, with search.",
   "wp.style_classic": "Classic",
-  "wp.style_skew": "Slanted"
+  "wp.style_skew": "Slanted",
+  "lock.disk": "Disk",
+  "lock.net": "Network",
+  "lock.temp": "Temp"
 }

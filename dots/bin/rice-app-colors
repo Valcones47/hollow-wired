@@ -233,6 +233,14 @@ def apply():
         kg.add_section("General")
     kg.set("General", "ColorScheme", "HollowWired")
     kg.remove_option("General", "ColorSchemeHash")
+    # Sem tema de ícones escolhido (instalação nova, sem Plasma configurado),
+    # os apps Qt e o Quickshell caíam no hicolor e metade dos ícones sumia.
+    # Quem já escolheu um tema não é tocado.
+    if not (kg.has_section("Icons") and kg.get("Icons", "Theme", fallback="")):
+        if os.path.isdir("/usr/share/icons/Papirus-Dark"):
+            if not kg.has_section("Icons"):
+                kg.add_section("Icons")
+            kg.set("Icons", "Theme", "Papirus-Dark")
     write_ini(kg, KDEGLOBALS)
     notify_kde()
 

@@ -142,8 +142,23 @@ def c_quickshell():
                    lambda: sh([os.path.join(BIN, "rice-restart")])[0] == 0 or hypr_exec("quickshell"))
 
 
-@check("Notificações (mako)", "Interface")
+@check("Notificações", "Interface")
 def c_mako():
+    # O servidor padrão é o próprio Quickshell; o mako só é reserva. Antes o
+    # doctor acusava "parado" em toda instalação e o conserto subia o mako
+    # por cima do Quickshell.
+    notifd = os.path.join(BIN, "rice-notif-daemon")
+    if os.path.exists(notifd):
+        code, out = sh([notifd, "status"])
+        try:
+            st = json.loads(out)
+        except ValueError:
+            st = {}
+        if st.get("provider_preference", "quickshell") != "mako":
+            if st.get("active_dbus_owner", "none") != "none":
+                return None
+            return Problem("fix", "nenhum serviço de notificações está ativo",
+                           lambda: sh([notifd, "check"])[0] == 0)
     if not have("mako"):
         return Problem("fix", "o serviço de notificações não está instalado",
                        lambda: pacman_install(["mako"]) and hypr_exec("mako"), root=True)
@@ -661,6 +676,11 @@ def c_cliphist_db():
 # ------------------------------------------------------------------- main
 
 def main(argv):
+    # Opção desconhecida (ex.: --help) não pode cair no modo completo, que
+    # conserta coisas sem perguntar.
+    if any(a in ("-h", "--help") for a in argv):
+        print(__doc__ or "rice-doctor [--check|--auto|--json]")
+        return 0
     mode = "check" if "--check" in argv else ("auto" if "--auto" in argv else "full")
     as_json = "--json" in argv
     results = []

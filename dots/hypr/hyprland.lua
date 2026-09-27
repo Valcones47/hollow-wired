@@ -200,6 +200,14 @@ hl.env("XDG_CURRENT_DESKTOP", "Hyprland")
 hl.env("XDG_SESSION_TYPE", "wayland")
 hl.env("XDG_SESSION_DESKTOP", "Hyprland")
 
+-- Tema dos apps Qt (e dos ícones do Quickshell): sem esta variável o Qt cai no
+-- tema genérico, os ícones de apps e notificações somem (quadrado magenta) e
+-- as cores do wallpaper não chegam aos apps KDE. Na máquina do autor ela vinha
+-- de um ~/.profile pessoal; quem instalava do zero ficava sem.
+if io.open("/usr/lib/qt6/plugins/platformthemes/KDEPlasmaPlatformTheme6.so", "r") then
+    hl.env("QT_QPA_PLATFORMTHEME", "kde")
+end
+
 -- Detecção dinâmica de GPU (NVIDIA dedicada, Intel, AMD Radeon e Laptops Híbridos)
 local hasNvidia = false
 local hasIgpu = false
@@ -271,7 +279,8 @@ hl.env("HYPRCURSOR_SIZE", "24")
 
 -- Apps padrão de sessão (nunca em shell rc, apenas aqui)
 hl.env("TERMINAL", "kitty")
-hl.env("EDITOR", "micro")
+-- micro não vem em toda instalação; sem ele o nano (que vem no base).
+hl.env("EDITOR", io.open("/usr/bin/micro", "r") and "micro" or "nano")
 hl.env("VISUAL", "kate")
 hl.env("BROWSER", "zen-browser")
 
@@ -362,8 +371,11 @@ hl.on("hyprland.start", function()
     -- sobe e a área de trabalho ficava simplesmente preta — e sem wallpaper o
     -- wallust também não gera paleta nenhuma. Agora, quando o Waywallen não
     -- está presente, o rice aplica um wallpaper estático com o hyprpaper.
+    -- Com o Waywallen instalado mas nenhum wallpaper escolhido nele ainda, o
+    -- --ensure também põe o estático (senão a tela ficava preta).
     hl.exec_cmd([[sh -c 'if flatpak info org.waywallen.waywallen >/dev/null 2>&1; then
     flatpak run org.waywallen.waywallen --no-ui >/dev/null 2>&1 &
+    "$HOME/.local/bin/rice-wallpaper-set" --ensure >/dev/null 2>&1 &
     for i in $(seq 1 30); do
         [ -S "$XDG_RUNTIME_DIR/waywallen/display.sock" ] && exec "$HOME/.local/bin/waywallen-layer-shell" --socket "$XDG_RUNTIME_DIR/waywallen/display.sock"
         sleep 0.5
@@ -561,12 +573,9 @@ hl.device({
     sensitivity   = 0,
 })
 
--- Touchpad estava desabilitado no Plasma - replicando aqui.
--- Confirme o nome exato com `hyprctl devices` e ajuste se necessário.
-hl.device({
-    name    = "elan0521:01-04f3:31b1-touchpad",
-    enabled = false,
-})
+-- Regras de um aparelho específico (ex.: desligar o touchpad de um notebook)
+-- ficam no ~/.config/hypr/user-binds.lua de cada um, não aqui: este arquivo
+-- vale para todo mundo que instala o rice.
 
 -----------------------
 ---- KEYBINDINGS ------

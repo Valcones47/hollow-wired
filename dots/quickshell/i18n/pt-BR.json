@@ -1800,5 +1800,8 @@
   "wp.style_title": "Estilo do seletor de papel de parede",
   "wp.style_sub": "Clássico: carrossel embaixo. Inclinado: cartões grandes no meio da tela, com busca.",
   "wp.style_classic": "Clássico",
-  "wp.style_skew": "Inclinado"
+  "wp.style_skew": "Inclinado",
+  "lock.disk": "Disco",
+  "lock.net": "Rede",
+  "lock.temp": "Temp"
 }

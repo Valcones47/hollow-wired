@@ -281,6 +281,22 @@ sudo pacman -Sy --needed --noconfirm archlinux-keyring 2>/dev/null || true
 if [ "$IS_CACHYOS" = true ]; then
     sudo pacman -Sy --needed --noconfirm cachyos-keyring 2>/dev/null || true
 fi
+# Atualiza o sistema inteiro antes de instalar. Instalar pacotes novos sobre
+# um banco sincronizado sem atualizar o resto é a "atualização parcial" do
+# Arch: num CachyOS instalado de uma ISO antiga, o Quickshell vinha compilado
+# contra um Qt mais novo que o do sistema e simplesmente não abria (sessão
+# sem barra nenhuma).
+KERNEL_BEFORE="$(uname -r)"
+info_msg "Atualizando o sistema antes de instalar o rice (pode demorar na primeira vez)..."
+if ! sudo pacman -Su --noconfirm; then
+    warn_msg "A atualização do sistema falhou. Rode ${WHITE}sudo pacman -Syu${NC} num terminal, resolva o que ele pedir e rode o instalador de novo."
+    exit 1
+fi
+
+# Primeiro wallpaper do rice: um dos que vêm com o CachyOS (rice-wallpaper-set).
+if [ "$IS_CACHYOS" = true ]; then
+    RICE_PACKAGES+=(cachyos-wallpapers)
+fi
 
 # Drivers Vulkan e de decodificação de vídeo da placa que desenha a tela.
 # (NVIDIA fica com o chwd/driver do sistema; a série legada tem etapa própria.)
@@ -337,13 +353,22 @@ else
 
     if [ ${#AUR_MISSING[@]} -gt 0 ]; then
         gear_msg "Instalando pacotes do AUR (${#AUR_MISSING[@]}) via $AUR_HELPER: ${AUR_MISSING[*]}..."
-        if [ "$AUR_HELPER" = "paru" ]; then
-            paru -S --needed --noconfirm --skipreview "${AUR_MISSING[@]}"
-        else
-            $AUR_HELPER -S --needed --noconfirm "${AUR_MISSING[@]}"
+        # Um pacote do AUR que não compila (acontece) abortava o instalador
+        # inteiro pelo `set -e`, antes de copiar o rice: a pessoa ficava com
+        # pacotes instalados e nenhuma configuração. Agora tenta todos juntos,
+        # depois um por um, e segue avisando o que ficou de fora.
+        aur_cmd=("$AUR_HELPER" -S --needed --noconfirm)
+        [ "$AUR_HELPER" = "paru" ] && aur_cmd+=(--skipreview)
+        if ! "${aur_cmd[@]}" "${AUR_MISSING[@]}"; then
+            AUR_FAILED=()
+            for pkg in "${AUR_MISSING[@]}"; do
+                pacman -T "$pkg" >/dev/null 2>&1 && continue
+                "${aur_cmd[@]}" "$pkg" || AUR_FAILED+=("$pkg")
+            done
+            [ ${#AUR_FAILED[@]} -gt 0 ] && warn_msg "Não consegui instalar do AUR: ${WHITE}${AUR_FAILED[*]}${NC} (o resto do rice segue normalmente)."
         fi
     fi
-    ok_msg "Dependências do rice instaladas com sucesso!"
+    ok_msg "Dependências do rice instaladas!"
 fi
 
 # ------------------------------------------------------------------------------
@@ -383,15 +408,24 @@ mkdir -p "$HOME/.config" \
 # 3. Cópia dos dotfiles para o usuário (preservando preferências pessoais se já existirem)
 gear_msg "Copiando configurações do Quickshell, Hyprland Lua, Kitty e Temas..."
 
-saved_dock="" saved_widgets="" saved_shell="" saved_locale="" saved_kitty="" saved_user_binds="" saved_user_prefs="" saved_colors=""
-[ -f "$HOME/.config/hypr/colors.conf" ] && saved_colors=$(cat "$HOME/.config/hypr/colors.conf")
-[ -f "$HOME/.config/quickshell/dock.json" ] && saved_dock=$(cat "$HOME/.config/quickshell/dock.json")
-[ -f "$HOME/.config/quickshell/desktop-widgets.json" ] && saved_widgets=$(cat "$HOME/.config/quickshell/desktop-widgets.json")
-[ -f "$HOME/.config/quickshell/shell-customization.json" ] && saved_shell=$(cat "$HOME/.config/quickshell/shell-customization.json")
-[ -f "$HOME/.config/quickshell/locale.json" ] && saved_locale=$(cat "$HOME/.config/quickshell/locale.json")
-[ -f "$HOME/.config/kitty/kitty.conf" ] && saved_kitty=$(cat "$HOME/.config/kitty/kitty.conf")
-[ -f "$HOME/.config/hypr/user-binds.lua" ] && saved_user_binds=$(cat "$HOME/.config/hypr/user-binds.lua")
-[ -f "$HOME/.config/hypr/user-prefs.json" ] && saved_user_prefs=$(cat "$HOME/.config/hypr/user-prefs.json")
+# Estado do usuário (mesma lista do rice-update): numa reinstalação, a cópia
+# dos dots passava por cima de layout, equalizador, tempos de ociosidade,
+# atalhos do Discord etc. — só alguns arquivos eram guardados.
+USER_STATE="quickshell/dock.json quickshell/desktop-widgets.json quickshell/shell-customization.json
+quickshell/shell-layout.json quickshell/locale.json quickshell/eq.json quickshell/clipboard-prefs.json
+quickshell/clipboard-favorites.json quickshell/todo.json hypr/user-prefs.json hypr/user-binds.lua
+hypr/animations.lua hypr/color-overrides.json hypr/colors-base.json hypr/hypridle.conf hypr/idle.json
+hypr/discord-binds.conf hypr/window-mode hypr/workspace-layout hypr/colors.conf hypr/hyprlock-colors.conf
+kitty/kitty.conf"
+STATE_TMP="$(mktemp -d)"
+for f in $USER_STATE; do
+    if [ -f "$HOME/.config/$f" ]; then
+        mkdir -p "$STATE_TMP/$(dirname "$f")"
+        cp -a "$HOME/.config/$f" "$STATE_TMP/$f"
+    fi
+done
+saved_locale=""
+[ -f "$STATE_TMP/quickshell/locale.json" ] && saved_locale=1
 
 cp -a "$SCRIPT_DIR/dots/hypr" "$HOME/.config/"
 cp -a "$SCRIPT_DIR/dots/quickshell" "$HOME/.config/"
@@ -406,17 +440,13 @@ cp -a "$SCRIPT_DIR/dots/kitty" "$HOME/.config/"
 [ -d "$SCRIPT_DIR/dots/gtk-3.0" ] && cp -a "$SCRIPT_DIR/dots/gtk-3.0" "$HOME/.config/"
 [ -d "$SCRIPT_DIR/dots/gtk-4.0" ] && cp -a "$SCRIPT_DIR/dots/gtk-4.0" "$HOME/.config/"
 
-# A paleta do wallust (colors.conf) pertence ao wallpaper do usuário: a cópia do
-# repositório só serve de ponto de partida quando ainda não existe nenhuma.
-if [ -n "$saved_colors" ]; then
-    echo "$saved_colors" > "$HOME/.config/hypr/colors.conf"
-fi
-
-# Restaura preferências pessoais pré-existentes
-[ -n "$saved_dock" ] && echo "$saved_dock" > "$HOME/.config/quickshell/dock.json"
-[ -n "$saved_widgets" ] && echo "$saved_widgets" > "$HOME/.config/quickshell/desktop-widgets.json"
-[ -n "$saved_shell" ] && echo "$saved_shell" > "$HOME/.config/quickshell/shell-customization.json"
-[ -n "$saved_locale" ] && echo "$saved_locale" > "$HOME/.config/quickshell/locale.json"
+# Devolve o estado do usuário (a paleta do wallust, colors.conf, também: ela
+# pertence ao wallpaper dele; a do repositório só serve de ponto de partida).
+( cd "$STATE_TMP" && find . -type f ) | while read -r f; do
+    mkdir -p "$HOME/.config/$(dirname "${f#./}")"
+    cp -a "$STATE_TMP/$f" "$HOME/.config/${f#./}"
+done
+rm -rf "$STATE_TMP"
 # Instalação nova: idioma da interface pelo idioma do sistema. Antes vinha
 # sempre o do repositório (inglês), mesmo num sistema em português.
 if [ -z "$saved_locale" ]; then
@@ -425,9 +455,6 @@ if [ -z "$saved_locale" ]; then
         *)   echo '{"locale": "en"}' > "$HOME/.config/quickshell/locale.json" ;;
     esac
 fi
-[ -n "$saved_kitty" ] && echo "$saved_kitty" > "$HOME/.config/kitty/kitty.conf"
-[ -n "$saved_user_binds" ] && echo "$saved_user_binds" > "$HOME/.config/hypr/user-binds.lua"
-[ -n "$saved_user_prefs" ] && echo "$saved_user_prefs" > "$HOME/.config/hypr/user-prefs.json"
 
 # 4. Cópia dos atalhos .desktop e binários
 gear_msg "Instalando utilitários do rice em ~/.local/bin/..."
@@ -445,7 +472,9 @@ fi
 if [ -f "$HOME/.config/fastfetch/config.jsonc" ]; then
     # Cobre tanto o caminho do autor (~/Imagens/FastFetch) quanto qualquer outro
     # já gravado, apontando pra pasta de imagens real deste usuário.
-    sed -i -E "s|/home/[^/\"]*/(Imagens|Pictures|Bilder|Images)/FastFetch|$PICTURES_DIR/FastFetch|g" "$HOME/.config/fastfetch/config.jsonc"
+    # Delimitador "#": com "|" o sed quebrava na alternância do padrão
+    # (Imagens|Pictures|...) e, pelo `set -e`, a instalação inteira parava aqui.
+    sed -i -E "s#/home/[^/\"]*/(Imagens|Pictures|Bilder|Images)/FastFetch#$PICTURES_DIR/FastFetch#g" "$HOME/.config/fastfetch/config.jsonc"
 fi
 if [ -f "$HOME/.config/swappy/config" ]; then
     sed -i "s|save_dir=.*|save_dir=$PICTURES_DIR/Capturas de tela|g" "$HOME/.config/swappy/config"
@@ -573,6 +602,8 @@ fi
 
 # Opcional: Wallpaper Engine (Waywallen via Flatpak)
 echo -e "\n${CYAN}◈ [OPCIONAL] Deseja instalar o suporte a Wallpaper Engine (Waywallen via Flatpak)?${NC}"
+echo -e "  ${GRAY}Wallpapers animados: os do Wallpaper Engine (comprado na Steam) e vídeos de uma pasta sua.${NC}"
+echo -e "  ${GRAY}Sem ele o rice usa imagens comuns; o primeiro wallpaper é um dos que vêm com o CachyOS.${NC}"
 read -rp "  Instalar Waywallen? [S/n]: " INSTALL_WAYWALLEN || true
 INSTALL_WAYWALLEN=${INSTALL_WAYWALLEN:-S}
 if [[ "$INSTALL_WAYWALLEN" =~ ^[Ss]$ ]]; then
@@ -725,4 +756,10 @@ echo -e "  • ${CYAN}Tecla Windows${NC} abre o menu de aplicativos · ${CYAN}Su
 echo -e "  • ${CYAN}Super + I${NC} abre o painel de configurações · ${CYAN}Rice Doctor${NC} conserta problemas comuns.\n"
 
 echo -e "${PURPLE}  \"No matter where you go, everyone's always connected.\"${NC}"
-echo -e "  Faça logout da sua sessão atual e inicie a sessão ${BOLD}${CYAN}Hyprland${NC} pelo gerenciador de login!\n"
+if [ ! -d "/usr/lib/modules/${KERNEL_BEFORE:-$(uname -r)}" ]; then
+    # A atualização trocou o kernel: sem reiniciar, módulos (Wi-Fi, vídeo,
+    # pendrive) podem não carregar na sessão nova.
+    echo -e "  O sistema foi atualizado com um kernel novo: ${BOLD}reinicie o computador${NC} e escolha a sessão ${BOLD}${CYAN}Hyprland${NC} na tela de login.\n"
+else
+    echo -e "  Faça logout da sua sessão atual e inicie a sessão ${BOLD}${CYAN}Hyprland${NC} pelo gerenciador de login!\n"
+fi
