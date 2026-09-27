@@ -1025,9 +1025,10 @@ PanelWindow {
                             required property SystemTrayItem modelData
                             implicitWidth: 20
                             implicitHeight: 20
-                            IconImage {
+                            TrayIcon {
                                 anchors.fill: parent
-                                source: tIcon.modelData.icon
+                                item: tIcon.modelData
+                                size: 20
                                 opacity: tIcon.modelData.status === Status.Passive ? 0.6 : 1
                             }
                             MouseArea {

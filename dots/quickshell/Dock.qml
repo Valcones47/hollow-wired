@@ -669,10 +669,10 @@ PanelWindow {
                             radius: 8
                             color: trayItArea.containsMouse ? Theme.tileHigh : "transparent"
                         }
-                        IconImage {
+                        TrayIcon {
                             anchors.centerIn: parent
-                            implicitSize: 18
-                            source: trayIt.modelData.icon
+                            item: trayIt.modelData
+                            size: 18
                             opacity: trayIt.modelData.status === Status.Passive ? 0.6 : 1
                         }
                         MouseArea {

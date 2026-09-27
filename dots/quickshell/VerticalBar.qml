@@ -586,10 +586,10 @@ PanelWindow {
                             color: trayArea.containsMouse || (vbar.pop === "tray" && vbar.popTray === trayBtn.modelData)
                                 ? Theme.tileHigh : "transparent"
                         }
-                        IconImage {
+                        TrayIcon {
                             anchors.centerIn: parent
-                            implicitSize: 18
-                            source: trayBtn.modelData.icon
+                            item: trayBtn.modelData
+                            size: 18
                             opacity: trayBtn.modelData.status === Status.Passive ? 0.6 : 1
                         }
                         MouseArea {

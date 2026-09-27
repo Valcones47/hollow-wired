@@ -711,10 +711,10 @@ PanelWindow {
                                 ? Theme.tileHigh : "transparent"
                             Behavior on color { ColorAnimation { duration: Theme.ms(140) } }
                         }
-                        IconImage {
+                        TrayIcon {
                             anchors.centerIn: parent
-                            implicitSize: 20
-                            source: trayBtn.modelData.icon
+                            item: trayBtn.modelData
+                            size: 20
                             opacity: trayBtn.modelData.status === Status.Passive ? 0.6 : 1
                         }
                         MouseArea {
