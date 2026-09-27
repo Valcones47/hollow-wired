@@ -124,7 +124,7 @@ PanelWindow {
             const key = e ? e.id : t.appId;
             if (!seen[key]) {
                 seen[key] = true;
-                out.push({ key: key, entry: e, pinned: false, appId: t.appId });
+                out.push({ key: key, entry: e, pinned: false, appId: t.appId, title: t.title });
             }
         }
         return out;
@@ -809,7 +809,7 @@ PanelWindow {
 
                     PopTitle {
                         Layout.fillWidth: true
-                        text: appPop.item ? (appPop.item.entry ? appPop.item.entry.name : appPop.item.appId) : ""
+                        text: appPop.item ? DockConfig.nameForWindow(appPop.item.appId || "", appPop.item.title || "", appPop.item.entry) : ""
                         elide: Text.ElideRight
                     }
                     PopText {

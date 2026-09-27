@@ -113,8 +113,11 @@ QtObject {
             const hit = apps.find(a => (a.execString || "").indexOf(tag) !== -1);
             if (hit) return hit;
         }
-        const lc = clean.toLowerCase();
-        const byClass = apps.find(a => (a.startupClass || "").toLowerCase() === lc);
+        // Classe e StartupWMClass nem sempre batem na grafia: o Concord abre
+        // como "concord-premium" e o atalho declara "Concord Premium".
+        const nc = root._norm(clean);
+        const byClass = apps.find(a => root._norm(a.startupClass) === nc)
+            || apps.find(a => root._norm(String(a.name || "").replace(/\(.*?\)/g, "")) === nc);
         if (byClass) return byClass;
         // A heurística casaria "steam_app_…" com o próprio Steam.
         if (!steam) {
@@ -135,7 +138,12 @@ QtObject {
         // "configurações"). Jogo sem atalho vira controle; o resto, janela.
         const game = steam || /\.exe$/i.test(appId || "") || /^gamescope$/i.test(appId || "");
         const fb = game ? "applications-games" : "preferences-system-windows";
-        if (!name && steam) return Quickshell.iconPath("steam_icon_" + steam[1], fb);
+        if (!name && steam) {
+            const cached = root.steamIcons[steam[1]];
+            if (cached) return cached;
+            Qt.callLater(() => root._askSteamIcon(steam[1]));
+            return Quickshell.iconPath("steam_icon_" + steam[1], fb);
+        }
         if (!name) return Quickshell.iconPath(fb);
         if (name.startsWith("file://")) return name;
         if (name.startsWith("/")) return "file://" + name;
@@ -144,6 +152,50 @@ QtObject {
     function iconForWindow(appId, title) {
         const e = entryForWindow(appId, title);
         return iconSource(e ? e.icon : (/^steam_app_/.test(appId || "") ? "" : appId), appId);
+    }
+
+    // Nome para mostrar: o do atalho; sem atalho (jogo do Steam sem .desktop,
+    // app solto), o título da janela — antes aparecia "steam_app_3069810".
+    function nameForWindow(appId, title, entry) {
+        const e = entry !== undefined ? entry : root.entryForWindow(appId, title);
+        if (e && e.name) return e.name;
+        if (title) return title;
+        return appId || "";
+    }
+
+    function _norm(x) { return String(x || "").toLowerCase().replace(/[\s_.\-]+/g, ""); }
+
+    // Jogo do Steam sem atalho (a maioria: o Steam só cria .desktop se pedir):
+    // o ícone de cada jogo fica em appcache/librarycache/<id>/<sha1>.jpg.
+    // Procurado uma vez por jogo, em segundo plano.
+    property var steamIcons: ({})
+    property var _steamAsked: ({})
+    property var _steamQueue: []
+    property Process steamIconProc: Process {
+        property string wanted: ""
+        property string found: ""
+        command: ["sh", "-c", "for b in \"$HOME/.local/share/Steam\" \"$HOME/.steam/steam\" \"$HOME/.var/app/com.valvesoftware.Steam/data/Steam\"; do d=\"$b/appcache/librarycache/$1\"; [ -d \"$d\" ] || continue; f=$(ls \"$d\" | grep -E '^[0-9a-f]{40}\\.jpg$' | head -n1); [ -n \"$f\" ] && { echo \"$d/$f\"; exit 0; }; done", "sh", wanted]
+        stdout: StdioCollector { onStreamFinished: root.steamIconProc.found = text.trim() }
+        onExited: {
+            if (found !== "") {
+                const m = Object.assign({}, root.steamIcons);
+                m[wanted] = "file://" + found;
+                root.steamIcons = m;
+            }
+            found = "";
+            root._nextSteam();
+        }
+    }
+    function _askSteamIcon(id) {
+        if (root._steamAsked[id]) return;
+        root._steamAsked[id] = true;
+        root._steamQueue.push(id);
+        if (!steamIconProc.running) root._nextSteam();
+    }
+    function _nextSteam() {
+        if (!root._steamQueue.length) return;
+        steamIconProc.wanted = root._steamQueue.shift();
+        steamIconProc.running = true;
     }
 
     function isPinned(id) {
