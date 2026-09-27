@@ -99,12 +99,46 @@ end
 -----------------
 ---- MONITORES --
 -----------------
+-- Escala, resolução e rotação salvas pelo painel (user-prefs.json) são lidas
+-- aqui, e não só aplicadas depois pelo `rice-hypr-prefs apply`. Antes, toda
+-- recarga (a do rice-update, por exemplo) voltava por um instante para
+-- "preferred" e escala 1, e só então o apply recolocava o salvo: a tela
+-- trocava de modo duas vezes e o wallpaper se perdia.
+local prefsFile = home .. "/.config/hypr/user-prefs.json"
+local globalScale = "1"
+do
+    local p = io.popen("jq -r '.monitor_scale // 1' '" .. prefsFile .. "' 2>/dev/null")
+    if p then
+        local v = p:read("*l")
+        p:close()
+        if v and v:match("^%d+%.?%d*$") then globalScale = v end
+    end
+end
 hl.monitor({
     output   = "",
     mode     = "preferred",
     position = "auto",
-    scale    = "1",
+    scale    = globalScale,
 })
+do
+    local p = io.popen("jq -r '(.monitors // {}) | to_entries[] | [.key, (.value.mode // \"preferred\"), ((.value.scale // 1) | tostring), ((.value.transform // 0) | tostring)] | join(\"\\t\")' '"
+        .. prefsFile .. "' 2>/dev/null")
+    if p then
+        for line in p:lines() do
+            local name, mode, scale, tr = line:match("^([^\t]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)$")
+            if name and scale:match("^%d+%.?%d*$") then
+                hl.monitor({
+                    output    = name,
+                    mode      = mode,
+                    position  = "auto",
+                    scale     = scale,
+                    transform = tonumber(tr) or 0,
+                })
+            end
+        end
+        p:close()
+    end
+end
 
 --------------------------
 ---- PROGRAMAS BASE ------

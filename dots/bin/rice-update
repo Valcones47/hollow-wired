@@ -180,6 +180,19 @@ make_backup() {
 
 # Arquivos de estado do usuário (mesma lista do AGENTS.md): o rollback volta
 # o código do rice, não as escolhas feitas depois do backup.
+# Pausa o recarregamento automático do Hyprland enquanto a pasta hypr é
+# copiada. O `cp --remove-destination` apaga e reescreve o hyprland.lua; o
+# Hyprland recarregava no meio, com o arquivo vazio ou pela metade, perdia a
+# regra de monitor e caía na escala automática (125–150% num notebook) até a
+# cópia terminar — "a tela dá zoom e volta", e o wallpaper se perdia na troca
+# de modo. O `hyprctl reload` do fim relê o config e desfaz a pausa sozinho;
+# o trap garante isso também se o script parar no meio.
+hypr_hold() {
+    command -v hyprctl >/dev/null 2>&1 && [ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ] || return 0
+    hyprctl eval 'hl.config({ misc = { disable_autoreload = true } })' >/dev/null 2>&1 || true
+    trap 'hyprctl reload >/dev/null 2>&1 || true' EXIT
+}
+
 USER_STATE="quickshell/dock.json quickshell/desktop-widgets.json quickshell/shell-customization.json
 quickshell/shell-layout.json quickshell/locale.json quickshell/eq.json quickshell/clipboard-prefs.json
 quickshell/clipboard-favorites.json quickshell/todo.json hypr/user-prefs.json hypr/user-binds.lua
@@ -228,6 +241,7 @@ rollback() {
     done
 
     echo -e "\e[1;34m[*] Restaurando $(basename "$chosen")...\e[0m"
+    hypr_hold
     for d in $BACKUP_DIRS; do
         [ -d "$chosen/$d" ] && cp -a --remove-destination "$chosen/$d" "$HOME/.config/" 2>/dev/null || true
     done
@@ -364,6 +378,7 @@ apply_updates() {
     # Copia as atualizações de componentes, temas e scripts
     # --remove-destination: sobrescrever um script que está rodando (como o
     # blur-fullscreen-toggle.sh, que fica em loop) corrompe a execução em curso.
+    hypr_hold
     cp -a --remove-destination "$REPO_DIR/dots/hypr" "$HOME/.config/"
     cp -a --remove-destination "$REPO_DIR/dots/quickshell" "$HOME/.config/"
     cp -a --remove-destination "$REPO_DIR/dots/kitty" "$HOME/.config/"
