@@ -739,6 +739,43 @@ if has_windows && [ "$(timedatectl show -p LocalRTC --value 2>/dev/null)" = "no"
     fi
 fi
 
+if has_windows; then
+    # Windows no menu do Limine. O CachyOS já o acha sozinho quando os dois
+    # estão na mesma partição EFI (FIND_BOOTLOADERS=yes); se o Windows ficou
+    # numa partição EFI separada, ele não aparece e só dava para entrar pelo
+    # menu de boot da BIOS. O limine-scan (do próprio CachyOS) procura em
+    # todas as partições e pergunta qual adicionar.
+    # `|| true`: com set -e + pipefail, o find sem /efi abortaria o instalador.
+    LIMINE_CONF="$(sudo find /boot /efi /boot/efi -maxdepth 4 -name limine.conf 2>/dev/null | head -n1 || true)"
+    if [ -n "$LIMINE_CONF" ] && command -v limine-scan >/dev/null 2>&1 \
+        && ! sudo grep -qiE "bootmgfw|windows" "$LIMINE_CONF" 2>/dev/null; then
+        echo -e "\n${CYAN}◈ [RECOMENDADO] O Windows não está no menu de boot (Limine).${NC}"
+        echo -e "  ${GRAY}O limine-scan procura o Windows nas outras partições e pergunta qual adicionar${NC}"
+        echo -e "  ${GRAY}(escolha a entrada \"Windows Boot Manager\"). Não mexe no Windows em si.${NC}"
+        read -rp "  Procurar e adicionar o Windows ao menu? [S/n]: " ADD_WIN || true
+        if [[ "${ADD_WIN:-s}" =~ ^[Ss]$ ]]; then
+            sudo limine-scan || echo -e "  ${GRAY}Dá para rodar de novo depois com: sudo limine-scan${NC}"
+        fi
+    fi
+
+    # Inicialização Rápida do Windows: com ela ligada, o disco do Windows fica
+    # "hibernado" e o Dolphin só mostra um erro genérico ao tentar abri-lo.
+    if command -v ntfs-3g.probe >/dev/null 2>&1; then
+        while read -r dev fstype; do
+            [ "$fstype" = "ntfs" ] || continue
+            probe_rc=0
+            sudo ntfs-3g.probe --readwrite "$dev" >/dev/null 2>&1 || probe_rc=$?
+            if [ "$probe_rc" -eq 14 ]; then
+                echo -e "\n${AMBER}▲ A partição do Windows ($dev) está travada pela Inicialização Rápida.${NC}"
+                echo -e "  ${GRAY}Para abrir seus arquivos do Windows pelo Linux: no Windows, Painel de Controle →${NC}"
+                echo -e "  ${GRAY}Opções de Energia → \"Escolher a função dos botões de energia\" → desmarque${NC}"
+                echo -e "  ${GRAY}\"Ligar inicialização rápida\" e desligue o Windows pelo menu (não reiniciar).${NC}"
+                break
+            fi
+        done < <(lsblk -rno PATH,FSTYPE 2>/dev/null)
+    fi
+fi
+
 # Economia de energia do Wi-Fi desligada por padrão: ligada, a placa "cochila"
 # entre pacotes e a velocidade cai e oscila (medido: ~400 → ~460 Mbit/s ao
 # desligar). Quem já escolheu (arquivo existe) não é tocado; muda no painel.
