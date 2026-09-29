@@ -190,19 +190,39 @@ GPU_INFO=$(lspci 2>/dev/null | grep -Ei "vga|3d" | sed 's/.*: //g' | paste -sd '
 GPU_INFO="${GPU_INFO:-Gráficos Genéricos}"
 info_msg "Placa(s) de Vídeo: ${WHITE}$GPU_INFO${NC}"
 
+# Geração pelo chip que o lspci mostra ("NVIDIA Corporation GM206 [GeForce
+# GTX 960]"): GM = Maxwell, GP = Pascal, GK = Kepler. Pelo número do modelo
+# escapavam a GTX 745/750/750 Ti e as 830M–860M (Maxwell, mesmo driver da
+# série 900) — o nome fica só de reserva, para lspci sem o código do chip.
 IS_LEGACY_NVIDIA=false
+IS_KEPLER_NVIDIA=false
 LEGACY_NVIDIA_NAME=""
-if echo "$GPU_INFO" | grep -Eiq "(GeForce|GTX|GT)[^]]*\b9[0-9]{2}"; then
-    IS_LEGACY_NVIDIA=true
-    LEGACY_NVIDIA_NAME="Série 900 (Maxwell - ex: GTX 950/960/970/980)"
-elif echo "$GPU_INFO" | grep -Eiq "(GeForce|GTX|GT)[^]]*\b10[0-9]{2}"; then
-    IS_LEGACY_NVIDIA=true
-    LEGACY_NVIDIA_NAME="Série 1000 (Pascal - ex: GTX 1050/1060/1070/1080)"
-fi
+NV_CHIP=$(echo "$GPU_INFO" | grep -Eio "NVIDIA[^|]*\bG[KMP][0-9]{3}" | grep -Eio "G[KMP][0-9]{3}" | head -n1 | tr '[:lower:]' '[:upper:]' || true)
+NV_MODEL=$(echo "$GPU_INFO" | grep -Eio "NVIDIA[^|]*" | grep -Eo "\[[^]]*\]" | head -n1 | tr -d '[]' || true)
+case "$NV_CHIP" in
+    GM*) IS_LEGACY_NVIDIA=true; LEGACY_NVIDIA_NAME="${NV_MODEL:-Maxwell} (Maxwell)" ;;
+    GP*) IS_LEGACY_NVIDIA=true; LEGACY_NVIDIA_NAME="${NV_MODEL:-Pascal} (Pascal)" ;;
+    GK*) IS_KEPLER_NVIDIA=true ;;
+    *)
+        if echo "$GPU_INFO" | grep -Eiq "(GeForce|GTX|GT)[^]]*\b9[0-9]{2}"; then
+            IS_LEGACY_NVIDIA=true
+            LEGACY_NVIDIA_NAME="Série 900 (Maxwell - ex: GTX 950/960/970/980)"
+        elif echo "$GPU_INFO" | grep -Eiq "(GeForce|GTX|GT)[^]]*\b10[0-9]{2}"; then
+            IS_LEGACY_NVIDIA=true
+            LEGACY_NVIDIA_NAME="Série 1000 (Pascal - ex: GTX 1050/1060/1070/1080)"
+        fi
+        ;;
+esac
 
 if [ "$IS_LEGACY_NVIDIA" = true ]; then
     warn_msg "NVIDIA ${WHITE}$LEGACY_NVIDIA_NAME${AMBER} detectada!"
     info_msg "Drivers de GPU: ${CYAN}Opção de instalação do driver legado proprietário (580xx) será oferecida na Etapa 4.${NC}"
+elif [ "$IS_KEPLER_NVIDIA" = true ]; then
+    # Kepler (GTX 600/700, 870M/880M): o único driver proprietário (470xx) não
+    # tem GBM, que o Hyprland exige para desenhar na NVIDIA. Fica o nouveau.
+    warn_msg "NVIDIA ${WHITE}${NV_MODEL:-Kepler} (Kepler)${AMBER} detectada."
+    info_msg "Drivers de GPU: ${CYAN}o driver aberto (nouveau) é o que funciona com o Hyprland nessa geração;${NC}"
+    info_msg "o proprietário (470xx) não tem o suporte que o Hyprland exige. Em notebook com Intel, a tela roda na Intel."
 else
     info_msg "Drivers de GPU: ${GREEN}Gerenciamento delegado ao CachyOS/Hardware Detection (chwd)${NC}"
 fi
