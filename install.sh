@@ -718,6 +718,27 @@ for svc in NetworkManager bluetooth power-profiles-daemon; do
     fi
 done
 
+# Dual boot com Windows: o Windows guarda a hora local no relógio do PC e o
+# Linux guarda UTC, então a hora fica errada (umas 3 h no Brasil) a cada troca
+# de sistema. Com o Windows detectado, o Linux passa a usar a hora local também.
+has_windows() {
+    command -v efibootmgr >/dev/null 2>&1 && efibootmgr 2>/dev/null | grep -qi "Windows Boot Manager" && return 0
+    local d
+    for d in /boot /efi /boot/efi; do
+        [ -d "$d/EFI" ] && find "$d/EFI" -maxdepth 1 -iname microsoft 2>/dev/null | grep -q . && return 0
+    done
+    return 1
+}
+if has_windows && [ "$(timedatectl show -p LocalRTC --value 2>/dev/null)" = "no" ]; then
+    echo -e "\n${CYAN}◈ [RECOMENDADO] Windows detectado neste computador (dual boot).${NC}"
+    echo -e "  ${GRAY}Sem este ajuste, a hora do Windows fica errada toda vez que você volta do Linux.${NC}"
+    read -rp "  Ajustar o relógio para os dois sistemas concordarem? [S/n]: " FIX_RTC || true
+    if [[ "${FIX_RTC:-s}" =~ ^[Ss]$ ]]; then
+        sudo timedatectl set-local-rtc 1 --adjust-system-clock 2>/dev/null \
+            && ok_msg "Relógio ajustado para o dual boot com o Windows."
+    fi
+fi
+
 # Economia de energia do Wi-Fi desligada por padrão: ligada, a placa "cochila"
 # entre pacotes e a velocidade cai e oscila (medido: ~400 → ~460 Mbit/s ao
 # desligar). Quem já escolheu (arquivo existe) não é tocado; muda no painel.
