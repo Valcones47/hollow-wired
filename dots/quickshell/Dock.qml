@@ -150,21 +150,20 @@ PanelWindow {
 
     // ================= menu radial (botão direito) =================
     // Segurar o botão direito num app aberto mostra quatro alvos em volta do
-    // ícone e esconde o cursor; o alvo sai da DIREÇÃO em que o mouse foi
+    // app, no meio da tela (janela própria, abaixo), e esconde o cursor; o
+    // alvo sai da DIREÇÃO em que o mouse foi
     // empurrado (não de onde o ponteiro está), então não dá para "errar" o
     // botão. Soltar confirma; soltar sem mexer, ou para baixo, cancela.
     // Clique rápido (soltar antes do tempo) fecha a janela direto.
     property bool radialOpen: false
     property var radialItem: null
     property string radialSel: ""    // "" | close | float | move | cancel
-    property real radialX: 0         // centro do ícone, em coordenadas do root
-    property real radialY: 0
     property var moveWin: null       // janela esperando a escolha da área
     readonly property var radialTargets: [
-        { key: "close",  dx: 0,     dy: -1 },
-        { key: "float",  dx: -0.87, dy: -0.5 },
-        { key: "move",   dx: 0.87,  dy: -0.5 },
-        { key: "cancel", dx: 0,     dy: 1 }
+        { key: "close",  dx: 0,  dy: -1 },
+        { key: "float",  dx: -1, dy: 0 },
+        { key: "move",   dx: 1,  dy: 0 },
+        { key: "cancel", dx: 0,  dy: 1 }
     ]
     Timer {
         id: radialHold
@@ -192,7 +191,7 @@ PanelWindow {
         radialOpen = true;
     }
     function radialPick(dx, dy) {
-        if (Math.hypot(dx, dy) < 16) { radialSel = ""; return; }
+        if (Math.hypot(dx, dy) < 20) { radialSel = ""; return; }
         const len = Math.hypot(dx, dy);
         let best = "", bestDot = -2;
         for (const t of radialTargets) {
@@ -589,9 +588,6 @@ PanelWindow {
                                     if (!dock.targetWindow(app.modelData)) return;
                                     rightDown = true;
                                     rStart = mapToItem(root, mouse.x, mouse.y);
-                                    const c = app.mapToItem(root, app.width / 2, app.height / 2);
-                                    dock.radialX = c.x;
-                                    dock.radialY = c.y;
                                     dock.radialItem = app.modelData;
                                     radialHold.restart();
                                     return;
@@ -888,61 +884,6 @@ PanelWindow {
                     tint: Theme.secondary
                     popKind: "power"
                     onActivated: dock.showPop("power", null, powerBtn)
-                }
-            }
-        }
-
-        // ================= menu radial =================
-        Item {
-            id: radialLayer
-            visible: dock.radialOpen
-            x: dock.radialX
-            y: dock.radialY
-            Repeater {
-                model: [
-                    { key: "close",  icon: Theme.icons.close,     label: Theme.t("dock.radial_close", "Fechar"),  x: 0,   y: -74, danger: true },
-                    { key: "float",  icon: Theme.icons.floatWin,  label: Theme.t("dock.radial_float", "Flutuar"), x: -64, y: -40, danger: false },
-                    { key: "move",   icon: Theme.icons.workspaces, label: Theme.t("dock.radial_move", "Mover"),   x: 64,  y: -40, danger: false },
-                    { key: "cancel", icon: Theme.icons.close,     label: "",                                      x: 0,   y: 0,   danger: false }
-                ]
-                delegate: Item {
-                    id: rb
-                    required property var modelData
-                    readonly property bool on: dock.radialSel === modelData.key
-                    readonly property bool small: modelData.key === "cancel"
-                    x: modelData.x - width / 2
-                    y: modelData.y - (small ? 0 : height / 2) + (small ? 14 : 0)
-                    width: small ? 26 : 46
-                    height: width
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: width / 2
-                        color: rb.on ? (rb.modelData.danger ? Theme.critical : Theme.primary) : ShellCustomization.getBgColor("dock")
-                        border.width: 1
-                        border.color: Theme.withAlpha(Theme.outline, 0.4)
-                        scale: rb.on ? 1.12 : 1
-                        Behavior on scale { NumberAnimation { duration: Theme.ms(100) } }
-                        Behavior on color { ColorAnimation { duration: Theme.ms(100) } }
-                    }
-                    Text {
-                        anchors.centerIn: parent
-                        text: rb.modelData.icon
-                        font.family: Theme.iconFontFamily
-                        font.pixelSize: rb.small ? 13 : 20
-                        color: rb.on ? Theme.background : (rb.small ? Theme.subtext : Theme.textColor)
-                    }
-                    Text {
-                        visible: rb.modelData.label !== "" && rb.on
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        anchors.bottom: parent.top
-                        anchors.bottomMargin: 4
-                        text: rb.modelData.label
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 12
-                        color: Theme.textColor
-                        style: Text.Outline
-                        styleColor: ShellCustomization.getBgColor("dock")
-                    }
                 }
             }
         }
@@ -1336,6 +1277,93 @@ PanelWindow {
                                     }
                                 }
                             }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // ================= menu radial: janela no meio da tela =================
+    // Camada própria por cima de tudo, sem entrada (máscara vazia): o ponteiro
+    // continua preso ao MouseArea do ícone da dock enquanto o botão direito
+    // está apertado, então é ele que esconde o cursor e lê a direção.
+    PanelWindow {
+        id: radialWin
+        visible: dock.radialOpen
+        screen: dock.screen
+        anchors { top: true; bottom: true; left: true; right: true }
+        exclusionMode: ExclusionMode.Ignore
+        color: "transparent"
+        focusable: false
+        WlrLayershell.namespace: "quickshell-dock-radial"
+        WlrLayershell.layer: WlrLayer.Overlay
+        WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+        mask: Region {}
+
+        Rectangle {
+            anchors.fill: parent
+            color: Theme.withAlpha(Theme.background, 0.3)
+        }
+
+        Item {
+            anchors.centerIn: parent
+
+            // o app que vai ser afetado, no centro
+            Rectangle {
+                x: -width / 2
+                y: -height / 2
+                width: 84
+                height: 84
+                radius: 42
+                color: ShellCustomization.getBgColor("dock")
+                border.width: 1
+                border.color: Theme.withAlpha(Theme.outline, 0.4)
+                IconImage {
+                    anchors.centerIn: parent
+                    implicitSize: 52
+                    source: dock.radialItem ? dock.iconFor(dock.radialItem) : ""
+                }
+            }
+
+            Repeater {
+                model: [
+                    { key: "close",  icon: Theme.icons.close,      label: Theme.t("dock.radial_close", "Fechar"),     x: 0,    y: -150, size: 112, danger: true },
+                    { key: "float",  icon: Theme.icons.floatWin,   label: Theme.t("dock.radial_float", "Flutuar"),    x: -150, y: 0,    size: 112, danger: false },
+                    { key: "move",   icon: Theme.icons.workspaces, label: Theme.t("dock.radial_move", "Mover"),       x: 150,  y: 0,    size: 112, danger: false },
+                    { key: "cancel", icon: Theme.icons.close,      label: Theme.t("dock.radial_cancel", "Cancelar"),  x: 0,    y: 130,  size: 76,  danger: false }
+                ]
+                delegate: Rectangle {
+                    id: rb
+                    required property var modelData
+                    readonly property bool on: dock.radialSel === modelData.key
+                    x: modelData.x - width / 2
+                    y: modelData.y - height / 2
+                    width: modelData.size
+                    height: width
+                    radius: width / 2
+                    color: on ? (modelData.danger ? Theme.critical : Theme.primary) : ShellCustomization.getBgColor("dock")
+                    border.width: 1
+                    border.color: Theme.withAlpha(Theme.outline, 0.4)
+                    scale: on ? 1.1 : 1
+                    Behavior on scale { NumberAnimation { duration: Theme.ms(100) } }
+                    Behavior on color { ColorAnimation { duration: Theme.ms(100) } }
+                    Column {
+                        anchors.centerIn: parent
+                        spacing: 2
+                        Text {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            text: rb.modelData.icon
+                            font.family: Theme.iconFontFamily
+                            font.pixelSize: rb.modelData.key === "cancel" ? 22 : 36
+                            color: rb.on ? Theme.background : Theme.textColor
+                        }
+                        Text {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            text: rb.modelData.label
+                            font.family: Theme.fontFamily
+                            font.pixelSize: rb.modelData.key === "cancel" ? 11 : 14
+                            color: rb.on ? Theme.background : Theme.subtext
                         }
                     }
                 }

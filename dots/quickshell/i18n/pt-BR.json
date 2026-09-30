@@ -1934,5 +1934,6 @@
   "dock.radial_move": "Mover",
   "sidebar.quick_update": "Atualizar o sistema (sem perguntas)",
   "store.quick_update": "Atualizar sem perguntar",
-  "store.quick_update_sub": "Só pede a senha. Limpar órfãos, cache e arquivos .pacnew continua no cachy-update."
+  "store.quick_update_sub": "Só pede a senha. Limpar órfãos, cache e arquivos .pacnew continua no cachy-update.",
+  "dock.radial_cancel": "Cancelar"
 }
