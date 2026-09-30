@@ -1927,5 +1927,12 @@
   "jobs.failed": "Failed",
   "jobs.files": "%1 of %2 files",
   "jobs.remaining": "%1 left",
-  "jobs.cancel": "Cancel"
+  "jobs.cancel": "Cancel",
+  "dock.move_to": "Move to workspace",
+  "dock.radial_close": "Close",
+  "dock.radial_float": "Float",
+  "dock.radial_move": "Move",
+  "sidebar.quick_update": "Update the system (no questions)",
+  "store.quick_update": "Update without asking",
+  "store.quick_update_sub": "Only asks for the password. Cleaning orphans, cache and .pacnew files stays in cachy-update."
 }

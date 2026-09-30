@@ -179,10 +179,20 @@ PanelWindow {
         }
     }
     // cachy-update é interativo (Terminal=true no .desktop) — precisa de
-    // terminal, senão morre sem mostrar nada. Reconta ao fechar o kitty.
+    // terminal, senão morre sem mostrar nada. O rice-software abre o cachy-update
+    // ou, no modo "sem perguntar" do painel, pacman/AUR/Flatpak com --noconfirm
+    // (update.json). Reconta ao fechar o terminal.
+    property bool quickUpdate: false
+    FileView {
+        path: Quickshell.env("HOME") + "/.config/hollow-wired/update.json"
+        watchChanges: true
+        printErrors: false
+        onFileChanged: reload()
+        onLoaded: { try { sidebar.quickUpdate = JSON.parse(text()).mode === "quick"; } catch (e) {} }
+    }
     Process {
         id: cachyUpdateProc
-        command: ["kitty", "--class", "cachy-update", "--title", "cachy-update", "-e", "cachy-update"]
+        command: ["rice-software", "update-default"]
         onExited: sidebar.checkUpdates()
     }
 
@@ -917,7 +927,8 @@ PanelWindow {
                     PopAction {
                         Layout.topMargin: 4
                         icon: Theme.icons.update
-                        label: Theme.t("sidebar.open_cachy_update", "Abrir cachy-update")
+                        label: sidebar.quickUpdate ? Theme.t("sidebar.quick_update", "Atualizar o sistema (sem perguntas)")
+                            : Theme.t("sidebar.open_cachy_update", "Abrir cachy-update")
                         onActivated: {
                             if (!cachyUpdateProc.running)
                                 cachyUpdateProc.running = true;

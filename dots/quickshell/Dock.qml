@@ -19,6 +19,8 @@ import "."
 // Clique: abre o app (sem janela) / foca (1 janela) / alterna entre as
 // janelas (várias). Botão do meio: nova janela. Hover: popup com as janelas
 // (clique foca, X fecha) e ações (nova janela, fixar/desafixar).
+// Botão direito num app aberto: clique rápido fecha a janela; segurar abre o
+// menu radial (Fechar / Flutuar / Mover para área / cancelar), ver "menu radial".
 //
 // Fixados e jogos: DockConfig (~/.config/quickshell/dock.json). Arrastar um
 // ícone fixado reordena; jogos se editam no popup (Editar) e se adicionam
@@ -58,7 +60,7 @@ PanelWindow {
     // do Windows — nesse caso ela também reserva espaço para as janelas.
     readonly property bool pinned: ShellLayout.dockEnabled && !ShellLayout.dockAutohide
     readonly property bool shown: ShellLayout.dockEnabled
-        && (ShellLayout.editing || pinned ? !hasFullscreen : (allowHover && (hovered || pop !== "" || dragFrom >= 0)))
+        && (ShellLayout.editing || pinned ? !hasFullscreen : (allowHover && (hovered || pop !== "" || dragFrom >= 0 || radialOpen)))
     onPopChanged: if (pop !== "games") gamesEdit = false
 
     Timer { id: hideDelay; interval: 450; onTriggered: dock.hovered = false }
@@ -146,8 +148,85 @@ PanelWindow {
         DockConfig.focusWindow(wins[(idx + 1) % wins.length]);
     }
 
+    // ================= menu radial (botão direito) =================
+    // Segurar o botão direito num app aberto mostra quatro alvos em volta do
+    // ícone e esconde o cursor; o alvo sai da DIREÇÃO em que o mouse foi
+    // empurrado (não de onde o ponteiro está), então não dá para "errar" o
+    // botão. Soltar confirma; soltar sem mexer, ou para baixo, cancela.
+    // Clique rápido (soltar antes do tempo) fecha a janela direto.
+    property bool radialOpen: false
+    property var radialItem: null
+    property string radialSel: ""    // "" | close | float | move | cancel
+    property real radialX: 0         // centro do ícone, em coordenadas do root
+    property real radialY: 0
+    property var moveWin: null       // janela esperando a escolha da área
+    readonly property var radialTargets: [
+        { key: "close",  dx: 0,     dy: -1 },
+        { key: "float",  dx: -0.87, dy: -0.5 },
+        { key: "move",   dx: 0.87,  dy: -0.5 },
+        { key: "cancel", dx: 0,     dy: 1 }
+    ]
+    Timer {
+        id: radialHold
+        interval: 250
+        onTriggered: dock.openRadial()
+    }
+
+    // A janela que o botão direito afeta: a focada do app, senão a primeira.
+    function targetWindow(item) {
+        if (!item) return null;
+        const wins = windowsOf(item.key);
+        if (wins.length === 0) return null;
+        return wins.find(w => w.activated) || wins[0];
+    }
+    function hyprAddr(t) {
+        const h = Hyprland.toplevels.values.find(x => x.wayland === t);
+        if (!h) return "";
+        return String(h.address).startsWith("0x") ? h.address : "0x" + h.address;
+    }
+    function openRadial() {
+        if (!radialItem || !targetWindow(radialItem)) return;
+        popHide.stop();
+        pop = "";
+        radialSel = "";
+        radialOpen = true;
+    }
+    function radialPick(dx, dy) {
+        if (Math.hypot(dx, dy) < 16) { radialSel = ""; return; }
+        const len = Math.hypot(dx, dy);
+        let best = "", bestDot = -2;
+        for (const t of radialTargets) {
+            const d = (dx * t.dx + dy * t.dy) / len;
+            if (d > bestDot) { bestDot = d; best = t.key; }
+        }
+        radialSel = best;
+    }
+    function finishRadial(anchor) {
+        const sel = radialSel, item = radialItem;
+        radialOpen = false;
+        radialSel = "";
+        const w = targetWindow(item);
+        if (!w) return;
+        const addr = hyprAddr(w);
+        if (sel === "close") {
+            w.close();
+        } else if (sel === "float" && addr !== "") {
+            Hyprland.dispatch('hl.dsp.window.float({ action = "toggle", window = "address:' + addr + '" })');
+        } else if (sel === "move" && addr !== "") {
+            moveWin = w;
+            showPop("move", item, anchor);
+        }
+    }
+    function moveTo(ws) {
+        const addr = hyprAddr(moveWin);
+        pop = "";
+        moveWin = null;
+        if (addr !== "")
+            Hyprland.dispatch("hl.dsp.window.move({ workspace = " + ws + ", window = \"address:" + addr + "\" })");
+    }
+
     // ================= popup =================
-    property string pop: ""          // "" | app | games | power | tray | tip
+    property string pop: ""          // "" | app | games | power | tray | tip | move
     property var popItem: null
     property real popAnchorX: 0
     Timer { id: popHide; interval: 260; onTriggered: dock.pop = "" }
@@ -495,16 +574,43 @@ PanelWindow {
                             anchors.fill: parent
                             hoverEnabled: true
                             preventStealing: true
-                            cursorShape: app.dragging ? Qt.ClosedHandCursor : Qt.PointingHandCursor
-                            acceptedButtons: Qt.LeftButton | Qt.MiddleButton
+                            // Cursor some enquanto o menu radial está aberto (a escolha
+                            // é pela direção do movimento).
+                            cursorShape: dock.radialOpen && dock.radialItem === app.modelData ? Qt.BlankCursor
+                                : app.dragging ? Qt.ClosedHandCursor : Qt.PointingHandCursor
+                            acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
                             property real startX: 0
-                            onEntered: if (dock.dragFrom < 0) dock.showPop("app", app.modelData, app)
-                            onExited: dock.leavePop()
+                            property point rStart: Qt.point(0, 0)
+                            property bool rightDown: false
+                            onEntered: if (dock.dragFrom < 0 && !dock.radialOpen && dock.pop !== "move") dock.showPop("app", app.modelData, app)
+                            onExited: if (dock.pop !== "move") dock.leavePop()
                             onPressed: mouse => {
+                                if (mouse.button === Qt.RightButton) {
+                                    if (!dock.targetWindow(app.modelData)) return;
+                                    rightDown = true;
+                                    rStart = mapToItem(root, mouse.x, mouse.y);
+                                    const c = app.mapToItem(root, app.width / 2, app.height / 2);
+                                    dock.radialX = c.x;
+                                    dock.radialY = c.y;
+                                    dock.radialItem = app.modelData;
+                                    radialHold.restart();
+                                    return;
+                                }
                                 startX = mapToItem(row, mouse.x, 0).x;
                                 app.justDragged = false;
                             }
                             onPositionChanged: mouse => {
+                                if (rightDown) {
+                                    const p = mapToItem(root, mouse.x, mouse.y);
+                                    const dx = p.x - rStart.x, dy = p.y - rStart.y;
+                                    // Empurrou antes do tempo: abre o menu na hora.
+                                    if (!dock.radialOpen && Math.hypot(dx, dy) > 12) {
+                                        radialHold.stop();
+                                        dock.openRadial();
+                                    }
+                                    if (dock.radialOpen) dock.radialPick(dx, dy);
+                                    return;
+                                }
                                 if (!pressed || !app.modelData.pinned || mouse.buttons !== Qt.LeftButton) return;
                                 const dx = mapToItem(row, mouse.x, 0).x - startX;
                                 if (!app.dragging && Math.abs(dx) > 8) {
@@ -521,12 +627,28 @@ PanelWindow {
                             }
                             // arraste interrompido (ex.: foco roubado): não deixa a dock presa aberta
                             onCanceled: {
+                                rightDown = false;
+                                radialHold.stop();
+                                dock.radialOpen = false;
                                 app.dragging = false;
                                 app.dragX = 0;
                                 dock.dragFrom = -1;
                                 dock.dragTo = -1;
                             }
-                            onReleased: {
+                            onReleased: mouse => {
+                                if (mouse.button === Qt.RightButton) {
+                                    if (!rightDown) return;
+                                    rightDown = false;
+                                    if (radialHold.running) {
+                                        // clique rápido: fecha a janela do app
+                                        radialHold.stop();
+                                        const w = dock.targetWindow(app.modelData);
+                                        if (w) w.close();
+                                    } else if (dock.radialOpen) {
+                                        dock.finishRadial(app);
+                                    }
+                                    return;
+                                }
                                 if (!app.dragging) return;
                                 const keys = dock.items.filter(i => i.pinned).map(i => i.key);
                                 const [k] = keys.splice(dock.dragFrom, 1);
@@ -539,7 +661,7 @@ PanelWindow {
                                 DockConfig.setPinsOrder(keys);
                             }
                             onClicked: mouse => {
-                                if (app.justDragged) return;
+                                if (app.justDragged || mouse.button === Qt.RightButton) return;
                                 if (mouse.button === Qt.MiddleButton) {
                                     DockConfig.launch(app.modelData.entry);
                                 } else {
@@ -770,6 +892,61 @@ PanelWindow {
             }
         }
 
+        // ================= menu radial =================
+        Item {
+            id: radialLayer
+            visible: dock.radialOpen
+            x: dock.radialX
+            y: dock.radialY
+            Repeater {
+                model: [
+                    { key: "close",  icon: Theme.icons.close,     label: Theme.t("dock.radial_close", "Fechar"),  x: 0,   y: -74, danger: true },
+                    { key: "float",  icon: Theme.icons.floatWin,  label: Theme.t("dock.radial_float", "Flutuar"), x: -64, y: -40, danger: false },
+                    { key: "move",   icon: Theme.icons.workspaces, label: Theme.t("dock.radial_move", "Mover"),   x: 64,  y: -40, danger: false },
+                    { key: "cancel", icon: Theme.icons.close,     label: "",                                      x: 0,   y: 0,   danger: false }
+                ]
+                delegate: Item {
+                    id: rb
+                    required property var modelData
+                    readonly property bool on: dock.radialSel === modelData.key
+                    readonly property bool small: modelData.key === "cancel"
+                    x: modelData.x - width / 2
+                    y: modelData.y - (small ? 0 : height / 2) + (small ? 14 : 0)
+                    width: small ? 26 : 46
+                    height: width
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: width / 2
+                        color: rb.on ? (rb.modelData.danger ? Theme.critical : Theme.primary) : ShellCustomization.getBgColor("dock")
+                        border.width: 1
+                        border.color: Theme.withAlpha(Theme.outline, 0.4)
+                        scale: rb.on ? 1.12 : 1
+                        Behavior on scale { NumberAnimation { duration: Theme.ms(100) } }
+                        Behavior on color { ColorAnimation { duration: Theme.ms(100) } }
+                    }
+                    Text {
+                        anchors.centerIn: parent
+                        text: rb.modelData.icon
+                        font.family: Theme.iconFontFamily
+                        font.pixelSize: rb.small ? 13 : 20
+                        color: rb.on ? Theme.background : (rb.small ? Theme.subtext : Theme.textColor)
+                    }
+                    Text {
+                        visible: rb.modelData.label !== "" && rb.on
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.bottom: parent.top
+                        anchors.bottomMargin: 4
+                        text: rb.modelData.label
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 12
+                        color: Theme.textColor
+                        style: Text.Outline
+                        styleColor: ShellCustomization.getBgColor("dock")
+                    }
+                }
+            }
+        }
+
         // ================= popup =================
         Item {
             id: popArea
@@ -793,7 +970,7 @@ PanelWindow {
                 height: implicitHeight
                 readonly property Item current: dock.pop === "app" ? appPop : dock.pop === "games" ? gamesPop
                     : dock.pop === "power" ? powerPop : dock.pop === "tray" ? trayPop
-                    : dock.pop === "tip" ? tipPop : null
+                    : dock.pop === "tip" ? tipPop : dock.pop === "move" ? movePop : null
                 opacity: root.popTargetW > 0 && Math.abs(root.popW - root.popTargetW) < 30
                     && Math.abs(root.popH - root.popTargetH) < 30 ? 1 : 0
                 Behavior on opacity { NumberAnimation { duration: Theme.ms(130) } }
@@ -911,6 +1088,50 @@ PanelWindow {
                         Layout.maximumWidth: 260
                         visible: text !== ""
                         text: dock.popItem && dock.popItem.text ? dock.popItem.text : ""
+                    }
+                }
+
+                // ---------- mover para área (menu radial) ----------
+                ColumnLayout {
+                    id: movePop
+                    visible: popContent.current === movePop
+                    width: 5 * 36 + 4 * 4
+                    spacing: 6
+                    readonly property int curWs: {
+                        const h = dock.moveWin ? Hyprland.toplevels.values.find(x => x.wayland === dock.moveWin) : null;
+                        return h && h.workspace ? h.workspace.id : -1;
+                    }
+                    PopTitle { text: Theme.t("dock.move_to", "Mover para a área") }
+                    GridLayout {
+                        columns: 5
+                        rowSpacing: 4
+                        columnSpacing: 4
+                        Repeater {
+                            model: 10
+                            delegate: Rectangle {
+                                required property int index
+                                readonly property int ws: index + 1
+                                implicitWidth: 36
+                                implicitHeight: 32
+                                radius: 9
+                                color: wsArea.containsMouse ? Theme.tileHigh
+                                    : ws === movePop.curWs ? Theme.withAlpha(Theme.primary, 0.22) : Theme.tile
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: parent.ws
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 13
+                                    color: Theme.textColor
+                                }
+                                MouseArea {
+                                    id: wsArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: dock.moveTo(parent.ws)
+                                }
+                            }
+                        }
                     }
                 }
 

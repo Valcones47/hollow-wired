@@ -1257,6 +1257,16 @@ PanelWindow {
         }
     }
 
+    // Modo do botão de atualizar (rice-software update-mode): "quick" roda
+    // pacman/AUR/Flatpak sem perguntar; senão abre o cachy-update.
+    property bool quickUpdate: false
+    FileView {
+        path: Quickshell.env("HOME") + "/.config/hollow-wired/update.json"
+        watchChanges: true
+        printErrors: false
+        onFileChanged: reload()
+        onLoaded: { try { win.quickUpdate = JSON.parse(text()).mode === "quick"; } catch (e) {} }
+    }
     Process {
         id: loadSoftwareUpdatesProc
         command: ["rice-software", "updates"]
@@ -9995,7 +10005,7 @@ PanelWindow {
                                             text: Theme.t("store.update_all", "Atualizar tudo")
                                             primary: true
                                             onClicked: {
-                                                Quickshell.execDetached(["rice-software", "update-system"]);
+                                                Quickshell.execDetached(["rice-software", "update-system"].concat(win.quickUpdate ? ["--no-confirm"] : []));
                                                 win.showToast(Theme.t("toast.update_window", "Janela de atualização aberta no terminal!"));
                                             }
                                         }
@@ -10007,6 +10017,18 @@ PanelWindow {
                                                 loadSoftwareUpdatesProc.running = true;
                                                 win.showToast(Theme.t("toast.checking_updates", "Verificando atualizações..."));
                                             }
+                                        }
+                                    }
+                                }
+
+                                OptionGroup {
+                                    OptionToggle {
+                                        title: Theme.t("store.quick_update", "Atualizar sem perguntar")
+                                        subtitle: Theme.t("store.quick_update_sub", "Só pede a senha. Limpar órfãos, cache e arquivos .pacnew continua no cachy-update.")
+                                        checked: win.quickUpdate
+                                        onToggled: nextVal => {
+                                            win.quickUpdate = nextVal;
+                                            Quickshell.execDetached(["rice-software", "update-mode", nextVal ? "quick" : "full"]);
                                         }
                                     }
                                 }

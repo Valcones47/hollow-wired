@@ -17,7 +17,9 @@
 #   rice-software status        # JSON com atualizações pendentes
 #   rice-software install <pkg...>
 #   rice-software open-store    # abre o gerenciador gráfico de programas
-#   rice-software update-system # atualiza tudo em uma janela de terminal
+#   rice-software update-system [--no-confirm]  # atualiza tudo em um terminal
+#   rice-software update-mode [quick|full]      # modo do botão de atualizar
+#   rice-software update-default                # abre o modo escolhido
 #   rice-software update-rice   # atualiza as dotfiles do rice
 # ==============================================================================
 
@@ -157,7 +159,33 @@ open_store() {
     install_packages shelly
 }
 
+# Modo de atualização escolhido no painel: "full" abre o cachy-update
+# (arch-update: pergunta em cada etapa, cuida de órfãos, cache e .pacnew) e
+# "quick" atualiza tudo sem perguntar — só a senha do sudo. Guardado em
+# ~/.config/hollow-wired/update.json (estado do usuário, não vem das dotfiles).
+UPDATE_PREFS="${XDG_CONFIG_HOME:-$HOME/.config}/hollow-wired/update.json"
+
+update_mode() {
+    local m
+    m=$(jq -r '.mode // "full"' "$UPDATE_PREFS" 2>/dev/null)
+    [ "$m" = "quick" ] && echo quick || echo full
+}
+
+set_update_mode() {
+    case "$1" in quick|full) ;; *) echo "Uso: $(basename "$0") update-mode [quick|full]" >&2; return 1 ;; esac
+    mkdir -p "$(dirname "$UPDATE_PREFS")"
+    local tmp="$UPDATE_PREFS.tmp"
+    jq -n --arg m "$1" '{mode: $m}' > "$tmp" && mv "$tmp" "$UPDATE_PREFS"
+}
+
+# Sem --no-confirm: cada gerenciador pergunta como sempre. Com --no-confirm:
+# pacman/yay/paru com --noconfirm (e sem revisar PKGBUILD), Flatpak com -y.
+# Um conflito que precisa de resposta ("remover X?") faz o --noconfirm
+# responder o padrão (não) e o pacman parar; aí o fim mostra o erro e manda
+# para o cachy-update, que pergunta.
 update_system() {
+    local quick=0
+    [ "${1:-}" = "--no-confirm" ] && quick=1
     local helper
     helper=$(aur_helper)
     local cmd="sudo pacman -Syu"
@@ -165,26 +193,54 @@ update_system() {
     [ "$helper" = "yay" ] && cmd="yay -Syu"
     [ "$helper" = "shelly" ] && cmd="shelly upgrade -a"
     [ "$helper" = "pamac" ] && cmd="pamac update -a"
+    if [ "$quick" = 1 ]; then
+        case "$helper" in
+            yay)  cmd="yay -Syu --noconfirm --sudoloop --answerclean None --answerdiff None --answeredit None" ;;
+            paru) cmd="paru -Syu --noconfirm --sudoloop --skipreview" ;;
+            *)    cmd="sudo pacman -Syu --noconfirm" ;;
+        esac
+    fi
 
     notify-send -a "Atualização do Sistema" -i system-software-update -r 91197 -t 3000 \
         "Iniciando atualização..." "Uma janela do terminal foi aberta." 2>/dev/null
 
     local term="${TERMINAL:-kitty}"
     command -v "$term" >/dev/null 2>&1 || term="kitty"
-    "$term" --title "Atualização do Sistema" -e bash -c "
-echo '===================================================='
-echo '  Atualização geral do sistema'
-echo '===================================================='
+    # shellcheck disable=SC2016  # o script roda dentro do terminal
+    local script='
+cmd="$1"; quick="$2"
+echo "===================================================="
+if [ "$quick" = 1 ]; then
+    echo "  Atualização sem perguntas (só a senha do sudo)"
+else
+    echo "  Atualização geral do sistema"
+fi
+echo "===================================================="
 echo
-$cmd
-if command -v flatpak >/dev/null 2>&1; then
+ok=1
+$cmd || ok=0
+if [ "$ok" = 1 ] && command -v flatpak >/dev/null 2>&1; then
     echo
-    echo '--- Flatpak ---'
-    flatpak update -y
+    echo "--- Flatpak ---"
+    flatpak update -y || ok=0
 fi
 echo
-echo 'Atualização concluída! Pressione ENTER para fechar.'
-read" &
+if [ "$ok" = 1 ]; then
+    echo "Atualização concluída."
+    # Kernel novo instalado: os módulos do kernel em uso somem de /usr/lib/modules.
+    if [ ! -d "/usr/lib/modules/$(uname -r)" ]; then
+        echo "O kernel foi atualizado: reinicie o computador para usar a versão nova."
+    fi
+else
+    echo "A atualização parou com erro (veja acima)."
+    if [ "$quick" = 1 ]; then
+        echo "Se o pacman pediu uma resposta (conflito ou pacote a remover), rode o"
+        echo "cachy-update, que pergunta em cada etapa:  cachy-update"
+    fi
+fi
+echo
+read -r -p "Pressione ENTER para fechar. "'
+    "$term" --title "Atualização do Sistema" -e bash -c "$script" _ "$cmd" "$quick" &
 }
 
 cmd="${1:-status}"
@@ -206,7 +262,21 @@ case "$cmd" in
         nohup "$target" >/dev/null 2>&1 &
         ;;
     update-system)
-        update_system
+        update_system "${2:-}"
+        ;;
+    update-mode)
+        if [ -n "${2:-}" ]; then set_update_mode "$2"; else update_mode; fi
+        ;;
+    # O que o botão de atualizar abre, conforme o modo escolhido no painel.
+    update-default)
+        if [ "$(update_mode)" = "quick" ]; then
+            update_system --no-confirm
+            wait    # quem chamou (barra lateral) reconta ao fechar
+        elif command -v cachy-update >/dev/null 2>&1; then
+            kitty --class cachy-update --title cachy-update -e cachy-update
+        else
+            update_system
+        fi
         ;;
     update-rice)
         rice-update gui
