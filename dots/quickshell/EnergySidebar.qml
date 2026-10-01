@@ -130,13 +130,13 @@ PanelWindow {
     // ================= updates pendentes =================
     property int repoUpdates: 0
     property int aurUpdates: 0
+    property int flatpakUpdates: 0
     property int riceUpdates: 0
-    readonly property int updateCount: repoUpdates + aurUpdates + riceUpdates
+    readonly property int updateCount: repoUpdates + aurUpdates + flatpakUpdates + riceUpdates
 
+    // Mesma fonte do painel: o rice-software escolhe yay/paru e conta Flatpak.
     function checkUpdates() {
-        repoUpdatesProc.running = true;
-        aurUpdatesProc.running = true;
-        riceUpdatesProc.running = true;
+        if (!updatesProc.running) updatesProc.running = true;
     }
     Timer {
         interval: 30 * 60 * 1000
@@ -146,20 +146,19 @@ PanelWindow {
         onTriggered: sidebar.checkUpdates()
     }
     Process {
-        id: repoUpdatesProc
-        // checkupdates sai com erro quando não há updates; conta linhas.
-        command: ["bash", "-c", "checkupdates 2>/dev/null | grep -c '.'"]
-        stdout: StdioCollector { onStreamFinished: sidebar.repoUpdates = parseInt(text.trim()) || 0 }
-    }
-    Process {
-        id: aurUpdatesProc
-        command: ["bash", "-c", "yay -Qu --aur 2>/dev/null | grep -c '.'"]
-        stdout: StdioCollector { onStreamFinished: sidebar.aurUpdates = parseInt(text.trim()) || 0 }
-    }
-    Process {
-        id: riceUpdatesProc
-        command: ["bash", "-c", "rice-update check 2>/dev/null | jq -r '.count // 0' 2>/dev/null || echo 0"]
-        stdout: StdioCollector { onStreamFinished: sidebar.riceUpdates = parseInt(text.trim()) || 0 }
+        id: updatesProc
+        command: ["rice-software", "status"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const st = JSON.parse(text);
+                    sidebar.repoUpdates = st.repo_count || 0;
+                    sidebar.aurUpdates = st.aur_count || 0;
+                    sidebar.flatpakUpdates = st.flatpak_count || 0;
+                    sidebar.riceUpdates = st.rice_updates || 0;
+                } catch (e) {}
+            }
+        }
     }
 
     // ================= ações =================
@@ -887,7 +886,7 @@ PanelWindow {
                     }
                     PopText {
                         visible: sidebar.updateCount > 0
-                        text: Theme.t("sidebar.updates_split", "%1 repositório · %2 AUR").replace("%1", sidebar.repoUpdates).replace("%2", sidebar.aurUpdates) + (sidebar.riceUpdates > 0 ? " · " + Theme.t("sidebar.updates_rice", "%1 do rice").replace("%1", sidebar.riceUpdates) : "")
+                        text: Theme.t("sidebar.updates_split", "%1 repositório · %2 AUR").replace("%1", sidebar.repoUpdates).replace("%2", sidebar.aurUpdates) + (sidebar.flatpakUpdates > 0 ? " · " + Theme.t("sidebar.updates_flatpak", "%1 Flatpak").replace("%1", sidebar.flatpakUpdates) : "") + (sidebar.riceUpdates > 0 ? " · " + Theme.t("sidebar.updates_rice", "%1 do rice").replace("%1", sidebar.riceUpdates) : "")
                     }
                     // Antes esta ação só aparecia quando havia commits novos.
                     // Como o rice-update também conserta o que ficou pela

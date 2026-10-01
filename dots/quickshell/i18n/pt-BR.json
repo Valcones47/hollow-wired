@@ -1833,6 +1833,7 @@
   "dock.hint_pinned": "Clique para abrir · arraste para reordenar",
   "dock.hint": "Clique para abrir",
   "sidebar.updates_split": "%1 repositório · %2 AUR",
+  "sidebar.updates_flatpak": "%1 Flatpak",
   "sidebar.updates_rice": "%1 do rice",
   "sidebar.open_cachy_update": "Abrir cachy-update",
   "sidebar.clean_pkg_cache": "Limpar cache de pacotes",
