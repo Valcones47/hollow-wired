@@ -21,6 +21,9 @@
 #   rice-software update-mode [quick|full]      # modo do botão de atualizar
 #   rice-software update-default                # abre o modo escolhido
 #   rice-software update-rice   # atualiza as dotfiles do rice
+#   rice-software list          # JSON com os pacotes pendentes por origem
+#   rice-software update-selected repo,aur,flatpak,rice [--terminal]
+#                               # atualiza só as origens marcadas, sem perguntas
 # ==============================================================================
 
 set -uo pipefail
@@ -243,6 +246,179 @@ read -r -p "Pressione ENTER para fechar. "'
     "$term" --title "Atualização do Sistema" -e bash -c "$script" _ "$cmd" "$quick" &
 }
 
+# ------------------------------------------------------------------------------
+# Janela de atualizações (Updater.qml): lista por origem e atualiza só o que a
+# pessoa marcou, sem perguntas. O trabalho roda solto do Quickshell (setsid):
+# um reload do shell no meio do pacman não pode matar a transação.
+# Estado em $XDG_RUNTIME_DIR/hollow-wired/update-job.json, saída em update-job.log.
+# ------------------------------------------------------------------------------
+JOB_DIR="${XDG_RUNTIME_DIR:-/tmp}/hollow-wired"
+JOB_STATE="$JOB_DIR/update-job.json"
+JOB_LOG="$JOB_DIR/update-job.log"
+JOB_LOCK="$JOB_DIR/update-job.lock"
+ASKPASS_PW="$JOB_DIR/askpass.pw"
+ASKPASS_BIN="$JOB_DIR/askpass"
+
+# "nome velha -> nova" (checkupdates, yay/paru -Qua) → [{name, old, new}]
+pkg_lines_json() {
+    awk 'NF>=4 && $3=="->" {print $1"\t"$2"\t"$4}' |
+        jq -R -s 'split("\n") | map(select(length>0) | split("\t") | {name: .[0], old: .[1], new: .[2]})'
+}
+
+list_updates() {
+    local repo="[]" aur="[]" flatpak="[]" helper
+    command -v checkupdates >/dev/null 2>&1 && repo=$(checkupdates 2>/dev/null | pkg_lines_json)
+    helper=$(aur_helper)
+    case "$helper" in
+        yay)  aur=$(yay -Qua 2>/dev/null | pkg_lines_json) ;;
+        paru) aur=$(paru -Qua 2>/dev/null | pkg_lines_json) ;;
+        *)    helper="" ;;
+    esac
+    if command -v flatpak >/dev/null 2>&1; then
+        local installed
+        installed=$(flatpak list --columns=application,version 2>/dev/null)
+        flatpak=$(flatpak remote-ls --updates --columns=name,application,version 2>/dev/null |
+            jq -R -s --arg inst "$installed" '
+                ($inst | split("\n") | map(select(length>0) | split("\t") | {key: .[0], value: (.[1] // "")}) | from_entries) as $v
+                | split("\n") | map(select(length>0) | split("\t")
+                | {name: .[0], id: .[1], old: ($v[.[1]] // ""), new: (.[2] // "")})')
+    fi
+    local rice="{}"
+    command -v rice-update >/dev/null 2>&1 && rice=$(rice-update check 2>/dev/null || echo '{}')
+    jq -n --argjson repo "${repo:-[]}" --argjson aur "${aur:-[]}" --argjson flatpak "${flatpak:-[]}" \
+        --argjson rice "$rice" --arg helper "$helper" --arg checked_at "$(date +'%H:%M')" \
+        --argjson has_flatpak "$(command -v flatpak >/dev/null 2>&1 && echo true || echo false)" \
+        '{repo: $repo, aur: $aur, flatpak: $flatpak, rice: $rice, aur_helper: $helper,
+          has_flatpak: $has_flatpak, checked_at: $checked_at}'
+}
+
+job_running() {
+    [ -e "$JOB_LOCK" ] || return 1
+    ! flock -n "$JOB_LOCK" true 2>/dev/null
+}
+
+# Askpass de uma tentativa só: se o mesmo sudo pedir de novo, a senha estava
+# errada — devolver a mesma senha três vezes travaria a conta no faillock.
+write_askpass() {
+    mkdir -p "$JOB_DIR" && chmod 700 "$JOB_DIR"
+    cat > "$ASKPASS_BIN" <<ASK
+#!/bin/sh
+seen="$JOB_DIR/askpass.ppid"
+[ -r "$ASKPASS_PW" ] || exit 1
+[ "\$(cat "\$seen" 2>/dev/null)" = "\$PPID" ] && exit 1
+echo "\$PPID" > "\$seen"
+cat "$ASKPASS_PW"
+ASK
+    chmod 700 "$ASKPASS_BIN"
+}
+
+job_set() {   # job_set <filtro jq> [args jq...]
+    local f="$1"; shift
+    local tmp="$JOB_STATE.tmp"
+    # No mesmo arquivo (sem mv): quem observa (a janela) segue o mesmo inode.
+    jq "$@" "$f" "$JOB_STATE" > "$tmp" 2>/dev/null && cat "$tmp" > "$JOB_STATE"
+    rm -f "$tmp"
+}
+
+# run-job <origens separadas por vírgula> [--tty]
+run_job() {
+    local sources="$1" tty=0
+    [ "${2:-}" = "--tty" ] && tty=1
+    mkdir -p "$JOB_DIR"
+    exec 9>"$JOB_LOCK"
+    flock -n 9 || { echo "Já existe uma atualização rodando." >&2; return 3; }
+
+    local sudo_cmd="sudo" yay_sudo=()
+    if [ "$tty" = 0 ]; then
+        export SUDO_ASKPASS="$ASKPASS_BIN"
+        sudo_cmd="sudo -A"
+        yay_sudo=(--sudoflags -A)
+        trap 'rm -f "$ASKPASS_PW" "$JOB_DIR/askpass.ppid"' EXIT
+        : > "$JOB_LOG"
+        exec >>"$JOB_LOG" 2>&1 </dev/null
+    fi
+
+    local steps
+    steps=$(printf '%s' "$sources" | tr ',' '\n' | grep -xE 'repo|aur|flatpak|rice' |
+        jq -R -s 'split("\n") | map(select(length>0)) | map({id: ., state: "pending"})')
+    jq -n --argjson steps "$steps" --arg mode "$([ "$tty" = 1 ] && echo terminal || echo window)" \
+        '{state: "running", mode: $mode, steps: $steps, kernel: false, started: now}' > "$JOB_STATE"
+
+    local helper ok_all=1 id rc
+    helper=$(aur_helper)
+    for id in $(jq -r '.steps[].id' "$JOB_STATE"); do
+        job_set '(.steps[] | select(.id == $i) | .state) = "running"' --arg i "$id"
+        echo; echo "=== $id ==="
+        rc=0
+        case "$id" in
+            repo) $sudo_cmd pacman -Syu --noconfirm || rc=$? ;;
+            aur)
+                case "$helper" in
+                    yay)  yay -Sua --noconfirm --answerclean None --answerdiff None --answeredit None \
+                              --removemake "${yay_sudo[@]}" || rc=$? ;;
+                    paru) paru -Sua --noconfirm --skipreview --removemake "${yay_sudo[@]}" || rc=$? ;;
+                    *)    echo "Nenhum AUR helper (yay ou paru) instalado."; rc=1 ;;
+                esac ;;
+            flatpak) flatpak update -y --noninteractive || rc=$? ;;
+            rice) rice-update auto || rc=$? ;;
+        esac
+        if [ "$rc" = 0 ]; then
+            job_set '(.steps[] | select(.id == $i) | .state) = "ok"' --arg i "$id"
+        else
+            ok_all=0
+            job_set '(.steps[] | select(.id == $i) | .state) = "error"' --arg i "$id"
+        fi
+    done
+
+    # Kernel novo instalado: os módulos do kernel em uso somem de /usr/lib/modules.
+    [ -d "/usr/lib/modules/$(uname -r)" ] || job_set '.kernel = true'
+    job_set '.state = $s | .finished = now' --arg s "$([ "$ok_all" = 1 ] && echo done || echo error)"
+    echo; echo "=== fim ==="
+
+    # O passo do rice reinicia o Quickshell; reabre a janela para mostrar o fim.
+    if [ "$tty" = 0 ] && printf '%s' "$sources" | grep -qw rice; then
+        sleep 4
+        qs ipc call updater open >/dev/null 2>&1 || true
+    fi
+    if [ "$tty" = 1 ]; then
+        echo
+        read -r -p "Pressione ENTER para fechar. " _ || true
+    fi
+    return 0
+}
+
+# update-selected <origens> [--terminal]
+# Na janela: a senha do sudo chega pela entrada padrão (só quando o sudo pede),
+# é conferida uma vez e fica num arquivo 0600 em $XDG_RUNTIME_DIR, apagado no fim.
+# Saída: 0 iniciado, 2 senha errada, 3 já rodando.
+update_selected() {
+    local sources="$1" where="${2:-}"
+    [ -n "$sources" ] || { echo "Uso: $(basename "$0") update-selected repo,aur,flatpak,rice [--terminal]" >&2; return 1; }
+    job_running && return 3
+    if [ "$where" = "--terminal" ]; then
+        local term="${TERMINAL:-kitty}"
+        command -v "$term" >/dev/null 2>&1 || term="kitty"
+        setsid -f "$term" --title "Atualização do Sistema" -e "$0" run-job "$sources" --tty >/dev/null 2>&1
+        return 0
+    fi
+    mkdir -p "$JOB_DIR" && chmod 700 "$JOB_DIR"
+    write_askpass
+    rm -f "$JOB_DIR/askpass.ppid"
+    local pw=""
+    IFS= read -r pw || true
+    if printf '%s' "$sources" | grep -qwE 'repo|aur' && ! sudo -n true 2>/dev/null; then
+        ( umask 077; printf '%s\n' "$pw" > "$ASKPASS_PW" )
+        if ! SUDO_ASKPASS="$ASKPASS_BIN" sudo -k -A true 2>/dev/null; then
+            rm -f "$ASKPASS_PW" "$JOB_DIR/askpass.ppid"
+            return 2
+        fi
+        rm -f "$JOB_DIR/askpass.ppid"
+    fi
+    pw=""
+    setsid -f "$0" run-job "$sources" >/dev/null 2>&1 </dev/null
+    return 0
+}
+
 cmd="${1:-status}"
 
 case "$cmd" in
@@ -278,11 +454,20 @@ case "$cmd" in
             update_system
         fi
         ;;
+    list)
+        list_updates
+        ;;
+    update-selected)
+        update_selected "${2:-}" "${3:-}"
+        ;;
+    run-job)
+        run_job "${2:-}" "${3:-}"
+        ;;
     update-rice)
         rice-update gui
         ;;
     *)
-        sed -n '2,26p' "$0"
+        sed -n '2,29p' "$0"
         exit 1
         ;;
 esac

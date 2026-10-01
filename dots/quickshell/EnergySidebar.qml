@@ -177,29 +177,16 @@ PanelWindow {
             onStreamFinished: if (text.trim() !== "") console.log("EnergySidebar: shutdown falhou:", text.trim())
         }
     }
-    // cachy-update é interativo (Terminal=true no .desktop) — precisa de
-    // terminal, senão morre sem mostrar nada. O rice-software abre o cachy-update
-    // ou, no modo "sem perguntar" do painel, pacman/AUR/Flatpak com --noconfirm
-    // (update.json). Reconta ao fechar o terminal.
-    property bool quickUpdate: false
-    FileView {
-        path: Quickshell.env("HOME") + "/.config/hollow-wired/update.json"
-        watchChanges: true
-        printErrors: false
-        onFileChanged: reload()
-        onLoaded: { try { sidebar.quickUpdate = JSON.parse(text()).mode === "quick"; } catch (e) {} }
-    }
-    Process {
-        id: cachyUpdateProc
-        command: ["rice-software", "update-default"]
-        onExited: sidebar.checkUpdates()
-    }
+    // O botão de atualizar abre a janela de atualizações (Updater.qml), que
+    // lista por origem e roda o rice-software solto do shell. Ela chama
+    // `qs ipc call sidebar check` quando o trabalho termina, para recontar.
+    function openUpdater() { Quickshell.execDetached(["qs", "ipc", "call", "updater", "open"]); }
 
     // Ações usadas também pelos itens das barras (catálogo do modo edição), para
     // não duplicar a checagem de estado.
     function toggleNight() { if (!nightToggle.running) nightToggle.running = true; }
     function toggleCaffeine() { if (!caffeineToggle.running) caffeineToggle.running = true; }
-    function runUpdate() { if (!cachyUpdateProc.running) cachyUpdateProc.running = true; }
+    function runUpdate() { openUpdater(); }
     function stopRecording() { recStopProc.running = true; }
     function refreshGpu() { if (!gpuStateProc.running) gpuStateProc.running = true; }
     // GPU na barra: lê o estado da NVIDIA a cada 5 s só se o item estiver lá.
@@ -639,8 +626,7 @@ PanelWindow {
                     icon: Theme.icons.update
                     tint: sidebar.updateCount > 0 ? Theme.primary : Theme.textColor
                     onActivated: {
-                        if (!cachyUpdateProc.running)
-                            cachyUpdateProc.running = true;
+                        sidebar.openUpdater();
                         sidebar.open = false;
                     }
 
@@ -926,11 +912,9 @@ PanelWindow {
                     PopAction {
                         Layout.topMargin: 4
                         icon: Theme.icons.update
-                        label: sidebar.quickUpdate ? Theme.t("sidebar.quick_update", "Atualizar o sistema (sem perguntas)")
-                            : Theme.t("sidebar.open_cachy_update", "Abrir cachy-update")
+                        label: Theme.t("sidebar.see_updates", "Ver atualizações")
                         onActivated: {
-                            if (!cachyUpdateProc.running)
-                                cachyUpdateProc.running = true;
+                            sidebar.openUpdater();
                             sidebar.open = false;
                         }
                     }

@@ -243,6 +243,8 @@ ShellRoot {
     Cheatsheet {}
     Clipboard {}
     Welcome {}
+    // Atualizações por origem (ícone de updates da sidebar).
+    Updater {}
     QuickNotes {}
     StickyNote {}
     SessionDialog {}
