@@ -165,6 +165,14 @@ PanelWindow {
         { key: "move",   dx: 1,  dy: 0 },
         { key: "cancel", dx: 0,  dy: 1 }
     ]
+    // O Qt.BlankCursor do MouseArea não esconde o cursor no Hyprland (testado:
+    // continua visível durante o gesto), então quem esconde é o compositor,
+    // pela opção cursor:invisible, desfeita ao fechar o menu.
+    function hideCursor(on) {
+        Quickshell.execDetached(["hyprctl", "eval", "hl.config({ cursor = { invisible = " + (on ? "true" : "false") + " } })"]);
+    }
+    onRadialOpenChanged: hideCursor(radialOpen)
+    Component.onDestruction: if (radialOpen) hideCursor(false)
     Timer {
         id: radialHold
         interval: 250
