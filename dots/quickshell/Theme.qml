@@ -249,7 +249,7 @@ QtObject {
         packages: "\u{F03D6}", console: "\u{F018D}", translate: "\u{F05CA}", cursor: "\u{F01C0}", font: "\u{F06D6}",
         network: "\u{F0C9D}", batHealth: "\u{F120F}", restore: "\u{F099B}", alert: "\u{F002A}",
         fileCompare: "\u{F08AA}", close: "\u{F0156}", verified: "\u{F0791}", camera: "\u{F0D5D}", clipboard: "\u{F014C}", apps: "\u{F003B}", folder: "\u{F024B}",
-        gamepad: "\u{F0297}", pin: "\u{F0403}", floatWin: "\u{F05B2}", pencil: "\u{F0CB6}",
+        gamepad: "\u{F0297}", pin: "\u{F0403}", pencil: "\u{F0CB6}",
         star: "\u{F04CE}", starOutline: "\u{F04D2}", content: "\u{F018F}", paste: "\u{F0192}", keyboard: "\u{F030C}",
         sleep: "\u{F0904}",
         tune: "\u{F062E}", palette: "\u{F03D8}", eyedropper: "\u{F020A}", file: "\u{F0224}", ethernet: "\u{F0200}", webcam: "\u{F05A0}", screenShare: "\u{F1483}", settings: "\u{F08B8}",

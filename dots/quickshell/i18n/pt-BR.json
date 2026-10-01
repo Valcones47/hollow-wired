@@ -1928,12 +1928,7 @@
   "jobs.files": "%1 de %2 arquivos",
   "jobs.remaining": "faltam %1",
   "jobs.cancel": "Cancelar",
-  "dock.move_to": "Mover para a área",
-  "dock.radial_close": "Fechar",
-  "dock.radial_float": "Flutuar",
-  "dock.radial_move": "Mover",
   "sidebar.quick_update": "Atualizar o sistema (sem perguntas)",
   "store.quick_update": "Atualizar sem perguntar",
-  "store.quick_update_sub": "Só pede a senha. Limpar órfãos, cache e arquivos .pacnew continua no cachy-update.",
-  "dock.radial_cancel": "Cancelar"
+  "store.quick_update_sub": "Só pede a senha. Limpar órfãos, cache e arquivos .pacnew continua no cachy-update."
 }

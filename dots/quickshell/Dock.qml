@@ -18,9 +18,9 @@ import "."
 // CONTEÚDO: apps fixados · apps abertos não fixados · botão Jogos.
 // Clique: abre o app (sem janela) / foca (1 janela) / alterna entre as
 // janelas (várias). Botão do meio: nova janela. Hover: popup com as janelas
-// (clique foca, X fecha) e ações (nova janela, fixar/desafixar).
-// Botão direito num app aberto: clique rápido fecha a janela; segurar abre o
-// menu radial (Fechar / Flutuar / Mover para área / cancelar), ver "menu radial".
+// (clique foca, X fecha) e ações (nova janela, fixar/desafixar). Botão
+// direito num app aberto: fecha a janela dele (a focada, senão a primeira).
+// Um menu radial no segurar foi testado e retirado: difícil de cancelar.
 //
 // Fixados e jogos: DockConfig (~/.config/quickshell/dock.json). Arrastar um
 // ícone fixado reordena; jogos se editam no popup (Editar) e se adicionam
@@ -60,7 +60,7 @@ PanelWindow {
     // do Windows — nesse caso ela também reserva espaço para as janelas.
     readonly property bool pinned: ShellLayout.dockEnabled && !ShellLayout.dockAutohide
     readonly property bool shown: ShellLayout.dockEnabled
-        && (ShellLayout.editing || pinned ? !hasFullscreen : (allowHover && (hovered || pop !== "" || dragFrom >= 0 || radialOpen)))
+        && (ShellLayout.editing || pinned ? !hasFullscreen : (allowHover && (hovered || pop !== "" || dragFrom >= 0)))
     onPopChanged: if (pop !== "games") gamesEdit = false
 
     Timer { id: hideDelay; interval: 450; onTriggered: dock.hovered = false }
@@ -148,92 +148,8 @@ PanelWindow {
         DockConfig.focusWindow(wins[(idx + 1) % wins.length]);
     }
 
-    // ================= menu radial (botão direito) =================
-    // Segurar o botão direito num app aberto mostra quatro alvos em volta do
-    // app, no meio da tela (janela própria, abaixo), e esconde o cursor; o
-    // alvo sai da DIREÇÃO em que o mouse foi
-    // empurrado (não de onde o ponteiro está), então não dá para "errar" o
-    // botão. Soltar confirma; soltar sem mexer, ou para baixo, cancela.
-    // Clique rápido (soltar antes do tempo) fecha a janela direto.
-    property bool radialOpen: false
-    property var radialItem: null
-    property string radialSel: ""    // "" | close | float | move | cancel
-    property var moveWin: null       // janela esperando a escolha da área
-    readonly property var radialTargets: [
-        { key: "close",  dx: 0,  dy: -1 },
-        { key: "float",  dx: -1, dy: 0 },
-        { key: "move",   dx: 1,  dy: 0 },
-        { key: "cancel", dx: 0,  dy: 1 }
-    ]
-    // O Qt.BlankCursor do MouseArea não esconde o cursor no Hyprland (testado:
-    // continua visível durante o gesto), então quem esconde é o compositor,
-    // pela opção cursor:invisible, desfeita ao fechar o menu.
-    function hideCursor(on) {
-        Quickshell.execDetached(["hyprctl", "eval", "hl.config({ cursor = { invisible = " + (on ? "true" : "false") + " } })"]);
-    }
-    onRadialOpenChanged: hideCursor(radialOpen)
-    Component.onDestruction: if (radialOpen) hideCursor(false)
-    Timer {
-        id: radialHold
-        interval: 250
-        onTriggered: dock.openRadial()
-    }
-
-    // A janela que o botão direito afeta: a focada do app, senão a primeira.
-    function targetWindow(item) {
-        if (!item) return null;
-        const wins = windowsOf(item.key);
-        if (wins.length === 0) return null;
-        return wins.find(w => w.activated) || wins[0];
-    }
-    function hyprAddr(t) {
-        const h = Hyprland.toplevels.values.find(x => x.wayland === t);
-        if (!h) return "";
-        return String(h.address).startsWith("0x") ? h.address : "0x" + h.address;
-    }
-    function openRadial() {
-        if (!radialItem || !targetWindow(radialItem)) return;
-        popHide.stop();
-        pop = "";
-        radialSel = "";
-        radialOpen = true;
-    }
-    function radialPick(dx, dy) {
-        if (Math.hypot(dx, dy) < 20) { radialSel = ""; return; }
-        const len = Math.hypot(dx, dy);
-        let best = "", bestDot = -2;
-        for (const t of radialTargets) {
-            const d = (dx * t.dx + dy * t.dy) / len;
-            if (d > bestDot) { bestDot = d; best = t.key; }
-        }
-        radialSel = best;
-    }
-    function finishRadial(anchor) {
-        const sel = radialSel, item = radialItem;
-        radialOpen = false;
-        radialSel = "";
-        const w = targetWindow(item);
-        if (!w) return;
-        const addr = hyprAddr(w);
-        if (sel === "close") {
-            w.close();
-        } else if (sel === "float" && addr !== "") {
-            Hyprland.dispatch('hl.dsp.window.float({ action = "toggle", window = "address:' + addr + '" })');
-        } else if (sel === "move" && addr !== "") {
-            moveWin = w;
-            showPop("move", item, anchor);
-        }
-    }
-    function moveTo(ws) {
-        const addr = hyprAddr(moveWin);
-        pop = "";
-        moveWin = null;
-        if (addr !== "")
-            Hyprland.dispatch("hl.dsp.window.move({ workspace = " + ws + ", window = \"address:" + addr + "\" })");
-    }
-
     // ================= popup =================
-    property string pop: ""          // "" | app | games | power | tray | tip | move
+    property string pop: ""          // "" | app | games | power | tray | tip
     property var popItem: null
     property real popAnchorX: 0
     Timer { id: popHide; interval: 260; onTriggered: dock.pop = "" }
@@ -581,40 +497,16 @@ PanelWindow {
                             anchors.fill: parent
                             hoverEnabled: true
                             preventStealing: true
-                            // Cursor some enquanto o menu radial está aberto (a escolha
-                            // é pela direção do movimento).
-                            cursorShape: dock.radialOpen && dock.radialItem === app.modelData ? Qt.BlankCursor
-                                : app.dragging ? Qt.ClosedHandCursor : Qt.PointingHandCursor
+                            cursorShape: app.dragging ? Qt.ClosedHandCursor : Qt.PointingHandCursor
                             acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
                             property real startX: 0
-                            property point rStart: Qt.point(0, 0)
-                            property bool rightDown: false
-                            onEntered: if (dock.dragFrom < 0 && !dock.radialOpen && dock.pop !== "move") dock.showPop("app", app.modelData, app)
-                            onExited: if (dock.pop !== "move") dock.leavePop()
+                            onEntered: if (dock.dragFrom < 0) dock.showPop("app", app.modelData, app)
+                            onExited: dock.leavePop()
                             onPressed: mouse => {
-                                if (mouse.button === Qt.RightButton) {
-                                    if (!dock.targetWindow(app.modelData)) return;
-                                    rightDown = true;
-                                    rStart = mapToItem(root, mouse.x, mouse.y);
-                                    dock.radialItem = app.modelData;
-                                    radialHold.restart();
-                                    return;
-                                }
                                 startX = mapToItem(row, mouse.x, 0).x;
                                 app.justDragged = false;
                             }
                             onPositionChanged: mouse => {
-                                if (rightDown) {
-                                    const p = mapToItem(root, mouse.x, mouse.y);
-                                    const dx = p.x - rStart.x, dy = p.y - rStart.y;
-                                    // Empurrou antes do tempo: abre o menu na hora.
-                                    if (!dock.radialOpen && Math.hypot(dx, dy) > 12) {
-                                        radialHold.stop();
-                                        dock.openRadial();
-                                    }
-                                    if (dock.radialOpen) dock.radialPick(dx, dy);
-                                    return;
-                                }
                                 if (!pressed || !app.modelData.pinned || mouse.buttons !== Qt.LeftButton) return;
                                 const dx = mapToItem(row, mouse.x, 0).x - startX;
                                 if (!app.dragging && Math.abs(dx) > 8) {
@@ -631,28 +523,12 @@ PanelWindow {
                             }
                             // arraste interrompido (ex.: foco roubado): não deixa a dock presa aberta
                             onCanceled: {
-                                rightDown = false;
-                                radialHold.stop();
-                                dock.radialOpen = false;
                                 app.dragging = false;
                                 app.dragX = 0;
                                 dock.dragFrom = -1;
                                 dock.dragTo = -1;
                             }
-                            onReleased: mouse => {
-                                if (mouse.button === Qt.RightButton) {
-                                    if (!rightDown) return;
-                                    rightDown = false;
-                                    if (radialHold.running) {
-                                        // clique rápido: fecha a janela do app
-                                        radialHold.stop();
-                                        const w = dock.targetWindow(app.modelData);
-                                        if (w) w.close();
-                                    } else if (dock.radialOpen) {
-                                        dock.finishRadial(app);
-                                    }
-                                    return;
-                                }
+                            onReleased: {
                                 if (!app.dragging) return;
                                 const keys = dock.items.filter(i => i.pinned).map(i => i.key);
                                 const [k] = keys.splice(dock.dragFrom, 1);
@@ -665,8 +541,12 @@ PanelWindow {
                                 DockConfig.setPinsOrder(keys);
                             }
                             onClicked: mouse => {
-                                if (app.justDragged || mouse.button === Qt.RightButton) return;
-                                if (mouse.button === Qt.MiddleButton) {
+                                if (app.justDragged) return;
+                                if (mouse.button === Qt.RightButton) {
+                                    const wins = dock.windowsOf(app.modelData.key);
+                                    const w = wins.find(t => t.activated) || wins[0];
+                                    if (w) w.close();
+                                } else if (mouse.button === Qt.MiddleButton) {
                                     DockConfig.launch(app.modelData.entry);
                                 } else {
                                     dock.activateItem(app.modelData);
@@ -919,7 +799,7 @@ PanelWindow {
                 height: implicitHeight
                 readonly property Item current: dock.pop === "app" ? appPop : dock.pop === "games" ? gamesPop
                     : dock.pop === "power" ? powerPop : dock.pop === "tray" ? trayPop
-                    : dock.pop === "tip" ? tipPop : dock.pop === "move" ? movePop : null
+                    : dock.pop === "tip" ? tipPop : null
                 opacity: root.popTargetW > 0 && Math.abs(root.popW - root.popTargetW) < 30
                     && Math.abs(root.popH - root.popTargetH) < 30 ? 1 : 0
                 Behavior on opacity { NumberAnimation { duration: Theme.ms(130) } }
@@ -1037,50 +917,6 @@ PanelWindow {
                         Layout.maximumWidth: 260
                         visible: text !== ""
                         text: dock.popItem && dock.popItem.text ? dock.popItem.text : ""
-                    }
-                }
-
-                // ---------- mover para área (menu radial) ----------
-                ColumnLayout {
-                    id: movePop
-                    visible: popContent.current === movePop
-                    width: 5 * 36 + 4 * 4
-                    spacing: 6
-                    readonly property int curWs: {
-                        const h = dock.moveWin ? Hyprland.toplevels.values.find(x => x.wayland === dock.moveWin) : null;
-                        return h && h.workspace ? h.workspace.id : -1;
-                    }
-                    PopTitle { text: Theme.t("dock.move_to", "Mover para a área") }
-                    GridLayout {
-                        columns: 5
-                        rowSpacing: 4
-                        columnSpacing: 4
-                        Repeater {
-                            model: 10
-                            delegate: Rectangle {
-                                required property int index
-                                readonly property int ws: index + 1
-                                implicitWidth: 36
-                                implicitHeight: 32
-                                radius: 9
-                                color: wsArea.containsMouse ? Theme.tileHigh
-                                    : ws === movePop.curWs ? Theme.withAlpha(Theme.primary, 0.22) : Theme.tile
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: parent.ws
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: 13
-                                    color: Theme.textColor
-                                }
-                                MouseArea {
-                                    id: wsArea
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: dock.moveTo(parent.ws)
-                                }
-                            }
-                        }
                     }
                 }
 
@@ -1285,93 +1121,6 @@ PanelWindow {
                                     }
                                 }
                             }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // ================= menu radial: janela no meio da tela =================
-    // Camada própria por cima de tudo, sem entrada (máscara vazia): o ponteiro
-    // continua preso ao MouseArea do ícone da dock enquanto o botão direito
-    // está apertado, então é ele que esconde o cursor e lê a direção.
-    PanelWindow {
-        id: radialWin
-        visible: dock.radialOpen
-        screen: dock.screen
-        anchors { top: true; bottom: true; left: true; right: true }
-        exclusionMode: ExclusionMode.Ignore
-        color: "transparent"
-        focusable: false
-        WlrLayershell.namespace: "quickshell-dock-radial"
-        WlrLayershell.layer: WlrLayer.Overlay
-        WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
-        mask: Region {}
-
-        Rectangle {
-            anchors.fill: parent
-            color: Theme.withAlpha(Theme.background, 0.3)
-        }
-
-        Item {
-            anchors.centerIn: parent
-
-            // o app que vai ser afetado, no centro
-            Rectangle {
-                x: -width / 2
-                y: -height / 2
-                width: 84
-                height: 84
-                radius: 42
-                color: ShellCustomization.getBgColor("dock")
-                border.width: 1
-                border.color: Theme.withAlpha(Theme.outline, 0.4)
-                IconImage {
-                    anchors.centerIn: parent
-                    implicitSize: 52
-                    source: dock.radialItem ? dock.iconFor(dock.radialItem) : ""
-                }
-            }
-
-            Repeater {
-                model: [
-                    { key: "close",  icon: Theme.icons.close,      label: Theme.t("dock.radial_close", "Fechar"),     x: 0,    y: -150, size: 112, danger: true },
-                    { key: "float",  icon: Theme.icons.floatWin,   label: Theme.t("dock.radial_float", "Flutuar"),    x: -150, y: 0,    size: 112, danger: false },
-                    { key: "move",   icon: Theme.icons.workspaces, label: Theme.t("dock.radial_move", "Mover"),       x: 150,  y: 0,    size: 112, danger: false },
-                    { key: "cancel", icon: Theme.icons.close,      label: Theme.t("dock.radial_cancel", "Cancelar"),  x: 0,    y: 130,  size: 76,  danger: false }
-                ]
-                delegate: Rectangle {
-                    id: rb
-                    required property var modelData
-                    readonly property bool on: dock.radialSel === modelData.key
-                    x: modelData.x - width / 2
-                    y: modelData.y - height / 2
-                    width: modelData.size
-                    height: width
-                    radius: width / 2
-                    color: on ? (modelData.danger ? Theme.critical : Theme.primary) : ShellCustomization.getBgColor("dock")
-                    border.width: 1
-                    border.color: Theme.withAlpha(Theme.outline, 0.4)
-                    scale: on ? 1.1 : 1
-                    Behavior on scale { NumberAnimation { duration: Theme.ms(100) } }
-                    Behavior on color { ColorAnimation { duration: Theme.ms(100) } }
-                    Column {
-                        anchors.centerIn: parent
-                        spacing: 2
-                        Text {
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            text: rb.modelData.icon
-                            font.family: Theme.iconFontFamily
-                            font.pixelSize: rb.modelData.key === "cancel" ? 22 : 36
-                            color: rb.on ? Theme.background : Theme.textColor
-                        }
-                        Text {
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            text: rb.modelData.label
-                            font.family: Theme.fontFamily
-                            font.pixelSize: rb.modelData.key === "cancel" ? 11 : 14
-                            color: rb.on ? Theme.background : Theme.subtext
                         }
                     }
                 }
