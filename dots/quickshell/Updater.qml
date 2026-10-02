@@ -127,7 +127,7 @@ PanelWindow {
                 for (const k of ["repo", "aur", "flatpak", "rice"]) s[k] = true;
                 upd.sel = s;
                 if (upd.view === "loading") upd.view = "list";
-                Qt.callLater(() => listScroll.ScrollBar.vertical.position = 0);
+                scrollTop.restart();
             }
         }
     }
@@ -193,6 +193,14 @@ PanelWindow {
         }
     }
     Timer { id: logStop; interval: 1500; onTriggered: logProc.running = false }
+    // Volta a lista ao topo depois que os delegates assumem a altura final;
+    // feito na hora (callLater) ela ficava uns pixels rolada, cortando o
+    // cabeçalho da primeira origem.
+    Timer {
+        id: scrollTop
+        interval: 120
+        onTriggered: listScroll.contentItem.contentY = 0
+    }
     // Reserva do watcher: o arquivo só passa a existir no primeiro trabalho
     // depois do boot (/run é tmpfs), e aí o FileView ainda não o observa.
     Timer {
@@ -376,14 +384,18 @@ PanelWindow {
                 contentWidth: availableWidth
                 ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
 
-                ColumnLayout {
+                // Column (não ColumnLayout): a altura implícita do layout ficava
+                // presa na do texto de "carregando" e o conteúdo, maior, era
+                // desenhado subindo para fora do topo (cabeçalho cortado).
+                Column {
+                    id: listCol
                     width: listScroll.availableWidth
-                    spacing: 6
+                    spacing: 14
 
                     Text {
                         visible: upd.view === "loading"
-                        Layout.topMargin: 40
-                        Layout.alignment: Qt.AlignHCenter
+                        topPadding: 40
+                        anchors.horizontalCenter: parent.horizontalCenter
                         text: Theme.t("updater.checking_long", "Consultando os repositórios, o AUR e o Flatpak…")
                         font.family: Theme.fontFamily
                         font.pixelSize: 13
@@ -402,8 +414,7 @@ PanelWindow {
                             property bool expanded: false
                             readonly property int cap: 6
                             readonly property var items: srcBlock.sid === "rice" ? upd.riceCommits() : (upd.info[srcBlock.sid] || [])
-                            Layout.fillWidth: true
-                            Layout.bottomMargin: srcBlock.pending ? 10 : 0
+                            width: listCol.width
                             spacing: 6
 
                             // Cabeçalho da origem: caixa, nome e contagem.
