@@ -148,6 +148,8 @@ QtObject {
     }
 
     // ---------- RAM + zram ----------
+    // "Real" = MemTotal - MemAvailable: inclui Shmem (o heap do ZGC do Minecraft é memória
+    // compartilhada, não AnonPages) e não infla com cache de arquivos, que o kernel devolve.
     // LC_ALL=C: em pt-BR o free imprime "Mem.:" e o awk não batia.
     property Timer ramTimer: Timer {
         interval: 5000
@@ -161,10 +163,10 @@ QtObject {
     }
     property Process ramProc: Process {
         command: ["bash", "-c",
-            "awk '/^MemTotal:/{tot=$2} /^AnonPages:/{anon=$2} /^Shmem:/{shmem=$2} " +
+            "awk '/^MemTotal:/{tot=$2} /^MemAvailable:/{avail=$2} /^Shmem:/{shmem=$2} " +
             "/^Cached:/{cached=$2} /^Buffers:/{buf=$2} /^SReclaimable:/{srec=$2} " +
             "END { " +
-            "real=anon*1024; cache=(cached-shmem+buf+srec)*1024; total=tot*1024; " +
+            "real=(tot-avail)*1024; cache=(cached-shmem+buf+srec)*1024; total=tot*1024; " +
             "print real, total, cache " +
             "}' /proc/meminfo"]
         stdout: StdioCollector {
