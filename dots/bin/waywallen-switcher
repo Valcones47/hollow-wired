@@ -104,6 +104,25 @@ SKEW_STAGE_W = 1560
 SKEW_STAGE_H = SKEW_H + 40
 
 CSS = b"""
+.screens button.screen {
+    background-color: rgba(18, 18, 24, 0.84);
+    border: 1.5px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 6px 10px;
+}
+.screens button.screen:hover {
+    background-color: rgba(40, 40, 50, 0.9);
+}
+.screens button.screen.current {
+    border-color: rgba(138, 180, 255, 0.95);
+}
+.screens .screen-label {
+    color: rgba(255, 255, 255, 0.75);
+    font-size: 11px;
+}
+.screens picture {
+    border-radius: 6px;
+}
 window.switcher {
     background: transparent;
 }
@@ -336,6 +355,35 @@ def fetch_wallpapers():
     return wallpapers
 
 
+def screen_targets():
+    """Telas do Waywallen (principal primeiro) e a tela com foco no Hyprland.
+
+    Com uma tela só a lista volta vazia e o seletor fica como sempre foi
+    (ApplyById, que aplica em todas).
+    """
+    bin_dir = os.path.expanduser("~/.local/bin")
+
+    def run_json(args, default):
+        try:
+            out = subprocess.run(args, capture_output=True, text=True, timeout=6).stdout
+            return json.loads(out) if out.strip() else default
+        except Exception:
+            return default
+
+    displays = run_json([os.path.join(bin_dir, "rice-waywallen-displays"), "list"], [])
+    if len(displays) < 2:
+        return [], None
+    order = [m["name"] for m in run_json([os.path.join(bin_dir, "rice-monitors"), "order"], {}).get("monitors", [])]
+    displays.sort(key=lambda d: order.index(d["name"]) if d["name"] in order else 99)
+    mons = run_json(["hyprctl", "monitors", "-j"], [])
+    transform = {m["name"]: m.get("transform", 0) for m in mons}
+    focused = next((m["name"] for m in mons if m.get("focused")), None)
+    for i, d in enumerate(displays):
+        d["primary"] = i == 0
+        d["portrait"] = transform.get(d["name"], 0) % 2 == 1
+    return displays, focused
+
+
 def daemon_proxy():
     bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
     return Gio.DBusProxy.new_sync(
@@ -544,9 +592,16 @@ class RiseBin(Gtk.Widget):
 
 
 class SwitcherWindow(Gtk.ApplicationWindow):
-    def __init__(self, app, proxy, wallpapers, current_id):
+    def __init__(self, app, proxy, wallpapers, current_id, screens=None, target="all"):
         super().__init__(application=app)
         self.app = app
+        # Várias telas: em qual o wallpaper vai ser aplicado ("all" = todas).
+        self.screens = screens or []
+        self.target = target if self.screens else "all"
+        if self.target != "all":
+            sid = next((d.get("wallpaper_id") for d in self.screens if d["name"] == self.target), None)
+            if sid:
+                current_id = sid
         self.add_css_class("switcher")
         self.proxy = proxy
         self.wallpapers = wallpapers
@@ -600,7 +655,10 @@ class SwitcherWindow(Gtk.ApplicationWindow):
             self._title_labels.append(label)
         self._title_slot = 0
 
-        hint = Gtk.Label(label="←/→ ou scroll: navegar  ·  Enter/clique: aplicar  ·  Esc: fechar")
+        hint_text = "←/→ ou scroll: navegar  ·  Enter/clique: aplicar  ·  Esc: fechar"
+        if self.screens:
+            hint_text += "  ·  PgUp/PgDn: tela"
+        hint = Gtk.Label(label=hint_text)
         hint.add_css_class("hint")
         hint.set_margin_top(2)
         hint.set_margin_bottom(12)
@@ -625,6 +683,8 @@ class SwitcherWindow(Gtk.ApplicationWindow):
             bar.append(self._style_button())
             self.panel.append(bar)
             self._update_count()
+        if self.screens:
+            self.panel.append(self._screen_row())
         self.panel.append(self.stage)
         self.panel.append(self.title_stack)
         if self.style == "skew":
@@ -666,6 +726,101 @@ class SwitcherWindow(Gtk.ApplicationWindow):
         self.ensure_ticking()
 
     # --- preview loading (decoding happens off the UI thread) --------------
+
+    # --- várias telas ---------------------------------------------------------
+
+    def _screen_row(self):
+        """Uma miniatura por tela com o wallpaper aplicado nela agora, mais
+        "Todas as telas". A escolhida recebe o Enter."""
+        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        row.add_css_class("screens")
+        row.set_halign(Gtk.Align.CENTER)
+        row.set_valign(Gtk.Align.END)
+        row.set_margin_bottom(6)
+        previews = {wp["id"]: wp.get("preview") for wp in self.wallpapers}
+        self._screen_buttons = {}
+        for d in self.screens + [{"name": "all"}]:
+            btn = Gtk.Button()
+            btn.add_css_class("screen")
+            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+            box.set_halign(Gtk.Align.CENTER)
+            if d["name"] != "all":
+                w, h = (36, 64) if d.get("portrait") else (96, 54)
+                pic = Gtk.Picture()
+                # Recorte já no tamanho final: o Gtk.Picture usa o tamanho da
+                # imagem como natural e o set_size_request não o segura.
+                prev = previews.get(str(d.get("wallpaper_id")))
+                if not prev or not os.path.isfile(prev) or prev.lower().endswith(".gif"):
+                    # Vídeo sem preview: o quadro que o rice já extrai.
+                    try:
+                        prev = subprocess.run(
+                            [os.path.expanduser("~/.local/bin/rice-wallpaper-current"),
+                             "--id", str(d.get("wallpaper_id"))],
+                            capture_output=True, text=True, timeout=10).stdout.strip() or prev
+                    except Exception:
+                        pass
+                tex = self._cover_texture(prev, w, h)
+                if tex is not None:
+                    pic.set_paintable(tex)
+                pic.set_size_request(w, h)
+                pic.set_halign(Gtk.Align.CENTER)
+                box.append(pic)
+                text = d["name"] + ("  ·  principal" if d.get("primary") else "")
+            else:
+                text = "Todas as telas"
+            label = Gtk.Label(label=text)
+            label.add_css_class("screen-label")
+            box.append(label)
+            btn.set_child(box)
+            btn.set_valign(Gtk.Align.END)
+            btn.connect("clicked", lambda _b, n=d["name"]: self.set_target(n))
+            row.append(btn)
+            self._screen_buttons[d["name"]] = btn
+        self._mark_target()
+        return row
+
+    @staticmethod
+    def _cover_texture(path, w, h):
+        if not path or not os.path.isfile(path):
+            return None
+        try:
+            pb = GdkPixbuf.Pixbuf.new_from_file(path)
+        except GLib.Error:
+            return None
+        sw, sh = pb.get_width(), pb.get_height()
+        scale = max(w / sw, h / sh)
+        tw, th = max(w, round(sw * scale)), max(h, round(sh * scale))
+        pb = pb.scale_simple(tw, th, GdkPixbuf.InterpType.BILINEAR)
+        pb = pb.new_subpixbuf((tw - w) // 2, (th - h) // 2, w, h)
+        return Gdk.Texture.new_for_pixbuf(pb)
+
+    def _mark_target(self):
+        for name, btn in getattr(self, "_screen_buttons", {}).items():
+            if name == self.target:
+                btn.add_css_class("current")
+            else:
+                btn.remove_css_class("current")
+
+    def set_target(self, name):
+        if not self.screens or self.closing:
+            return
+        self.target = name
+        self._mark_target()
+        if name != "all":
+            wid = next((str(d.get("wallpaper_id")) for d in self.screens if d["name"] == name), None)
+            idx = next((i for i, wp in enumerate(self.wallpapers) if wp["id"] == wid), None)
+            if idx is not None:
+                self.select(idx)
+
+    def cycle_target(self, step):
+        names = [d["name"] for d in self.screens] + ["all"]
+        if self.target in names:
+            self.set_target(names[(names.index(self.target) + step) % len(names)])
+
+    def _target_is_primary(self):
+        if self.target == "all":
+            return True
+        return any(d["name"] == self.target and d.get("primary") for d in self.screens)
 
     _stills = {}
 
@@ -910,8 +1065,11 @@ class SwitcherWindow(Gtk.ApplicationWindow):
         fader = os.path.expanduser("~/.local/bin/rice-wallpaper-fade")
         if still and os.path.isfile(fader):
             try:
+                cover_args = [fader, "--cover", still]
+                if self.target != "all":
+                    cover_args.append(self.target)
                 out = subprocess.run(
-                    [fader, "--cover", still],
+                    cover_args,
                     capture_output=True, text=True, timeout=3,
                 ).stdout.strip()
                 delay = int(out) if out.isdigit() else 0
@@ -1026,13 +1184,25 @@ class SwitcherWindow(Gtk.ApplicationWindow):
         import time
         self._apply_t0 = time.time()
         try:
-            self.proxy.call_sync(
-                "ApplyById",
-                GLib.Variant("(s)", (wallpaper["id"],)),
-                Gio.DBusCallFlags.NONE,
-                -1,
-                None,
-            )
+            if self.target != "all":
+                # Só nesta tela: a API WebSocket do Waywallen (o ApplyById do
+                # D-Bus não escolhe tela). Erro vira GLib.Error para cair no
+                # mesmo tratamento abaixo.
+                r = subprocess.run(
+                    [os.path.expanduser("~/.local/bin/rice-waywallen-displays"),
+                     "apply", wallpaper["id"], self.target],
+                    capture_output=True, text=True, timeout=30,
+                )
+                if r.returncode != 0:
+                    raise GLib.Error(r.stderr.strip() or "falha ao aplicar na tela")
+            else:
+                self.proxy.call_sync(
+                    "ApplyById",
+                    GLib.Variant("(s)", (wallpaper["id"],)),
+                    Gio.DBusCallFlags.NONE,
+                    -1,
+                    None,
+                )
             # Despausa o daemon imediatamente para que o novo wallpaper inicie
             # e comece a rodar o vídeo normalmente no meio da transição.
             try:
@@ -1075,7 +1245,7 @@ class SwitcherWindow(Gtk.ApplicationWindow):
         fader = os.path.expanduser("~/.local/bin/rice-wallpaper-fade")
         if os.path.isfile(fader) and wallpaper.get("target"):
             cmd = [fader, "--reveal-when-ready", wallpaper["target"]]
-            if still:
+            if still and self._target_is_primary():
                 cmd += ["--colors", still]
             cmd += ["--since", "%.3f" % getattr(self, "_apply_t0", 0)]
             subprocess.Popen(
@@ -1120,6 +1290,8 @@ class SwitcherWindow(Gtk.ApplicationWindow):
             self.close_animated()
         elif name in ("Tab", "ISO_Left_Tab"):
             self.toggle_style()
+        elif name in ("Page_Down", "Page_Up") and self.screens:
+            self.cycle_target(1 if name == "Page_Down" else -1)
         else:
             return False
         return True
@@ -1163,13 +1335,17 @@ class SwitcherApp(Gtk.Application):
         )
 
         self._proxy, self._wallpapers = proxy, wallpapers
-        self.window = SwitcherWindow(self, proxy, wallpapers, get_current_id(proxy))
+        self._screens, focused = screen_targets()
+        target = focused if focused and any(d["name"] == focused for d in self._screens) else "all"
+        self.window = SwitcherWindow(self, proxy, wallpapers, get_current_id(proxy),
+                                     self._screens, target)
         self.window.present()
 
     def restyle(self, selected_id):
         old = self.window
         # A janela nova nasce antes de a velha sumir: sem janela o app sairia.
-        self.window = SwitcherWindow(self, self._proxy, self._wallpapers, selected_id)
+        self.window = SwitcherWindow(self, self._proxy, self._wallpapers, selected_id,
+                                     self._screens, old.target)
         self.window.appear = 1.0
         self.window.apply_appear()
         self.window.present()

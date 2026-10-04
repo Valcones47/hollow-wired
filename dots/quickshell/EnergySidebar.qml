@@ -38,6 +38,14 @@ PanelWindow {
     screen: targetScreen || Theme.primaryScreen
     readonly property bool _openForScreen: open
     on_OpenForScreenChanged: if (_openForScreen) targetScreen = Theme.focusedScreen()
+    // Fechada, a sidebar mora na tela onde está o mouse: o gatilho dela é a
+    // borda direita, e numa tela sem ela não havia como abrir.
+    property Connections focusFollow: Connections {
+        target: Hyprland
+        function onFocusedMonitorChanged() {
+            if (!sidebar.open) sidebar.targetScreen = Theme.focusedScreen();
+        }
+    }
     WlrLayershell.layer: launcherOpen ? WlrLayer.Overlay : WlrLayer.Top
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
     // Fixa, ela reserva espaço como uma central de ações sempre aberta;

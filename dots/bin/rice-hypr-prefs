@@ -204,7 +204,7 @@ hl.device({
             m_scale=$(jq -r --arg m "$mon" '.monitors[$m].scale // 1' "$PREFS_FILE")
             m_transform=$(jq -r --arg m "$mon" '.monitors[$m].transform // 0' "$PREFS_FILE")
             m_pos=$(jq -r --arg m "$mon" '.monitors[$m].position // "auto"' "$PREFS_FILE")
-            case "$m_pos" in auto|auto-left|auto-right|auto-up|auto-down) ;; *) m_pos=auto ;; esac
+            case "$m_pos" in auto|auto-left|auto-right|auto-up|auto-down|auto-center-left|auto-center-right|auto-center-up|auto-center-down) ;; *) m_pos=auto ;; esac
             hyprctl eval "hl.monitor({ output = '$mon', mode = '$m_mode', position = '$m_pos', scale = '$m_scale', transform = $m_transform })" &>/dev/null || true
         done <<< "$saved_monitors"
         apply_anim_preset "$anim_preset"
@@ -300,7 +300,7 @@ case "$cmd" in
         # Aplica primeiro: se o modo não existir, o Hyprland recusa e mantém o
         # atual — aí nem chega a ser salvo como preferência.
         pos=$(jq -r --arg m "$mon" '.monitors[$m].position // "auto"' "$PREFS_FILE" 2>/dev/null || echo auto)
-        case "$pos" in auto|auto-left|auto-right|auto-up|auto-down) ;; *) pos=auto ;; esac
+        case "$pos" in auto|auto-left|auto-right|auto-up|auto-down|auto-center-left|auto-center-right|auto-center-up|auto-center-down) ;; *) pos=auto ;; esac
         if ! hyprctl eval "hl.monitor({ output = '$mon', mode = '$mode', position = '$pos', scale = '$scale', transform = $transform })" &>/dev/null; then
             echo "[!] Hyprland recusou o modo $mode em $mon" >&2
             exit 1

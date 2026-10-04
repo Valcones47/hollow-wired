@@ -13,7 +13,7 @@
 #
 # Uso:
 #   rice-wallpaper-fade <preview> -- <comando que troca o wallpaper...>
-#   rice-wallpaper-fade --cover <preview>     # só cobre (quem troca é o chamador)
+#   rice-wallpaper-fade --cover <preview> [tela]  # só cobre (quem troca é o chamador); com tela, só ela
 #   rice-wallpaper-fade --dismiss             # tira a camada na hora
 #
 # Sem o Quickshell rodando o comando é executado direto, sem transição.
@@ -208,7 +208,13 @@ PY
             echo 0
             exit 0
         fi
-        if ! qs_call cover "$2" >/dev/null; then
+        # --cover <preview> [tela]: com a tela, só ela faz a transição.
+        if [ -n "${3:-}" ]; then
+            qs_call coverOn "$2" "$3" >/dev/null; cover_rc=$?
+        else
+            qs_call cover "$2" >/dev/null; cover_rc=$?
+        fi
+        if [ "$cover_rc" != 0 ]; then
             trace "cover FALHOU: IPC do quickshell não respondeu (qs_bin='$qs_bin')"
             echo 0
             exit 0

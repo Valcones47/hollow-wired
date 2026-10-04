@@ -3964,12 +3964,29 @@ PanelWindow {
                                                 { value: "auto-up", label: Theme.t("monitor.multi_pos_up", "Acima") },
                                                 { value: "auto-down", label: Theme.t("monitor.multi_pos_down", "Abaixo") }
                                             ]
-                                            current: win.monPos(win.selectedMonitor)
+                                            // "auto-center-x" mostra a mesma direção; o centro é a opção abaixo.
+                                            current: win.monPos(win.selectedMonitor).replace("center-", "")
                                             onPicked: v => {
-                                                win.setMonPref(win.selectedMonitor, "position", v);
-                                                Quickshell.execDetached(["rice-monitors", "position", win.selectedMonitor, v]);
+                                                const centered = win.monPos(win.selectedMonitor).indexOf("center-") >= 0;
+                                                const pos = centered && v !== "auto" ? v.replace("auto-", "auto-center-") : v;
+                                                win.setMonPref(win.selectedMonitor, "position", pos);
+                                                Quickshell.execDetached(["rice-monitors", "position", win.selectedMonitor, pos]);
                                                 monitorReloadTimer.restart();
                                             }
+                                        }
+                                    }
+                                    RowDivider {}
+                                    OptionToggle {
+                                        title: Theme.t("monitor.multi_center_title", "Alinhar pelo centro")
+                                        subtitle: Theme.t("monitor.multi_center_sub", "O cursor só passa de uma tela para a outra onde as bordas se encostam. Centralizado, essa faixa fica no meio da tela maior em vez de no topo. Super + X leva o mouse para a outra tela de qualquer lugar.")
+                                        checked: win.monPos(win.selectedMonitor).indexOf("center-") >= 0
+                                        onToggled: nv => {
+                                            let dir = win.monPos(win.selectedMonitor).replace("center-", "");
+                                            if (dir === "auto") dir = "auto-right";
+                                            const pos = nv ? dir.replace("auto-", "auto-center-") : dir;
+                                            win.setMonPref(win.selectedMonitor, "position", pos);
+                                            Quickshell.execDetached(["rice-monitors", "position", win.selectedMonitor, pos]);
+                                            monitorReloadTimer.restart();
                                         }
                                     }
                                     RowDivider {}

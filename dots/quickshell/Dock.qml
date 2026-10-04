@@ -53,6 +53,8 @@ PanelWindow {
     // vazia) é o da workspace ativa *desta* tela. secondary = cópia numa tela
     // extra (o IPC "dock" fica só na principal).
     property bool secondary: false
+    // Paleta desta tela (ThemePalette da tela extra, ou o Theme na principal).
+    property var pal: Theme
     readonly property var hyprMonitor: Hyprland.monitorFor(dock.screen)
     readonly property var monWorkspace: dock.hyprMonitor ? dock.hyprMonitor.activeWorkspace : null
     readonly property bool hasFullscreen: (dock.monWorkspace && dock.monWorkspace.hasFullscreen) || false
@@ -294,7 +296,7 @@ PanelWindow {
                     ctx.lineWidth = 2;
                     ctx.stroke();
                 } else if (ShellCustomization.getStyle("dock") === "solid") {
-                    ctx.strokeStyle = Theme.withAlpha(Theme.outline, 0.25);
+                    ctx.strokeStyle = Theme.withAlpha(dock.pal.outline, 0.25);
                     ctx.lineWidth = 1;
                     ctx.stroke();
                 } else if (ShellCustomization.getStyle("dock") === "glass") {
@@ -334,7 +336,7 @@ PanelWindow {
                         anchors.fill: parent
                         anchors.margins: 2
                         radius: 14
-                        color: launcherArea.containsMouse ? Theme.tileHigh : "transparent"
+                        color: launcherArea.containsMouse ? dock.pal.tileHigh : "transparent"
                         Behavior on color { ColorAnimation { duration: Theme.ms(120) } }
                     }
 
@@ -364,7 +366,7 @@ PanelWindow {
                         text: Theme.icons.arch
                         font.family: Theme.iconFontFamily
                         font.pixelSize: dock.iconSize * 0.8
-                        color: Theme.primary
+                        color: dock.pal.primary
                     }
 
                     MouseArea {
@@ -383,7 +385,7 @@ PanelWindow {
                     implicitWidth: 1
                     implicitHeight: 30
                     Layout.alignment: Qt.AlignVCenter
-                    color: Theme.withAlpha(Theme.outline, 0.45)
+                    color: Theme.withAlpha(dock.pal.outline, 0.45)
                 }
 
                 Repeater {
@@ -435,7 +437,7 @@ PanelWindow {
                             anchors.verticalCenter: parent.verticalCenter
                             width: 1
                             height: 30
-                            color: Theme.withAlpha(Theme.outline, 0.45)
+                            color: Theme.withAlpha(dock.pal.outline, 0.45)
                         }
 
                         Rectangle {
@@ -443,7 +445,7 @@ PanelWindow {
                             anchors.margins: 2
                             radius: 14
                             color: appArea.containsMouse || (dock.pop === "app" && dock.popItem && dock.popItem.key === app.modelData.key)
-                                ? Theme.tileHigh : "transparent"
+                                ? dock.pal.tileHigh : "transparent"
                             Behavior on color { ColorAnimation { duration: Theme.ms(120) } }
                         }
 
@@ -466,9 +468,9 @@ PanelWindow {
                             width: Math.max(16, wsBadge.implicitWidth + 8)
                             height: 16
                             radius: 8
-                            color: app.active ? Theme.primary : Theme.tileHigh
+                            color: app.active ? dock.pal.primary : dock.pal.tileHigh
                             border.width: 1
-                            border.color: Theme.withAlpha(Theme.background, 0.6)
+                            border.color: Theme.withAlpha(dock.pal.background, 0.6)
                             Text {
                                 id: wsBadge
                                 anchors.centerIn: parent
@@ -476,7 +478,7 @@ PanelWindow {
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 10
                                 font.bold: true
-                                color: app.active ? Theme.background : Theme.textColor
+                                color: app.active ? dock.pal.background : dock.pal.textColor
                             }
                         }
 
@@ -492,7 +494,7 @@ PanelWindow {
                                     width: app.active && index === 0 ? 12 : 4
                                     height: 4
                                     radius: 2
-                                    color: app.active ? Theme.primary : Theme.subtext
+                                    color: app.active ? dock.pal.primary : dock.pal.subtext
                                     Behavior on width { NumberAnimation { duration: Theme.ms(180) } }
                                 }
                             }
@@ -567,7 +569,7 @@ PanelWindow {
                     Layout.leftMargin: 6
                     implicitWidth: 1
                     implicitHeight: 30
-                    color: Theme.withAlpha(Theme.outline, 0.45)
+                    color: Theme.withAlpha(dock.pal.outline, 0.45)
                 }
                 Item {
                     id: gamesBtn
@@ -577,7 +579,7 @@ PanelWindow {
                         anchors.fill: parent
                         anchors.margins: 2
                         radius: 14
-                        color: gamesArea.containsMouse || dock.pop === "games" ? Theme.tileHigh : "transparent"
+                        color: gamesArea.containsMouse || dock.pop === "games" ? dock.pal.tileHigh : "transparent"
                         Behavior on color { ColorAnimation { duration: Theme.ms(120) } }
                     }
                     Text {
@@ -585,7 +587,7 @@ PanelWindow {
                         text: Theme.icons.gamepad
                         font.family: Theme.iconFontFamily
                         font.pixelSize: 30
-                        color: Theme.primary
+                        color: dock.pal.primary
                         scale: gamesArea.containsMouse ? 1.08 : 1
                         Behavior on scale { NumberAnimation { duration: Theme.ms(140); easing.type: Easing.OutBack } }
                     }
@@ -679,7 +681,7 @@ PanelWindow {
                             anchors.fill: parent
                             anchors.margins: 2
                             radius: 8
-                            color: trayItArea.containsMouse ? Theme.tileHigh : "transparent"
+                            color: trayItArea.containsMouse ? dock.pal.tileHigh : "transparent"
                         }
                         TrayIcon {
                             anchors.centerIn: parent
@@ -714,7 +716,7 @@ PanelWindow {
                     Layout.rightMargin: 4
                     implicitWidth: 1
                     implicitHeight: 26
-                    color: Theme.withAlpha(Theme.outline, 0.45)
+                    color: Theme.withAlpha(dock.pal.outline, 0.45)
                 }
                 TrayBtn {
                     visible: ShellLayout.dockHas("updates")
@@ -722,7 +724,7 @@ PanelWindow {
                     tipTitle: Theme.t("side.item_update", "Atualizações")
                     tipText: !dock.energy || dock.energy.updateCount === 0 ? Theme.t("dock.tip_uptodate", "Tudo em dia.")
                         : Theme.t("dock.tip_updates", "%1 pendentes. Clique para atualizar.").replace("%1", dock.energy.updateCount)
-                    tint: dock.energy && dock.energy.updateCount > 0 ? Theme.primary : Theme.textColor
+                    tint: dock.energy && dock.energy.updateCount > 0 ? dock.pal.primary : dock.pal.textColor
                     badge: dock.energy && dock.energy.updateCount > 0
                         ? (dock.energy.updateCount > 99 ? "99+" : String(dock.energy.updateCount)) : ""
                     onActivated: if (dock.energy) dock.energy.runUpdate()
@@ -733,7 +735,7 @@ PanelWindow {
                     tipTitle: Theme.t("bar.item_record", "Gravar tela")
                     tipText: dock.energy && dock.energy.recording ? Theme.t("dock.tip_rec_stop", "Gravando. Clique para parar.")
                         : Theme.t("dock.tip_rec_start", "Clique para gravar a tela inteira.")
-                    tint: dock.energy && dock.energy.recording ? Theme.critical : Theme.textColor
+                    tint: dock.energy && dock.energy.recording ? dock.pal.critical : dock.pal.textColor
                     onActivated: {
                         if (dock.energy && dock.energy.recording) dock.energy.stopRecording();
                         else Quickshell.execDetached(["rice-record", "full"]);
@@ -744,7 +746,7 @@ PanelWindow {
                     icon: Theme.icons.night
                     tipTitle: Theme.t("side.item_night", "Luz noturna")
                     tipText: dock.energy && dock.energy.nightLight ? Theme.t("dock.tip_on", "Ligada. Clique para desligar.") : Theme.t("dock.tip_off", "Desligada. Clique para ligar.")
-                    tint: dock.energy && dock.energy.nightLight ? Theme.primary : Theme.textColor
+                    tint: dock.energy && dock.energy.nightLight ? dock.pal.primary : dock.pal.textColor
                     onActivated: if (dock.energy) dock.energy.toggleNight()
                 }
                 TrayBtn {
@@ -753,7 +755,7 @@ PanelWindow {
                     tipTitle: Theme.t("side.item_caffeine", "Manter acordado")
                     tipText: dock.energy && dock.energy.caffeine ? Theme.t("dock.tip_caf_on", "A tela não apaga sozinha. Clique para desligar.")
                         : Theme.t("dock.tip_caf_off", "Clique para a tela não apagar sozinha.")
-                    tint: dock.energy && dock.energy.caffeine ? Theme.primary : Theme.textColor
+                    tint: dock.energy && dock.energy.caffeine ? dock.pal.primary : dock.pal.textColor
                     onActivated: if (dock.energy) dock.energy.toggleCaffeine()
                 }
                 TrayBtn {
@@ -762,7 +764,7 @@ PanelWindow {
                     tipTitle: Theme.t("side.item_gpu", "GPU NVIDIA")
                     tipText: dock.energy && dock.energy.nvidiaState === "active" ? Theme.t("dock.tip_gpu_on", "Ligada (algum app está usando).")
                         : Theme.t("dock.tip_gpu_off", "Dormindo, sem gastar bateria.")
-                    tint: dock.energy && dock.energy.nvidiaState === "active" ? Theme.primary : Theme.subtext
+                    tint: dock.energy && dock.energy.nvidiaState === "active" ? dock.pal.primary : dock.pal.subtext
                 }
                 TrayBtn {
                     visible: ShellLayout.dockHas("lock")
@@ -775,7 +777,7 @@ PanelWindow {
                     id: powerBtn
                     visible: ShellLayout.dockHas("power")
                     icon: Theme.icons.power
-                    tint: Theme.secondary
+                    tint: dock.pal.secondary
                     popKind: "power"
                     onActivated: dock.showPop("power", null, powerBtn)
                 }
@@ -837,7 +839,7 @@ PanelWindow {
                             Layout.fillWidth: true
                             implicitHeight: 32
                             radius: 9
-                            color: winArea.containsMouse ? Theme.tileHigh : modelData.activated ? Theme.withAlpha(Theme.primary, 0.22) : Theme.tile
+                            color: winArea.containsMouse ? dock.pal.tileHigh : modelData.activated ? Theme.withAlpha(dock.pal.primary, 0.22) : dock.pal.tile
                             RowLayout {
                                 anchors.fill: parent
                                 anchors.leftMargin: 10
@@ -849,19 +851,19 @@ PanelWindow {
                                     elide: Text.ElideRight
                                     font.family: Theme.fontFamily
                                     font.pixelSize: 12
-                                    color: Theme.textColor
+                                    color: dock.pal.textColor
                                 }
                                 Rectangle {
                                     implicitWidth: 24
                                     implicitHeight: 24
                                     radius: 12
-                                    color: closeArea.containsMouse ? Theme.withAlpha(Theme.critical, 0.6) : "transparent"
+                                    color: closeArea.containsMouse ? Theme.withAlpha(dock.pal.critical, 0.6) : "transparent"
                                     Text {
                                         anchors.centerIn: parent
                                         text: Theme.icons.close
                                         font.family: Theme.iconFontFamily
                                         font.pixelSize: 14
-                                        color: Theme.subtext
+                                        color: dock.pal.subtext
                                     }
                                     MouseArea {
                                         id: closeArea
@@ -1017,9 +1019,9 @@ PanelWindow {
                                 implicitHeight: 80
                                 radius: 12
                                 z: dragging ? 10 : 0
-                                color: gameArea.containsMouse || dragging ? Theme.tileHigh : Theme.tile
+                                color: gameArea.containsMouse || dragging ? dock.pal.tileHigh : dock.pal.tile
                                 border.width: gamesPop.dragFrom >= 0 && gamesPop.dragTo === index && !dragging ? 2 : 0
-                                border.color: Theme.primary
+                                border.color: dock.pal.primary
                                 Behavior on color { ColorAnimation { duration: Theme.ms(120) } }
                                 transform: Translate { x: game.dx; y: game.dy }
 
@@ -1052,7 +1054,7 @@ PanelWindow {
                                         elide: Text.ElideRight
                                         font.family: Theme.fontFamily
                                         font.pixelSize: 11
-                                        color: Theme.textColor
+                                        color: dock.pal.textColor
                                     }
                                 }
 
@@ -1110,13 +1112,13 @@ PanelWindow {
                                     anchors.top: parent.top
                                     anchors.right: parent.right
                                     anchors.margins: 4
-                                    color: removeArea.containsMouse ? Theme.critical : Theme.withAlpha(Theme.critical, 0.75)
+                                    color: removeArea.containsMouse ? dock.pal.critical : Theme.withAlpha(dock.pal.critical, 0.75)
                                     Text {
                                         anchors.centerIn: parent
                                         text: Theme.icons.close
                                         font.family: Theme.iconFontFamily
                                         font.pixelSize: 13
-                                        color: Theme.textColor
+                                        color: dock.pal.textColor
                                     }
                                     MouseArea {
                                         id: removeArea

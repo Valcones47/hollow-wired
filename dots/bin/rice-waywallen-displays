@@ -1,0 +1,182 @@
+#!/usr/bin/env python3
+"""rice-waywallen-displays — telas do Waywallen e wallpaper de cada uma.
+
+O D-Bus do Waywallen (ApplyById) aplica em todas as telas de uma vez. A
+escolha por tela só existe na API WebSocket (protobuf, proto/control.proto
+do projeto waywallen), que é o que a interface dele usa. Aqui vai um cliente
+mínimo, sem depender do pacote protobuf: os poucos campos usados são
+codificados à mão.
+
+Uso:
+  rice-waywallen-displays list            # JSON: [{name, display_id, settings_key, wallpaper_id}]
+  rice-waywallen-displays apply <id> [tela...]   # aplica o wallpaper só nessas telas
+                                                 # (sem tela = todas, como o ApplyById)
+
+O wallpaper de cada tela vem do config.toml do Waywallen
+([display.<settings_key>].last_wallpaper), que ele grava ao aplicar.
+"""
+import json
+import os
+import subprocess
+import sys
+
+CFG = os.path.expanduser("~/.var/app/org.waywallen.waywallen/config/waywallen/config.toml")
+
+# Campos de proto/control.proto (waywallen 0.4.x).
+REQ_ID = 1
+REQ_WALLPAPER_APPLY = 22
+REQ_DISPLAY_LIST = 23
+APPLY_WALLPAPER_ID = 1
+APPLY_TARGETS = 5
+TARGET_DISPLAY_ID = 1
+RESP_STATUS = 2
+RESP_MESSAGE = 3
+DL_DISPLAYS = 1
+DI_ID, DI_NAME, DI_SETTINGS_KEY = 1, 2, 16
+STATUS_OK = 1
+
+
+def _varint(n):
+    out = bytearray()
+    while True:
+        b = n & 0x7F
+        n >>= 7
+        if n:
+            out.append(b | 0x80)
+        else:
+            out.append(b)
+            return bytes(out)
+
+
+def _key(field, wire):
+    return _varint((field << 3) | wire)
+
+
+def f_varint(field, n):
+    return _key(field, 0) + _varint(n)
+
+
+def f_bytes(field, b):
+    return _key(field, 2) + _varint(len(b)) + b
+
+
+def parse(buf):
+    """Mensagem protobuf → {campo: [valores]} (int ou bytes)."""
+    i, out = 0, {}
+
+    def read_varint():
+        nonlocal i
+        v = s = 0
+        while True:
+            b = buf[i]
+            i += 1
+            v |= (b & 0x7F) << s
+            s += 7
+            if not b & 0x80:
+                return v
+
+    while i < len(buf):
+        k = read_varint()
+        field, wire = k >> 3, k & 7
+        if wire == 0:
+            v = read_varint()
+        elif wire == 2:
+            n = read_varint()
+            v = buf[i:i + n]
+            i += n
+        elif wire == 1:
+            v = buf[i:i + 8]
+            i += 8
+        elif wire == 5:
+            v = buf[i:i + 4]
+            i += 4
+        else:
+            raise ValueError("tipo de campo desconhecido: %d" % wire)
+        out.setdefault(field, []).append(v)
+    return out
+
+
+def ws_port():
+    out = subprocess.run(
+        ["busctl", "--user", "get-property", "org.waywallen.waywallen.Daemon",
+         "/org/waywallen/waywallen/Daemon", "org.waywallen.waywallen.Daemon1", "WsPort"],
+        capture_output=True, text=True, timeout=3).stdout.split()
+    return int(out[1]) if len(out) > 1 else 0
+
+
+def call(payload_field, payload):
+    from websockets.sync.client import connect
+    port = ws_port()
+    if not port:
+        raise RuntimeError("Waywallen não está rodando")
+    with connect(f"ws://127.0.0.1:{port}", max_size=None, open_timeout=3) as ws:
+        ws.send(f_varint(REQ_ID, 1) + f_bytes(payload_field, payload))
+        while True:
+            frame = parse(ws.recv(timeout=8))
+            if 1 in frame:  # ServerFrame.response (2 = evento, ignora)
+                return parse(frame[1][0])
+
+
+def last_wallpapers():
+    try:
+        import tomllib
+        with open(CFG, "rb") as f:
+            data = tomllib.load(f)
+    except Exception:
+        return {}, None
+    per = {k: str(v.get("last_wallpaper")) for k, v in data.get("display", {}).items()
+           if isinstance(v, dict) and v.get("last_wallpaper")}
+    glob = data.get("global", {}).get("last_wallpaper")
+    return per, (str(glob) if glob else None)
+
+
+def list_displays():
+    resp = call(REQ_DISPLAY_LIST, b"")
+    per, glob = last_wallpapers()
+    out = []
+    dl = parse(resp.get(REQ_DISPLAY_LIST, [b""])[0])
+    for raw in dl.get(DL_DISPLAYS, []):
+        d = parse(raw)
+        key = d.get(DI_SETTINGS_KEY, [b""])[0].decode()
+        out.append({
+            "name": d.get(DI_NAME, [b""])[0].decode(),
+            "display_id": d.get(DI_ID, [0])[0],
+            "settings_key": key,
+            "wallpaper_id": per.get(key) or glob,
+        })
+    return out
+
+
+def apply(wallpaper_id, names):
+    targets = b""
+    if names:
+        by_name = {d["name"]: d["display_id"] for d in list_displays()}
+        missing = [n for n in names if n not in by_name]
+        if missing:
+            raise RuntimeError("tela desconhecida para o Waywallen: " + ", ".join(missing))
+        for n in names:
+            targets += f_bytes(APPLY_TARGETS, f_varint(TARGET_DISPLAY_ID, by_name[n]))
+    resp = call(REQ_WALLPAPER_APPLY, f_bytes(APPLY_WALLPAPER_ID, str(wallpaper_id).encode()) + targets)
+    if resp.get(RESP_STATUS, [0])[0] != STATUS_OK:
+        msg = resp.get(RESP_MESSAGE, [b""])[0].decode(errors="replace")
+        raise RuntimeError(msg or "o Waywallen recusou o pedido")
+
+
+def main():
+    cmd = sys.argv[1] if len(sys.argv) > 1 else "list"
+    try:
+        if cmd == "list":
+            print(json.dumps(list_displays(), ensure_ascii=False))
+        elif cmd == "apply" and len(sys.argv) > 2:
+            apply(sys.argv[2], sys.argv[3:])
+        else:
+            print(__doc__.strip(), file=sys.stderr)
+            return 1
+    except Exception as e:  # noqa: BLE001 — erro vira mensagem para quem chamou
+        print(f"erro: {e}", file=sys.stderr)
+        return 2
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

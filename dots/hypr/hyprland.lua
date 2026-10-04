@@ -840,6 +840,27 @@ for i = 1, 10 do
     hl.bind(mainMod .. " + SHIFT + " .. key, function() hl.dispatch(hl.dsp.window.move({ workspace = wsTarget(i) })) end)
 end
 
+-- Super + X: leva o mouse (e o foco) para o centro da próxima tela. Com uma
+-- tela em pé ao lado do notebook, a borda em comum só cobre a altura do
+-- notebook: abaixo dela o cursor não tem para onde passar.
+hl.bind(mainMod .. " + X", function()
+    local order = rice_monitor_order()
+    if #order < 2 then return end
+    local cur = hl.get_active_monitor()
+    local idx = 1
+    for i, n in ipairs(order) do if cur and n == cur.name then idx = i end end
+    local nextName = order[(idx % #order) + 1]
+    for _, m in ipairs(hl.get_monitors()) do
+        if m.name == nextName then
+            local w, h = m.width, m.height
+            if (m.transform or 0) % 2 == 1 then w, h = h, w end
+            local sc = m.scale or 1
+            hl.dispatch(hl.dsp.cursor.move({ x = math.floor(m.x + w / sc / 2), y = math.floor(m.y + h / sc / 2) }))
+            hl.dispatch(hl.dsp.focus({ monitor = nextName }))
+        end
+    end
+end)
+
 hl.bind(mainMod .. " + A",         hl.dsp.workspace.toggle_special("magic"))
 hl.bind(mainMod .. " + SHIFT + A", hl.dsp.window.move({ workspace = "special:magic" }))
 

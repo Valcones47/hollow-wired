@@ -1982,5 +1982,7 @@
   "monitor.multi_half_size": "Tamanho da janela",
   "monitor.multi_half_third": "Um terço",
   "monitor.multi_half_half": "Metade",
-  "monitor.multi_half_two_thirds": "Dois terços"
+  "monitor.multi_half_two_thirds": "Dois terços",
+  "monitor.multi_center_title": "Alinhar pelo centro",
+  "monitor.multi_center_sub": "O cursor só passa de uma tela para a outra onde as bordas se encostam. Centralizado, essa faixa fica no meio da tela maior em vez de no topo. Super + X leva o mouse para a outra tela de qualquer lugar."
 }

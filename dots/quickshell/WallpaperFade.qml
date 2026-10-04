@@ -45,6 +45,9 @@ Scope {
 
     property string source: ""
     property bool covering: false
+    // Várias telas: "" cobre todas; com um nome, só aquela tela faz a
+    // transição (o wallpaper foi trocado só nela).
+    property string onlyScreen: ""
 
     // Progresso da máscara: 0 = nada coberto, 1 = tela inteira coberta.
     property real progress: 0
@@ -54,9 +57,10 @@ Scope {
     property bool pendingCover: false
     property int opDuration: 0
 
-    function cover(path) {
+    function cover(path, screenName) {
         if (!path)
             return;
+        fadeScope.onlyScreen = screenName || "";
         fadeScope.source = path.startsWith("file://") ? path : "file://" + path;
         fadeScope.progress = 0;
         fadeScope.pendingCover = true;
@@ -188,7 +192,8 @@ Scope {
 
             // Enquanto invisível a janela sai do compositor, pra não custar
             // nada de fillrate na iGPU no uso normal.
-            visible: fadeScope.covering || fadeImage.opacity > 0.001
+            visible: (fadeScope.onlyScreen === "" || fadeScope.onlyScreen === fadeWin.modelData.name)
+                && (fadeScope.covering || fadeImage.opacity > 0.001)
 
             // ---------------------------------------------- máscaras
             //
@@ -386,7 +391,9 @@ Scope {
         target: "wallfade"
 
         // Cobre a tela com a imagem do wallpaper que está entrando.
-        function cover(path: string): void { fadeScope.cover(path); }
+        function cover(path: string): void { fadeScope.cover(path, ""); }
+        // Igual ao cover, mas só numa tela (nome do monitor no Hyprland).
+        function coverOn(path: string, screen: string): void { fadeScope.cover(path, screen); }
         // Tira a camada na hora (usado quando a troca falhou).
         function dismiss(): void { fadeScope.dismiss(); }
         // Revela o wallpaper novo, agora que o renderizador dele está no ar.

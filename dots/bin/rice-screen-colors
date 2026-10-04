@@ -1,0 +1,156 @@
+#!/usr/bin/env python3
+"""rice-screen-colors — paleta própria para cada tela extra.
+
+A paleta principal (wallust → ~/.cache/wallust/colors-quickshell.json, Hyprland,
+kitty, mako...) sai do wallpaper da tela principal. Com um wallpaper diferente
+em outra tela, a barra e o dock *daquela* tela usam uma paleta tirada do
+wallpaper dela: ~/.cache/wallust/screens/<tela>.json, no mesmo formato do JSON
+principal (o ThemePalette.qml lê e deriva as cores com as mesmas regras do
+Theme.qml). Tela com o mesmo wallpaper da principal não tem arquivo e usa a
+paleta principal.
+
+Só gera o JSON do Quickshell: roda o wallust com uma pasta de config própria
+(as mesmas opções do toml efetivo, sem os outros templates nem hooks), para
+não tocar nos arquivos da paleta principal.
+
+Uso:
+  rice-screen-colors refresh   # refaz o que mudou (chamado pelo rice-wallust-refresh)
+  rice-screen-colors status    # JSON: tela → wallpaper e arquivo de paleta
+"""
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+
+HOME = os.path.expanduser("~")
+BIN = os.path.join(HOME, ".local/bin")
+CACHE = os.path.join(HOME, ".cache/wallust")
+OUT_DIR = os.path.join(CACHE, "screens")
+WORK = os.path.join(HOME, ".cache/hollow-wired/screen-wallust")
+STATE = os.path.join(WORK, "state.json")
+MAIN_TOML = os.path.join(HOME, ".config/wallust/wallust.toml")
+EFFECTIVE_TOML = os.path.join(CACHE, "wallust-effective.toml")
+TEMPLATE = os.path.join(HOME, ".config/wallust/templates/quickshell-colors.json")
+
+
+def run(args, timeout=30):
+    try:
+        return subprocess.run(args, capture_output=True, text=True, timeout=timeout).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
+def load_json(path, default):
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return default
+
+
+def settings_only(toml_text):
+    """O toml sem as tabelas [templates] e [hooks] (só as opções da paleta)."""
+    out, skip = [], False
+    for line in toml_text.splitlines():
+        m = re.match(r"\s*\[([^\]]+)\]", line)
+        if m:
+            skip = m.group(1).split(".")[0].strip() in ("templates", "hooks")
+        if not skip:
+            out.append(line)
+    return "\n".join(out)
+
+
+def wallust_palette(image, target):
+    src = EFFECTIVE_TOML if os.path.isfile(EFFECTIVE_TOML) else MAIN_TOML
+    try:
+        with open(src) as f:
+            base = settings_only(f.read())
+    except OSError:
+        base = ""
+    cfg = os.path.join(WORK, "cfg")
+    os.makedirs(os.path.join(cfg, "templates"), exist_ok=True)
+    shutil.copyfile(TEMPLATE, os.path.join(cfg, "templates", "quickshell-colors.json"))
+    with open(os.path.join(cfg, "wallust.toml"), "w") as f:
+        f.write(base + "\n\n[templates]\nquickshell = { template = 'quickshell-colors.json', target = '%s' }\n" % target)
+    subprocess.run(["wallust", "-d", cfg, "run", "-q", "-s", "-n", image],
+                   capture_output=True, timeout=60)
+    return os.path.isfile(target)
+
+
+def screen_image(wallpaper_id):
+    img = run([os.path.join(BIN, "rice-wallpaper-current"), "--id", str(wallpaper_id)])
+    if not img or not os.path.isfile(img):
+        return None
+    # Mesmo cuidado do rice-wallust-refresh: o preview do Wallpaper Engine é um
+    # thumbnail; em vídeo, um quadro na resolução real representa melhor.
+    better = run([os.path.join(BIN, "rice-wallpaper-frame"), os.path.dirname(img), img])
+    return better if better and os.path.isfile(better) else img
+
+
+def current():
+    order = json.loads(run([os.path.join(BIN, "rice-monitors"), "order"]) or "{}").get("monitors", [])
+    displays = json.loads(run([os.path.join(BIN, "rice-waywallen-displays"), "list"]) or "[]")
+    wid = {d["name"]: d.get("wallpaper_id") for d in displays}
+    return [m["name"] for m in order], wid
+
+
+def refresh():
+    if not shutil.which("wallust"):
+        return 1
+    names, wid = current()
+    if not names:
+        return 0
+    os.makedirs(OUT_DIR, exist_ok=True)
+    os.makedirs(WORK, exist_ok=True)
+    state = load_json(STATE, {})
+    primary = names[0]
+    for name in names[1:]:
+        target = os.path.join(OUT_DIR, name + ".json")
+        w = wid.get(name)
+        if not w or w == wid.get(primary):
+            # Mesmo wallpaper da principal (ou desconhecido): usa a paleta principal.
+            if os.path.exists(target):
+                os.remove(target)
+            state.pop(name, None)
+            continue
+        if state.get(name) == w and os.path.isfile(target):
+            continue
+        img = screen_image(w)
+        if img and wallust_palette(img, target):
+            state[name] = w
+    # Tela que saiu da lista (ou virou a principal) perde a paleta própria.
+    for f in os.listdir(OUT_DIR):
+        n = f[:-5] if f.endswith(".json") else None
+        if n and (n not in names[1:]):
+            os.remove(os.path.join(OUT_DIR, f))
+            state.pop(n, None)
+    with open(STATE, "w") as f:
+        json.dump(state, f)
+    return 0
+
+
+def status():
+    names, wid = current()
+    out = {}
+    for i, n in enumerate(names):
+        path = os.path.join(OUT_DIR, n + ".json")
+        out[n] = {"primary": i == 0, "wallpaper_id": wid.get(n),
+                  "palette": path if os.path.isfile(path) else None}
+    print(json.dumps(out, ensure_ascii=False))
+    return 0
+
+
+def main():
+    cmd = sys.argv[1] if len(sys.argv) > 1 else "refresh"
+    if cmd == "refresh":
+        return refresh()
+    if cmd == "status":
+        return status()
+    print(__doc__.strip(), file=sys.stderr)
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

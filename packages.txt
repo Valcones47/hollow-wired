@@ -56,6 +56,7 @@ imagemagick       # Processa o fundo da tela de login e miniaturas
 hyprpaper         # Wallpaper estático (para quem não usa o Wallpaper Engine)
 pacman-contrib    # checkupdates: contador de atualizações da sidebar
 python-pillow     # Otimizador de wallpapers do Wallpaper Engine
+python-websockets # Wallpaper por tela (API WebSocket do Waywallen, rice-waywallen-displays)
 python-dateutil   # Agenda do Hub: eventos recorrentes dos calendários .ics
 libwebp
 jq

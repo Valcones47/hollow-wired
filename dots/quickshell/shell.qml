@@ -277,9 +277,14 @@ ShellRoot {
         delegate: Scope {
             id: extra
             required property var modelData
+            // Paleta do wallpaper desta tela (rice-screen-colors); sem arquivo,
+            // usa a principal.
+            ThemePalette { id: extraPal; screenName: extra.modelData.name }
+            readonly property var pal: extraPal.valid ? extraPal : Theme
             TopBar {
                 screen: extra.modelData
                 secondary: true
+                pal: extra.pal
                 wsOffset: shellRoot.wsOffsetFor(extra.modelData.name)
                 energy: sidebar
                 launcherOpen: shellRoot.launcherOpen
@@ -294,6 +299,7 @@ ShellRoot {
             VerticalBar {
                 screen: extra.modelData
                 secondary: true
+                pal: extra.pal
                 wsOffset: shellRoot.wsOffsetFor(extra.modelData.name)
                 energy: sidebar
                 launcherOpen: shellRoot.launcherOpen
@@ -305,6 +311,7 @@ ShellRoot {
             Dock {
                 screen: extra.modelData
                 secondary: true
+                pal: extra.pal
                 energy: sidebar
                 launcherOpen: shellRoot.launcherOpen
             }

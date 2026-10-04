@@ -79,6 +79,25 @@ if preview_path:
     print(preview_path)
 ' 2>/dev/null || true)
 
+# Várias telas: a paleta principal vem do wallpaper da tela principal (o bloco
+# acima lê o "último aplicado", que pode ser o da outra tela). As telas extras
+# ganham paleta própria pelo rice-screen-colors.
+if command -v rice-wallpaper-current >/dev/null 2>&1; then
+    primary_preview=$(rice-wallpaper-current 2>/dev/null || true)
+    [ -n "$primary_preview" ] && [ -f "$primary_preview" ] && preview="$primary_preview"
+fi
+
+# Trocar o wallpaper só da tela extra também mexe no config.toml do Waywallen
+# (é isso que dispara este script). Se a imagem da principal não mudou, refazer
+# a paleta principal não muda nada: só atualiza as paletas por tela.
+STAMP="${XDG_CACHE_HOME:-$HOME/.cache}/hollow-wired/palette-source"
+STAMP_SRC="$preview"
+if [ "$FORCE" != "true" ] && [ -n "$preview" ] && [ "$(cat "$STAMP" 2>/dev/null)" = "$preview" ]; then
+    command -v rice-screen-colors >/dev/null 2>&1 && rice-screen-colors refresh >/dev/null 2>&1 || true
+    echo "[·] Wallpaper da tela principal não mudou; só as paletas por tela."
+    exit 0
+fi
+
 if ! command -v wallust >/dev/null 2>&1; then
     echo "[-] wallust não encontrado. Instale com: yay -S wallust-git"
     notify-send -a "Wallust" -u normal -i dialog-warning -r 91199 -t 4000 "Wallust não encontrado" "Instale com: yay -S wallust-git para cores dinâmicas do wallpaper"
@@ -109,6 +128,8 @@ if [ -n "$preview" ] && [ -f "$preview" ]; then
         rice-colors snapshot >/dev/null 2>&1 || true
         rice-colors apply >/dev/null 2>&1 || true
     fi
+    mkdir -p "$(dirname "$STAMP")" && printf '%s' "$STAMP_SRC" > "$STAMP"
+    command -v rice-screen-colors >/dev/null 2>&1 && rice-screen-colors refresh >/dev/null 2>&1 &
     notify-send -a "Wallust" -i preferences-desktop-color -r 91199 -t 2500 "Paleta de Cores Atualizada" "Cores sincronizadas com o wallpaper ativo"
     echo "[✓] Wallust atualizado com: $preview"
 else

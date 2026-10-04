@@ -16,8 +16,11 @@ Ordem de resolução:
 
 Saída: caminho absoluto na stdout, código 0. Sem nada encontrado: código 1.
 Opções: --kind imprime também a origem (ex.: "waywallen\t/caminho").
+       --monitor <tela> usa o wallpaper daquela tela (padrão: a tela principal).
+       --id <id> resolve um wallpaper específico do Waywallen.
        --media imprime o arquivo de vídeo do wallpaper ativo (código 1 se não for vídeo).
 """
+import json
 import os
 import sqlite3
 import sys
@@ -56,7 +59,43 @@ def from_static_pointer():
     return path if path and os.path.isfile(path) else None
 
 
+# Com várias telas cada uma tem o seu wallpaper. A "cara" do sistema (paleta
+# principal, tela de login) vem da tela principal; --monitor escolhe outra e
+# --id resolve um wallpaper específico.
+FORCED_ID = None
+FORCED_MONITOR = None
+
+
+def _primary_monitor():
+    try:
+        out = subprocess.run([os.path.join(HOME, ".local/bin/rice-monitors"), "order"],
+                             capture_output=True, text=True, timeout=5).stdout
+        mons = json.loads(out).get("monitors", [])
+        return mons[0]["name"] if mons else None
+    except Exception:
+        return None
+
+
+def _monitor_wallpaper_id(name):
+    try:
+        out = subprocess.run([os.path.join(HOME, ".local/bin/rice-waywallen-displays"), "list"],
+                             capture_output=True, text=True, timeout=10).stdout
+        for d in json.loads(out):
+            if d.get("name") == name and d.get("wallpaper_id"):
+                return str(d["wallpaper_id"])
+    except Exception:
+        pass
+    return None
+
+
 def waywallen_last_id():
+    if FORCED_ID:
+        return FORCED_ID
+    mon = FORCED_MONITOR or _primary_monitor()
+    if mon:
+        wid = _monitor_wallpaper_id(mon)
+        if wid:
+            return wid
     if not os.path.isfile(WAYWALLEN_CFG):
         return None
     try:
@@ -220,6 +259,12 @@ def waywallen_video():
 
 
 def main():
+    global FORCED_ID, FORCED_MONITOR
+    args = sys.argv[1:]
+    if "--id" in args and args.index("--id") + 1 < len(args):
+        FORCED_ID = args[args.index("--id") + 1]
+    if "--monitor" in args and args.index("--monitor") + 1 < len(args):
+        FORCED_MONITOR = args[args.index("--monitor") + 1]
     if "--media" in sys.argv[1:]:
         # Só o vídeo (a tela de bloqueio toca ele no fundo). Sem vídeo: código 1.
         if from_static_pointer():

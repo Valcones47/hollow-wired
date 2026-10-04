@@ -1982,5 +1982,7 @@
   "monitor.multi_half_size": "Window size",
   "monitor.multi_half_third": "One third",
   "monitor.multi_half_half": "Half",
-  "monitor.multi_half_two_thirds": "Two thirds"
+  "monitor.multi_half_two_thirds": "Two thirds",
+  "monitor.multi_center_title": "Align to the center",
+  "monitor.multi_center_sub": "The cursor only crosses where the screen edges touch. Centered, that strip sits in the middle of the larger screen instead of at the top. Super + X moves the mouse to the other screen from anywhere."
 }

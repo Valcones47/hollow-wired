@@ -39,6 +39,8 @@ PanelWindow {
     // ver "WORKSPACES POR TELA" no hyprland.lua). wsOffset é o início da faixa
     // desta barra; secondary = cópia numa tela extra (sem IPC próprio).
     property int wsOffset: 0
+    // Paleta desta tela (ThemePalette da tela extra, ou o Theme na principal).
+    property var pal: Theme
     property bool secondary: false
     readonly property var hyprMonitor: Hyprland.monitorFor(vbar.screen)
     readonly property var monWorkspace: vbar.hyprMonitor ? vbar.hyprMonitor.activeWorkspace : null
@@ -359,7 +361,7 @@ PanelWindow {
             anchors.fill: parent
             anchors.leftMargin: vbar.onLeft ? 0 : Theme.frameThickness
             anchors.rightMargin: vbar.onLeft ? Theme.frameThickness : 0
-            color: Theme.surface
+            color: vbar.pal.surface
             // Só os cantos do lado de dentro são arredondados; o de fora
             // encosta na borda da tela.
             topRightRadius: vbar.onLeft ? Theme.frameRadius : 0
@@ -399,7 +401,7 @@ PanelWindow {
                 // ---- launcher ----
                 BarButton {
                     icon: Theme.icons.arch
-                    iconColor: Theme.primary
+                    iconColor: vbar.pal.primary
                     onActivated: Quickshell.execDetached(["quickshell", "ipc", "call", "launcher", "toggle"])
                 }
 
@@ -407,7 +409,7 @@ PanelWindow {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.preferredWidth: 20
                     Layout.preferredHeight: 1
-                    color: Theme.withAlpha(Theme.outline, 0.35)
+                    color: Theme.withAlpha(vbar.pal.outline, 0.35)
                 }
 
                 // ---- áreas de trabalho ----
@@ -426,10 +428,10 @@ PanelWindow {
                             implicitWidth: 10
                             implicitHeight: wsDot.active ? 26 : (wsDot.modelData.occupied ? 10 : 7)
                             radius: width / 2
-                            color: wsDot.active ? Theme.primary
-                                : wsDot.modelData.urgent ? Theme.critical
-                                : wsArea.containsMouse ? Theme.textColor
-                                : Theme.withAlpha(Theme.subtext, wsDot.modelData.occupied ? 0.55 : 0.28)
+                            color: wsDot.active ? vbar.pal.primary
+                                : wsDot.modelData.urgent ? vbar.pal.critical
+                                : wsArea.containsMouse ? vbar.pal.textColor
+                                : Theme.withAlpha(vbar.pal.subtext, wsDot.modelData.occupied ? 0.55 : 0.28)
                             Behavior on implicitHeight { NumberAnimation { duration: Theme.ms(220); easing.type: Easing.OutCubic } }
                             Behavior on color { ColorAnimation { duration: Theme.ms(160) } }
 
@@ -452,12 +454,12 @@ PanelWindow {
                     visible: ShellLayout.showModule("clock")
                     opacity: ShellLayout.barModule("clock") ? 1 : 0.35
                     border.width: ShellLayout.editing ? 1 : 0
-                    border.color: Theme.withAlpha(Theme.primary, 0.7)
+                    border.color: Theme.withAlpha(vbar.pal.primary, 0.7)
                     Layout.alignment: Qt.AlignHCenter
                     implicitWidth: 40
                     implicitHeight: clockCol.implicitHeight + 12
                     radius: 12
-                    color: clockArea.containsMouse ? Theme.tileHigh : "transparent"
+                    color: clockArea.containsMouse ? vbar.pal.tileHigh : "transparent"
 
                     ColumnLayout {
                         id: clockCol
@@ -470,21 +472,21 @@ PanelWindow {
                             font.family: Theme.fontFamily
                             font.pixelSize: 15
                             font.weight: Font.Bold
-                            color: Theme.textColor
+                            color: vbar.pal.textColor
                         }
                         Text {
                             Layout.alignment: Qt.AlignHCenter
                             text: vbar.timeText.split(":")[1] || ""
                             font.family: Theme.fontFamily
                             font.pixelSize: 15
-                            color: Theme.subtext
+                            color: vbar.pal.subtext
                         }
                         Rectangle {
                             Layout.alignment: Qt.AlignHCenter
                             Layout.topMargin: 4
                             Layout.preferredWidth: 14
                             Layout.preferredHeight: 1
-                            color: Theme.withAlpha(Theme.outline, 0.4)
+                            color: Theme.withAlpha(vbar.pal.outline, 0.4)
                         }
                         Text {
                             Layout.alignment: Qt.AlignHCenter
@@ -492,7 +494,7 @@ PanelWindow {
                             text: vbar.dateText
                             font.family: Theme.fontFamily
                             font.pixelSize: 9
-                            color: Theme.subtext
+                            color: vbar.pal.subtext
                         }
                     }
 
@@ -520,7 +522,7 @@ PanelWindow {
                     implicitWidth: 36
                     implicitHeight: 36
                     radius: 10
-                    color: Theme.tileHigh
+                    color: vbar.pal.tileHigh
                     clip: true
                     Image {
                         id: artImg
@@ -538,7 +540,7 @@ PanelWindow {
                         text: Theme.icons.album
                         font.family: Theme.iconFontFamily
                         font.pixelSize: 17
-                        color: Theme.textColor
+                        color: vbar.pal.textColor
                     }
                     MouseArea {
                         anchors.fill: parent
@@ -598,7 +600,7 @@ PanelWindow {
                             anchors.fill: parent
                             radius: 10
                             color: trayArea.containsMouse || (vbar.pop === "tray" && vbar.popTray === trayBtn.modelData)
-                                ? Theme.tileHigh : "transparent"
+                                ? vbar.pal.tileHigh : "transparent"
                         }
                         TrayIcon {
                             anchors.centerIn: parent
@@ -633,8 +635,8 @@ PanelWindow {
                     editKey: "notifications"
                     visible: ShellLayout.barHas("notifications")
                     icon: NotifService.dnd ? Theme.icons.bellOff : Theme.icons.bell
-                    iconColor: NotifService.dnd ? Theme.secondary
-                        : (NotifService.unreadCount > 0 ? Theme.primary : Theme.textColor)
+                    iconColor: NotifService.dnd ? vbar.pal.secondary
+                        : (NotifService.unreadCount > 0 ? vbar.pal.primary : vbar.pal.textColor)
                     badge: NotifService.unreadCount > 0
                         ? (NotifService.unreadCount > 99 ? "99+" : String(NotifService.unreadCount)) : ""
                     onActivated: vbar.pop === "notifs" ? vbar.pop = "" : vbar.showPop("notifs", vNotif)
@@ -647,7 +649,7 @@ PanelWindow {
                     visible: ShellLayout.barHas("network")
                     icon: vbar.wiredDevice ? Theme.icons.ethernet : vbar.wifiIcon()
                     popKind: "wifi"
-                    iconColor: vbar.activeNetwork || vbar.wiredDevice ? Theme.textColor : Theme.subtext
+                    iconColor: vbar.activeNetwork || vbar.wiredDevice ? vbar.pal.textColor : vbar.pal.subtext
                     onActivated: Quickshell.execDetached(["quickshell", "ipc", "call", "visualconfig", "tab", "11"])
                 }
 
@@ -661,9 +663,9 @@ PanelWindow {
                     implicitWidth: 36
                     implicitHeight: ctlCol.implicitHeight + 16
                     radius: 12
-                    color: ctlArea.containsMouse || vCtl.dragging ? Theme.tileHigh : Theme.withAlpha(Theme.tile, 0.6)
+                    color: ctlArea.containsMouse || vCtl.dragging ? vbar.pal.tileHigh : Theme.withAlpha(vbar.pal.tile, 0.6)
                     border.width: vCtl.editable ? 1 : 0
-                    border.color: Theme.withAlpha(Theme.primary, 0.7)
+                    border.color: Theme.withAlpha(vbar.pal.primary, 0.7)
                     Behavior on color { ColorAnimation { duration: Theme.ms(130) } }
                     property bool dragging: false
                     property real pressY: 0
@@ -681,14 +683,14 @@ PanelWindow {
                             text: Theme.icons.brightness
                             font.family: Theme.iconFontFamily
                             font.pixelSize: 16
-                            color: Theme.textColor
+                            color: vbar.pal.textColor
                         }
                         Text {
                             Layout.alignment: Qt.AlignHCenter
                             text: vbar.volIcon()
                             font.family: Theme.iconFontFamily
                             font.pixelSize: 17
-                            color: (vbar.sink && vbar.sink.audio && vbar.sink.audio.muted) ? Theme.subtext : Theme.textColor
+                            color: (vbar.sink && vbar.sink.audio && vbar.sink.audio.muted) ? vbar.pal.subtext : vbar.pal.textColor
                         }
                         Text {
                             Layout.alignment: Qt.AlignHCenter
@@ -696,7 +698,7 @@ PanelWindow {
                             text: vbar.batIcon()
                             font.family: Theme.iconFontFamily
                             font.pixelSize: 17
-                            color: vbar.battery && vbar.battery.percentage < 0.15 ? Theme.critical : Theme.textColor
+                            color: vbar.battery && vbar.battery.percentage < 0.15 ? vbar.pal.critical : vbar.pal.textColor
                         }
                     }
                     MouseArea {
@@ -741,7 +743,7 @@ PanelWindow {
                     editKey: "updates"
                     visible: ShellLayout.barHas("updates")
                     icon: Theme.icons.update
-                    iconColor: vbar.energy && vbar.energy.updateCount > 0 ? Theme.primary : Theme.textColor
+                    iconColor: vbar.energy && vbar.energy.updateCount > 0 ? vbar.pal.primary : vbar.pal.textColor
                     badge: vbar.energy && vbar.energy.updateCount > 0
                         ? (vbar.energy.updateCount > 99 ? "99+" : String(vbar.energy.updateCount)) : ""
                     onActivated: if (vbar.energy) vbar.energy.runUpdate()
@@ -751,7 +753,7 @@ PanelWindow {
                     editKey: "night"
                     visible: ShellLayout.barHas("night")
                     icon: Theme.icons.night
-                    iconColor: vbar.energy && vbar.energy.nightLight ? Theme.primary : Theme.textColor
+                    iconColor: vbar.energy && vbar.energy.nightLight ? vbar.pal.primary : vbar.pal.textColor
                     onActivated: if (vbar.energy) vbar.energy.toggleNight()
                 }
                 BarButton {
@@ -759,7 +761,7 @@ PanelWindow {
                     editKey: "caffeine"
                     visible: ShellLayout.barHas("caffeine")
                     icon: vbar.energy && vbar.energy.caffeine ? Theme.icons.coffee : Theme.icons.coffeeOff
-                    iconColor: vbar.energy && vbar.energy.caffeine ? Theme.primary : Theme.textColor
+                    iconColor: vbar.energy && vbar.energy.caffeine ? vbar.pal.primary : vbar.pal.textColor
                     onActivated: if (vbar.energy) vbar.energy.toggleCaffeine()
                 }
                 BarButton {
@@ -767,7 +769,7 @@ PanelWindow {
                     editKey: "record"
                     visible: ShellLayout.barHas("record")
                     icon: Theme.icons.record
-                    iconColor: vbar.energy && vbar.energy.recording ? Theme.critical : Theme.textColor
+                    iconColor: vbar.energy && vbar.energy.recording ? vbar.pal.critical : vbar.pal.textColor
                     onActivated: {
                         if (vbar.energy && vbar.energy.recording) vbar.energy.stopRecording();
                         else Quickshell.execDetached(["rice-record", "full"]);
@@ -793,7 +795,7 @@ PanelWindow {
                     editKey: "picker"
                     visible: ShellLayout.barHas("picker")
                     icon: Theme.icons.eyedropper
-                    iconColor: ColorPick.picking ? Theme.primary : Theme.textColor
+                    iconColor: ColorPick.picking ? vbar.pal.primary : vbar.pal.textColor
                     onActivated: ColorPick.pick()
                 }
                 // Privacidade: só enquanto microfone, câmera ou tela estão em uso.
@@ -802,14 +804,14 @@ PanelWindow {
                     visible: ShellLayout.barPrivacy && Privacy.active
                     icon: Privacy.screenApps.length > 0 ? Theme.icons.screenShare
                         : Privacy.camApps.length > 0 ? Theme.icons.webcam : Theme.icons.mic
-                    iconColor: Theme.critical
+                    iconColor: vbar.pal.critical
                 }
                 BarButton {
                     id: vGpu
                     editKey: "gpu"
                     visible: ShellLayout.barHas("gpu")
                     icon: Theme.icons.gpu
-                    iconColor: vbar.energy && vbar.energy.nvidiaState === "active" ? Theme.primary : Theme.subtext
+                    iconColor: vbar.energy && vbar.energy.nvidiaState === "active" ? vbar.pal.primary : vbar.pal.subtext
                     onActivated: Quickshell.execDetached(["quickshell", "ipc", "call", "sidebar", "toggle"])
                 }
                 BarButton {
@@ -831,7 +833,7 @@ PanelWindow {
                     editKey: "power"
                     visible: ShellLayout.barHas("power")
                     icon: Theme.icons.power
-                    iconColor: Theme.secondary
+                    iconColor: vbar.pal.secondary
                     onActivated: Quickshell.execDetached(["qs", "ipc", "call", "power", "toggle"])
                 }
             }
@@ -851,8 +853,8 @@ PanelWindow {
                        : vbar.width - vbar.stripW - gap - width + (vbar.pop !== "" ? 0 : 8)
         y: Math.max(10, Math.min(vbar.height - height - 10, vbar.popAnchorY - height / 2))
         radius: Theme.frameRadius
-        color: Theme.surface
-        border.color: Theme.withAlpha(Theme.outline, 0.35)
+        color: vbar.pal.surface
+        border.color: Theme.withAlpha(vbar.pal.outline, 0.35)
         border.width: 1
         opacity: vbar.pop !== "" ? 1 : 0
         visible: opacity > 0
@@ -882,7 +884,7 @@ PanelWindow {
                     implicitWidth: 64
                     implicitHeight: 64
                     radius: 10
-                    color: Theme.tileHigh
+                    color: vbar.pal.tileHigh
                     clip: true
                     Image {
                         anchors.fill: parent
@@ -902,7 +904,7 @@ PanelWindow {
                         font.family: Theme.fontFamily
                         font.pixelSize: 13
                         font.weight: Font.DemiBold
-                        color: Theme.textColor
+                        color: vbar.pal.textColor
                     }
                     Text {
                         Layout.fillWidth: true
@@ -910,7 +912,7 @@ PanelWindow {
                         elide: Text.ElideRight
                         font.family: Theme.fontFamily
                         font.pixelSize: 11
-                        color: Theme.subtext
+                        color: vbar.pal.subtext
                     }
                     Row {
                         spacing: 4
@@ -926,13 +928,13 @@ PanelWindow {
                                 width: 32
                                 height: 28
                                 radius: 8
-                                color: mBtnArea.containsMouse ? Theme.tileHigh : "transparent"
+                                color: mBtnArea.containsMouse ? vbar.pal.tileHigh : "transparent"
                                 Text {
                                     anchors.centerIn: parent
                                     text: mBtn.modelData.icon
                                     font.family: Theme.iconFontFamily
                                     font.pixelSize: 16
-                                    color: Theme.textColor
+                                    color: vbar.pal.textColor
                                 }
                                 MouseArea {
                                     id: mBtnArea

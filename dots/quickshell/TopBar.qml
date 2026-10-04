@@ -49,6 +49,8 @@ PanelWindow {
     // ver "WORKSPACES POR TELA" no hyprland.lua). wsOffset é o início da faixa
     // desta barra; secondary = cópia numa tela extra (sem IPC próprio).
     property int wsOffset: 0
+    // Paleta desta tela (ThemePalette da tela extra, ou o Theme na principal).
+    property var pal: Theme
     property bool secondary: false
     readonly property var hyprMonitor: Hyprland.monitorFor(bar.screen)
     readonly property var monWorkspace: bar.hyprMonitor ? bar.hyprMonitor.activeWorkspace : null
@@ -499,7 +501,7 @@ PanelWindow {
                 ctx.reset();
                 const W = width, H = bar.barH, R = root.radius;
                 const ph = root.popH, pw = root.popW;
-                ctx.fillStyle = Theme.surface;
+                ctx.fillStyle = bar.pal.surface;
                 ctx.beginPath();
                 ctx.moveTo(0, 0);
                 ctx.lineTo(W, 0);
@@ -550,9 +552,9 @@ PanelWindow {
                     anchors.verticalCenter: parent.verticalCenter
                     height: bar.barH - 6
                     radius: height / 2
-                    color: Theme.withAlpha(Theme.primary, bar.dragZone === index ? 0.14 : 0.04)
+                    color: Theme.withAlpha(bar.pal.primary, bar.dragZone === index ? 0.14 : 0.04)
                     border.width: 1
-                    border.color: Theme.withAlpha(Theme.primary, bar.dragZone === index ? 0.5 : 0.15)
+                    border.color: Theme.withAlpha(bar.pal.primary, bar.dragZone === index ? 0.5 : 0.15)
                     Behavior on color { ColorAnimation { duration: Theme.ms(120) } }
                 }
             }
@@ -597,7 +599,7 @@ PanelWindow {
                             implicitWidth: wsRow.implicitWidth + 16
                             implicitHeight: bar.barH - 10
                             radius: height / 2
-                            color: Theme.tile
+                            color: bar.pal.tile
 
                             Row {
                                 id: wsRow
@@ -629,13 +631,13 @@ PanelWindow {
                                         width: showIcon ? (active ? 34 : 22) : active ? 26 : (modelData.occupied ? 10 : 7)
                                         height: showIcon ? 20 : modelData.occupied || active ? 10 : 7
                                         radius: height / 2
-                                        color: showIcon ? (active ? Theme.primary : wsArea.containsMouse ? Theme.tileHigh : "transparent")
-                                            : active ? Theme.primary
-                                            : modelData.urgent ? Theme.critical
-                                            : wsArea.containsMouse ? Theme.textColor
-                                            : Theme.withAlpha(Theme.subtext, modelData.occupied ? 0.55 : 0.28)
+                                        color: showIcon ? (active ? bar.pal.primary : wsArea.containsMouse ? bar.pal.tileHigh : "transparent")
+                                            : active ? bar.pal.primary
+                                            : modelData.urgent ? bar.pal.critical
+                                            : wsArea.containsMouse ? bar.pal.textColor
+                                            : Theme.withAlpha(bar.pal.subtext, modelData.occupied ? 0.55 : 0.28)
                                         border.width: showIcon && modelData.urgent ? 1.5 : 0
-                                        border.color: Theme.critical
+                                        border.color: bar.pal.critical
                                         Behavior on width { NumberAnimation { duration: Theme.ms(220); easing.type: Easing.OutCubic } }
                                         Behavior on height { NumberAnimation { duration: Theme.ms(220); easing.type: Easing.OutCubic } }
                                         Behavior on color { ColorAnimation { duration: Theme.ms(160) } }
@@ -677,10 +679,10 @@ PanelWindow {
                             implicitWidth: specialRow.implicitWidth + 16
                             implicitHeight: bar.barH - 10
                             radius: height / 2
-                            color: open ? Theme.withAlpha(Theme.primary, 0.3)
-                                 : specialArea.containsMouse ? Theme.tileHigh : Theme.tile
+                            color: open ? Theme.withAlpha(bar.pal.primary, 0.3)
+                                 : specialArea.containsMouse ? bar.pal.tileHigh : bar.pal.tile
                             border.width: open ? 1 : 0
-                            border.color: Theme.primary
+                            border.color: bar.pal.primary
                             Behavior on color { ColorAnimation { duration: Theme.ms(140) } }
 
                             Row {
@@ -692,7 +694,7 @@ PanelWindow {
                                     text: specialBtn.open ? Theme.icons.star : Theme.icons.starOutline
                                     font.family: Theme.iconFontFamily
                                     font.pixelSize: 12
-                                    color: specialBtn.open ? Theme.primary : Theme.subtext
+                                    color: specialBtn.open ? bar.pal.primary : bar.pal.subtext
                                 }
                                 Text {
                                     anchors.verticalCenter: parent.verticalCenter
@@ -700,7 +702,7 @@ PanelWindow {
                                     text: specialBtn.count
                                     font.family: Theme.fontFamily
                                     font.pixelSize: 10
-                                    color: specialBtn.open ? Theme.primary : Theme.subtext
+                                    color: specialBtn.open ? bar.pal.primary : bar.pal.subtext
                                 }
                             }
                             MouseArea {
@@ -745,7 +747,7 @@ PanelWindow {
                             Layout.maximumWidth: Math.min(420, Math.max(0, bar.width / 2 - centerRow.implicitWidth / 2 - 260))
                             text: shownTop ? shownTop.title : ""
                             elide: Text.ElideRight
-                            color: Theme.subtext
+                            color: bar.pal.subtext
                             font.pixelSize: 12
                         }
                     }
@@ -791,7 +793,7 @@ PanelWindow {
                 BarIcon {
                     visible: MediaState.player === null
                     text: Theme.icons.music
-                    color: EqService.enabled ? Theme.primary : Theme.textColor
+                    color: EqService.enabled ? bar.pal.primary : bar.pal.textColor
                 }
             }
 
@@ -812,7 +814,7 @@ PanelWindow {
                 }
                 BarText {
                     text: Qt.formatDateTime(clockMod.now, "dd/MM")
-                    color: Theme.subtext
+                    color: bar.pal.subtext
                 }
             }
 
@@ -826,7 +828,7 @@ PanelWindow {
                 onClicked: bar.showPopNow("mixer", mixerMod)
                 BarIcon {
                     text: Theme.icons.mixer
-                    color: bar.streams.length > 0 ? Theme.textColor : Theme.subtext
+                    color: bar.streams.length > 0 ? bar.pal.textColor : bar.pal.subtext
                 }
             }
 
@@ -845,7 +847,7 @@ PanelWindow {
                 Module {
                     kind: ""
                     visible: GameMode.active
-                    BarIcon { text: Theme.icons.gamepad; color: Theme.primary }
+                    BarIcon { text: Theme.icons.gamepad; color: bar.pal.primary }
                 }
 
                 Module {
@@ -855,7 +857,7 @@ PanelWindow {
                     onClicked: bar.stopRecording()
                     BarIcon {
                         text: Theme.icons.record
-                        color: Theme.critical
+                        color: bar.pal.critical
                         SequentialAnimation on opacity {
                             running: bar.recording
                             loops: Animation.Infinite
@@ -869,7 +871,7 @@ PanelWindow {
                     kind: "audio"
                     visible: bar.source && bar.source.audio && bar.source.audio.muted
                     onClicked: bar.source.audio.muted = false
-                    BarIcon { text: Theme.icons.micOff; color: Theme.critical }
+                    BarIcon { text: Theme.icons.micOff; color: bar.pal.critical }
                 }
 
                 Module {
@@ -883,12 +885,12 @@ PanelWindow {
                             text: "󰄉"
                             font.family: Theme.iconFontFamily
                             font.pixelSize: 13
-                            color: PomodoroService.paused ? Theme.warning : Theme.primary
+                            color: PomodoroService.paused ? bar.pal.warning : bar.pal.primary
                         }
                         BarText {
                             text: PomodoroService.timeString
                             font.weight: Font.DemiBold
-                            color: PomodoroService.paused ? Theme.warning : Theme.textColor
+                            color: PomodoroService.paused ? bar.pal.warning : bar.pal.textColor
                         }
                     }
                 }
@@ -903,19 +905,19 @@ PanelWindow {
                         implicitWidth: 8
                         implicitHeight: 8
                         radius: 4
-                        color: Theme.critical
+                        color: bar.pal.critical
                     }
                     BarIcon {
                         visible: Privacy.camApps.length > 0 || Privacy.screenApps.length > 0
                         text: Privacy.screenApps.length > 0 ? Theme.icons.screenShare : Theme.icons.webcam
                         font.pixelSize: 14
-                        color: Theme.critical
+                        color: bar.pal.critical
                     }
                     BarIcon {
                         visible: Privacy.micApps.length > 0
                         text: Theme.icons.mic
                         font.pixelSize: 14
-                        color: Theme.critical
+                        color: bar.pal.critical
                     }
                 }
 
@@ -930,7 +932,7 @@ PanelWindow {
                         BarIcon {
                             text: WeatherService.icon
                             font.pixelSize: 14
-                            color: Theme.primary
+                            color: bar.pal.primary
                         }
                         BarText {
                             text: WeatherService.temp
@@ -949,7 +951,7 @@ PanelWindow {
 
                     BarIcon {
                         text: NotifService.dnd ? Theme.icons.bellOff : Theme.icons.bell
-                        color: NotifService.dnd ? Theme.secondary : (NotifService.unreadCount > 0 ? Theme.primary : Theme.textColor)
+                        color: NotifService.dnd ? bar.pal.secondary : (NotifService.unreadCount > 0 ? bar.pal.primary : bar.pal.textColor)
                         font.pixelSize: 15
                     }
 
@@ -958,7 +960,7 @@ PanelWindow {
                         implicitWidth: Math.max(16, notifBadgeText.implicitWidth + 8)
                         implicitHeight: 16
                         radius: 8
-                        color: Theme.primary
+                        color: bar.pal.primary
 
                         Text {
                             id: notifBadgeText
@@ -967,7 +969,7 @@ PanelWindow {
                             font.family: Theme.fontFamily
                             font.pixelSize: 10
                             font.weight: Font.Bold
-                            color: Theme.background
+                            color: bar.pal.background
                         }
                     }
                 }
@@ -994,7 +996,7 @@ PanelWindow {
                     BarIcon {
                         text: !bar.btAdapter || !bar.btAdapter.enabled ? Theme.icons.btOff
                             : bar.btConnected ? Theme.icons.btConnected : Theme.icons.bt
-                        color: bar.btConnected ? Theme.primary : Theme.textColor
+                        color: bar.btConnected ? bar.pal.primary : bar.pal.textColor
                     }
                 }
 
@@ -1021,7 +1023,7 @@ PanelWindow {
                         visible: bar.battery && bar.battery.isLaptopBattery
                         text: bar.batIcon()
                         color: bar.battery && bar.battery.percentage <= 0.15 && bar.battery.state !== UPowerDeviceState.Charging
-                            ? Theme.critical : Theme.textColor
+                            ? bar.pal.critical : bar.pal.textColor
                     }
                     BarText {
                         visible: bar.battery && bar.battery.isLaptopBattery
@@ -1082,7 +1084,7 @@ PanelWindow {
                     BarIcon {
                         text: Theme.icons.update
                         font.pixelSize: 15
-                        color: bar.energy && bar.energy.updateCount > 0 ? Theme.primary : Theme.textColor
+                        color: bar.energy && bar.energy.updateCount > 0 ? bar.pal.primary : bar.pal.textColor
                     }
                     BarText {
                         visible: bar.energy && bar.energy.updateCount > 0
@@ -1099,7 +1101,7 @@ PanelWindow {
                     BarIcon {
                         text: Theme.icons.night
                         font.pixelSize: 15
-                        color: bar.energy && bar.energy.nightLight ? Theme.primary : Theme.textColor
+                        color: bar.energy && bar.energy.nightLight ? bar.pal.primary : bar.pal.textColor
                     }
                 }
 
@@ -1112,7 +1114,7 @@ PanelWindow {
                     BarIcon {
                         text: bar.energy && bar.energy.caffeine ? Theme.icons.coffee : Theme.icons.coffeeOff
                         font.pixelSize: 15
-                        color: bar.energy && bar.energy.caffeine ? Theme.primary : Theme.textColor
+                        color: bar.energy && bar.energy.caffeine ? bar.pal.primary : bar.pal.textColor
                     }
                 }
 
@@ -1128,7 +1130,7 @@ PanelWindow {
                     BarIcon {
                         text: Theme.icons.record
                         font.pixelSize: 15
-                        color: bar.recording ? Theme.critical : Theme.textColor
+                        color: bar.recording ? bar.pal.critical : bar.pal.textColor
                     }
                 }
 
@@ -1169,7 +1171,7 @@ PanelWindow {
                     BarIcon {
                         text: Theme.icons.gpu
                         font.pixelSize: 15
-                        color: bar.energy && bar.energy.nvidiaState === "active" ? Theme.primary : Theme.subtext
+                        color: bar.energy && bar.energy.nvidiaState === "active" ? bar.pal.primary : bar.pal.subtext
                     }
                 }
 
@@ -1197,7 +1199,7 @@ PanelWindow {
                     editKey: "power"
                     visible: ShellLayout.barHas("power")
                     onClicked: Quickshell.execDetached(["qs", "ipc", "call", "power", "toggle"])
-                    BarIcon { text: Theme.icons.power; font.pixelSize: 15; color: Theme.secondary }
+                    BarIcon { text: Theme.icons.power; font.pixelSize: 15; color: bar.pal.secondary }
                 }
             }
         }
@@ -1274,7 +1276,7 @@ PanelWindow {
                                     implicitWidth: 72
                                     implicitHeight: 72
                                     radius: 12
-                                    color: Theme.tileHigh
+                                    color: bar.pal.tileHigh
                                     clip: true
                                     Image {
                                         id: mediaArt
@@ -1291,7 +1293,7 @@ PanelWindow {
                                         text: Theme.icons.album
                                         font.family: Theme.iconFontFamily
                                         font.pixelSize: 24
-                                        color: Theme.subtext
+                                        color: bar.pal.subtext
                                     }
                                 }
                                 ColumnLayout {
@@ -1304,7 +1306,7 @@ PanelWindow {
                                         font.family: Theme.fontFamily
                                         font.pixelSize: 14
                                         font.weight: Font.DemiBold
-                                        color: Theme.textColor
+                                        color: bar.pal.textColor
                                     }
                                     Text {
                                         Layout.fillWidth: true
@@ -1313,7 +1315,7 @@ PanelWindow {
                                         elide: Text.ElideRight
                                         font.family: Theme.fontFamily
                                         font.pixelSize: 12
-                                        color: Theme.subtext
+                                        color: bar.pal.subtext
                                     }
                                     Text {
                                         Layout.fillWidth: true
@@ -1321,7 +1323,7 @@ PanelWindow {
                                         elide: Text.ElideRight
                                         font.family: Theme.fontFamily
                                         font.pixelSize: 10
-                                        color: Theme.withAlpha(Theme.subtext, 0.7)
+                                        color: Theme.withAlpha(bar.pal.subtext, 0.7)
                                     }
                                     Row {
                                         Layout.topMargin: 4
@@ -1338,13 +1340,13 @@ PanelWindow {
                                                 width: 36
                                                 height: 30
                                                 radius: 9
-                                                color: mbtnArea.containsMouse ? Theme.tileHigh : Theme.withAlpha(Theme.tile, 0.6)
+                                                color: mbtnArea.containsMouse ? bar.pal.tileHigh : Theme.withAlpha(bar.pal.tile, 0.6)
                                                 Text {
                                                     anchors.centerIn: parent
                                                     text: mbtn.modelData.icon
                                                     font.family: Theme.iconFontFamily
                                                     font.pixelSize: 17
-                                                    color: Theme.textColor
+                                                    color: bar.pal.textColor
                                                 }
                                                 MouseArea {
                                                     id: mbtnArea
@@ -1373,7 +1375,7 @@ PanelWindow {
                                     text: MediaState.fmt(parent.shownPos)
                                     font.family: Theme.monoFamily
                                     font.pixelSize: 10
-                                    color: Theme.subtext
+                                    color: bar.pal.subtext
                                 }
                                 Item {
                                     id: seekBar
@@ -1386,12 +1388,12 @@ PanelWindow {
                                         width: parent.width
                                         height: 4
                                         radius: 2
-                                        color: Theme.withAlpha(Theme.outline, 0.35)
+                                        color: Theme.withAlpha(bar.pal.outline, 0.35)
                                         Rectangle {
                                             width: parent.width * seekBar.frac
                                             height: parent.height
                                             radius: 2
-                                            color: Theme.primary
+                                            color: bar.pal.primary
                                         }
                                     }
                                     Rectangle {
@@ -1401,7 +1403,7 @@ PanelWindow {
                                         width: seekArea.containsMouse || seekArea.pressed ? 12 : 8
                                         height: width
                                         radius: width / 2
-                                        color: Theme.textColor
+                                        color: bar.pal.textColor
                                     }
                                     MouseArea {
                                         id: seekArea
@@ -1421,7 +1423,7 @@ PanelWindow {
                                     text: MediaState.fmt(MediaState.length)
                                     font.family: Theme.monoFamily
                                     font.pixelSize: 10
-                                    color: Theme.subtext
+                                    color: bar.pal.subtext
                                 }
                             }
                         }
@@ -1437,7 +1439,7 @@ PanelWindow {
                                 text: Math.round(volCol.shown * 100) + "%"
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 10
-                                color: Theme.subtext
+                                color: bar.pal.subtext
                             }
                             Item {
                                 id: volCol
@@ -1453,13 +1455,13 @@ PanelWindow {
                                     width: 6
                                     height: parent.height
                                     radius: 3
-                                    color: Theme.withAlpha(Theme.outline, 0.35)
+                                    color: Theme.withAlpha(bar.pal.outline, 0.35)
                                     Rectangle {
                                         anchors.bottom: parent.bottom
                                         width: parent.width
                                         height: parent.height * volCol.shown
                                         radius: 3
-                                        color: MediaState.muted ? Theme.subtext : Theme.primary
+                                        color: MediaState.muted ? bar.pal.subtext : bar.pal.primary
                                     }
                                 }
                                 Rectangle {
@@ -1468,7 +1470,7 @@ PanelWindow {
                                     width: volArea.containsMouse || volArea.pressed ? 14 : 10
                                     height: width
                                     radius: width / 2
-                                    color: Theme.textColor
+                                    color: bar.pal.textColor
                                 }
                                 MouseArea {
                                     id: volArea
@@ -1492,7 +1494,7 @@ PanelWindow {
                                 text: MediaState.muted ? Theme.icons.volOff : Theme.icons.music
                                 font.family: Theme.iconFontFamily
                                 font.pixelSize: 15
-                                color: MediaState.muted ? Theme.subtext : Theme.textColor
+                                color: MediaState.muted ? bar.pal.subtext : bar.pal.textColor
                                 MouseArea {
                                     anchors.fill: parent
                                     anchors.margins: -4
@@ -1508,7 +1510,7 @@ PanelWindow {
                         Layout.fillWidth: true
                         Layout.topMargin: 2
                         implicitHeight: 1
-                        color: Theme.withAlpha(Theme.outline, 0.25)
+                        color: Theme.withAlpha(bar.pal.outline, 0.25)
                     }
                     Item {
                         Layout.fillWidth: true
@@ -1525,7 +1527,7 @@ PanelWindow {
                     id: recordPop
                     visible: popContent.current === recordPop
                     spacing: 2
-                    PopTitle { text: Theme.t("topbar.recording_active", "Gravando a tela"); color: Theme.critical }
+                    PopTitle { text: Theme.t("topbar.recording_active", "Gravando a tela"); color: bar.pal.critical }
                     PopText { text: Theme.t("topbar.click_to_stop", "Clique no ícone para parar (ou Super+Shift+R)") }
                 }
 
@@ -1614,12 +1616,12 @@ PanelWindow {
                             implicitHeight: 22
                             radius: 11
                             readonly property bool on: bar.btAdapter !== null && bar.btAdapter.enabled
-                            color: on ? Theme.primary : Theme.tileHigh
+                            color: on ? bar.pal.primary : bar.pal.tileHigh
                             Rectangle {
                                 width: 16; height: 16; radius: 8
                                 anchors.verticalCenter: parent.verticalCenter
                                 x: parent.on ? parent.width - width - 3 : 3
-                                color: Theme.textColor
+                                color: bar.pal.textColor
                                 Behavior on x { NumberAnimation { duration: Theme.ms(140) } }
                             }
                             MouseArea {
@@ -1730,7 +1732,7 @@ PanelWindow {
                                 radius: 5
                                 color: colorRow.modelData
                                 border.width: 1
-                                border.color: Theme.border
+                                border.color: bar.pal.border
                             }
                             Repeater {
                                 model: [colorRow.modelData, ColorPick.rgb(colorRow.modelData), ColorPick.hsl(colorRow.modelData)]
@@ -1742,14 +1744,14 @@ PanelWindow {
                                     implicitWidth: fmtText.implicitWidth + 12
                                     implicitHeight: 24
                                     radius: 6
-                                    color: fmtArea.containsMouse ? Theme.tileHigh : "transparent"
+                                    color: fmtArea.containsMouse ? bar.pal.tileHigh : "transparent"
                                     Text {
                                         id: fmtText
                                         anchors.centerIn: parent
                                         text: ColorPick.copied === fmt.modelData ? Theme.t("picker.copied", "copiado") : fmt.modelData
                                         font.family: Theme.fontFamily
                                         font.pixelSize: 11
-                                        color: ColorPick.copied === fmt.modelData ? Theme.primary : Theme.subtext
+                                        color: ColorPick.copied === fmt.modelData ? bar.pal.primary : bar.pal.subtext
                                     }
                                     MouseArea {
                                         id: fmtArea
@@ -1833,12 +1835,12 @@ PanelWindow {
                             implicitWidth: 40
                             implicitHeight: 22
                             radius: 11
-                            color: Networking.wifiEnabled ? Theme.primary : Theme.tileHigh
+                            color: Networking.wifiEnabled ? bar.pal.primary : bar.pal.tileHigh
                             Rectangle {
                                 width: 16; height: 16; radius: 8
                                 anchors.verticalCenter: parent.verticalCenter
                                 x: Networking.wifiEnabled ? parent.width - width - 3 : 3
-                                color: Theme.textColor
+                                color: bar.pal.textColor
                                 Behavior on x { NumberAnimation { duration: Theme.ms(140) } }
                             }
                             MouseArea {

@@ -9,7 +9,7 @@ usa uma faixa de 10 workspaces: 1–10, 11–20...
 Uso:
   rice-monitors order                  # JSON: {per_monitor, monitors: [{name, offset, ...}]}
   rice-monitors primary <nome>         # grava a tela principal e recarrega o Hyprland
-  rice-monitors position <nome> <pos>  # auto | auto-left | auto-right | auto-up | auto-down
+  rice-monitors position <nome> <pos>  # auto | auto-[center-]left | -right | -up | -down
   rice-monitors per-monitor <true|false>   # workspaces por tela (padrão true)
   rice-monitors half <nome> <fração>   # janela única ocupa a fração de cima; 0 desliga
 
@@ -66,7 +66,10 @@ def order():
     return {"per_monitor": per, "monitors": out}
 
 
-POSITIONS = ("auto", "auto-left", "auto-right", "auto-up", "auto-down")
+# "auto-center-*" alinha pelo centro em vez da borda de cima/esquerda: com uma
+# tela em pé ao lado do notebook, a faixa por onde o cursor passa fica no meio.
+POSITIONS = ("auto", "auto-left", "auto-right", "auto-up", "auto-down",
+             "auto-center-left", "auto-center-right", "auto-center-up", "auto-center-down")
 
 
 def save(p):
