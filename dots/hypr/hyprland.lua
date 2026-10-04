@@ -731,15 +731,36 @@ end
 -- Prende cada faixa ao seu monitor (a primeira workspace é a padrão dele).
 -- Monitor conectado depois do boot entra pelo evento monitor.added.
 -- "Metade da tela por janela" (monitors[nome].half_window = fração, 0 = desligado):
--- as workspaces daquele monitor usam o layout master com a janela principal
--- em cima ocupando a fração escolhida; o resto fica livre até abrir outra
--- janela. Super+F continua deixando qualquer janela em tela cheia.
+-- nas workspaces daquele monitor, quando há uma janela lado a lado só, ela
+-- ocupa a fração de cima e o resto fica livre (margem inferior via regra
+-- `w[tv1]`). A partir da segunda janela a divisão volta ao normal, e Super+F
+-- deixa qualquer uma em tela cheia. O layout master com always_keep_position
+-- parecia o caminho, mas no 0.56 ele ignora orientation=top com uma janela só.
 local riceWsRuled = {}
-local riceHalfAny = false
 local function riceHalfFraction(monName)
     local v = tonumber(prefsValue('.monitors["' .. monName .. '"].half_window // 0', "0")) or 0
     if v <= 0 or v >= 1 then return 0 end
     return v
+end
+-- Margens externas atuais (podem ser diferentes por lado).
+local function riceGapsOut()
+    local ok, v = pcall(hl.get_config, "general:gaps_out")
+    if ok and type(v) == "table" then
+        return { top = v.top or 0, right = v.right or 0, bottom = v.bottom or 0, left = v.left or 0 }
+    end
+    local n = (ok and tonumber(v)) or 9
+    return { top = n, right = n, bottom = n, left = n }
+end
+-- Altura lógica do monitor (rotação de 90°/270° troca largura e altura).
+local function riceMonHeight(monName)
+    for _, m in ipairs(hl.get_monitors()) do
+        if m.name == monName then
+            local h = m.height
+            if (m.transform or 0) % 2 == 1 then h = m.width end
+            return math.floor(h / (m.scale or 1))
+        end
+    end
+    return 0
 end
 function rice_register_ws_rules()
     if not rice_ws_per_monitor then return end
@@ -747,18 +768,17 @@ function rice_register_ws_rules()
         if not riceWsRuled[name] then
             riceWsRuled[name] = true
             local off = (i - 1) * 10
-            local half = riceHalfFraction(name)
             for n = 1, 10 do
-                local rule = { workspace = tostring(off + n), monitor = name, default = (n == 1) }
-                if half > 0 then
-                    rule.layout = "master"
-                    rule.layout_opts = { orientation = "top" }
-                end
-                hl.workspace_rule(rule)
+                hl.workspace_rule({ workspace = tostring(off + n), monitor = name, default = (n == 1) })
             end
-            if half > 0 and not riceHalfAny then
-                riceHalfAny = true
-                hl.config({ master = { mfact = half, always_keep_position = true } })
+            local half = riceHalfFraction(name)
+            local h = riceMonHeight(name)
+            if half > 0 and h > 0 then
+                local g = riceGapsOut()
+                hl.workspace_rule({
+                    workspace = "r[" .. (off + 1) .. "-" .. (off + 10) .. "] w[tv1]",
+                    gaps_out = { top = g.top, right = g.right, left = g.left, bottom = g.bottom + math.floor(h * (1 - half)) },
+                })
             end
         end
     end
