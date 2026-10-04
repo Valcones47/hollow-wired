@@ -2,6 +2,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import Quickshell.Hyprland
 
 // Paleta lida de ~/.cache/wallust/colors-quickshell.json (gerada pelo
 // wallust a partir do wallpaper atual — ver template em
@@ -372,6 +373,15 @@ QtObject {
     function formatDate(d, fmt) { return qtLocale.toString(d, fmt); }
     property var translationsPt: ({})
     property var translationsEn: ({})
+
+    // Tela (ShellScreen) do monitor com foco no Hyprland. Os overlays leem na
+    // hora de abrir, para aparecer onde a pessoa está, não sempre na primeira.
+    function focusedScreen() {
+        const m = Hyprland.focusedMonitor;
+        const list = Quickshell.screens;
+        if (m) for (let i = 0; i < list.length; i++) if (list[i].name === m.name) return list[i];
+        return list.length > 0 ? list[0] : null;
+    }
 
     function t(key, fallback) {
         const currentLoc = root.locale;

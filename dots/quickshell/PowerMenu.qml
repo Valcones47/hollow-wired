@@ -22,7 +22,13 @@ PanelWindow {
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.namespace: "quickshell-powermenu"
     WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: open ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    WlrLayershell.keyboardFocus: open ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+    // OnDemand (não Exclusive): com Exclusive a outra tela ficava sem clique
+    // até fechar. Abre na tela com foco, escolhida no momento de abrir.
+    property var targetScreen: null
+    screen: targetScreen
+    readonly property bool _openForScreen: open
+    on_OpenForScreenChanged: if (_openForScreen) targetScreen = Theme.focusedScreen()
 
     IpcHandler {
         target: "power"

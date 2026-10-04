@@ -235,7 +235,13 @@ PanelWindow {
 
     WlrLayershell.namespace: "quickshell-welcome"
     WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: welcomeWindow.open ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    WlrLayershell.keyboardFocus: welcomeWindow.open ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+    // OnDemand (não Exclusive): com Exclusive a outra tela ficava sem clique
+    // até fechar. Abre na tela com foco, escolhida no momento de abrir.
+    property var targetScreen: null
+    screen: targetScreen
+    readonly property bool _openForScreen: welcomeWindow.open
+    on_OpenForScreenChanged: if (_openForScreen) targetScreen = Theme.focusedScreen()
 
     onOpenChanged: {
         if (open) blurCheckProc.running = true;

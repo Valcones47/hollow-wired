@@ -218,7 +218,13 @@ PanelWindow {
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.namespace: "quickshell-updater"
     WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: upd.open ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    WlrLayershell.keyboardFocus: upd.open ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+    // OnDemand (não Exclusive): com Exclusive a outra tela ficava sem clique
+    // até fechar. Abre na tela com foco, escolhida no momento de abrir.
+    property var targetScreen: null
+    screen: targetScreen
+    readonly property bool _openForScreen: upd.open
+    on_OpenForScreenChanged: if (_openForScreen) targetScreen = Theme.focusedScreen()
 
     onOpenChanged: {
         if (!upd.open) return;

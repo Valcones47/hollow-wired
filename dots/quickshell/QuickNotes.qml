@@ -30,7 +30,13 @@ PanelWindow {
 
     WlrLayershell.namespace: "quickshell-quicknotes"
     WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: notesWindow.open ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    WlrLayershell.keyboardFocus: notesWindow.open ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+    // OnDemand (não Exclusive): com Exclusive a outra tela ficava sem clique
+    // até fechar. Abre na tela com foco, escolhida no momento de abrir.
+    property var targetScreen: null
+    screen: targetScreen
+    readonly property bool _openForScreen: notesWindow.open
+    on_OpenForScreenChanged: if (_openForScreen) targetScreen = Theme.focusedScreen()
 
     // Persistência das notas em JSON
     FileView {

@@ -26,7 +26,13 @@ PanelWindow {
 
     WlrLayershell.namespace: "quickshell-session"
     WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: open ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    WlrLayershell.keyboardFocus: open ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+    // OnDemand (não Exclusive): com Exclusive a outra tela ficava sem clique
+    // até fechar. Abre na tela com foco, escolhida no momento de abrir.
+    property var targetScreen: null
+    screen: targetScreen
+    readonly property bool _openForScreen: open
+    on_OpenForScreenChanged: if (_openForScreen) targetScreen = Theme.focusedScreen()
 
     readonly property var actions: [
         { key: "suspend",  icon: "󰒲", label: Theme.t("session.suspend", "Suspender"),  desc: Theme.t("session.desc_suspend", "Dormir") },

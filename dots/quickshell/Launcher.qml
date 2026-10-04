@@ -34,6 +34,12 @@ PanelWindow {
     // ponteiro para esta camada, e barra, dock e sidebar paravam de responder a
     // hover e clique enquanto o launcher estivesse aberto.
     WlrLayershell.keyboardFocus: open ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+    // OnDemand (não Exclusive): com Exclusive a outra tela ficava sem clique
+    // até fechar. Abre na tela com foco, escolhida no momento de abrir.
+    property var targetScreen: null
+    screen: targetScreen
+    readonly property bool _openForScreen: open
+    on_OpenForScreenChanged: if (_openForScreen) targetScreen = Theme.focusedScreen()
 
     // Estado da dock e da sidebar, vindos do shell.qml. Enquanto elas estão
     // abertas, a área que ocupam sai da máscara de input do launcher.
