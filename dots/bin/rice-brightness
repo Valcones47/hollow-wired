@@ -1,0 +1,179 @@
+#!/usr/bin/env python3
+"""rice-brightness — brilho de qualquer tela: notebook e monitor externo.
+
+A tela do notebook tem backlight (brightnessctl). Monitor externo não: o
+brilho é o do próprio monitor, ajustado pelo cabo via DDC/CI (ddcutil, VCP
+0x10). Sem tela indicada, age na tela onde está o mouse (a com foco no
+Hyprland).
+
+Uso:
+  rice-brightness get [tela]          # porcentagem (0–100)
+  rice-brightness set <N|+N|-N> [tela]   # define ou soma; imprime o valor novo
+  rice-brightness list                # JSON: telas com controle de brilho
+
+Ler pelo DDC leva ~0,4 s e o monitor só aceita um comando por vez: o último
+valor fica guardado em $XDG_RUNTIME_DIR/hollow-wired/brightness.json e é o que
+o `get` devolve por alguns segundos depois de um `set`.
+"""
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import time
+
+RUN = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "hollow-wired")
+CACHE = os.path.join(RUN, "brightness.json")
+BUS_CACHE = os.path.join(RUN, "ddc-bus.json")
+FRESH_S = 20
+
+
+def run(args, timeout=10):
+    try:
+        r = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
+        return r.returncode, r.stdout
+    except (OSError, subprocess.SubprocessError):
+        return 1, ""
+
+
+def load(path):
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+def store(path, data):
+    os.makedirs(RUN, exist_ok=True)
+    with open(path, "w") as f:
+        json.dump(data, f)
+
+
+def is_internal(name):
+    return name.startswith(("eDP", "LVDS", "DSI"))
+
+
+def focused():
+    rc, out = run(["hyprctl", "monitors", "-j"], 3)
+    try:
+        mons = json.loads(out)
+        return next((m["name"] for m in mons if m.get("focused")), mons[0]["name"])
+    except (ValueError, IndexError, KeyError):
+        return ""
+
+
+def ddc_buses(refresh=False):
+    """Conector DRM (ex.: HDMI-A-1) → barramento i2c do monitor."""
+    cache = {} if refresh else load(BUS_CACHE)
+    if cache:
+        return cache
+    if not shutil.which("ddcutil"):
+        return {}
+    rc, out = run(["ddcutil", "detect", "--brief"], 30)
+    buses, bus = {}, None
+    for line in out.splitlines():
+        m = re.search(r"/dev/i2c-(\d+)", line)
+        if m:
+            bus = m.group(1)
+        m = re.search(r"DRM connector:\s+card\d+-(\S+)", line)
+        if m and bus and not line.strip().startswith("Invalid"):
+            buses[m.group(1)] = bus
+    store(BUS_CACHE, buses)
+    return buses
+
+
+def backlight_get():
+    rc, out = run(["brightnessctl", "-m"], 3)
+    try:
+        return int(out.split(",")[3].rstrip("%"))
+    except (IndexError, ValueError):
+        return None
+
+
+def ddc_get(name):
+    bus = ddc_buses().get(name) or ddc_buses(refresh=True).get(name)
+    if not bus:
+        return None
+    rc, out = run(["ddcutil", "--bus", bus, "getvcp", "10", "--brief"], 10)
+    m = re.search(r"VCP 10 C (\d+) (\d+)", out)
+    if not m:
+        return None
+    cur, mx = int(m.group(1)), int(m.group(2)) or 100
+    return round(cur * 100 / mx)
+
+
+def get(name):
+    if is_internal(name):
+        return backlight_get()
+    c = load(CACHE).get(name)
+    if c and time.time() - c["t"] < FRESH_S:
+        return c["v"]
+    v = ddc_get(name)
+    if v is not None:
+        cache = load(CACHE)
+        cache[name] = {"v": v, "t": time.time()}
+        store(CACHE, cache)
+    return v
+
+
+def set_(name, spec):
+    cur = get(name)
+    if cur is None:
+        return None
+    if spec.startswith(("+", "-")):
+        val = cur + int(spec)
+    else:
+        val = int(spec)
+    val = max(1, min(100, val))
+    if is_internal(name):
+        run(["brightnessctl", "-q", "set", "%d%%" % val], 3)
+        return backlight_get()
+    bus = ddc_buses().get(name)
+    if not bus:
+        return None
+    # --noverify: o monitor demora a refletir; conferir dobrava o tempo.
+    run(["ddcutil", "--bus", bus, "--noverify", "setvcp", "10", str(val)], 10)
+    cache = load(CACHE)
+    cache[name] = {"v": val, "t": time.time()}
+    store(CACHE, cache)
+    return val
+
+
+def list_():
+    rc, out = run(["hyprctl", "monitors", "-j"], 3)
+    try:
+        mons = [m["name"] for m in json.loads(out)]
+    except ValueError:
+        mons = []
+    buses = ddc_buses()
+    has_bl = os.path.isdir("/sys/class/backlight") and bool(os.listdir("/sys/class/backlight"))
+    print(json.dumps([{"name": n, "kind": "backlight" if is_internal(n) else "ddc",
+                       "available": has_bl if is_internal(n) else n in buses} for n in mons]))
+
+
+def main():
+    args = sys.argv[1:]
+    cmd = args[0] if args else "get"
+    if cmd == "list":
+        list_()
+        return 0
+    if cmd == "get":
+        name = args[1] if len(args) > 1 else focused()
+        v = get(name)
+    elif cmd == "set" and len(args) > 1:
+        name = args[2] if len(args) > 2 else focused()
+        v = set_(name, args[1])
+    else:
+        print(__doc__.strip(), file=sys.stderr)
+        return 1
+    if v is None:
+        print("sem controle de brilho para " + name, file=sys.stderr)
+        return 2
+    print(v)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

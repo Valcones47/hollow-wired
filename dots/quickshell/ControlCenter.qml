@@ -116,11 +116,26 @@ PanelWindow {
 
     // --- brilho (sysfs não avisa mudança: lê ao abrir e a cada 2 s aberto) ---
     property real brightness: 0
-    readonly property bool hasBacklight: brMax.text().trim() !== ""
+    // A central abre na tela com foco: o controle mexe no brilho *dela*
+    // (monitor externo por DDC/CI, via rice-brightness).
+    readonly property string brScreen: cc.screen ? cc.screen.name : ""
+    readonly property bool brExternal: cc.brScreen !== "" && !/^(eDP|LVDS|DSI)/.test(cc.brScreen)
+    readonly property bool hasBacklight: cc.brExternal || brMax.text().trim() !== ""
     FileView { id: brCur; path: "/sys/class/backlight/intel_backlight/brightness"; blockLoading: true; printErrors: false }
     FileView { id: brMax; path: "/sys/class/backlight/intel_backlight/max_brightness"; blockLoading: true; printErrors: false }
+    Process {
+        id: brGet
+        command: ["rice-brightness", "get", cc.brScreen]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const v = parseInt(text.trim());
+                if (!isNaN(v) && !brHold.running && !brSet.running) cc.brightness = v / 100;
+            }
+        }
+    }
     function readBrightness() {
         if (brHold.running || brSet.running || !cc.hasBacklight) return;
+        if (cc.brExternal) { if (!brGet.running) brGet.running = true; return; }
         brCur.reload();
         cc.brightness = Math.max(0, Math.min(1, (parseFloat(brCur.text()) || 0) / (parseFloat(brMax.text()) || 1)));
     }
@@ -131,7 +146,7 @@ PanelWindow {
     Process {
         id: brSet
         property int pct: 0
-        command: ["brightnessctl", "-q", "set", pct + "%"]
+        command: ["rice-brightness", "set", String(pct), cc.brScreen]
         onExited: {
             if (cc.brPending >= 0) {
                 pct = cc.brPending;

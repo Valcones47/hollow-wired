@@ -168,7 +168,8 @@ PanelWindow {
 
     Process {
         id: brUp
-        command: ["bash", "-c", "brightnessctl -q set 5%+ && brightnessctl -m | cut -d, -f4 | tr -d '%'"]
+        // Tela onde está o mouse (rice-brightness: notebook ou DDC/CI do externo).
+        command: ["rice-brightness", "set", "+5"]
         stdout: StdioCollector {
             onStreamFinished: {
                 const val = parseInt(text.trim());
@@ -179,7 +180,7 @@ PanelWindow {
 
     Process {
         id: brDown
-        command: ["bash", "-c", "brightnessctl -q set 5%- && brightnessctl -m | cut -d, -f4 | tr -d '%'"]
+        command: ["rice-brightness", "set", "-5"]
         stdout: StdioCollector {
             onStreamFinished: {
                 const val = parseInt(text.trim());

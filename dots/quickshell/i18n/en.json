@@ -1999,5 +1999,6 @@
   "monitor.multi_mode_sub": "Laptop only, duplicate, extend or second screen only. Shortcut: Super + P.",
   "monitor.multi_mode_btn": "Choose",
   "binds.act_display_mode": "How to use the screens (laptop only, duplicate, extend)",
-  "binds.act_next_screen": "Move the mouse to the other screen"
+  "binds.act_next_screen": "Move the mouse to the other screen",
+  "monitor.brightness_section_sub_ext": "The monitor's own brightness, set over the cable (DDC/CI)"
 }

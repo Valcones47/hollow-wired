@@ -173,8 +173,23 @@ PanelWindow {
     property real brightness: 0
     FileView { id: brCur; path: "/sys/class/backlight/intel_backlight/brightness"; blockLoading: true }
     FileView { id: brMax; path: "/sys/class/backlight/intel_backlight/max_brightness"; blockLoading: true }
+    // Tela desta barra. Notebook: sysfs (rápido). Monitor externo: o brilho
+    // do próprio monitor por DDC/CI (rice-brightness), lido a cada 10 s — cada
+    // leitura ocupa o barramento do monitor por ~0,3 s.
+    readonly property string brScreen: bar.screen ? bar.screen.name : ""
+    readonly property bool brExternal: bar.brScreen !== "" && !/^(eDP|LVDS|DSI)/.test(bar.brScreen)
+    Process {
+        id: brGet
+        command: ["rice-brightness", "get", bar.brScreen]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const v = parseInt(text.trim());
+                if (!isNaN(v) && !brHold.running && !brSet.running) bar.brightness = v / 100;
+            }
+        }
+    }
     Timer {
-        interval: 2000
+        interval: bar.brExternal ? 10000 : 2000
         running: true
         repeat: true
         triggeredOnStart: true
@@ -182,6 +197,7 @@ PanelWindow {
             // Logo depois de uma mudança feita aqui, o sysfs ainda pode ter o
             // valor antigo; reler agora desfazia o que o usuário acabou de rolar.
             if (brHold.running || brSet.running) return;
+            if (bar.brExternal) { if (!brGet.running) brGet.running = true; return; }
             brCur.reload();
             bar.brightness = Math.max(0, Math.min(1, (parseFloat(brCur.text()) || 0) / (parseFloat(brMax.text()) || 1)));
         }
@@ -194,7 +210,7 @@ PanelWindow {
     Process {
         id: brSet
         property int pct: 0
-        command: ["brightnessctl", "-q", "set", pct + "%"]
+        command: ["rice-brightness", "set", String(pct), bar.brScreen]
         onExited: {
             if (bar.brPending >= 0) {
                 pct = bar.brPending;

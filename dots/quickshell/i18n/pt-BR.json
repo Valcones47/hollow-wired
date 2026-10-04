@@ -1999,5 +1999,6 @@
   "monitor.multi_mode_sub": "Só o notebook, duplicar, estender ou só a segunda tela. Atalho: Super + P.",
   "monitor.multi_mode_btn": "Escolher",
   "binds.act_display_mode": "Como usar as telas (só notebook, duplicar, estender)",
-  "binds.act_next_screen": "Levar o mouse para a outra tela"
+  "binds.act_next_screen": "Levar o mouse para a outra tela",
+  "monitor.brightness_section_sub_ext": "Brilho do próprio monitor, ajustado pelo cabo (DDC/CI)"
 }

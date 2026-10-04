@@ -57,6 +57,7 @@ hyprpaper         # Wallpaper estático (para quem não usa o Wallpaper Engine)
 pacman-contrib    # checkupdates: contador de atualizações da sidebar
 python-pillow     # Otimizador de wallpapers do Wallpaper Engine
 python-websockets # Wallpaper por tela (API WebSocket do Waywallen, rice-waywallen-displays)
+ddcutil           # Brilho de monitor externo pelo cabo (DDC/CI, rice-brightness)
 python-dateutil   # Agenda do Hub: eventos recorrentes dos calendários .ics
 libwebp
 jq

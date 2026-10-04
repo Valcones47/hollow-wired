@@ -149,7 +149,9 @@ PanelWindow {
 
     // Só para decidir se o bloco da central mostra o ícone de brilho.
     FileView { id: brMax; path: "/sys/class/backlight/intel_backlight/max_brightness"; blockLoading: true; printErrors: false }
+    // Monitor externo também tem brilho (DDC/CI, rice-brightness).
     readonly property bool hasBacklight: brMax.text().trim() !== ""
+        || (vbar.screen !== null && !/^(eDP|LVDS|DSI)/.test(vbar.screen.name))
 
     // Áreas de trabalho: mesma regra da barra de cima (ver TopBar.wsModel).
     readonly property var wsModel: {

@@ -1129,12 +1129,17 @@ PanelWindow {
         }
     }
 
+    property bool selectedHasBrightness: false
+    readonly property bool selectedExternal: win.selectedMonitor !== "" && !/^(eDP|LVDS|DSI)/.test(win.selectedMonitor)
+    onSelectedMonitorChanged: loadBrightnessProc.running = true
     Process {
         id: loadBrightnessProc
-        command: ["sh", "-c", "brightnessctl -m 2>/dev/null | awk -F, '{print $4}' | tr -d '%'"]
+        // Brilho da tela escolhida no topo da aba (monitor externo por DDC/CI).
+        command: ["rice-brightness", "get", win.selectedMonitor]
         stdout: StdioCollector {
             onStreamFinished: {
                 const b = parseInt(text.trim());
+                win.selectedHasBrightness = !isNaN(b);
                 if (!isNaN(b) && b > 0) win.screenBrightness = b;
             }
         }
@@ -4063,19 +4068,21 @@ PanelWindow {
 
                                 // -------------------------------------------------- brilho
                                 SectionHeader {
-                                    visible: win.hasBacklight
+                                    visible: win.selectedHasBrightness
                                     title: Theme.t("monitor.brightness_section", "Brilho do painel")
-                                    subtitle: Theme.t("monitor.brightness_section_sub", "Ajuste da iluminação da tela interna (backlight)")
+                                    subtitle: win.selectedExternal
+                                        ? Theme.t("monitor.brightness_section_sub_ext", "Brilho do próprio monitor, ajustado pelo cabo (DDC/CI)")
+                                        : Theme.t("monitor.brightness_section_sub", "Ajuste da iluminação da tela interna (backlight)")
                                 }
 
                                 CfgSlider {
-                                    visible: win.hasBacklight
+                                    visible: win.selectedHasBrightness
                                     title: Theme.t("monitor.brightness_slider", "Nível de brilho")
                                     minVal: 5; maxVal: 100; value: win.screenBrightness; unit: "%"
                                     onChanged: newVal => {
                                         win.screenBrightness = Math.round(newVal);
                                         debounceTimer.exec(() => {
-                                            Quickshell.execDetached(["brightnessctl", "set", win.screenBrightness + "%"]);
+                                            Quickshell.execDetached(["rice-brightness", "set", String(win.screenBrightness), win.selectedMonitor]);
                                         });
                                     }
                                 }
