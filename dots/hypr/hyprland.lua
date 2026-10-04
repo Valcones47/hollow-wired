@@ -659,6 +659,115 @@ hl.bind(mainMod .. " + F", hl.dsp.window.fullscreen({ mode = "fullscreen", actio
 -- só o aviso do Hyprland (allow_session_lock_restore, acima, permite retomar).
 hl.bind(mainMod .. " + L", hl.dsp.exec_cmd("rice-lock"), { locked = true })
 
+-----------------------------------------------
+---- WORKSPACES POR TELA (várias telas) -------
+-----------------------------------------------
+-- Cada monitor tem a sua série 1–10. Por baixo são números globais em faixas
+-- de 10: a tela principal usa 1–10, a segunda 11–20, e assim por diante. Os
+-- atalhos (Super+N, Super+Shift+N, setas, roda) agem na tela com foco, e a
+-- barra de cada tela mostra só as dela, renumeradas 1–10 (Workspaces.qml lê a
+-- mesma ordem pelo `rice-monitors order`).
+-- Com uma tela só a faixa é 1–10: nada muda para quem não tem monitor extra.
+-- A ordem vem de user-prefs.json: "primary_monitor" primeiro, depois as outras
+-- da esquerda para a direita. "per_monitor_workspaces": false volta à
+-- numeração única de antes.
+local function prefsValue(filter, fallback)
+    local p = io.popen("jq -r '" .. filter .. "' '" .. prefsFile .. "' 2>/dev/null")
+    if not p then return fallback end
+    local v = p:read("*l")
+    p:close()
+    if v == nil or v == "" or v == "null" then return fallback end
+    return v
+end
+
+rice_ws_per_monitor = prefsValue(".per_monitor_workspaces // true", "true") ~= "false"
+rice_primary_monitor = prefsValue(".primary_monitor // empty", "")
+
+function rice_monitor_order()
+    local list = {}
+    for _, m in ipairs(hl.get_monitors()) do list[#list + 1] = { name = m.name, x = m.x or 0, y = m.y or 0 } end
+    local primary = rice_primary_monitor
+    if primary == "" then
+        -- Sem escolha salva: a tela interna do notebook é a principal.
+        for _, m in ipairs(list) do if m.name:match("^eDP") then primary = m.name break end end
+    end
+    table.sort(list, function(a, b)
+        if a.name == primary then return true end
+        if b.name == primary then return false end
+        if a.x ~= b.x then return a.x < b.x end
+        return a.y < b.y
+    end)
+    local names = {}
+    for i, m in ipairs(list) do names[i] = m.name end
+    return names
+end
+
+local function wsOffset(monName)
+    if not rice_ws_per_monitor then return 0 end
+    for i, n in ipairs(rice_monitor_order()) do
+        if n == monName then return (i - 1) * 10 end
+    end
+    return 0
+end
+
+local function activeOffset()
+    local m = hl.get_active_monitor()
+    return m and wsOffset(m.name) or 0
+end
+
+-- Workspace N da tela com foco.
+local function wsTarget(n) return activeOffset() + n end
+
+-- Vizinha (±1) dentro da faixa da tela com foco, sem pular para outra tela.
+local function wsNeighbor(step)
+    local off = activeOffset()
+    local w = hl.get_active_workspace()
+    local cur = (w and w.id or off + 1) - off
+    if cur < 1 or cur > 10 then cur = 1 end
+    local n = math.max(1, math.min(10, cur + step))
+    return off + n
+end
+
+-- Prende cada faixa ao seu monitor (a primeira workspace é a padrão dele).
+-- Monitor conectado depois do boot entra pelo evento monitor.added.
+-- "Metade da tela por janela" (monitors[nome].half_window = fração, 0 = desligado):
+-- as workspaces daquele monitor usam o layout master com a janela principal
+-- em cima ocupando a fração escolhida; o resto fica livre até abrir outra
+-- janela. Super+F continua deixando qualquer janela em tela cheia.
+local riceWsRuled = {}
+local riceHalfAny = false
+local function riceHalfFraction(monName)
+    local v = tonumber(prefsValue('.monitors["' .. monName .. '"].half_window // 0', "0")) or 0
+    if v <= 0 or v >= 1 then return 0 end
+    return v
+end
+function rice_register_ws_rules()
+    if not rice_ws_per_monitor then return end
+    for i, name in ipairs(rice_monitor_order()) do
+        if not riceWsRuled[name] then
+            riceWsRuled[name] = true
+            local off = (i - 1) * 10
+            local half = riceHalfFraction(name)
+            for n = 1, 10 do
+                local rule = { workspace = tostring(off + n), monitor = name, default = (n == 1) }
+                if half > 0 then
+                    rule.layout = "master"
+                    rule.layout_opts = { orientation = "top" }
+                end
+                hl.workspace_rule(rule)
+            end
+            if half > 0 and not riceHalfAny then
+                riceHalfAny = true
+                hl.config({ master = { mfact = half, always_keep_position = true } })
+            end
+        end
+    end
+end
+rice_register_ws_rules()
+hl.on("monitor.added", function() rice_register_ws_rules() end)
+-- Globais para scripts e testes via `hyprctl eval`.
+rice_ws_target, rice_ws_neighbor = wsTarget, wsNeighbor
+
 -- Super + esquerda/direita troca de área de trabalho. Antes as quatro setas
 -- moviam só o foco entre janelas — algo que quem vem do Windows não procura,
 -- enquanto trocar de workspace é a ação do dia a dia (e já existia escondida
@@ -671,14 +780,14 @@ if wsVertical then
     wsPrev, wsNext = "up", "down"
     focusA, focusB = "left", "right"
 end
-hl.bind(mainMod .. " + " .. wsPrev, hl.dsp.focus({ workspace = "-1" }))
-hl.bind(mainMod .. " + " .. wsNext, hl.dsp.focus({ workspace = "+1" }))
+hl.bind(mainMod .. " + " .. wsPrev, function() hl.dispatch(hl.dsp.focus({ workspace = wsNeighbor(-1) })) end)
+hl.bind(mainMod .. " + " .. wsNext, function() hl.dispatch(hl.dsp.focus({ workspace = wsNeighbor(1) })) end)
 hl.bind(mainMod .. " + " .. focusA, hl.dsp.focus({ direction = focusA }))
 hl.bind(mainMod .. " + " .. focusB, hl.dsp.focus({ direction = focusB }))
 
 -- Levar a janela atual junto para a área de trabalho vizinha.
-hl.bind(mainMod .. " + SHIFT + " .. wsPrev, hl.dsp.window.move({ workspace = "-1" }))
-hl.bind(mainMod .. " + SHIFT + " .. wsNext, hl.dsp.window.move({ workspace = "+1" }))
+hl.bind(mainMod .. " + SHIFT + " .. wsPrev, function() hl.dispatch(hl.dsp.window.move({ workspace = wsNeighbor(-1) })) end)
+hl.bind(mainMod .. " + SHIFT + " .. wsNext, function() hl.dispatch(hl.dsp.window.move({ workspace = wsNeighbor(1) })) end)
 
 -- Foco entre janelas, que era o papel antigo do Super + setas.
 hl.bind(mainMod .. " + ALT + left",  hl.dsp.focus({ direction = "left" }))
@@ -688,8 +797,8 @@ hl.bind(mainMod .. " + ALT + down",  hl.dsp.focus({ direction = "down" }))
 
 for i = 1, 10 do
     local key = i % 10 -- 10 mapeia pra tecla 0
-    hl.bind(mainMod .. " + " .. key,         hl.dsp.focus({ workspace = i }))
-    hl.bind(mainMod .. " + SHIFT + " .. key, hl.dsp.window.move({ workspace = i }))
+    hl.bind(mainMod .. " + " .. key,         function() hl.dispatch(hl.dsp.focus({ workspace = wsTarget(i) })) end)
+    hl.bind(mainMod .. " + SHIFT + " .. key, function() hl.dispatch(hl.dsp.window.move({ workspace = wsTarget(i) })) end)
 end
 
 hl.bind(mainMod .. " + A",         hl.dsp.workspace.toggle_special("magic"))
@@ -725,8 +834,8 @@ hl.bind("CTRL + ALT + delete", hl.dsp.exec_cmd("quickshell ipc call session open
 -- "e+1"/"e-1" são aceitos sem erro mas não movem nada neste provider Lua:
 -- o Super + roda do mouse estava quebrado em silêncio. O relativo que funciona
 -- é "+1"/"-1" (confirmado por teste).
-hl.bind(mainMod .. " + mouse_down", hl.dsp.focus({ workspace = "+1" }))
-hl.bind(mainMod .. " + mouse_up",   hl.dsp.focus({ workspace = "-1" }))
+hl.bind(mainMod .. " + mouse_down", function() hl.dispatch(hl.dsp.focus({ workspace = wsNeighbor(1) })) end)
+hl.bind(mainMod .. " + mouse_up",   function() hl.dispatch(hl.dsp.focus({ workspace = wsNeighbor(-1) })) end)
 
 hl.bind(mainMod .. " + mouse:272", hl.dsp.window.drag(),   { mouse = true })
 hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
