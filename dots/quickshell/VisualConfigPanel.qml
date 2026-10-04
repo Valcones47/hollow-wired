@@ -280,7 +280,7 @@ PanelWindow {
     Timer {
         id: monitorReloadTimer
         interval: 700
-        onTriggered: loadMonitorsProc.running = true
+        onTriggered: { loadMonitorsProc.running = true; monOrderPanelProc.running = true; }
     }
 
     // Áudio
@@ -1019,6 +1019,38 @@ PanelWindow {
         }
     }
 
+    // Várias telas (rice-monitors): principal, posição, workspaces por tela e
+    // "metade da tela por janela". Lido junto com a lista de monitores.
+    property string primaryMonitor: ""
+    property bool perMonitorWs: true
+    property var monPrefs: ({})
+    function monPos(name) { return (win.monPrefs[name] && win.monPrefs[name].position) || "auto"; }
+    function monHalf(name) { return (win.monPrefs[name] && win.monPrefs[name].half_window) || 0; }
+    function setMonPref(name, key, val) {
+        const all = Object.assign({}, win.monPrefs);
+        all[name] = Object.assign({}, all[name] || {});
+        all[name][key] = val;
+        win.monPrefs = all;
+    }
+    Process {
+        id: monOrderPanelProc
+        command: ["rice-monitors", "order"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const d = JSON.parse(text);
+                    win.perMonitorWs = d.per_monitor !== false;
+                    const prefs = {};
+                    for (const m of (d.monitors || [])) {
+                        prefs[m.name] = { position: m.position || "auto", half_window: m.half_window || 0 };
+                        if (m.primary) win.primaryMonitor = m.name;
+                    }
+                    win.monPrefs = prefs;
+                } catch (e) {}
+            }
+        }
+    }
+
     Process {
         id: loadMonitorsProc
         command: ["hyprctl", "monitors", "-j"]
@@ -1516,6 +1548,7 @@ PanelWindow {
         vidPrefsProc.running = true;
         s2vWhereProc.running = true;
         loadMonitorsProc.running = true;
+        monOrderPanelProc.running = true;
         checkBacklightProc.running = true;
         checkTouchpadProc.running = true;
         loadIdleProc.running = true;
@@ -3539,6 +3572,7 @@ PanelWindow {
 
                         // ==================== ABA 3: TELA & MONITORES ====================
                         Flickable {
+                            id: displayFlickable
                             anchors.fill: parent
                             visible: win.currentTab === 3
                             contentHeight: displayCol.implicitHeight
@@ -3893,6 +3927,86 @@ PanelWindow {
                                                 hoverEnabled: true
                                                 cursorShape: Qt.PointingHandCursor
                                                 onClicked: win.applyMonitorTransform(rotCard.modelData.val)
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // -------------------------------------------------- várias telas
+                                GroupLabel {
+                                    visible: win.monitorsData.length > 1
+                                    text: Theme.t("monitor.multi_title", "Várias telas")
+                                }
+                                OptionGroup {
+                                    visible: win.monitorsData.length > 1
+                                    OptionRow {
+                                        title: Theme.t("monitor.multi_primary_title", "Tela principal")
+                                        subtitle: Theme.t("monitor.multi_primary_sub", "Onde ficam as notificações e os widgets, e onde os painéis aparecem antes de abrir em outra tela. As workspaces dela são as primeiras.")
+                                        Segmented {
+                                            options: win.monitorsData.map(m => ({ value: m.name, label: m.name }))
+                                            current: win.primaryMonitor
+                                            onPicked: v => {
+                                                win.primaryMonitor = v;
+                                                Quickshell.execDetached(["rice-monitors", "primary", v]);
+                                                win.showToast(Theme.t("monitor.multi_primary_toast", "Tela principal: %1").replace("%1", v));
+                                            }
+                                        }
+                                    }
+                                    RowDivider {}
+                                    OptionRow {
+                                        title: Theme.t("monitor.multi_pos_title", "Posição desta tela")
+                                        subtitle: Theme.t("monitor.multi_pos_sub", "Em relação às outras telas. Vale para a tela escolhida acima.")
+                                        Segmented {
+                                            options: [
+                                                { value: "auto", label: Theme.t("monitor.multi_pos_auto", "Automática") },
+                                                { value: "auto-left", label: Theme.t("monitor.multi_pos_left", "Esquerda") },
+                                                { value: "auto-right", label: Theme.t("monitor.multi_pos_right", "Direita") },
+                                                { value: "auto-up", label: Theme.t("monitor.multi_pos_up", "Acima") },
+                                                { value: "auto-down", label: Theme.t("monitor.multi_pos_down", "Abaixo") }
+                                            ]
+                                            current: win.monPos(win.selectedMonitor)
+                                            onPicked: v => {
+                                                win.setMonPref(win.selectedMonitor, "position", v);
+                                                Quickshell.execDetached(["rice-monitors", "position", win.selectedMonitor, v]);
+                                                monitorReloadTimer.restart();
+                                            }
+                                        }
+                                    }
+                                    RowDivider {}
+                                    OptionToggle {
+                                        title: Theme.t("monitor.multi_perws_title", "Workspaces por tela")
+                                        subtitle: Theme.t("monitor.multi_perws_sub", "Cada tela com a sua série 1–10; Super + número, setas e roda do mouse agem na tela com foco. Desligado, a numeração é uma só para todas.")
+                                        checked: win.perMonitorWs
+                                        onToggled: nv => {
+                                            win.perMonitorWs = nv;
+                                            Quickshell.execDetached(["rice-monitors", "per-monitor", nv ? "true" : "false"]);
+                                        }
+                                    }
+                                    RowDivider {}
+                                    OptionToggle {
+                                        title: Theme.t("monitor.multi_half_title", "Janela única ocupa só uma parte")
+                                        subtitle: Theme.t("monitor.multi_half_sub", "Para telas grandes ou em pé: com uma janela só nesta tela, ela fica na parte de cima e o resto fica livre. Com duas ou mais, a tela é dividida normalmente. Super + F deixa em tela cheia.")
+                                        checked: win.monHalf(win.selectedMonitor) > 0
+                                        onToggled: nv => {
+                                            const f = nv ? 0.5 : 0;
+                                            win.setMonPref(win.selectedMonitor, "half_window", f);
+                                            Quickshell.execDetached(["rice-monitors", "half", win.selectedMonitor, String(f)]);
+                                        }
+                                    }
+                                    RowDivider { visible: win.monHalf(win.selectedMonitor) > 0 }
+                                    OptionRow {
+                                        visible: win.monHalf(win.selectedMonitor) > 0
+                                        title: Theme.t("monitor.multi_half_size", "Tamanho da janela")
+                                        Segmented {
+                                            options: [
+                                                { value: 0.333, label: Theme.t("monitor.multi_half_third", "Um terço") },
+                                                { value: 0.5, label: Theme.t("monitor.multi_half_half", "Metade") },
+                                                { value: 0.667, label: Theme.t("monitor.multi_half_two_thirds", "Dois terços") }
+                                            ]
+                                            current: win.monHalf(win.selectedMonitor)
+                                            onPicked: v => {
+                                                win.setMonPref(win.selectedMonitor, "half_window", v);
+                                                Quickshell.execDetached(["rice-monitors", "half", win.selectedMonitor, String(v)]);
                                             }
                                         }
                                     }
@@ -11896,6 +12010,9 @@ PanelWindow {
             } else {
                 win.refreshAll();
             }
+        }
+        function scrollDisplay(y: string): void {
+            displayFlickable.contentY = Math.max(0, Math.min(displayFlickable.contentHeight - displayFlickable.height, parseFloat(y) || 0));
         }
         function scrollInput(y: string): void {
             inputFlickable.contentY = Math.max(0, Math.min(inputFlickable.contentHeight - inputFlickable.height, parseFloat(y) || 0));

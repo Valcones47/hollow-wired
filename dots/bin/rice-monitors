@@ -7,8 +7,14 @@ tela interna eDP) vem primeiro, as outras da esquerda para a direita. Cada uma
 usa uma faixa de 10 workspaces: 1–10, 11–20...
 
 Uso:
-  rice-monitors order          # JSON: {per_monitor, monitors: [{name, offset, ...}]}
-  rice-monitors primary <nome> # grava a tela principal e recarrega o Hyprland
+  rice-monitors order                  # JSON: {per_monitor, monitors: [{name, offset, ...}]}
+  rice-monitors primary <nome>         # grava a tela principal e recarrega o Hyprland
+  rice-monitors position <nome> <pos>  # auto | auto-left | auto-right | auto-up | auto-down
+  rice-monitors per-monitor <true|false>   # workspaces por tela (padrão true)
+  rice-monitors half <nome> <fração>   # janela única ocupa a fração de cima; 0 desliga
+
+Tudo é gravado em ~/.config/hypr/user-prefs.json (preferência do usuário) e
+lido pelo hyprland.lua; as regras de workspace só se refazem num reload.
 """
 import json
 import os
@@ -54,19 +60,67 @@ def order():
             "transform": m.get("transform", 0),
             "x": m.get("x", 0),
             "y": m.get("y", 0),
+            "position": (p.get("monitors", {}).get(m["name"], {}) or {}).get("position", "auto"),
+            "half_window": (p.get("monitors", {}).get(m["name"], {}) or {}).get("half_window", 0),
         })
     return {"per_monitor": per, "monitors": out}
+
+
+POSITIONS = ("auto", "auto-left", "auto-right", "auto-up", "auto-down")
+
+
+def save(p):
+    # No mesmo arquivo (sem rename): quem observa o user-prefs.json segue o inode.
+    data = json.dumps(p, indent=2, ensure_ascii=False) + "\n"
+    with open(PREFS, "w") as f:
+        f.write(data)
+
+
+def reload():
+    # As regras de workspace (faixa por tela) só se refazem num reload.
+    subprocess.run(["hyprctl", "reload"], capture_output=True, timeout=10)
+
+
+def monitor_entry(p, name):
+    mons = p.setdefault("monitors", {})
+    return mons.setdefault(name, {})
 
 
 def set_primary(name):
     p = prefs()
     p["primary_monitor"] = name
-    tmp = PREFS + ".tmp"
-    with open(tmp, "w") as f:
-        json.dump(p, f, indent=2, ensure_ascii=False)
-    os.replace(tmp, PREFS)
-    # As regras de workspace (faixa por tela) só se refazem num reload.
-    subprocess.run(["hyprctl", "reload"], capture_output=True, timeout=10)
+    save(p)
+    reload()
+
+
+def set_position(name, pos):
+    if pos not in POSITIONS:
+        raise SystemExit("posição inválida: " + pos)
+    p = prefs()
+    monitor_entry(p, name)["position"] = pos
+    save(p)
+    reload()
+
+
+def set_per_monitor(val):
+    p = prefs()
+    p["per_monitor_workspaces"] = val in ("1", "true", "on")
+    save(p)
+    reload()
+
+
+def set_half(name, frac):
+    f = float(frac)
+    if not 0 <= f < 1:
+        raise SystemExit("fração deve estar entre 0 e 1")
+    p = prefs()
+    e = monitor_entry(p, name)
+    if f == 0:
+        e.pop("half_window", None)
+    else:
+        e["half_window"] = round(f, 3)
+    save(p)
+    reload()
 
 
 def main():
@@ -75,6 +129,12 @@ def main():
         print(json.dumps(order(), ensure_ascii=False))
     elif cmd == "primary" and len(sys.argv) > 2:
         set_primary(sys.argv[2])
+    elif cmd == "position" and len(sys.argv) > 3:
+        set_position(sys.argv[2], sys.argv[3])
+    elif cmd == "per-monitor" and len(sys.argv) > 2:
+        set_per_monitor(sys.argv[2])
+    elif cmd == "half" and len(sys.argv) > 3:
+        set_half(sys.argv[2], sys.argv[3])
     else:
         print(__doc__.strip(), file=sys.stderr)
         sys.exit(1)

@@ -121,16 +121,19 @@ hl.monitor({
     scale    = globalScale,
 })
 do
-    local p = io.popen("jq -r '(.monitors // {}) | to_entries[] | [.key, (.value.mode // \"preferred\"), ((.value.scale // 1) | tostring), ((.value.transform // 0) | tostring)] | join(\"\\t\")' '"
+    -- position: "auto" ou "auto-left/right/up/down" (relativa às outras telas),
+    -- escolhida no painel (rice-monitors position).
+    local p = io.popen("jq -r '(.monitors // {}) | to_entries[] | [.key, (.value.mode // \"preferred\"), ((.value.scale // 1) | tostring), ((.value.transform // 0) | tostring), (.value.position // \"auto\")] | join(\"\\t\")' '"
         .. prefsFile .. "' 2>/dev/null")
     if p then
         for line in p:lines() do
-            local name, mode, scale, tr = line:match("^([^\t]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)$")
+            local name, mode, scale, tr, pos = line:match("^([^\t]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)$")
             if name and scale:match("^%d+%.?%d*$") then
+                if not pos:match("^auto") then pos = "auto" end
                 hl.monitor({
                     output    = name,
                     mode      = mode,
-                    position  = "auto",
+                    position  = pos,
                     scale     = scale,
                     transform = tonumber(tr) or 0,
                 })
