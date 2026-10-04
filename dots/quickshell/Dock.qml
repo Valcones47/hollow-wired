@@ -49,13 +49,19 @@ PanelWindow {
     // A sidebar (EnergySidebar): estados/ações dos itens do lado direito
     // (updates, luz noturna, café, gravação, GPU). Ligada no shell.qml.
     property var energy: null
-    readonly property bool hasFullscreen: (Hyprland.focusedWorkspace && Hyprland.focusedWorkspace.hasFullscreen) || false
+    // Várias telas: cada tela tem o seu dock; o estado (tela cheia, área
+    // vazia) é o da workspace ativa *desta* tela. secondary = cópia numa tela
+    // extra (o IPC "dock" fica só na principal).
+    property bool secondary: false
+    readonly property var hyprMonitor: Hyprland.monitorFor(dock.screen)
+    readonly property var monWorkspace: dock.hyprMonitor ? dock.hyprMonitor.activeWorkspace : null
+    readonly property bool hasFullscreen: (dock.monWorkspace && dock.monWorkspace.hasFullscreen) || false
     readonly property bool allowHover: !hasFullscreen || launcherOpen
     property bool gamesEdit: false
     property int dragFrom: -1
     property int dragTo: -1
-    readonly property bool workspaceEmpty: Hyprland.focusedWorkspace !== null
-        && Hyprland.focusedWorkspace.toplevels.values.length === 0
+    readonly property bool workspaceEmpty: dock.monWorkspace !== null
+        && dock.monWorkspace.toplevels.values.length === 0
     // Some no hover (padrão) ou fica sempre à mostra, como a barra de tarefas
     // do Windows — nesse caso ela também reserva espaço para as janelas.
     readonly property bool pinned: ShellLayout.dockEnabled && !ShellLayout.dockAutohide
@@ -1129,6 +1135,7 @@ PanelWindow {
     }
 
     IpcHandler {
+        enabled: !dock.secondary
         target: "dock"
         function toggle(): void { dock.hovered = !dock.hovered; }
         function games(): void { dock.hovered = true; dock.showPop("games", null, gamesBtn); }

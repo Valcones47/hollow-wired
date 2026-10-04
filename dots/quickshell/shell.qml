@@ -27,6 +27,7 @@ ShellRoot {
     PanelWindow {
         id: clickCatcher
         visible: hub.open
+        screen: hub.screen
         color: "transparent"
         focusable: false
 
@@ -45,6 +46,7 @@ ShellRoot {
 
     DesktopWidgets {
         id: dw
+        screen: shellRoot.primaryScreen
         onDesktopRightClicked: (x, y) => desktopMenu.popup(x, y)
     }
     DesktopMenu { id: desktopMenu }
@@ -188,8 +190,45 @@ ShellRoot {
         barPopupOpen: topbar.pop !== ""
     }
 
+    // ---------- várias telas ----------
+    // Ordem das telas e faixa de workspaces de cada uma (rice-monitors, mesma
+    // regra do hyprland.lua). Barra e dock "principais" ficam na primeira; as
+    // outras telas ganham cópias (Variants abaixo).
+    property var monOrder: []
+    function screenNamed(name) {
+        const list = Quickshell.screens;
+        for (let i = 0; i < list.length; i++) if (list[i].name === name) return list[i];
+        return null;
+    }
+    function wsOffsetFor(name) {
+        for (const m of shellRoot.monOrder) if (m.name === name) return m.offset;
+        return 0;
+    }
+    readonly property string primaryName: monOrder.length > 0 ? monOrder[0].name : ""
+    readonly property var primaryScreen: screenNamed(primaryName)
+    readonly property var extraScreens: Quickshell.screens.filter(s => shellRoot.primaryName !== "" && s.name !== shellRoot.primaryName)
+    Process {
+        id: monOrderProc
+        command: ["rice-monitors", "order"]
+        running: true
+        stdout: StdioCollector {
+            onStreamFinished: { try { shellRoot.monOrder = JSON.parse(text).monitors || []; } catch (e) {} }
+        }
+    }
+    Connections {
+        target: Hyprland
+        function onRawEvent(ev) {
+            if (["monitoradded", "monitoraddedv2", "monitorremoved", "monitorremovedv2", "configreloaded"].indexOf(ev.name) >= 0)
+                monOrderRefresh.restart();
+        }
+    }
+    Timer { id: monOrderRefresh; interval: 600; onTriggered: monOrderProc.running = true }
+    Binding { target: Theme; property: "primaryScreen"; value: shellRoot.primaryScreen }
+
     TopBar {
         id: topbar
+        screen: shellRoot.primaryScreen
+        wsOffset: shellRoot.wsOffsetFor(shellRoot.primaryName)
         energy: sidebar
         launcherOpen: shellRoot.launcherOpen
         recording: sidebar.recording
@@ -205,6 +244,8 @@ ShellRoot {
     // arranjo escolhe uma (ShellLayout.barVertical).
     VerticalBar {
         id: vbar
+        screen: shellRoot.primaryScreen
+        wsOffset: shellRoot.wsOffsetFor(shellRoot.primaryName)
         energy: sidebar
         launcherOpen: shellRoot.launcherOpen
         onClockClicked: hub.open = !hub.open
@@ -224,8 +265,50 @@ ShellRoot {
 
     Dock {
         id: dock
+        screen: shellRoot.primaryScreen
         energy: sidebar
         launcherOpen: shellRoot.launcherOpen
+    }
+
+    // Cópias da barra e do dock nas telas extras. Os popups globais (hub,
+    // painel, central de controle) abrem na tela com foco (Theme.focusedScreen).
+    Variants {
+        model: shellRoot.extraScreens
+        delegate: Scope {
+            id: extra
+            required property var modelData
+            TopBar {
+                screen: extra.modelData
+                secondary: true
+                wsOffset: shellRoot.wsOffsetFor(extra.modelData.name)
+                energy: sidebar
+                launcherOpen: shellRoot.launcherOpen
+                recording: sidebar.recording
+                onClockClicked: hub.open = !hub.open
+                onVisualConfigClicked: visualConfig.open = !visualConfig.open
+                onControlClicked: controlCenter.clickToggle()
+                onControlHovered: on => on ? controlCenter.hoverEnter() : controlCenter.hoverLeave()
+                onBtPageRequested: controlCenter.openPage("bt")
+                onStopRecording: Quickshell.execDetached(["rice-record", "stop"])
+            }
+            VerticalBar {
+                screen: extra.modelData
+                secondary: true
+                wsOffset: shellRoot.wsOffsetFor(extra.modelData.name)
+                energy: sidebar
+                launcherOpen: shellRoot.launcherOpen
+                onClockClicked: hub.open = !hub.open
+                onVisualConfigClicked: visualConfig.open = !visualConfig.open
+                onControlClicked: controlCenter.clickToggle()
+                onControlHovered: on => on ? controlCenter.hoverEnter() : controlCenter.hoverLeave()
+            }
+            Dock {
+                screen: extra.modelData
+                secondary: true
+                energy: sidebar
+                launcherOpen: shellRoot.launcherOpen
+            }
+        }
     }
 
 
@@ -250,7 +333,7 @@ ShellRoot {
     SessionDialog {}
     // Assistente de IA (Super + Ctrl + A): conversa e tradução pelo rice-ai.
     AiSidebar {}
-    NotifToasts {}
+    NotifToasts { screen: shellRoot.primaryScreen }
     PolkitDialog {}
     EditMode {}
     PowerMenu { id: powerMenu }
@@ -264,6 +347,9 @@ ShellRoot {
         id: hub
         visible: false
         focusable: true
+        // Abre na tela com foco (várias telas).
+        property var targetScreen: null
+        screen: targetScreen || Theme.primaryScreen
         color: "transparent"
 
         // Colado logo abaixo da waybar, sem vão: o card tem o mesmo fundo da
@@ -294,6 +380,7 @@ ShellRoot {
         property bool open: false
         onOpenChanged: {
             if (open) {
+                hub.targetScreen = Theme.focusedScreen();
                 closeTimer.stop();
                 hub.visible = true;
             } else {

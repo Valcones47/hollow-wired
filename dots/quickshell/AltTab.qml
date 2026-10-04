@@ -29,6 +29,11 @@ PanelWindow {
     focusable: true
 
     WlrLayershell.namespace: "quickshell-alttab"
+    // Várias telas: abre na tela com foco, escolhida no momento de abrir.
+    property var targetScreen: null
+    screen: targetScreen || Theme.primaryScreen
+    readonly property bool _openForScreen: open
+    on_OpenForScreenChanged: if (_openForScreen) targetScreen = Theme.focusedScreen()
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: open ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 

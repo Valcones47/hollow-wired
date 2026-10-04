@@ -24,6 +24,11 @@ PanelWindow {
     mask: Region {}
 
     WlrLayershell.namespace: "quickshell-osd"
+    // Várias telas: abre na tela com foco, escolhida no momento de abrir.
+    property var targetScreen: null
+    screen: targetScreen || Theme.primaryScreen
+    readonly property bool _openForScreen: open
+    on_OpenForScreenChanged: if (_openForScreen) targetScreen = Theme.focusedScreen()
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 

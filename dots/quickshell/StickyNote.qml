@@ -32,6 +32,11 @@ PanelWindow {
     }
 
     WlrLayershell.namespace: "quickshell-sticky-note"
+    // Várias telas: abre na tela com foco, escolhida no momento de abrir.
+    property var targetScreen: null
+    screen: targetScreen || Theme.primaryScreen
+    readonly property bool _openForScreen: stickyWindow.open
+    on_OpenForScreenChanged: if (_openForScreen) targetScreen = Theme.focusedScreen()
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: stickyWindow.open ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
 

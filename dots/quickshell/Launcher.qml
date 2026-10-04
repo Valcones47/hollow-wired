@@ -37,7 +37,7 @@ PanelWindow {
     // OnDemand (não Exclusive): com Exclusive a outra tela ficava sem clique
     // até fechar. Abre na tela com foco, escolhida no momento de abrir.
     property var targetScreen: null
-    screen: targetScreen
+    screen: targetScreen || Theme.primaryScreen
     readonly property bool _openForScreen: open
     on_OpenForScreenChanged: if (_openForScreen) targetScreen = Theme.focusedScreen()
 

@@ -35,9 +35,22 @@ PanelWindow {
     // A sidebar (EnergySidebar): estados/ações dos itens do catálogo.
     property var energy: null
 
+    // Várias telas: cada tela tem a sua faixa de workspaces (1–10, 11–20...,
+    // ver "WORKSPACES POR TELA" no hyprland.lua). wsOffset é o início da faixa
+    // desta barra; secondary = cópia numa tela extra (sem IPC próprio).
+    property int wsOffset: 0
+    property bool secondary: false
+    readonly property var hyprMonitor: Hyprland.monitorFor(vbar.screen)
+    readonly property var monWorkspace: vbar.hyprMonitor ? vbar.hyprMonitor.activeWorkspace : null
+    function wsStep(step) {
+        const cur = (vbar.monWorkspace ? vbar.monWorkspace.id : vbar.wsOffset + 1) - vbar.wsOffset;
+        const n = Math.max(1, Math.min(10, (cur >= 1 && cur <= 10 ? cur : 1) + step));
+        Hyprland.dispatch("hl.dsp.focus({ workspace = " + (vbar.wsOffset + n) + " })");
+    }
+
     property bool launcherOpen: false
     readonly property bool onLeft: ShellLayout.barPosition === "left"
-    readonly property bool hasFullscreen: (Hyprland.focusedWorkspace && Hyprland.focusedWorkspace.hasFullscreen) || false
+    readonly property bool hasFullscreen: (vbar.monWorkspace && vbar.monWorkspace.hasFullscreen) || false
 
     readonly property int barW: 52
 
@@ -138,18 +151,19 @@ PanelWindow {
 
     // Áreas de trabalho: mesma regra da barra de cima (ver TopBar.wsModel).
     readonly property var wsModel: {
-        const existing = Hyprland.workspaces.values.filter(w => w.id > 0).sort((a, b) => a.id - b.id);
+        const off = vbar.wsOffset;
+        const existing = Hyprland.workspaces.values.filter(w => w.id > off && w.id <= off + 10).sort((a, b) => a.id - b.id);
         const n = ShellLayout.workspaceCount;
         if (n <= 0)
             return existing.map(w => ({ id: w.id, urgent: w.urgent, occupied: true }));
         const byId = {};
         for (const w of existing) byId[w.id] = w;
         const out = [];
-        for (let i = 1; i <= n; i++) {
+        for (let i = off + 1; i <= off + n; i++) {
             const w = byId[i] || null;
             out.push({ id: i, urgent: w ? w.urgent : false, occupied: w ? w.toplevels.values.length > 0 : false });
         }
-        for (const w of existing) if (w.id > n) out.push({ id: w.id, urgent: w.urgent, occupied: true });
+        for (const w of existing) if (w.id > off + n) out.push({ id: w.id, urgent: w.urgent, occupied: true });
         return out;
     }
 
@@ -406,8 +420,8 @@ PanelWindow {
                         delegate: Rectangle {
                             id: wsDot
                             required property var modelData
-                            readonly property bool active: Hyprland.focusedWorkspace
-                                && Hyprland.focusedWorkspace.id === wsDot.modelData.id
+                            readonly property bool active: vbar.monWorkspace
+                                && vbar.monWorkspace.id === wsDot.modelData.id
                             Layout.alignment: Qt.AlignHCenter
                             implicitWidth: 10
                             implicitHeight: wsDot.active ? 26 : (wsDot.modelData.occupied ? 10 : 7)

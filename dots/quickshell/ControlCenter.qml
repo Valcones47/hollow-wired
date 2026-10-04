@@ -32,6 +32,11 @@ PanelWindow {
     anchors { top: true; bottom: true; left: true; right: true }
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.namespace: "quickshell-controlcenter"
+    // Várias telas: abre na tela com foco, escolhida no momento de abrir.
+    property var targetScreen: null
+    screen: targetScreen || Theme.primaryScreen
+    readonly property bool _openForScreen: open
+    on_OpenForScreenChanged: if (_openForScreen) targetScreen = Theme.focusedScreen()
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: open && !hoverMode ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
 

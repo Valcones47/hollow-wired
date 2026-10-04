@@ -45,8 +45,21 @@ PanelWindow {
     color: "transparent"
     focusable: false
 
+    // Várias telas: cada tela tem a sua faixa de workspaces (1–10, 11–20...,
+    // ver "WORKSPACES POR TELA" no hyprland.lua). wsOffset é o início da faixa
+    // desta barra; secondary = cópia numa tela extra (sem IPC próprio).
+    property int wsOffset: 0
+    property bool secondary: false
+    readonly property var hyprMonitor: Hyprland.monitorFor(bar.screen)
+    readonly property var monWorkspace: bar.hyprMonitor ? bar.hyprMonitor.activeWorkspace : null
+    function wsStep(step) {
+        const cur = (bar.monWorkspace ? bar.monWorkspace.id : bar.wsOffset + 1) - bar.wsOffset;
+        const n = Math.max(1, Math.min(10, (cur >= 1 && cur <= 10 ? cur : 1) + step));
+        Hyprland.dispatch("hl.dsp.focus({ workspace = " + (bar.wsOffset + n) + " })");
+    }
+
     property bool launcherOpen: false
-    readonly property bool hasFullscreen: (Hyprland.focusedWorkspace && Hyprland.focusedWorkspace.hasFullscreen) || false
+    readonly property bool hasFullscreen: (bar.monWorkspace && bar.monWorkspace.hasFullscreen) || false
 
     WlrLayershell.namespace: "quickshell-bar"
     WlrLayershell.layer: launcherOpen ? WlrLayer.Overlay : WlrLayer.Top
@@ -66,7 +79,9 @@ PanelWindow {
     // lá, mesmo sem nenhuma janela aberta — é assim que dá para pular para uma
     // área vazia sem decorar o atalho.
     readonly property var wsModel: {
-        const existing = Hyprland.workspaces.values.filter(w => w.id > 0).sort((a, b) => a.id - b.id);
+        const off = bar.wsOffset;
+        // Só a faixa desta tela; a numeração vista é 1..10 em todas.
+        const existing = Hyprland.workspaces.values.filter(w => w.id > off && w.id <= off + 10).sort((a, b) => a.id - b.id);
         const n = ShellLayout.workspaceCount;
         if (n <= 0)
             return existing.map(w => ({ id: w.id, ws: w, urgent: w.urgent, occupied: true }));
@@ -74,7 +89,7 @@ PanelWindow {
         const byId = {};
         for (const w of existing) byId[w.id] = w;
         const out = [];
-        for (let i = 1; i <= n; i++) {
+        for (let i = off + 1; i <= off + n; i++) {
             const w = byId[i] || null;
             out.push({
                 id: i,
@@ -85,7 +100,7 @@ PanelWindow {
         }
         // Áreas acima do limite só aparecem se realmente existirem.
         for (const w of existing) {
-            if (w.id > n) out.push({ id: w.id, ws: w, urgent: w.urgent, occupied: true });
+            if (w.id > off + n) out.push({ id: w.id, ws: w, urgent: w.urgent, occupied: true });
         }
         return out;
     }
@@ -593,8 +608,8 @@ PanelWindow {
                                     delegate: Rectangle {
                                         id: wsDot
                                         required property var modelData
-                                        readonly property bool active: Hyprland.focusedWorkspace
-                                            && Hyprland.focusedWorkspace.id === modelData.id
+                                        readonly property bool active: bar.monWorkspace
+                                            && bar.monWorkspace.id === modelData.id
                                         // Ícone do app da área (a janela em foco, se estiver
                                         // nela; senão a primeira). Opcional: bar.wsIcons.
                                         readonly property string appIcon: {
@@ -647,7 +662,7 @@ PanelWindow {
                             MouseArea {
                                 anchors.fill: parent
                                 acceptedButtons: Qt.NoButton
-                                onWheel: w => Hyprland.dispatch("hl.dsp.focus({ workspace = \"" + (w.angleDelta.y > 0 ? "e-1" : "e+1") + "\" })")
+                                onWheel: w => bar.wsStep(w.angleDelta.y > 0 ? -1 : 1)
                             }
                         }
 
@@ -718,9 +733,17 @@ PanelWindow {
                         }
 
                         BarText {
-                            Layout.maximumWidth: 420
-                            text: Hyprland.activeToplevel && Hyprland.activeToplevel.workspace === Hyprland.focusedWorkspace
-                                ? Hyprland.activeToplevel.title : ""
+                            // Título da janela *desta* tela (a com foco, se estiver aqui;
+                            // senão a primeira da workspace ativa dela). Largura limitada
+                            // para não invadir o relógio numa tela estreita (em pé).
+                            readonly property var shownTop: {
+                                const at = Hyprland.activeToplevel;
+                                if (at && bar.monWorkspace && at.workspace === bar.monWorkspace) return at;
+                                const tops = bar.monWorkspace ? bar.monWorkspace.toplevels.values : [];
+                                return tops.length > 0 ? tops[0] : null;
+                            }
+                            Layout.maximumWidth: Math.min(420, Math.max(0, bar.width / 2 - centerRow.implicitWidth / 2 - 260))
+                            text: shownTop ? shownTop.title : ""
                             elide: Text.ElideRight
                             color: Theme.subtext
                             font.pixelSize: 12
@@ -1846,6 +1869,7 @@ PanelWindow {
 
     // IPC de teste: `qs ipc call bar popup <audio|wifi|media|eq>` / `hide`
     IpcHandler {
+        enabled: !bar.secondary
         target: "bar"
         function popup(kind: string): void {
             if (kind === "eq" || kind === "media") {

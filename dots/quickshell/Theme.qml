@@ -374,6 +374,11 @@ QtObject {
     property var translationsPt: ({})
     property var translationsEn: ({})
 
+    // Tela principal (a primeira do rice-monitors), preenchida pelo shell.qml.
+    // Painel fechado que nunca abriu fica nela, em vez de cair na primeira
+    // tela da lista do Quickshell (que pode ser o monitor externo).
+    property var primaryScreen: null
+
     // Tela (ShellScreen) do monitor com foco no Hyprland. Os overlays leem na
     // hora de abrir, para aparecer onde a pessoa está, não sempre na primeira.
     function focusedScreen() {

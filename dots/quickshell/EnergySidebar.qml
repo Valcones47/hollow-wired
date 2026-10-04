@@ -33,6 +33,11 @@ PanelWindow {
     implicitWidth: Theme.frameThickness + Theme.sidebarWidth + Theme.popoutMaxWidth + 40
 
     WlrLayershell.namespace: "quickshell-sidebar"
+    // Várias telas: abre na tela com foco, escolhida no momento de abrir.
+    property var targetScreen: null
+    screen: targetScreen || Theme.primaryScreen
+    readonly property bool _openForScreen: open
+    on_OpenForScreenChanged: if (_openForScreen) targetScreen = Theme.focusedScreen()
     WlrLayershell.layer: launcherOpen ? WlrLayer.Overlay : WlrLayer.Top
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
     // Fixa, ela reserva espaço como uma central de ações sempre aberta;
