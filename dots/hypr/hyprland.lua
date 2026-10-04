@@ -580,6 +580,19 @@ hl.config({
 --   [Libinput][...][USB Gaming Mouse] PointerAccelerationProfile=1 (libinput FLAT)
 --   sem PointerAcceleration explícito -> velocidade neutra (0)
 --   touchpad ELAN0521:01 04F3:31B1: Enabled=false (desabilitado no Plasma)
+-- Alguma tela conectada está numa GPU NVIDIA enquanto o Hyprland desenha na
+-- integrada? (saída cardN-* conectada cujo driver é nvidia, com i915/amdgpu
+-- presente). Reavaliado quando um monitor entra ou sai.
+function riceNvidiaOutput()
+    local p = io.popen([[sh -c 'igpu=0; nv=0; for c in /sys/class/drm/card[0-9]*-*; do [ "$(cat "$c/status" 2>/dev/null)" = connected ] || continue; card=${c##*/}; card=${card%%-*}; d=$(basename "$(readlink -f /sys/class/drm/$card/device/driver)"); [ "$d" = nvidia ] && nv=1; done; for d in /sys/class/drm/card[0-9]*; do case "$(basename "$(readlink -f $d/device/driver)")" in i915|xe|amdgpu) igpu=1;; esac; done; [ $nv = 1 ] && [ $igpu = 1 ] && echo yes']])
+    if not p then return false end
+    local v = p:read("*l")
+    p:close()
+    return v == "yes"
+end
+hl.on("monitor.added", function() hl.config({ cursor = { no_hardware_cursors = (hasNvidia and not hasIgpu) or riceNvidiaOutput() } }) end)
+hl.on("monitor.removed", function() hl.config({ cursor = { no_hardware_cursors = (hasNvidia and not hasIgpu) or riceNvidiaOutput() } }) end)
+
 hl.config({
     input = {
         kb_layout = kbLayout,
@@ -595,8 +608,11 @@ hl.config({
     },
 
     cursor = {
-        -- Em desktops com NVIDIA exclusiva (ex: GTX 950/1060), software cursors evita sumiço ou lag de ponteiro
-        no_hardware_cursors = (hasNvidia and not hasIgpu),
+        -- Em desktops com NVIDIA exclusiva (ex: GTX 950/1060), software cursors evita sumiço ou lag de ponteiro.
+        -- Notebook híbrido com tela ligada na NVIDIA (HDMI do dGPU): o cursor de
+        -- hardware falha a cópia entre GPUs a cada movimento ("cursor blit
+        -- failed", ~150 erros/s no log) e o mouse engasga. Ver riceNvidiaOutput().
+        no_hardware_cursors = (hasNvidia and not hasIgpu) or riceNvidiaOutput(),
         -- Não teleporta o mouse pro centro da janela ao focar (dock, launcher,
         -- Super+setas). Pedido do usuário.
         no_warps = true,
