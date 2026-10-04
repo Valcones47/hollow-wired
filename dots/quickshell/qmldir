@@ -78,3 +78,4 @@ KeyCombo 1.0 KeyCombo.qml
 TrayIcon 1.0 TrayIcon.qml
 Updater 1.0 Updater.qml
 ThemePalette 1.0 ThemePalette.qml
+DisplayMode 1.0 DisplayMode.qml

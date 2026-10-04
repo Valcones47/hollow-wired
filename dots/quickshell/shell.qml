@@ -335,6 +335,8 @@ ShellRoot {
     Welcome {}
     // Atualizações por origem (ícone de updates da sidebar).
     Updater {}
+    // Modo das telas (Super + P), como o Win + P.
+    DisplayMode {}
     QuickNotes {}
     StickyNote {}
     SessionDialog {}

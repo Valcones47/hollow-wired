@@ -120,6 +120,27 @@ hl.monitor({
     position = "auto",
     scale    = globalScale,
 })
+-- Modo das telas (Super + P, rice-display-mode): extend | mirror | internal |
+-- external. Só vale com tela interna E externa conectadas; senão é "extend"
+-- (sem tela externa, "external" apagaria tudo).
+local riceDisplayMode = "extend"
+local riceInternalName = ""
+do
+    local p = io.popen("jq -r '.display_mode // \"extend\"' '" .. prefsFile .. "' 2>/dev/null")
+    if p then riceDisplayMode = p:read("*l") or "extend"; p:close() end
+    local hasExt = false
+    local q = io.popen([[sh -c 'for c in /sys/class/drm/card[0-9]*-*; do [ "$(cat "$c/status" 2>/dev/null)" = connected ] && echo "${c##*/}"; done']])
+    if q then
+        for line in q:lines() do
+            local name = line:gsub("^card%d+%-", "")
+            if name:match("^eDP") or name:match("^LVDS") or name:match("^DSI") then riceInternalName = name else hasExt = true end
+        end
+        q:close()
+    end
+    if riceInternalName == "" or not hasExt then riceDisplayMode = "extend" end
+end
+local function riceIsInternal(name) return name:match("^eDP") or name:match("^LVDS") or name:match("^DSI") end
+
 do
     -- position: "auto" ou "auto-left/right/up/down" (relativa às outras telas),
     -- escolhida no painel (rice-monitors position).
@@ -130,12 +151,16 @@ do
             local name, mode, scale, tr, pos = line:match("^([^\t]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)$")
             if name and scale:match("^%d+%.?%d*$") then
                 if not pos:match("^auto") then pos = "auto" end
+                local internal = riceIsInternal(name)
                 hl.monitor({
                     output    = name,
                     mode      = mode,
                     position  = pos,
                     scale     = scale,
                     transform = tonumber(tr) or 0,
+                    disabled  = (riceDisplayMode == "internal" and not internal)
+                        or (riceDisplayMode == "external" and internal) and true or false,
+                    mirror    = (riceDisplayMode == "mirror" and not internal) and riceInternalName or "",
                 })
             end
         end
@@ -669,7 +694,10 @@ hl.bind(mainMod .. " + SHIFT + N", hl.dsp.exec_cmd("quickshell ipc call notif to
 hl.bind(mainMod .. " + SHIFT + V", hl.dsp.window.float({ action = "toggle" }))
 hl.bind(mainMod .. " + R", hl.dsp.exec_cmd(menu))
 hl.bind(mainMod .. " + SUPER_L", hl.dsp.exec_cmd(menu), { release = true })
-hl.bind(mainMod .. " + P", hl.dsp.window.pseudo())
+-- Super + P: modo das telas (só notebook, duplicar, estender, só a externa),
+-- como o Win + P. O pseudo-tiling que morava aqui foi para Super + Shift + P.
+hl.bind(mainMod .. " + P", hl.dsp.exec_cmd("quickshell ipc call displaymode toggle"))
+hl.bind(mainMod .. " + SHIFT + P", hl.dsp.window.pseudo())
 hl.bind(mainMod .. " + J", hl.dsp.layout("togglesplit"))
 hl.bind(mainMod .. " + F", hl.dsp.window.fullscreen({ mode = "fullscreen", action = "toggle" }))
 -- Tela de bloqueio do shell (LockScreen.qml); o rice-lock cai no hyprlock se
@@ -803,7 +831,8 @@ function rice_register_ws_rules()
     end
 end
 rice_register_ws_rules()
-hl.on("monitor.added", function() rice_register_ws_rules() end)
+hl.on("monitor.added", function() rice_register_ws_rules(); hl.exec_cmd("rice-display-mode apply") end)
+hl.on("monitor.removed", function() hl.exec_cmd("rice-display-mode apply") end)
 -- Globais para scripts e testes via `hyprctl eval`.
 rice_ws_target, rice_ws_neighbor = wsTarget, wsNeighbor
 

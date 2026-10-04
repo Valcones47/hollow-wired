@@ -375,7 +375,9 @@ PanelWindow {
                 { key: "Alt + F4", action: Theme.t("binds.act_close_alt", "Fechar Janela Ativa (Padrão Windows)") },
                 { key: "Super + F", action: Theme.t("binds.act_fullscreen", "Alternar Tela Cheia (Fullscreen)") },
                 { key: "Super + Shift + V", action: Theme.t("binds.act_floating", "Alternar Janela Flutuante") },
-                { key: "Super + P", action: Theme.t("binds.act_pseudo", "Alternar Modo Pseudo-Tiling") },
+                { key: "Super + Shift + P", action: Theme.t("binds.act_pseudo", "Alternar Modo Pseudo-Tiling") },
+                { key: "Super + P", action: Theme.t("binds.act_display_mode", "Como usar as telas (só notebook, duplicar, estender)") },
+                { key: "Super + X", action: Theme.t("binds.act_next_screen", "Levar o mouse para a outra tela") },
                 { key: "Super + J", action: Theme.t("binds.act_split", "Alternar Divisão Horizontal / Vertical") },
                 { key: "Super + Setas", action: Theme.t("binds.act_focus", "Mudar Foco entre Janelas") },
                 { key: "Super + 1..9", action: Theme.t("binds.act_workspace", "Mudar para Área de Trabalho (Workspace)") },
@@ -3939,6 +3941,19 @@ PanelWindow {
                                 }
                                 OptionGroup {
                                     visible: win.monitorsData.length > 1
+                                    OptionRow {
+                                        title: Theme.t("monitor.multi_mode_title", "Como usar as telas")
+                                        subtitle: Theme.t("monitor.multi_mode_sub", "Só o notebook, duplicar, estender ou só a segunda tela. Atalho: Super + P.")
+                                        ActionBtn {
+                                            text: Theme.t("monitor.multi_mode_btn", "Escolher")
+                                            minWidth: 0
+                                            onClicked: {
+                                                win.open = false;
+                                                Quickshell.execDetached(["qs", "ipc", "call", "displaymode", "open"]);
+                                            }
+                                        }
+                                    }
+                                    RowDivider {}
                                     OptionRow {
                                         title: Theme.t("monitor.multi_primary_title", "Tela principal")
                                         subtitle: Theme.t("monitor.multi_primary_sub", "Onde ficam as notificações e os widgets, e onde os painéis aparecem antes de abrir em outra tela. As workspaces dela são as primeiras.")

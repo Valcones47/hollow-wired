@@ -1984,5 +1984,20 @@
   "monitor.multi_half_half": "Half",
   "monitor.multi_half_two_thirds": "Two thirds",
   "monitor.multi_center_title": "Align to the center",
-  "monitor.multi_center_sub": "The cursor only crosses where the screen edges touch. Centered, that strip sits in the middle of the larger screen instead of at the top. Super + X moves the mouse to the other screen from anywhere."
+  "monitor.multi_center_sub": "The cursor only crosses where the screen edges touch. Centered, that strip sits in the middle of the larger screen instead of at the top. Super + X moves the mouse to the other screen from anywhere.",
+  "dm.internal": "Laptop screen only",
+  "dm.mirror": "Duplicate",
+  "dm.extend": "Extend",
+  "dm.external": "Second screen only",
+  "dm.title": "Screens",
+  "dm.one_screen": "Only one screen connected. Plug in a monitor to choose how to use both.",
+  "dm.keep_q": "Keep this setup? Reverting in %1 s.",
+  "dm.revert": "Revert",
+  "dm.keep": "Keep",
+  "dm.hint": "Super + P again or arrows: choose  ·  Enter: apply  ·  Esc: close",
+  "monitor.multi_mode_title": "How to use the screens",
+  "monitor.multi_mode_sub": "Laptop only, duplicate, extend or second screen only. Shortcut: Super + P.",
+  "monitor.multi_mode_btn": "Choose",
+  "binds.act_display_mode": "How to use the screens (laptop only, duplicate, extend)",
+  "binds.act_next_screen": "Move the mouse to the other screen"
 }

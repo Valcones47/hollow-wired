@@ -1984,5 +1984,20 @@
   "monitor.multi_half_half": "Metade",
   "monitor.multi_half_two_thirds": "Dois terços",
   "monitor.multi_center_title": "Alinhar pelo centro",
-  "monitor.multi_center_sub": "O cursor só passa de uma tela para a outra onde as bordas se encostam. Centralizado, essa faixa fica no meio da tela maior em vez de no topo. Super + X leva o mouse para a outra tela de qualquer lugar."
+  "monitor.multi_center_sub": "O cursor só passa de uma tela para a outra onde as bordas se encostam. Centralizado, essa faixa fica no meio da tela maior em vez de no topo. Super + X leva o mouse para a outra tela de qualquer lugar.",
+  "dm.internal": "Só a tela do notebook",
+  "dm.mirror": "Duplicar",
+  "dm.extend": "Estender",
+  "dm.external": "Só a segunda tela",
+  "dm.title": "Telas",
+  "dm.one_screen": "Só uma tela conectada. Ligue um monitor para escolher como usar as duas.",
+  "dm.keep_q": "Manter esta configuração? Volta à anterior em %1 s.",
+  "dm.revert": "Voltar",
+  "dm.keep": "Manter",
+  "dm.hint": "Super + P de novo ou setas: escolher  ·  Enter: aplicar  ·  Esc: fechar",
+  "monitor.multi_mode_title": "Como usar as telas",
+  "monitor.multi_mode_sub": "Só o notebook, duplicar, estender ou só a segunda tela. Atalho: Super + P.",
+  "monitor.multi_mode_btn": "Escolher",
+  "binds.act_display_mode": "Como usar as telas (só notebook, duplicar, estender)",
+  "binds.act_next_screen": "Levar o mouse para a outra tela"
 }
