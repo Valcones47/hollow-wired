@@ -1,0 +1,106 @@
+#!/usr/bin/env python3
+"""rice-mc-icon <pid> — ícone da instância do Minecraft que esse processo roda.
+
+O jogo aberto por um launcher (Freesm, Prism, PolyMC, MultiMC) roda dentro da
+pasta da instância (<instâncias>/<nome>/minecraft); o instance.cfg dela diz o
+ícone escolhido (iconKey). O ícone pode ser:
+  - personalizado: arquivo <iconKey>.* na pasta "icons" do launcher;
+  - embutido no launcher (ex.: herobrine_legacy): não existe como arquivo no
+    sistema — é baixado uma vez do repositório público do launcher e fica em
+    ~/.cache/hollow-wired/mc-icons/.
+
+Imprime o caminho do arquivo; sem ícone, não imprime nada (quem chama usa o
+ícone do launcher).
+"""
+import os
+import re
+import sys
+import urllib.request
+
+CACHE = os.path.expanduser("~/.cache/hollow-wired/mc-icons")
+EXTS = (".png", ".svg", ".jpg", ".jpeg", ".webp", ".gif", ".ico")
+# Repositório de cada launcher (os ícones embutidos de todos vêm do MultiMC).
+BUILTIN_URLS = {
+    "FreesmLauncher": "https://raw.githubusercontent.com/FreesmTeam/FreesmLauncher/HEAD/launcher/resources/multimc/128x128/instances/{key}.png",
+    "PrismLauncher": "https://raw.githubusercontent.com/PrismLauncher/PrismLauncher/develop/launcher/resources/multimc/128x128/instances/{key}.png",
+}
+DEFAULT_URL = BUILTIN_URLS["FreesmLauncher"]
+
+
+def instance_dir(pid):
+    try:
+        cwd = os.readlink(f"/proc/{pid}/cwd")
+    except OSError:
+        return None
+    d = cwd
+    for _ in range(3):
+        if os.path.isfile(os.path.join(d, "instance.cfg")):
+            return d
+        d = os.path.dirname(d)
+    return None
+
+
+def icon_key(inst):
+    try:
+        with open(os.path.join(inst, "instance.cfg"), encoding="utf-8", errors="replace") as f:
+            for line in f:
+                if line.startswith("iconKey="):
+                    return line.split("=", 1)[1].strip()
+    except OSError:
+        pass
+    return ""
+
+
+def launcher_root(inst):
+    # <raiz do launcher>/instances/<instância>
+    return os.path.dirname(os.path.dirname(inst))
+
+
+def custom_icon(root, key):
+    icons = os.path.join(root, "icons")
+    for ext in EXTS:
+        p = os.path.join(icons, key + ext)
+        if os.path.isfile(p):
+            return p
+    return None
+
+
+def builtin_icon(root, key):
+    if not re.fullmatch(r"[A-Za-z0-9_\-]+", key):
+        return None
+    path = os.path.join(CACHE, key + ".png")
+    if os.path.isfile(path):
+        return path
+    url = BUILTIN_URLS.get(os.path.basename(root), DEFAULT_URL).format(key=key)
+    try:
+        with urllib.request.urlopen(url, timeout=8) as r:
+            data = r.read()
+    except Exception:
+        return None
+    if not data.startswith(b"\x89PNG"):
+        return None
+    os.makedirs(CACHE, exist_ok=True)
+    with open(path, "wb") as f:
+        f.write(data)
+    return path
+
+
+def main():
+    if len(sys.argv) < 2 or not sys.argv[1].isdigit():
+        print(__doc__.strip(), file=sys.stderr)
+        return 1
+    inst = instance_dir(sys.argv[1])
+    if not inst:
+        return 0
+    key = icon_key(inst)
+    if not key or key == "default":
+        return 0
+    root = launcher_root(inst)
+    path = custom_icon(root, key) or builtin_icon(root, key)
+    if path:
+        print(path)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

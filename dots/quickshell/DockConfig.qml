@@ -156,6 +156,34 @@ QtObject {
     // jogo não vira o item do launcher no dock.
     readonly property var _mcLaunchers: ["org.freesmlauncher.FreesmLauncher", "org.prismlauncher.PrismLauncher",
         "org.polymc.PolyMC", "org.multimc.MultiMC", "com.atlauncher.ATLauncher", "minecraft-launcher"]
+    // Ícone da instância (rice-mc-icon: iconKey do instance.cfg), por pid do
+    // jogo; enquanto não chega, o do launcher.
+    property var mcIcons: ({})
+    property var _mcAsked: ({})
+    property Process mcIconProc: Process {
+        property string pid: ""
+        command: ["rice-mc-icon", pid]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const path = text.trim();
+                const m = Object.assign({}, root.mcIcons);
+                m[root.mcIconProc.pid] = path ? "file://" + path : "";
+                root.mcIcons = m;
+            }
+        }
+    }
+    function _instanceIcon(appId) {
+        const t = Hyprland.toplevels.values.find(x => x.lastIpcObject && x.lastIpcObject.class === appId);
+        const pid = t && t.lastIpcObject.pid ? String(t.lastIpcObject.pid) : "";
+        if (!pid) return "";
+        if (root.mcIcons[pid] !== undefined) return root.mcIcons[pid];
+        if (!root._mcAsked[pid] && !root.mcIconProc.running) {
+            root._mcAsked[pid] = true;
+            root.mcIconProc.pid = pid;
+            root.mcIconProc.running = true;
+        }
+        return "";
+    }
     function _minecraftIcon() {
         const open = Hyprland.toplevels.values.map(t => (t.lastIpcObject && t.lastIpcObject.class) || "");
         const ids = root._mcLaunchers.filter(id => open.indexOf(id) >= 0).concat(root._mcLaunchers);
@@ -166,7 +194,7 @@ QtObject {
         return iconSource("applications-games", "");
     }
     function iconForWindow(appId, title) {
-        if (/^minecraft\*?\s+[\d.]+/i.test(appId || "")) return root._minecraftIcon();
+        if (/^minecraft\*?\s+[\d.]+/i.test(appId || "")) return root._instanceIcon(appId) || root._minecraftIcon();
         const e = entryForWindow(appId, title);
         if (e) return iconSource(e.icon, appId);
         if (/^steam_app_/.test(appId || "")) return iconSource("", appId);
