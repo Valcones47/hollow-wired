@@ -149,7 +149,24 @@ QtObject {
         if (name.startsWith("/")) return "file://" + name;
         return Quickshell.iconPath(name, fb);
     }
+    // Minecraft aberto por um launcher (Freesm, Prism, MultiMC...): a janela do
+    // jogo se chama "Minecraft* 1.21.11" — versão no nome, sem atalho, e o
+    // Papirus não tem ícone de Minecraft. Usa o ícone do launcher aberto (ou do
+    // primeiro instalado). Só o ícone: o nome continua o título do jogo, e o
+    // jogo não vira o item do launcher no dock.
+    readonly property var _mcLaunchers: ["org.freesmlauncher.FreesmLauncher", "org.prismlauncher.PrismLauncher",
+        "org.polymc.PolyMC", "org.multimc.MultiMC", "com.atlauncher.ATLauncher", "minecraft-launcher"]
+    function _minecraftIcon() {
+        const open = Hyprland.toplevels.values.map(t => (t.lastIpcObject && t.lastIpcObject.class) || "");
+        const ids = root._mcLaunchers.filter(id => open.indexOf(id) >= 0).concat(root._mcLaunchers);
+        for (const id of ids) {
+            const e = DesktopEntries.byId(id);
+            if (e && e.icon) return iconSource(e.icon, id);
+        }
+        return iconSource("applications-games", "");
+    }
     function iconForWindow(appId, title) {
+        if (/^minecraft\*?\s+[\d.]+/i.test(appId || "")) return root._minecraftIcon();
         const e = entryForWindow(appId, title);
         if (e) return iconSource(e.icon, appId);
         if (/^steam_app_/.test(appId || "")) return iconSource("", appId);
