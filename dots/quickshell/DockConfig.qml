@@ -119,6 +119,15 @@ QtObject {
         const byClass = apps.find(a => root._norm(a.startupClass) === nc)
             || apps.find(a => root._norm(String(a.name || "").replace(/\(.*?\)/g, "")) === nc);
         if (byClass) return byClass;
+        // Atalho em formato de domínio ("io.github.hedge_dev.unleashedrecomp") e
+        // janela só com o último trecho ("UnleashedRecomp"), sem StartupWMClass:
+        // o Dock e o Super+Tab chamam sem título, então nada mais casava.
+        const byTail = apps.find(a => {
+            const id = String(a.id || "");
+            const i = id.lastIndexOf(".");
+            return i > 0 && root._norm(id.slice(i + 1)) === nc;
+        });
+        if (byTail) return byTail;
         // A heurística casaria "steam_app_…" com o próprio Steam.
         if (!steam) {
             e = DesktopEntries.heuristicLookup(clean);
