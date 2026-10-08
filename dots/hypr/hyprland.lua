@@ -980,12 +980,26 @@ local function toggle_discord_deafen()
 
     discord_log("deafen ENVIADO")
 
-    -- Envia Ctrl + Shift + d (minúsculo) para o Discord / Vesktop
-    hl.dispatch(hl.dsp.send_shortcut({ mods = "CTRL SHIFT", key = "d", window = "class:^(discord|vesktop)$" }))
-    -- Força liberação imediata do 'd' e modificadores para nunca travar a tecla repetindo no chat
-    hl.dispatch(hl.dsp.send_key_state({ mods = "", key = "d", state = "up", window = "class:^(discord|vesktop)$" }))
-    hl.dispatch(hl.dsp.send_key_state({ mods = "", key = "Control_L", state = "up", window = "class:^(discord|vesktop)$" }))
-    hl.dispatch(hl.dsp.send_key_state({ mods = "", key = "Shift_L", state = "up", window = "class:^(discord|vesktop)$" }))
+    -- Por que o Ctrl+D antes (medido dentro do Discord, via depuração remota):
+    -- o Discord usa Ctrl+D (ou Meta+D) para ligar o "modo de teclado" do
+    -- arrastar-e-soltar (react-dnd). Quando esse modo está desligado — logo
+    -- depois de abrir e depois de qualquer clique na janela — ele troca de
+    -- backend e REENVIA a mesma tecla, uma segunda vez (evento com
+    -- isTrusted=false). O ensurdecer (Ctrl+Shift+D) cai na regra e o Discord o
+    -- recebia duas vezes: ensurdecia e desensurdecia 0,2 s depois, só "na
+    -- primeira vez" e "de novo depois de um tempo". O mutar (Ctrl+Shift+M) não
+    -- tem a letra D e nunca teve o problema. Um Ctrl+D inofensivo antes faz a
+    -- troca de backend com a tecla de preparo; a seguinte chega uma vez só.
+    local discord_win = "class:^(discord|vesktop)$"
+    hl.dispatch(hl.dsp.send_shortcut({ mods = "CTRL", key = "d", window = discord_win }))
+    hl.timer(function()
+        -- Envia Ctrl + Shift + d (minúsculo) para o Discord / Vesktop
+        hl.dispatch(hl.dsp.send_shortcut({ mods = "CTRL SHIFT", key = "d", window = discord_win }))
+        -- Força liberação imediata do 'd' e modificadores para nunca travar a tecla repetindo no chat
+        hl.dispatch(hl.dsp.send_key_state({ mods = "", key = "d", state = "up", window = discord_win }))
+        hl.dispatch(hl.dsp.send_key_state({ mods = "", key = "Control_L", state = "up", window = discord_win }))
+        hl.dispatch(hl.dsp.send_key_state({ mods = "", key = "Shift_L", state = "up", window = discord_win }))
+    end, { timeout = 60, type = "oneshot" })
 end
 
 local discord_mute_ready = true
