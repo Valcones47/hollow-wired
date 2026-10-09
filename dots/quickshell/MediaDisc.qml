@@ -69,7 +69,7 @@ Item {
         Timer {
             interval: 33
             repeat: true
-            running: d.playing && d.visible
+            running: Theme.audioViz && d.playing && d.visible
             onTriggered: {
                 const target = d.level;
                 c.amp += (target - c.amp) * (target > c.amp ? 0.6 : 0.15);

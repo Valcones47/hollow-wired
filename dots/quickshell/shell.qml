@@ -653,12 +653,14 @@ ShellRoot {
                         }
 
                         Dashboard {
+                            hubShown: hub.visible
                             width: tabStage.width; height: tabStage.height
                             x: tabStage.place(0)
                             visible: Math.abs(x) < width
                             Behavior on x { enabled: !swipe.active; NumberAnimation { duration: Theme.ms(300); easing.type: Easing.OutCubic } }
                         }
                         Media {
+                            hubShown: hub.visible
                             width: tabStage.width; height: tabStage.height
                             x: tabStage.place(1)
                             visible: Math.abs(x) < width

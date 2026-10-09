@@ -446,6 +446,10 @@ for f in $USER_STATE; do
 done
 saved_locale=""
 [ -f "$STATE_TMP/quickshell/locale.json" ] && saved_locale=1
+# Instalação nova (sem preferências anteriores): serve para escolher o perfil de
+# desempenho abaixo, sem mexer em quem reinstala.
+had_prefs=""
+[ -f "$STATE_TMP/hypr/user-prefs.json" ] && had_prefs=1
 
 cp -a "$SCRIPT_DIR/dots/hypr" "$HOME/.config/"
 cp -a "$SCRIPT_DIR/dots/quickshell" "$HOME/.config/"
@@ -487,6 +491,19 @@ if [ -d "$SCRIPT_DIR/dots/dbus-services" ]; then
 fi
 cp -a --remove-destination "$SCRIPT_DIR/dots/bin/"* "$HOME/.local/bin/"
 chmod +x "$HOME/.local/bin/"*
+
+# Processador com 2 threads ou menos (Celeron/Pentium antigos): a instalação nova
+# já nasce no perfil de desempenho "mínimo" (sem desfoque, sombras e animações,
+# sem visualizador de áudio e com o papel de parede animado congelado). O
+# perfil pode ser trocado em Configurações → Efeitos & janelas. Quem reinstala
+# mantém o que já tinha escolhido.
+if [ -z "$had_prefs" ] && [ "$(nproc 2>/dev/null || echo 4)" -le 2 ]; then
+    # `get` cria o user-prefs.json com os valores padrão; o perfil só sobrescreve os dele.
+    PATH="$HOME/.local/bin:$PATH" rice-hypr-prefs get >/dev/null 2>&1 || true
+    if PATH="$HOME/.local/bin:$PATH" rice-perf-profile set minimo >/dev/null 2>&1; then
+        info_msg "Processador de $(nproc) threads: perfil de desempenho ${WHITE}Mínimo${NC} ativado (muda em Configurações → Efeitos & janelas)."
+    fi
+fi
 
 # 5. Cópia dos Logos e GIFs da Lain para ~/Imagens/FastFetch
 gear_msg "Copiando GIFs da Lain e logos para $PICTURES_DIR/FastFetch/..."

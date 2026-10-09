@@ -301,6 +301,9 @@ QtObject {
     // Não usar em animação com loops infinitos (duração 0 em loop gira a CPU).
     property string shellAnim: "completo"
     property bool overviewLive: true
+    // Perfil "mínimo" (rice-perf-profile): sem visualizador de áudio (cava e o
+    // disco que reage ao som).
+    property bool audioViz: true
     readonly property real animScale: shellAnim === "off" ? 0 : shellAnim === "rapido" ? 0.5 : 1
     function ms(d) { return Math.round(d * root.animScale); }
     property FileView perfPrefsFile: FileView {
@@ -313,6 +316,7 @@ QtObject {
                 const d = JSON.parse(text()) || {};
                 root.shellAnim = ["off", "rapido", "completo"].includes(d.shell_anim) ? d.shell_anim : "completo";
                 root.overviewLive = d.overview_live !== false;
+                root.audioViz = d.audio_viz !== false;
             } catch (e) {}
         }
     }

@@ -1434,7 +1434,7 @@
   "edit.target_top_bar": "Barra de cima",
   "edit.target_sidebar": "Central de ações",
   "perf.group": "Desempenho",
-  "perf.desc": "Junta desfoque, sombras e animações num nível só. Leve é o melhor para placa integrada e bateria.",
+  "perf.desc": "Junta desfoque, sombras, animações e outros gastos fixos num nível só. Leve é o melhor para placa integrada e bateria; Mínimo é para processador de 2 núcleos.",
   "perf.leve": "Leve",
   "perf.leve_sub": "Sem desfoque, animações curtas",
   "perf.medio": "Médio",
@@ -2000,5 +2000,11 @@
   "monitor.multi_mode_btn": "Escolher",
   "binds.act_display_mode": "Como usar as telas (só notebook, duplicar, estender)",
   "binds.act_next_screen": "Levar o mouse para a outra tela",
-  "monitor.brightness_section_sub_ext": "Brilho do próprio monitor, ajustado pelo cabo (DDC/CI)"
+  "monitor.brightness_section_sub_ext": "Brilho do próprio monitor, ajustado pelo cabo (DDC/CI)",
+  "perf.minimo": "Mínimo",
+  "perf.minimo_sub": "Processador fraco: sem efeitos, papel de parede parado",
+  "perf.viz": "Visualizador de áudio",
+  "perf.viz_sub": "O anel e o disco da mídia que dançam com o som. Desligado, o cava não roda.",
+  "perf.frozen": "Congelar o papel de parede animado",
+  "perf.frozen_sub": "O Waywallen fica em pausa e o último quadro continua na tela: some o custo de CPU e GPU do vídeo ou da cena."
 }

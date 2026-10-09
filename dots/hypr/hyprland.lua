@@ -445,6 +445,9 @@ hl.on("hyprland.start", function()
 else
     "$HOME/.local/bin/rice-wallpaper-set" --ensure >/dev/null 2>&1
 fi']])
+    -- Perfil "mínimo": papel de parede animado congelado. O Waywallen sobe
+    -- retomando o último wallpaper; depois de uns segundos, pausa (se o perfil pede).
+    hl.exec_cmd("sh -c 'command -v rice-wallpaper-freeze >/dev/null && setsid -f rice-wallpaper-freeze auto 25 >/dev/null 2>&1'")
 end)
 
 -----------------------------

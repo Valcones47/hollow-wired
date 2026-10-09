@@ -17,6 +17,9 @@ import "."
 Item {
     id: root
 
+    // Só com o hub aberto (o item fica instanciado mesmo com a janela fechada).
+    property bool hubShown: true
+
     readonly property var dayNames: Theme.locale === "en"
         ? ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
         : ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"]
@@ -741,7 +744,7 @@ Item {
             Layout.preferredWidth: 236
             Layout.fillHeight: true
 
-            Binding { target: MediaState; property: "levelWanted"; value: true; when: root.visible && root.player !== null && root.player.isPlaying }
+            Binding { target: MediaState; property: "levelWanted"; value: true; when: root.hubShown && root.visible && root.player !== null && root.player.isPlaying }
 
             // MPRIS não empurra a posição continuamente — avança local e
             // resincroniza em eventos (mesma lógica da aba Mídia).

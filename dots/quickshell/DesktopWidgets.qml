@@ -889,7 +889,7 @@ PanelWindow {
                         Timer {
                             interval: 33
                             repeat: true
-                            running: w.playing && w.visible
+                            running: Theme.audioViz && w.playing && w.visible
                             onTriggered: discCanvas.phase += 0.08
                         }
 

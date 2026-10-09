@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""rice-perf-profile — perfis de desempenho: leve, médio, pesado e personalizado.
+"""rice-perf-profile — perfis de desempenho: mínimo, leve, médio, pesado e personalizado.
 
 Um perfil é só um jeito rápido de gravar, de uma vez, as preferências que pesam
 na GPU (em ~/.config/hypr/user-prefs.json):
@@ -10,6 +10,8 @@ na GPU (em ~/.config/hypr/user-prefs.json):
   anim_workspaces      troca de área de trabalho    (off | rapido | completo)
   shell_anim           animações dos painéis do shell (off | rapido | completo)
   overview_live        prévia ao vivo das janelas no Super + Tab
+  audio_viz            visualizador de áudio (cava) e disco que reage ao som
+  wallpaper_frozen     congela o papel de parede animado (Waywallen em pausa)
 
 O perfil atual não é guardado: é o que bate com os valores gravados, ou
 "custom". Assim, mexer no desfoque pelo Super + B ou pela central já aparece
@@ -20,11 +22,11 @@ Hyprland) e o próprio Quickshell (Theme lê shell_anim e overview_live).
 
 Uso:
   rice-perf-profile get                 # JSON: perfil atual, valores e perfis
-  rice-perf-profile set <leve|medio|pesado>
+  rice-perf-profile set <minimo|leve|medio|pesado>
   rice-perf-profile item <chave> <valor>   # vira "Personalizado"
       chaves: blur_level (off|leve|padrao|forte), shadows (true|false),
               anim_windows, anim_workspaces, shell_anim (off|rapido|completo),
-              overview_live (true|false)
+              overview_live, audio_viz, wallpaper_frozen (true|false)
 """
 
 import json
@@ -38,18 +40,29 @@ PREFS = os.path.join(HOME, ".config/hypr/user-prefs.json")
 LEVELS = ["off", "rapido", "completo"]
 
 PROFILES = {
+    # Processador fraco (2 núcleos/2 threads, Celeron/Pentium): corta o que
+    # custa CPU além do visual — papel de parede animado, visualizador de
+    # áudio, leituras do sistema — e desliga desfoque, sombras e animações.
+    # O instalador escolhe este perfil sozinho em máquina de 2 threads.
+    "minimo": {"blur": False, "blur_quality": "leve", "shadows": False,
+               "anim_windows": "off", "anim_workspaces": "off",
+               "shell_anim": "off", "overview_live": False,
+               "audio_viz": False, "wallpaper_frozen": True},
     # Integradas fracas / bateria: nada de desfoque, animações curtas.
     "leve": {"blur": False, "blur_quality": "leve", "shadows": False,
              "anim_windows": "rapido", "anim_workspaces": "rapido",
-             "shell_anim": "rapido", "overview_live": False},
+             "shell_anim": "rapido", "overview_live": False,
+             "audio_viz": True, "wallpaper_frozen": False},
     # O visual padrão do rice.
     "medio": {"blur": True, "blur_quality": "padrao", "shadows": False,
               "anim_windows": "completo", "anim_workspaces": "completo",
-              "shell_anim": "completo", "overview_live": True},
+              "shell_anim": "completo", "overview_live": True,
+              "audio_viz": True, "wallpaper_frozen": False},
     # Tudo no máximo.
     "pesado": {"blur": True, "blur_quality": "forte", "shadows": True,
                "anim_windows": "completo", "anim_workspaces": "completo",
-               "shell_anim": "completo", "overview_live": True},
+               "shell_anim": "completo", "overview_live": True,
+               "audio_viz": True, "wallpaper_frozen": False},
 }
 
 DEFAULTS = PROFILES["medio"]
@@ -103,6 +116,9 @@ def apply(old, new):
     # configuração: trocar a qualidade precisa de reload (ver rice-hypr-prefs).
     if old.get("blur_quality") != new.get("blur_quality") or old.get("blur") != new.get("blur"):
         run(["hyprctl", "reload"])
+    # Papel de parede animado: pausa/retoma o Waywallen conforme o perfil.
+    if old.get("wallpaper_frozen") != new.get("wallpaper_frozen"):
+        run(["rice-wallpaper-freeze", "apply"])
 
 
 def dump(prefs):
@@ -131,7 +147,7 @@ def main(argv):
             prefs["blur"] = val != "off"
             if val != "off":
                 prefs["blur_quality"] = val
-        elif key in ("shadows", "overview_live") and val in ("true", "false"):
+        elif key in ("shadows", "overview_live", "audio_viz", "wallpaper_frozen") and val in ("true", "false"):
             prefs[key] = val == "true"
         elif key in ("anim_windows", "anim_workspaces", "shell_anim") and val in LEVELS:
             prefs[key] = val

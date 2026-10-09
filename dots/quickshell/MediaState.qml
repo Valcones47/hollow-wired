@@ -130,7 +130,7 @@ Singleton {
     property real level: 0
     property var barValues: []
     property Process levelProc: Process {
-        running: root.levelWanted && root.player !== null && root.playing
+        running: Theme.audioViz && root.levelWanted && root.player !== null && root.playing
         command: ["cava", "-p", Quickshell.env("HOME") + "/.config/quickshell/cava-bar.conf"]
         stdout: SplitParser {
             splitMarker: "\n"

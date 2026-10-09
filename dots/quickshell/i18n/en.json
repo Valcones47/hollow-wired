@@ -1434,7 +1434,7 @@
   "edit.target_top_bar": "Top bar",
   "edit.target_sidebar": "Action center",
   "perf.group": "Performance",
-  "perf.desc": "Blur, shadows and animations in a single level. Light is best for integrated graphics and battery.",
+  "perf.desc": "Bundles blur, shadows, animations and other fixed costs into one level. Light suits integrated graphics and battery; Minimal is for 2-core processors.",
   "perf.leve": "Light",
   "perf.leve_sub": "No blur, short animations",
   "perf.medio": "Medium",
@@ -2000,5 +2000,11 @@
   "monitor.multi_mode_btn": "Choose",
   "binds.act_display_mode": "How to use the screens (laptop only, duplicate, extend)",
   "binds.act_next_screen": "Move the mouse to the other screen",
-  "monitor.brightness_section_sub_ext": "The monitor's own brightness, set over the cable (DDC/CI)"
+  "monitor.brightness_section_sub_ext": "The monitor's own brightness, set over the cable (DDC/CI)",
+  "perf.minimo": "Minimal",
+  "perf.minimo_sub": "Weak CPU: no effects, wallpaper paused",
+  "perf.viz": "Audio visualizer",
+  "perf.viz_sub": "The ring and disc in the media panel that dance with the sound. Off, cava does not run.",
+  "perf.frozen": "Freeze the animated wallpaper",
+  "perf.frozen_sub": "Waywallen is paused and the last frame stays on screen: the video or scene stops using CPU and GPU."
 }

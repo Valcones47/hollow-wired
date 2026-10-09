@@ -40,9 +40,13 @@ Item {
     // 44 faixas: o suficiente para o anel em volta da capa não ficar serrilhado.
     // Ver cava.conf — mexer aqui sem mexer lá deixa o anel com buracos.
     property var barValues: []
+    // Só com o hub aberto: o Media fica instanciado dentro dele mesmo fechado
+    // (visible do item não acompanha a janela), e o cava de 44 faixas rodava o
+    // tempo todo com música tocando, sem ninguém olhando o anel.
+    property bool hubShown: true
     Process {
         id: cavaProc
-        running: root.player !== null && root.player.isPlaying
+        running: Theme.audioViz && root.hubShown && root.visible && root.player !== null && root.player.isPlaying
         command: ["cava", "-p", Quickshell.env("HOME") + "/.config/quickshell/cava.conf"]
         stdout: SplitParser {
             splitMarker: "\n"

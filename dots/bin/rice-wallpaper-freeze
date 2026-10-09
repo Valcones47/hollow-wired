@@ -1,0 +1,92 @@
+#!/usr/bin/env python3
+"""rice-wallpaper-freeze — congela o papel de parede animado (perfil "mínimo").
+
+O Waywallen continua rodando, mas em pausa: o último quadro fica na tela e o
+renderizador (vídeo ou cena do Wallpaper Engine) deixa de gastar CPU e GPU.
+É o maior corte de uso contínuo num processador fraco.
+
+Uso:
+  rice-wallpaper-freeze apply        # pausa ou retoma conforme user-prefs.json
+                                     # ("wallpaper_frozen")
+  rice-wallpaper-freeze auto [seg]   # depois de [seg] s, se o perfil pede, pausa
+                                     # (usado no login e depois de trocar o
+                                     # wallpaper, que o Waywallen retoma sozinho)
+
+O D-Bus do Waywallen (Pause/Resume) vale para todas as telas.
+"""
+import json
+import os
+import subprocess
+import sys
+import time
+
+PREFS = os.path.expanduser("~/.config/hypr/user-prefs.json")
+RUN = os.path.join(os.environ.get("XDG_RUNTIME_DIR", "/tmp"), "hollow-wired")
+TOKEN = os.path.join(RUN, "wallpaper-freeze.token")
+DEST = "org.waywallen.waywallen.Daemon"
+PATH = "/org/waywallen/waywallen/Daemon"
+IFACE = "org.waywallen.waywallen.Daemon1"
+
+
+def frozen_wanted():
+    try:
+        with open(PREFS, encoding="utf-8") as f:
+            return json.load(f).get("wallpaper_frozen") is True
+    except (OSError, ValueError):
+        return False
+
+
+def daemon_up():
+    r = subprocess.run(["busctl", "--user", "get-property", DEST, PATH, IFACE, "Version"],
+                       capture_output=True, text=True, timeout=5)
+    return r.returncode == 0
+
+
+def call(method):
+    subprocess.run(["busctl", "--user", "call", DEST, PATH, IFACE, method],
+                   capture_output=True, timeout=10)
+
+
+def apply():
+    if not daemon_up():
+        return 0
+    call("Pause" if frozen_wanted() else "Resume")
+    return 0
+
+
+def auto(delay):
+    # Só o pedido mais recente vale: trocar o wallpaper duas vezes seguidas não
+    # empilha pausas.
+    os.makedirs(RUN, exist_ok=True)
+    token = str(time.time())
+    with open(TOKEN, "w") as f:
+        f.write(token)
+    time.sleep(delay)
+    try:
+        with open(TOKEN) as f:
+            if f.read() != token:
+                return 0
+    except OSError:
+        return 0
+    if not frozen_wanted():
+        return 0
+    for _ in range(60):  # no login o daemon ainda está subindo
+        if daemon_up():
+            call("Pause")
+            return 0
+        time.sleep(1)
+    return 0
+
+
+def main():
+    cmd = sys.argv[1] if len(sys.argv) > 1 else ""
+    if cmd == "apply":
+        return apply()
+    if cmd == "auto":
+        return auto(float(sys.argv[2]) if len(sys.argv) > 2 else 0)
+    print(__doc__.strip(), file=sys.stderr)
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

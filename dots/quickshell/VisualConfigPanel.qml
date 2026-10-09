@@ -6123,7 +6123,7 @@ PanelWindow {
                                 GroupLabel { Layout.topMargin: 0; text: Theme.t("perf.group", "Desempenho") }
                                 Text {
                                     Layout.fillWidth: true
-                                    text: Theme.t("perf.desc", "Junta desfoque, sombras e animações num nível só. Leve é o melhor para placa integrada e bateria.")
+                                    text: Theme.t("perf.desc", "Junta desfoque, sombras, animações e outros gastos fixos num nível só. Leve é o melhor para placa integrada e bateria; Mínimo é para processador de 2 núcleos.")
                                     wrapMode: Text.WordWrap
                                     font.family: Theme.fontFamily
                                     font.pixelSize: 11
@@ -6134,6 +6134,7 @@ PanelWindow {
                                     spacing: 8
                                     Repeater {
                                         model: [
+                                            { k: "minimo", name: Theme.t("perf.minimo", "Mínimo"), sub: Theme.t("perf.minimo_sub", "Processador fraco: sem efeitos, papel de parede parado") },
                                             { k: "leve", name: Theme.t("perf.leve", "Leve"), sub: Theme.t("perf.leve_sub", "Sem desfoque, animações curtas") },
                                             { k: "medio", name: Theme.t("perf.medio", "Médio"), sub: Theme.t("perf.medio_sub", "O visual padrão") },
                                             { k: "pesado", name: Theme.t("perf.pesado", "Pesado"), sub: Theme.t("perf.pesado_sub", "Desfoque forte e sombras") },
@@ -6247,6 +6248,20 @@ PanelWindow {
                                         subtitle: Theme.t("perf.live_sub", "Desligada, as janelas aparecem como foto parada.")
                                         checked: (win.perf.values || {}).overview_live !== false
                                         onToggled: nv => win.perfItem("overview_live", nv)
+                                    }
+                                    RowDivider {}
+                                    OptionToggle {
+                                        title: Theme.t("perf.viz", "Visualizador de áudio")
+                                        subtitle: Theme.t("perf.viz_sub", "O anel e o disco da mídia que dançam com o som. Desligado, o cava não roda.")
+                                        checked: (win.perf.values || {}).audio_viz !== false
+                                        onToggled: nv => win.perfItem("audio_viz", nv)
+                                    }
+                                    RowDivider {}
+                                    OptionToggle {
+                                        title: Theme.t("perf.frozen", "Congelar o papel de parede animado")
+                                        subtitle: Theme.t("perf.frozen_sub", "O Waywallen fica em pausa e o último quadro continua na tela: some o custo de CPU e GPU do vídeo ou da cena.")
+                                        checked: (win.perf.values || {}).wallpaper_frozen === true
+                                        onToggled: nv => win.perfItem("wallpaper_frozen", nv)
                                     }
                                 }
 
