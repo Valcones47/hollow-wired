@@ -335,6 +335,8 @@ ShellRoot {
     Welcome {}
     // Atualizações por origem (ícone de updates da sidebar).
     Updater {}
+    // Monitor do sistema próprio (Super + Esc; Super + Shift + ' desce do topo).
+    TaskManager {}
     // Modo das telas (Super + P), como o Win + P.
     DisplayMode {}
     QuickNotes {}

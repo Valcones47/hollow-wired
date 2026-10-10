@@ -1090,6 +1090,8 @@ hl.bind(mainMod .. " + SHIFT + X", hl.dsp.exec_cmd("hyprctl kill"))
 -- Tecla à esquerda do 1 (no ABNT2 é aspas; "grave" nunca dispara nesse
 -- teclado porque a crase é tecla morta com Shift).
 hl.bind(mainMod .. " + apostrophe", hl.dsp.exec_cmd("rice-dropterm"))
+-- Monitor do sistema do rice descendo do topo; apertar de novo fecha por completo.
+hl.bind(mainMod .. " + SHIFT + apostrophe", hl.dsp.exec_cmd("rice-task-manager drop"))
 -- Emergência: reinicia quickshell/barra sem abrir terminal.
 hl.bind(mainMod .. " + CTRL + R", hl.dsp.exec_cmd("rice-restart"))
 -- Toggle manual de blur (também acessível pelo botão da sidebar do Quickshell)

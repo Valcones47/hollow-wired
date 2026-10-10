@@ -404,7 +404,8 @@ PanelWindow {
                 { key: "Super + L", action: Theme.t("binds.act_lock", "Bloquear Tela (Hyprlock)") },
                 { key: "Alt + Tab", action: Theme.t("binds.act_alttab", "Alternador de Janelas com Miniaturas") },
                 { key: "Super + Tab", action: Theme.t("binds.act_overview", "Visão Geral das Áreas de Trabalho (Carrossel)") },
-                { key: "Super + Esc", action: Theme.t("binds.act_taskmgr", "Gerenciador de Tarefas (também Ctrl + Shift + Esc)") }
+                { key: "Super + Esc", action: Theme.t("binds.act_taskmgr", "Gerenciador de Tarefas (também Ctrl + Shift + Esc)") },
+                { key: "Super + Shift + '", action: Theme.t("binds.act_taskmgr_drop", "Gerenciador de Tarefas descendo do topo (de novo fecha)") }
             ]
         },
         {

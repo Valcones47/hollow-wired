@@ -1,0 +1,257 @@
+#!/usr/bin/env python3
+"""rice-procs — dados do monitor do sistema do rice (TaskManager.qml).
+
+Agrupa os processos do usuário por aplicativo: cada janela do Hyprland vira
+um app (pela classe) e leva consigo todos os processos descendentes do pid da
+janela (renderizadores do navegador, helpers do Electron...). O que não
+pertence a nenhuma janela fica em "segundo plano", agrupado pelo nome.
+
+Uso:
+  rice-procs watch [seg]               # uma linha JSON a cada [seg] s (padrão 2)
+  rice-procs once                      # uma linha e sai
+  rice-procs kill <TERM|KILL> <pid>... # encerra; recusa o compositor e o shell
+
+Memória = páginas residentes menos as compartilhadas (evita contar duas vezes
+a biblioteca que o navegador e os helpers dividem). CPU em % da máquina toda.
+GPU não é lida de propósito: o nvidia-smi acorda a placa e gasta bateria.
+"""
+import glob
+import json
+import os
+import signal
+import subprocess
+import sys
+import time
+
+CLK = os.sysconf("SC_CLK_TCK")
+PAGE = os.sysconf("SC_PAGE_SIZE")
+NCPU = os.cpu_count() or 1
+UID = os.getuid()
+ME = os.getpid()
+# Nunca encerrar: a sessão cai junto.
+PROTECTED = {"Hyprland", "quickshell", "qs", "systemd", "dbus-daemon", "dbus-broker",
+             "greetd", "sddm", "login", "pipewire", "wireplumber"}
+# Interpretadores: o nome útil está no primeiro argumento (o script).
+WRAPPERS = {"python", "python3", "bash", "sh", "fish", "zsh", "node", "java", "perl", "ruby", "electron"}
+
+
+def read(path):
+    try:
+        with open(path) as f:
+            return f.read()
+    except OSError:
+        return ""
+
+
+def scan():
+    procs = {}
+    for name in os.listdir("/proc"):
+        if not name.isdigit():
+            continue
+        pid = int(name)
+        try:
+            if os.stat("/proc/%d" % pid).st_uid != UID:
+                continue
+            data = read("/proc/%d/stat" % pid)
+            i = data.rindex(")")
+            comm = data[data.index("(") + 1:i]
+            rest = data[i + 2:].split()
+            if rest[0] == "Z":
+                continue
+            sm = read("/proc/%d/statm" % pid).split()
+            procs[pid] = {
+                "ppid": int(rest[1]),
+                "ticks": int(rest[11]) + int(rest[12]),
+                "mem": max(0, int(sm[1]) - int(sm[2])) * PAGE,
+                "comm": comm,
+            }
+        except (OSError, ValueError, IndexError):
+            continue
+    return procs
+
+
+def friendly(pid, comm):
+    if comm.lower() not in WRAPPERS:
+        return comm
+    parts = read("/proc/%d/cmdline" % pid).split("\0")
+    for a in parts[1:]:
+        if a and not a.startswith("-"):
+            return os.path.basename(a)
+    return comm
+
+
+def hypr_clients():
+    try:
+        r = subprocess.run(["hyprctl", "clients", "-j"], capture_output=True, text=True, timeout=3)
+        return [c for c in json.loads(r.stdout) if c.get("mapped", True)]
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return []
+
+
+def cpu_times():
+    f = read("/proc/stat").splitlines()[0].split()[1:]
+    v = [int(x) for x in f]
+    return sum(v), v[3] + (v[4] if len(v) > 4 else 0)  # total, ocioso (idle+iowait)
+
+
+def meminfo():
+    m = {}
+    for line in read("/proc/meminfo").splitlines():
+        k, _, v = line.partition(":")
+        m[k] = int(v.split()[0]) * 1024
+    return m
+
+
+_temp_path = None
+
+
+def cpu_temp():
+    global _temp_path
+    if _temp_path is None:
+        _temp_path = ""
+        for h in glob.glob("/sys/class/hwmon/hwmon*"):
+            if read(h + "/name").strip() in ("coretemp", "k10temp", "zenpower"):
+                for t in ("temp1_input", "temp2_input"):
+                    if os.path.exists(h + "/" + t):
+                        _temp_path = h + "/" + t
+                        break
+                if _temp_path:
+                    break
+    try:
+        return round(int(read(_temp_path)) / 1000) if _temp_path else None
+    except ValueError:
+        return None
+
+
+class Sampler:
+    def __init__(self):
+        self.prev = {}
+        self.prev_t = None
+        self.prev_cpu = cpu_times()
+
+    def sample(self):
+        now = time.monotonic()
+        procs = scan()
+        clients = hypr_clients()
+        dt = (now - self.prev_t) if self.prev_t else None
+
+        roots = {}  # pid da janela -> classe
+        titles = {}
+        wins = {}
+        for c in clients:
+            cls = c.get("class") or c.get("initialClass") or ""
+            pid = c.get("pid")
+            if not cls or pid not in procs:
+                continue
+            roots[pid] = cls
+            titles.setdefault(cls, c.get("title", ""))
+            wins[cls] = wins.get(cls, 0) + 1
+
+        groups = {}
+        for pid, p in procs.items():
+            if pid == ME:
+                continue
+            owner, cur, hops = None, pid, 0
+            while cur in procs and hops < 64:
+                if cur in roots:
+                    owner = roots[cur]
+                    break
+                cur = procs[cur]["ppid"]
+                hops += 1
+            if owner is not None:
+                key, kind, name = "app:" + owner.lower(), "app", owner
+            else:
+                nm = friendly(pid, p["comm"])
+                key, kind, name = "bg:" + nm, "bg", nm
+            g = groups.setdefault(key, {"key": key, "kind": kind, "name": name, "cls": name if kind == "app" else "",
+                                        "title": titles.get(name, "") if kind == "app" else "",
+                                        "wins": wins.get(name, 0) if kind == "app" else 0,
+                                        "pids": [], "mem": 0, "cpu": 0.0})
+            g["pids"].append(pid)
+            g["mem"] += p["mem"]
+            if dt and pid in self.prev:
+                g["cpu"] += max(0, p["ticks"] - self.prev[pid]) / CLK / dt / NCPU * 100
+
+        self.prev = {pid: p["ticks"] for pid, p in procs.items()}
+        self.prev_t = now
+
+        tot, idle = cpu_times()
+        d_tot, d_idle = tot - self.prev_cpu[0], idle - self.prev_cpu[1]
+        self.prev_cpu = (tot, idle)
+        cpu = round(100 * (d_tot - d_idle) / d_tot, 1) if d_tot > 0 else 0.0
+
+        mi = meminfo()
+        out_groups = []
+        for g in groups.values():
+            g["cpu"] = round(g["cpu"], 1)
+            g["n"] = len(g["pids"])
+            g["pids"] = ",".join(str(x) for x in g["pids"])
+            out_groups.append(g)
+        return {
+            "cpu": cpu,
+            "temp": cpu_temp(),
+            "mem_total": mi.get("MemTotal", 0),
+            "mem_used": mi.get("MemTotal", 0) - mi.get("MemAvailable", 0),
+            "swap_total": mi.get("SwapTotal", 0),
+            "swap_used": mi.get("SwapTotal", 0) - mi.get("SwapFree", 0),
+            "groups": out_groups,
+        }
+
+
+def watch(interval, once=False):
+    s = Sampler()
+    s.sample()
+    time.sleep(0.5)  # primeira linha já com CPU
+    while True:
+        t0 = time.monotonic()
+        try:
+            sys.stdout.write(json.dumps(s.sample(), separators=(",", ":")) + "\n")
+            sys.stdout.flush()
+        except BrokenPipeError:
+            return 0
+        if once:
+            return 0
+        time.sleep(max(0.2, interval - (time.monotonic() - t0)))
+
+
+def kill(sig_name, pids):
+    sig = {"TERM": signal.SIGTERM, "KILL": signal.SIGKILL}.get(sig_name)
+    if sig is None:
+        print("sinal inválido: use TERM ou KILL", file=sys.stderr)
+        return 1
+    done = 0
+    for raw in pids:
+        if not raw.isdigit():
+            continue
+        pid = int(raw)
+        if pid <= 1 or pid == ME:
+            continue
+        comm = read("/proc/%d/comm" % pid).strip()
+        if comm in PROTECTED:
+            continue
+        try:
+            os.kill(pid, sig)
+            done += 1
+        except OSError:
+            pass
+    print(done)
+    return 0
+
+
+def main():
+    a = sys.argv[1:]
+    if not a:
+        print(__doc__.strip(), file=sys.stderr)
+        return 1
+    if a[0] == "watch":
+        return watch(float(a[1]) if len(a) > 1 else 2.0)
+    if a[0] == "once":
+        return watch(0, once=True)
+    if a[0] == "kill" and len(a) > 2:
+        return kill(a[1], a[2:])
+    print(__doc__.strip(), file=sys.stderr)
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

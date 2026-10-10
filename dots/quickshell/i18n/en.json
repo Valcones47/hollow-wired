@@ -2006,5 +2006,20 @@
   "perf.viz": "Audio visualizer",
   "perf.viz_sub": "The ring and disc in the media panel that dance with the sound. Off, cava does not run.",
   "perf.frozen": "Freeze the animated wallpaper",
-  "perf.frozen_sub": "Waywallen is paused and the last frame stays on screen: the video or scene stops using CPU and GPU."
+  "perf.frozen_sub": "Waywallen is paused and the last frame stays on screen: the video or scene stops using CPU and GPU.",
+  "taskman.title": "System monitor",
+  "taskman.search": "Search apps",
+  "taskman.col_app": "Application",
+  "taskman.col_cpu": "Processor",
+  "taskman.col_mem": "Memory",
+  "taskman.end": "End",
+  "taskman.force": "Force quit",
+  "taskman.background": "Background",
+  "taskman.window_one": "1 window",
+  "taskman.windows_n": "%1 windows",
+  "taskman.proc_one": "1 process",
+  "taskman.procs_n": "%1 processes",
+  "taskman.of": "of",
+  "taskman.loading": "Reading processes…",
+  "binds.act_taskmgr_drop": "Task Manager dropping from the top (press again to close)"
 }

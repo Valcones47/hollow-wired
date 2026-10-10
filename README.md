@@ -152,7 +152,8 @@ Full list and user guides (getting started, coming from Windows, FAQ): [`docs/`]
 | `Super + M` | Exit Hyprland Session |
 | `Alt + Tab` | Live Window Switcher |
 | `Super + Tab` | Workspace Overview — 3D carousel of every workspace with live windows, plus a row of all open apps; `/` searches, drag a window to move it to another workspace |
-| `Super + Esc` or `Ctrl + Shift + Esc` | Task Manager (Mission Center, falls back to the Plasma/GNOME monitor or `btop`) |
+| `Super + Esc` or `Ctrl + Shift + Esc` | Task Manager: the rice's own system monitor (apps with CPU/memory, search, End). Falls back to Mission Center, the Plasma/GNOME monitor or `btop` if you pick one of those |
+| `Super + Shift + '` | The same monitor dropping from the top, like the drop-down terminal; press again to close it completely |
 | Right-click on the desktop | Quick menu: Settings, Display, Terminal, Wallpaper, Edit widgets, Files, Overview, Shortcuts |
 | `Print` or `Super + Shift + S` | Region Screenshot — saves, copies to clipboard and notifies. Cancelling the selection captures the **entire screen** instead of doing nothing |
 | `Super + Alt + S` | Interactive Screenshot with Annotation (Swappy) |

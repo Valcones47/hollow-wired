@@ -7,8 +7,13 @@
 # mais parecido com o do Windows), Monitor do Sistema do Plasma, o do GNOME e,
 # por último, btop no terminal.
 #
+# O padrão é o monitor do próprio rice (TaskManager.qml, aberto por IPC do
+# Quickshell). Os outros ficam como escolha do usuário e como reserva se o
+# Quickshell não estiver rodando.
+#
 # Uso:
-#   rice-task-manager            abre (ou foca) o monitor escolhido
+#   rice-task-manager            abre (ou fecha) o monitor escolhido
+#   rice-task-manager drop       monitor do rice descendo do topo; de novo fecha
 #   rice-task-manager list       JSON com os monitores instalados e o atual
 #   rice-task-manager get        imprime o id escolhido ("auto" se não há)
 #   rice-task-manager set <id>   grava a escolha
@@ -20,6 +25,7 @@ PREF_FILE="$PREF_DIR/task-manager"
 
 # id|executável|classe da janela|nome amigável
 CANDIDATES=(
+    "rice|rice-procs||Monitor do rice"
     "missioncenter|missioncenter|io.missioncenter.MissionCenter|Mission Center"
     "plasma|plasma-systemmonitor|org.kde.plasma-systemmonitor|Monitor do Sistema (KDE)"
     "gnome|gnome-system-monitor|gnome-system-monitor|Monitor do Sistema (GNOME)"
@@ -42,6 +48,10 @@ case "${1:-}" in
         mkdir -p "$PREF_DIR"
         printf '%s\n' "$2" > "$PREF_FILE"
         exit 0
+        ;;
+    drop)
+        qs ipc call taskmanager drop >/dev/null 2>&1 && exit 0
+        # Quickshell fora do ar: cai no monitor externo (segue o fluxo abaixo).
         ;;
     list)
         cur=$(current)
@@ -70,6 +80,11 @@ focus_existing() {
 launch() {
     # $1 = executável, $2 = classe da janela
     command -v "$1" >/dev/null 2>&1 || return 1
+    if [ "$1" = "rice-procs" ]; then
+        # Monitor do rice: é do Quickshell, não tem janela própria para focar.
+        qs ipc call taskmanager window >/dev/null 2>&1 && exit 0
+        return 1
+    fi
     focus_existing "$2" && exit 0
     if [ "$1" = "btop" ]; then
         setsid -f kitty --class rice-btop -e btop >/dev/null 2>&1
