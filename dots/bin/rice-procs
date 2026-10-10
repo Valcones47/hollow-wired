@@ -9,7 +9,8 @@ pertence a nenhuma janela fica em "segundo plano", agrupado pelo nome.
 Uso:
   rice-procs watch [seg] [--no-nvidia]  # uma linha JSON a cada [seg] s (padrão 2)
   rice-procs once                       # uma linha e sai
-  rice-procs kill <TERM|KILL> <pid>...  # encerra; recusa o compositor e o shell
+  rice-procs kill <TERM|KILL|STOP|CONT> <pid>...  # sinal; recusa o compositor e o shell
+  rice-procs nice <valor> <pid>...      # prioridade (todas as threads)
 
 Por processo: CPU (% da máquina toda), memória (residente − compartilhada),
 swap (VmSwap), disco (leitura+escrita em B/s) e GPU.
@@ -196,6 +197,9 @@ def scan():
             threads += nthr
             procs[pid] = {
                 "ppid": int(rest[1]),
+                "state": rest[0],
+                "nice": int(rest[16]),
+                "threads": nthr,
                 "ticks": int(rest[11]) + int(rest[12]),
                 "mem": max(0, int(sm[1]) - int(sm[2])) * PAGE,
                 "comm": comm,
@@ -253,26 +257,47 @@ def hypr_clients():
         return []
 
 
+def drm_node_vendors():
+    """/dev/dri/cardN e renderDN -> intel | nvidia | amd."""
+    names = {"0x8086": "intel", "0x10de": "nvidia", "0x1002": "amd"}
+    out = {}
+    for d in glob.glob("/sys/class/drm/card[0-9]") + glob.glob("/sys/class/drm/renderD[0-9]*"):
+        v = names.get(read(d + "/device/vendor").strip())
+        if v:
+            out[os.path.basename(d)] = v
+    return out
+
+
 class DrmScan:
-    """Tempo de engine de GPU por processo (fdinfo do DRM), com cache dos fds."""
+    """Tempo de engine de GPU por processo (fdinfo do DRM), com cache dos fds.
+
+    Também diz QUAIS placas o processo tem abertas (nós /dev/dri e /dev/nvidia*),
+    o que vale mesmo com a GPU parada — é o "qual GPU o app usa"."""
 
     def __init__(self):
-        self.fds = {}      # pid -> (tick_visto, [caminhos fdinfo])
+        self.fds = {}      # pid -> (tick_visto, [caminhos fdinfo], {fabricantes})
         self.tick = 0
+        self.nodes = drm_node_vendors()
 
     def _find(self, pid):
-        out = []
+        out, devs = [], set()
         base = "/proc/%d/fd" % pid
         try:
             for fd in os.listdir(base):
                 try:
-                    if os.readlink(base + "/" + fd).startswith("/dev/dri/"):
-                        out.append("/proc/%d/fdinfo/%s" % (pid, fd))
+                    link = os.readlink(base + "/" + fd)
                 except OSError:
                     continue
+                if link.startswith("/dev/dri/"):
+                    out.append("/proc/%d/fdinfo/%s" % (pid, fd))
+                    v = self.nodes.get(os.path.basename(link))
+                    if v:
+                        devs.add(v)
+                elif link.startswith("/dev/nvidia") and not link.startswith("/dev/nvidia-caps"):
+                    devs.add("nvidia")
         except OSError:
             pass
-        return out
+        return out, devs
 
     def read(self, pids):
         self.tick += 1
@@ -280,8 +305,9 @@ class DrmScan:
         for pid in pids:
             ent = self.fds.get(pid)
             if ent is None or (self.tick - ent[0] > 30 and pid % 30 == self.tick % 30) or \
-                    (ent[1] and self.tick - ent[0] > 10):
-                ent = (self.tick, self._find(pid))
+                    ((ent[1] or ent[2]) and self.tick - ent[0] > 10):
+                paths, devs = self._find(pid)
+                ent = (self.tick, paths, devs)
                 self.fds[pid] = ent
             if not ent[1]:
                 continue
@@ -311,6 +337,10 @@ class DrmScan:
             if pid not in pids:
                 del self.fds[pid]
         return res
+
+    def devices(self, pid):
+        ent = self.fds.get(pid)
+        return sorted(ent[2]) if ent else []
 
 
 # ----------------------------------------------------------------- sistema
@@ -425,7 +455,7 @@ class Sampler:
         slot_nv = (self.gpus.nvidia_card() or {}).get("slot")
         intel_total = {}
 
-        roots, titles, wins = {}, {}, {}
+        roots, titles, wins, addrs = {}, {}, {}, {}
         for c in clients:
             cls = c.get("class") or c.get("initialClass") or ""
             pid = c.get("pid")
@@ -434,6 +464,8 @@ class Sampler:
             roots[pid] = cls
             titles.setdefault(cls, c.get("title", ""))
             wins[cls] = wins.get(cls, 0) + 1
+            if c.get("address"):
+                addrs.setdefault(cls.lower(), []).append(c["address"])
 
         groups = {}
         new_prev, new_io, new_drm = {}, {}, {}
@@ -456,7 +488,8 @@ class Sampler:
                 "key": key, "kind": kind, "name": name, "cls": name if kind == "app" else "",
                 "title": titles.get(name, "") if kind == "app" else "",
                 "wins": wins.get(name, 0) if kind == "app" else 0,
-                "procs": [], "mem": 0, "cpu": 0.0, "swap": 0, "disk": 0.0, "gpu": 0.0, "vram": 0.0})
+                "procs": [], "devs": [], "addrs": addrs.get(owner.lower(), []) if owner is not None else [],
+                "mem": 0, "cpu": 0.0, "swap": 0, "disk": 0.0, "gpu": 0.0, "vram": 0.0})
 
             cpu = 0.0
             if dt and pid in self.prev:
@@ -485,8 +518,18 @@ class Sampler:
 
             new_prev[pid] = p["ticks"]
             new_io[pid] = io
+            devs = self.drm.devices(pid)
+            cmd = " ".join(a for a in read("/proc/%d/cmdline" % pid).split("\0") if a)[:400]
+            try:
+                exe = os.readlink("/proc/%d/exe" % pid).replace(" (deleted)", "")
+            except OSError:
+                exe = ""
             g["procs"].append([pid, proc_label(pid, p["comm"]) if kind == "app" else p["comm"],
-                               round(cpu, 1), p["mem"], swap, round(disk), round(gpu, 1), round(vram), gdev])
+                               round(cpu, 1), p["mem"], swap, round(disk), round(gpu, 1), round(vram), gdev,
+                               ",".join(devs), p["state"], p["threads"], p["nice"], p["ppid"], cmd, exe])
+            for dv in devs:
+                if dv not in g["devs"]:
+                    g["devs"].append(dv)
             g["mem"] += p["mem"]
             g["cpu"] += cpu
             g["swap"] += swap
@@ -527,6 +570,7 @@ class Sampler:
             g["disk"] = round(g["disk"])
             g["vram"] = round(g["vram"])
             g["n"] = len(g["procs"])
+            g["devs"] = ",".join(g["devs"])
 
         up = read("/proc/uptime").split()
         la = read("/proc/loadavg").split()
@@ -567,9 +611,10 @@ def watch(interval, want_nvidia=True, once=False):
 
 
 def kill(sig_name, pids):
-    sig = {"TERM": signal.SIGTERM, "KILL": signal.SIGKILL}.get(sig_name)
+    sig = {"TERM": signal.SIGTERM, "KILL": signal.SIGKILL,
+           "STOP": signal.SIGSTOP, "CONT": signal.SIGCONT}.get(sig_name)
     if sig is None:
-        print("sinal inválido: use TERM ou KILL", file=sys.stderr)
+        print("sinal inválido: use TERM, KILL, STOP ou CONT", file=sys.stderr)
         return 1
     done = 0
     for raw in pids:
@@ -590,6 +635,32 @@ def kill(sig_name, pids):
     return 0
 
 
+def renice(value, pids):
+    """Muda a prioridade de todas as threads de cada processo (o nice do Linux
+    é por thread). Só dá para subir o valor sem privilégio."""
+    done = 0
+    for raw in pids:
+        if not raw.isdigit() or int(raw) <= 1:
+            continue
+        pid = int(raw)
+        if read("/proc/%d/comm" % pid).strip() in PROTECTED:
+            continue
+        try:
+            tids = [int(t) for t in os.listdir("/proc/%d/task" % pid)]
+        except OSError:
+            continue
+        ok = False
+        for t in tids:
+            try:
+                os.setpriority(os.PRIO_PROCESS, t, value)
+                ok = True
+            except OSError:
+                pass
+        done += 1 if ok else 0
+    print(done)
+    return 0
+
+
 def main():
     a = sys.argv[1:]
     if not a:
@@ -603,6 +674,8 @@ def main():
         return watch(0, nvidia, once=True)
     if a[0] == "kill" and len(a) > 2:
         return kill(a[1], a[2:])
+    if a[0] == "nice" and len(a) > 2 and re.fullmatch(r"-?\d+", a[1]):
+        return renice(max(-20, min(19, int(a[1]))), a[2:])
     print(__doc__.strip(), file=sys.stderr)
     return 1
 

@@ -1358,7 +1358,7 @@ hl.window_rule({
     match = { class = "^org\\.quickshell$", title = "^(Gerenciador de Tarefas|Task Manager)$" },
 
     float  = true,
-    size   = "1100 720",
+    size   = "1280 760",
     center = true,
 })
 

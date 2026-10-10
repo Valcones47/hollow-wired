@@ -3,9 +3,9 @@ import QtQuick.Layouts
 import "."
 
 // Conteúdo do Gerenciador de Tarefas, no desenho do Windows: barra lateral
-// (Processos, Desempenho, Configurações), tabela com células coloridas pelo uso
-// e subprocessos que abrem ao clicar no app. Os dados vêm do controlador
-// (TaskManager.qml) pela propriedade `ctrl`.
+// (Processos, Desempenho, Detalhes, Configurações), tabela com células
+// coloridas pelo uso, subprocessos ao clicar no app e menu de clique direito.
+// Os dados vêm do controlador (TaskManager.qml) pela propriedade `ctrl`.
 Item {
     id: view
 
@@ -14,246 +14,158 @@ Item {
     property bool closeOnEscape: false
     signal closeRequested()
 
-    property string tab: "processes"      // processes | performance | settings
+    property string tab: "processes"      // processes | details | performance | settings
     property string selRes: "cpu"
-    property string sortKey: "mem"        // name | cpu | mem | swap | disk | gpu | vram
-    property bool sortDesc: true
-    property string selKey: ""
-    property string selPids: ""
-    property var expanded: ({})
-    property var collapsed: ({})
+    property var menuRow: null
 
-    // ---------------------------------------------------------- colunas
-    readonly property var colSpecs: [
-        { id: "cpu",  w: 100 },
-        { id: "mem",  w: 108 },
-        { id: "swap", w: 100 },
-        { id: "disk", w: 108 },
-        { id: "gpu",  w: 100 },
-        { id: "vram", w: 116 }
-    ]
-    readonly property var activeCols: view.ctrl ? view.colSpecs.filter(c => view.ctrl.settings.cols[c.id]) : []
+    readonly property bool onTable: view.tab === "processes" || view.tab === "details"
 
-    function colTitle(id) {
-        switch (id) {
-        case "cpu": return Theme.t("taskman.col_cpu", "CPU");
-        case "mem": return Theme.t("taskman.col_mem", "Memória");
-        case "swap": return "Swap";
-        case "disk": return Theme.t("taskman.col_disk", "Disco");
-        case "gpu": return "GPU";
-        case "vram": return Theme.t("taskman.col_vram", "Mem. de vídeo");
-        }
-        return id;
-    }
-    function accent(id) {
-        switch (id) {
-        case "cpu": return Theme.primary;
-        case "mem": return Theme.tertiary;
-        case "swap": return Theme.color3;
-        case "disk": return Theme.color12;
-        case "gpu": return Theme.color2;
-        case "vram": return Theme.color2;
-        }
-        return Theme.primary;
-    }
-    // 0..1: o quanto a célula pesa (a cor acompanha, como no Windows).
-    function level(id, v) {
-        let l = 0;
-        const c = view.ctrl;
-        switch (id) {
-        case "cpu": l = v / 30; break;
-        case "mem": l = c.mem.total > 0 ? v / (c.mem.total * 0.12) : 0; break;
-        case "swap": l = v / 1073741824; break;
-        case "disk": l = v / (30 * 1048576); break;
-        case "gpu": l = v / 40; break;
-        case "vram": l = v / 1073741824; break;
-        }
-        return Math.max(0, Math.min(1, l));
-    }
-    function heat(id, v) {
-        if (!(v > 0)) return "transparent";
-        const l = view.level(id, v);
-        return Theme.withAlpha(l > 0.85 ? Theme.critical : view.accent(id), 0.07 + 0.5 * l);
-    }
-    function cell(id, v) {
-        const c = view.ctrl;
-        switch (id) {
-        case "cpu": case "gpu": return c.fmtPct(v);
-        case "mem": case "swap": case "vram": return v > 0 ? c.fmtBytes(v) : "0 MB";
-        case "disk": return v > 0 ? c.fmtRate(v) : "0 MB/s";
-        }
-        return "";
-    }
-    // Total do cabeçalho de cada coluna (valor bruto na mesma unidade da célula).
-    function total(id) {
-        const c = view.ctrl;
-        switch (id) {
-        case "cpu": return c.sys.cpu;
-        case "mem": return c.mem.used;
-        case "swap": return c.mem.swap_used;
-        case "disk": { let m = 0; for (const d of c.disks) m = Math.max(m, d.busy); return m; }
-        case "gpu": { let m = 0; for (const g of c.gpus) if (g.util !== null) m = Math.max(m, g.util); return m; }
-        case "vram": { let m = 0; for (const g of c.gpus) if (g.mem_used) m += g.mem_used; return m; }
-        }
-        return 0;
-    }
-    function totalText(id) {
-        const c = view.ctrl;
-        const v = view.total(id);
-        switch (id) {
-        case "cpu": case "gpu": case "disk": return c.fmtPct(v);
-        case "mem": return c.mem.total > 0 ? c.fmtPct(v * 100 / c.mem.total) : "—";
-        case "swap": return c.mem.swap_total > 0 ? c.fmtPct(v * 100 / c.mem.swap_total) : "—";
-        case "vram": return v > 0 ? c.fmtBytes(v) : "—";
-        }
-        return "";
-    }
-    // O cabeçalho usa a mesma escala da célula: converte o total para ela.
-    function totalHeat(id) {
-        const c = view.ctrl;
-        const v = view.total(id);
-        if (id === "disk") return view.heat("disk", v / 100 * 30 * 1048576);
-        return view.heat(id, v);
-    }
+    function tr(k, f) { return Theme.t(k, f); }
 
-    // ---------------------------------------------------------- linhas
-    ListModel { id: lm }
-
-    function sortVal(it, k) {
-        if (k === "name") return it.label.toLowerCase();
-        return it.g[k] || 0;
+    // ---------------------------------------------------------- resumo
+    readonly property int appCount: {
+        if (!view.ctrl) return 0;
+        let n = 0;
+        for (const g of view.ctrl.groups) if (g.kind === "app") n++;
+        return n;
     }
-    function cmpFor() {
-        const k = view.sortKey, d = view.sortDesc ? -1 : 1;
-        return (a, b) => {
-            const x = view.sortVal(a, k), y = view.sortVal(b, k);
-            let r = x < y ? -1 : x > y ? 1 : 0;
-            if (r === 0) r = a.label.toLowerCase() < b.label.toLowerCase() ? -1 : 1;
-            return r * d;
-        };
-    }
+    readonly property int procCount: view.ctrl ? view.ctrl.sys.procs : 0
 
-    function rebuild() {
-        const c = view.ctrl;
-        if (!c || !view.active) return;
-        const q = search.text.trim().toLowerCase();
-        const ap = [], bg = [];
-        for (const g of c.groups) {
-            const label = g.kind === "app" ? c.appLabel(g) : g.name;
-            if (q) {
-                let hit = label.toLowerCase().indexOf(q) >= 0 || g.name.toLowerCase().indexOf(q) >= 0;
-                if (!hit) for (const p of g.procs) if (String(p[1]).toLowerCase().indexOf(q) >= 0) { hit = true; break; }
-                if (!hit) continue;
-            }
-            (g.kind === "app" ? ap : bg).push({ g: g, label: label });
-        }
-        const cmp = view.cmpFor();
-        ap.sort(cmp);
-        bg.sort(cmp);
+    // ---------------------------------------------------------- ações
+    function pidList(row) { return String(row.pids || "").split(",").filter(x => x !== "").map(x => parseInt(x)); }
 
-        const rows = [];
-        const sect = (key, title, items) => {
-            const closed = q ? false
-                : (view.collapsed[key] !== undefined ? view.collapsed[key]
-                   : (key === "sect:bg" ? !c.settings.bgOpen : false));
-            rows.push({ key: key, kind: "sect", label: title, sub: String(items.length), icon: "",
-                        expanded: !closed, pids: "", cpu: 0, mem: 0, swap: 0, disk: 0, gpu: 0, vram: 0,
-                        gdev: "", n: items.length, depth: 0 });
-            if (closed) return;
-            for (const it of items) {
-                const g = it.g;
-                const open = !!view.expanded[g.key] && g.n > 1;
-                rows.push({ key: g.key, kind: "grp", label: it.label, sub: g.n > 1 ? "(" + g.n + ")" : "",
-                            icon: g.kind === "app" ? c.appIcon(g) : "", expanded: open,
-                            pids: g.procs.map(p => p[0]).join(","),
-                            cpu: g.cpu, mem: g.mem, swap: g.swap, disk: g.disk, gpu: g.gpu, vram: g.vram,
-                            gdev: g.procs.reduce((a, p) => a || (p[8] || ""), ""), n: g.n, depth: 0 });
-                if (!open) continue;
-                const ps = g.procs.slice();
-                const idx = { cpu: 2, mem: 3, swap: 4, disk: 5, gpu: 6, vram: 7 }[view.sortKey];
-                ps.sort((a, b) => view.sortKey === "name"
-                         ? (view.sortDesc ? -1 : 1) * String(a[1]).localeCompare(String(b[1]))
-                         : (view.sortDesc ? -1 : 1) * (a[idx] - b[idx]));
-                for (const p of ps) {
-                    rows.push({ key: "proc:" + p[0], kind: "proc", label: String(p[1]), sub: "PID " + p[0], icon: "",
-                                expanded: false, pids: String(p[0]), cpu: p[2], mem: p[3], swap: p[4], disk: p[5],
-                                gpu: p[6], vram: p[7], gdev: p[8] || "", n: 1, depth: 1 });
-                }
-            }
-        };
-        sect("sect:apps", Theme.t("taskman.sect_apps", "Aplicativos"), ap);
-        if (bg.length > 0) sect("sect:bg", Theme.t("taskman.sect_bg", "Processos em segundo plano"), bg);
-        view.syncModel(rows);
-
-        // a seleção some se o processo sumiu
-        if (view.selKey !== "") {
-            let found = false;
-            for (let i = 0; i < lm.count; i++) if (lm.get(i).key === view.selKey) { found = true; view.selPids = lm.get(i).pids; break; }
-            if (!found) { view.selKey = ""; view.selPids = ""; }
-        }
-    }
-
-    // Atualiza o ListModel no lugar: reatribuir recriaria os delegates a cada
-    // leitura (perde o hover e pisca).
-    function syncModel(rows) {
-        const want = {};
-        for (const r of rows) want[r.key] = true;
-        for (let i = lm.count - 1; i >= 0; i--)
-            if (!want[lm.get(i).key]) lm.remove(i);
-        for (let i = 0; i < rows.length; i++) {
-            const r = rows[i];
-            let j = -1;
-            for (let k = i; k < lm.count; k++) {
-                if (lm.get(k).key === r.key) { j = k; break; }
-            }
-            if (j === -1) lm.insert(i, r);
-            else {
-                if (j !== i) lm.move(j, i, 1);
-                lm.set(i, r);
-            }
-        }
-    }
-
-    function toggleExpanded(key) {
-        const e = Object.assign({}, view.expanded);
-        e[key] = !e[key];
-        view.expanded = e;
-        view.rebuild();
-    }
-    function toggleSect(key, openNow) {
-        const c = Object.assign({}, view.collapsed);
-        c[key] = openNow;   // openNow = estava aberta -> fecha
-        view.collapsed = c;
-        view.rebuild();
-    }
-    function setSort(k) {
-        if (view.sortKey === k) view.sortDesc = !view.sortDesc;
-        else { view.sortKey = k; view.sortDesc = k !== "name"; }
-        view.rebuild();
+    function endRow(row, force) {
+        const pids = view.pidList(row);
+        if (pids.length === 0) return;
+        if (force) view.ctrl.sendSignal("KILL", pids);
+        else view.ctrl.endPids(row.key, pids);
     }
     function endSelected() {
-        if (view.selKey === "" || view.selPids === "") return;
-        view.ctrl.endPids(view.selKey, view.selPids.split(",").map(x => parseInt(x)));
+        const r = table.selRow;
+        if (r && r.kind !== "sect") view.endRow(r, false);
     }
 
-    Connections {
-        target: view.ctrl
-        function onDataRevChanged() { view.rebuild(); }
-        function onTabRequestChanged() {
-            const t = view.ctrl.tabRequest;
-            if (t === "processes" || t === "performance" || t === "settings") view.tab = t;
-        }
+    function openRowMenu(row, x, y) {
+        view.menuRow = row;
+        const items = [];
+        if (row.addr) items.push({ id: "focus", label: tr("taskman.m_goto", "Ir para a janela") }, { sep: true });
+        items.push({ id: "end", label: tr("taskman.end_task", "Encerrar tarefa"), danger: true });
+        items.push({ id: "kill", label: tr("taskman.force", "Forçar encerramento"), danger: true });
+        if (row.kind === "proc" && row.pid > 0)
+            items.push({ id: "tree", label: tr("taskman.m_tree", "Encerrar árvore de processos"), danger: true });
+        items.push({ sep: true });
+        items.push(row.pstate === "T"
+                   ? { id: "resume", label: tr("taskman.m_resume", "Retomar") }
+                   : { id: "suspend", label: tr("taskman.m_suspend", "Suspender") });
+        items.push({ header: tr("taskman.m_prio", "Prioridade") });
+        const opts = [[19, tr("taskman.p_lowest", "Muito baixa")], [10, tr("taskman.p_low", "Baixa")],
+                      [0, tr("taskman.p_normal", "Normal")], [-5, tr("taskman.p_high", "Alta")]];
+        const cur = row.nice;
+        const curOpt = cur >= 15 ? 19 : (cur >= 5 ? 10 : (cur >= 0 ? 0 : -5));
+        for (const o of opts)
+            items.push({ id: "nice:" + o[0], label: o[1], checked: o[0] === curOpt, enabled: o[0] >= cur });
+        items.push({ sep: true });
+        if (row.exe) items.push({ id: "folder", label: tr("taskman.m_folder", "Abrir local do arquivo") });
+        items.push({ id: "copypid", label: tr("taskman.m_copypid", "Copiar PID") });
+        if (row.cmd) items.push({ id: "copycmd", label: tr("taskman.copy_cmd", "Copiar comando") });
+        items.push({ id: "props", label: tr("taskman.m_props", "Propriedades") });
+        ctxMenu.openAt(x, y, items);
     }
+
+    function onRowAction(id) {
+        const r = view.menuRow;
+        if (!r) return;
+        const c = view.ctrl;
+        const pids = view.pidList(r);
+        if (id === "focus") c.focusWindow(r.addr);
+        else if (id === "end") view.endRow(r, false);
+        else if (id === "kill") c.sendSignal("KILL", pids);
+        else if (id === "tree") c.sendSignal("TERM", c.descendants(r.pid));
+        else if (id === "suspend") c.sendSignal("STOP", pids);
+        else if (id === "resume") c.sendSignal("CONT", pids);
+        else if (id.indexOf("nice:") === 0) c.setNice(parseInt(id.slice(5)), pids);
+        else if (id === "folder") c.openFolder(r.exe);
+        else if (id === "copypid") c.copyText(r.kind === "proc" ? String(r.pid) : r.pids);
+        else if (id === "copycmd") c.copyText(r.cmd);
+        else if (id === "props") view.showProps(r);
+    }
+
+    function showProps(r) {
+        const c = view.ctrl;
+        const rows = [];
+        const add = (k, v, mono) => { if (v !== "" && v !== undefined && v !== null) rows.push({ k: k, v: String(v), mono: !!mono }); };
+        add(tr("taskman.col_name", "Nome"), r.label);
+        if (r.kind === "proc") {
+            add("PID", r.pid);
+            add(tr("taskman.p_ppid", "PID pai"), r.ppid);
+        } else {
+            add(tr("taskman.col_n", "Processos"), r.n);
+            add("PIDs", r.pids);
+        }
+        add(tr("taskman.col_status", "Status"), r.pstate === "T" ? tr("taskman.suspended", "Suspenso") : tr("taskman.running", "Em execução"));
+        add("Threads", r.threads);
+        add(tr("taskman.p_nice", "Prioridade (nice)"), r.nice);
+        add("CPU", c.fmtPct(r.cpu));
+        add(tr("taskman.col_mem", "Memória"), c.fmtBytes(r.mem));
+        add("Swap", c.fmtBytes(r.swap));
+        add(tr("taskman.col_disk", "Disco"), c.fmtRate(r.disk));
+        add(tr("taskman.col_gpuused", "GPU usada"), r.devs === "" ? "—" : r.devs.split(",").map(d => table.devLabel(d)).join(", "));
+        add(tr("taskman.p_exe", "Arquivo"), r.exe, true);
+        add(tr("taskman.col_cmd", "Linha de comando"), r.cmd, true);
+        props.title = r.label;
+        props.rows = rows;
+        props.show();
+    }
+
+    function openHeaderMenu(x, y) {
+        const c = view.ctrl;
+        const items = [{ header: tr("taskman.set_cols", "Colunas") }];
+        for (const id of c.settings.colOrder) {
+            if (c.colDef(id).modes.indexOf(table.mode) < 0) continue;
+            items.push({ id: "col:" + id, label: c.colTitle(id), checked: !!c.settings.cols[id] });
+        }
+        items.push({ sep: true });
+        items.push({ id: "heat", label: tr("taskman.set_heat", "Realçar células pelo uso"), checked: c.settings.heat !== false });
+        items.push({ id: "reset", label: tr("taskman.set_reset", "Restaurar colunas padrão") });
+        headerMenu.openAt(x, y, items);
+    }
+    function onHeaderAction(id) {
+        const c = view.ctrl;
+        if (id.indexOf("col:") === 0) {
+            const k = id.slice(4);
+            c.setCol(k, !c.settings.cols[k]);
+        } else if (id === "heat") c.setSetting("heat", !(c.settings.heat !== false));
+        else if (id === "reset") c.resetCols();
+    }
+
+    // ---------------------------------------------------------- ciclo de vida
     onActiveChanged: {
         if (view.active) {
             search.text = "";
-            view.selKey = ""; view.selPids = "";
-            view.expanded = ({}); view.collapsed = ({});
+            table.reset();
             view.ctrl.asked = ({});
+            const st = view.ctrl.settings.startTab;
+            if (st === "processes" || st === "details" || st === "performance" || st === "settings") view.tab = st;
+            table.mode = view.tab === "details" ? "flat" : "grouped";
+            table.active = view.onTable;
             search.forceActiveFocus();
-            view.rebuild();
         } else {
-            lm.clear();
+            table.active = false;
+        }
+    }
+    onTabChanged: {
+        if (view.tab === "processes") table.mode = "grouped";
+        else if (view.tab === "details") {
+            if (table.sortKey === "n") table.sortKey = "mem";
+            table.mode = "flat";
+        }
+        table.active = view.active && view.onTable;
+    }
+    Connections {
+        target: view.ctrl
+        function onTabRequestChanged() {
+            const t = view.ctrl.tabRequest;
+            if (t === "processes" || t === "details" || t === "performance" || t === "settings") view.tab = t;
         }
     }
     Keys.onEscapePressed: if (view.closeOnEscape) view.closeRequested()
@@ -357,6 +269,87 @@ Item {
         Switch { checked: sr.checked; onToggled: (v) => sr.toggled(v) }
     }
 
+    // Escolha de uma opção entre poucas.
+    component Seg: Row {
+        id: sg
+        property var options: []      // [{ v, t }]
+        property var current: null
+        signal picked(var v)
+        spacing: 6
+        Repeater {
+            model: sg.options
+            delegate: Rectangle {
+                id: opt
+                required property var modelData
+                readonly property bool on: sg.current === opt.modelData.v
+                width: optText.implicitWidth + 28
+                height: 32
+                radius: 10
+                color: opt.on ? Theme.withAlpha(Theme.primary, 0.2)
+                              : (optArea.containsMouse ? Theme.tileHigh : Theme.withAlpha(Theme.tile, 0.8))
+                border.width: opt.on ? 1 : 0
+                border.color: Theme.primary
+                Text {
+                    id: optText
+                    anchors.centerIn: parent
+                    text: opt.modelData.t
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 13
+                    color: opt.on ? Theme.textColor : Theme.subtext
+                }
+                MouseArea {
+                    id: optArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: sg.picked(opt.modelData.v)
+                }
+            }
+        }
+    }
+
+    component SmallBtn: Rectangle {
+        id: sb
+        property string text: ""
+        property bool enabledBtn: true
+        signal clicked()
+        width: Math.max(30, sbText.implicitWidth + 18)
+        height: 28
+        radius: 8
+        opacity: sb.enabledBtn ? 1 : 0.35
+        color: sbArea.containsMouse && sb.enabledBtn ? Theme.tileHigh : Theme.withAlpha(Theme.tile, 0.8)
+        Text {
+            id: sbText
+            anchors.centerIn: parent
+            text: sb.text
+            font.family: Theme.fontFamily
+            font.pixelSize: 13
+            color: Theme.textColor
+        }
+        MouseArea {
+            id: sbArea
+            anchors.fill: parent
+            hoverEnabled: true
+            enabled: sb.enabledBtn
+            cursorShape: Qt.PointingHandCursor
+            onClicked: sb.clicked()
+        }
+    }
+
+    component SectionLabel: Text {
+        Layout.topMargin: 10
+        font.family: Theme.fontFamily
+        font.pixelSize: 12
+        font.weight: Font.Medium
+        color: Theme.primary
+    }
+
+    component FieldLabel: Text {
+        font.family: Theme.fontFamily
+        font.pixelSize: 13
+        color: Theme.subtext
+    }
+
     // ---------------------------------------------------------- layout
     RowLayout {
         anchors.fill: parent
@@ -364,31 +357,80 @@ Item {
 
         // ---- barra lateral
         Rectangle {
-            Layout.preferredWidth: 196
+            Layout.preferredWidth: 228
             Layout.fillHeight: true
             color: Theme.withAlpha(Theme.tile, 0.5)
 
             ColumnLayout {
                 anchors.fill: parent
-                anchors.margins: 10
+                anchors.margins: 12
                 spacing: 4
+
+                // identidade + resumo ao vivo
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.bottomMargin: 14
+                    Layout.topMargin: 4
+                    spacing: 10
+                    Rectangle {
+                        Layout.preferredWidth: 38
+                        Layout.preferredHeight: 38
+                        radius: 11
+                        color: Theme.withAlpha(Theme.primary, 0.18)
+                        Text {
+                            anchors.centerIn: parent
+                            text: Theme.icons.performance
+                            font.family: Theme.iconFontFamily
+                            font.pixelSize: 20
+                            color: Theme.primary
+                        }
+                    }
+                    Column {
+                        Layout.fillWidth: true
+                        spacing: 1
+                        Text {
+                            width: parent.width
+                            text: view.tr("taskman.title", "Gerenciador de Tarefas")
+                            elide: Text.ElideRight
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 12
+                            font.weight: Font.Medium
+                            color: Theme.textColor
+                        }
+                        Text {
+                            width: parent.width
+                            text: view.ctrl ? view.ctrl.fmtPct(view.ctrl.sys.cpu) + " CPU  ·  "
+                                              + (view.ctrl.mem.total > 0 ? view.ctrl.fmtPct(view.ctrl.mem.used * 100 / view.ctrl.mem.total) : "—") + " RAM" : ""
+                            elide: Text.ElideRight
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 11
+                            color: Theme.subtext
+                        }
+                    }
+                }
 
                 NavItem {
                     icon: Theme.icons.apps
-                    label: Theme.t("taskman.nav_procs", "Processos")
+                    label: view.tr("taskman.nav_procs", "Processos")
                     on: view.tab === "processes"
                     onClicked: view.tab = "processes"
                 }
                 NavItem {
                     icon: Theme.icons.performance
-                    label: Theme.t("taskman.nav_perf", "Desempenho")
+                    label: view.tr("taskman.nav_perf", "Desempenho")
                     on: view.tab === "performance"
                     onClicked: view.tab = "performance"
+                }
+                NavItem {
+                    icon: Theme.icons.console
+                    label: view.tr("taskman.nav_details", "Detalhes")
+                    on: view.tab === "details"
+                    onClicked: view.tab = "details"
                 }
                 Item { Layout.fillHeight: true }
                 NavItem {
                     icon: Theme.icons.settings
-                    label: Theme.t("taskman.nav_settings", "Configurações")
+                    label: view.tr("taskman.nav_settings", "Configurações")
                     on: view.tab === "settings"
                     onClicked: view.tab = "settings"
                 }
@@ -400,31 +442,44 @@ Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
 
-            // ====================== Processos
+            // ====================== Processos / Detalhes
             ColumnLayout {
                 anchors.fill: parent
-                anchors.margins: 20
+                anchors.margins: 22
+                anchors.bottomMargin: 12
                 spacing: 12
-                visible: view.tab === "processes"
+                visible: view.onTable
 
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 12
-                    Text {
-                        text: Theme.t("taskman.nav_procs", "Processos")
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 22
-                        font.weight: Font.Medium
-                        color: Theme.textColor
+                    Column {
+                        spacing: 2
+                        Text {
+                            text: view.tab === "details" ? view.tr("taskman.nav_details", "Detalhes")
+                                                         : view.tr("taskman.nav_procs", "Processos")
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 22
+                            font.weight: Font.Medium
+                            color: Theme.textColor
+                        }
+                        Text {
+                            text: view.tab === "details"
+                                  ? view.tr("taskman.procs_n", "%1 processos").replace("%1", view.procCount)
+                                  : view.tr("taskman.apps_n", "%1 aplicativos").replace("%1", view.appCount)
+                                    + "  ·  " + view.tr("taskman.procs_n", "%1 processos").replace("%1", view.procCount)
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 12
+                            color: Theme.subtext
+                        }
                     }
                     Item { Layout.fillWidth: true }
                     Rectangle {
-                        Layout.preferredWidth: 240
-                        Layout.preferredHeight: 34
+                        Layout.preferredWidth: 250
+                        Layout.preferredHeight: 36
                         radius: 10
                         color: Theme.withAlpha(Theme.tile, 0.9)
                         Text {
-                            id: magnify
                             anchors.left: parent.left
                             anchors.leftMargin: 10
                             anchors.verticalCenter: parent.verticalCenter
@@ -445,7 +500,7 @@ Item {
                             selectionColor: Theme.primary
                             selectedTextColor: Theme.background
                             clip: true
-                            onTextChanged: view.rebuild()
+                            onTextChanged: table.query = text
                             Keys.onEscapePressed: if (view.closeOnEscape) view.closeRequested(); else text = ""
                         }
                         Text {
@@ -453,7 +508,7 @@ Item {
                             anchors.leftMargin: 34
                             anchors.verticalCenter: parent.verticalCenter
                             visible: search.text === ""
-                            text: Theme.t("taskman.search", "Buscar processo")
+                            text: view.tr("taskman.search", "Buscar processo")
                             font.family: Theme.fontFamily
                             font.pixelSize: 13
                             color: Theme.withAlpha(Theme.subtext, 0.8)
@@ -461,10 +516,10 @@ Item {
                     }
                     Rectangle {
                         id: endBtn
-                        readonly property bool can: view.selKey !== "" && view.selKey.indexOf("sect:") !== 0
-                        readonly property bool forced: !!(view.ctrl && view.ctrl.asked[view.selKey])
+                        readonly property bool can: table.selRow !== null && table.selRow.kind !== "sect"
+                        readonly property bool forced: !!(view.ctrl && table.selRow && view.ctrl.asked[table.selRow.key])
                         Layout.preferredWidth: endLabel.implicitWidth + 32
-                        Layout.preferredHeight: 34
+                        Layout.preferredHeight: 36
                         radius: 10
                         opacity: endBtn.can ? 1 : 0.4
                         color: endBtn.forced ? Theme.critical
@@ -472,8 +527,8 @@ Item {
                         Text {
                             id: endLabel
                             anchors.centerIn: parent
-                            text: endBtn.forced ? Theme.t("taskman.force", "Forçar encerramento")
-                                                : Theme.t("taskman.end_task", "Encerrar tarefa")
+                            text: endBtn.forced ? view.tr("taskman.force", "Forçar encerramento")
+                                                : view.tr("taskman.end_task", "Encerrar tarefa")
                             font.family: Theme.fontFamily
                             font.pixelSize: 13
                             font.weight: Font.Medium
@@ -490,246 +545,57 @@ Item {
                     }
                 }
 
-                // cabeçalho: nome + uma coluna por métrica, com o total em cima
-                RowLayout {
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 52
-                    Layout.minimumHeight: 52
-                    Layout.maximumHeight: 52
-                    spacing: 0
-
-                    Item {
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
-                        Layout.leftMargin: 10
-                        Text {
-                            anchors.left: parent.left
-                            anchors.leftMargin: 32
-                            anchors.bottom: parent.bottom
-                            anchors.bottomMargin: 6
-                            text: Theme.t("taskman.col_name", "Nome") + (view.sortKey === "name" ? (view.sortDesc ? "  ▾" : "  ▴") : "")
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 12
-                            color: view.sortKey === "name" ? Theme.textColor : Theme.subtext
-                        }
-                        MouseArea {
-                            anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: view.setSort("name")
-                        }
-                    }
-                    Repeater {
-                        model: view.activeCols
-                        delegate: Rectangle {
-                            id: hc
-                            required property var modelData
-                            Layout.preferredWidth: hc.modelData.w
-                            Layout.fillHeight: true
-                            color: view.totalHeat(hc.modelData.id)
-                            Column {
-                                anchors.right: parent.right
-                                anchors.rightMargin: 10
-                                anchors.verticalCenter: parent.verticalCenter
-                                spacing: 1
-                                Text {
-                                    anchors.right: parent.right
-                                    text: view.totalText(hc.modelData.id)
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: 17
-                                    color: Theme.textColor
-                                }
-                                Text {
-                                    anchors.right: parent.right
-                                    text: view.colTitle(hc.modelData.id)
-                                          + (view.sortKey === hc.modelData.id ? (view.sortDesc ? "  ▾" : "  ▴") : "")
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: 12
-                                    color: view.sortKey === hc.modelData.id ? Theme.textColor : Theme.subtext
-                                }
-                            }
-                            MouseArea {
-                                anchors.fill: parent
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: view.setSort(hc.modelData.id)
-                            }
-                        }
-                    }
-                    Item { Layout.preferredWidth: 12 }
-                }
-
-                ListView {
-                    id: list
+                TaskTable {
+                    id: table
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    clip: true
-                    model: lm
-                    spacing: 0
-                    boundsBehavior: Flickable.StopAtBounds
-
-                    Text {
-                        anchors.centerIn: parent
-                        visible: lm.count === 0
-                        text: Theme.t("taskman.loading", "Lendo processos…")
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 13
-                        color: Theme.subtext
+                    ctrl: view.ctrl
+                    onRowMenu: (row, x, y) => {
+                        const p = table.mapToItem(view, x, y);
+                        view.openRowMenu(row, p.x, p.y);
                     }
+                    onHeaderMenu: (x, y) => {
+                        const p = table.mapToItem(view, x, y);
+                        view.openHeaderMenu(p.x, p.y);
+                    }
+                }
 
-                    delegate: Item {
-                        id: row
-                        required property int index
-                        required property string key
-                        required property string kind
-                        required property string label
-                        required property string sub
-                        required property string icon
-                        required property bool expanded
-                        required property string pids
-                        required property real cpu
-                        required property real mem
-                        required property real swap
-                        required property real disk
-                        required property real gpu
-                        required property real vram
-                        required property string gdev
-                        required property int n
-                        required property int depth
-
-                        readonly property bool isSect: kind === "sect"
-                        readonly property bool selected: view.selKey === key
-                        readonly property bool canExpand: kind === "grp" && n > 1
-                        width: list.width
-                        height: isSect ? 40 : 38
-
-                        Rectangle {
-                            anchors.fill: parent
-                            radius: 6
-                            color: row.selected ? Theme.withAlpha(Theme.primary, 0.2)
-                                   : (rowArea.containsMouse ? Theme.withAlpha(Theme.tile, 0.7) : "transparent")
-                        }
-                        MouseArea {
-                            id: rowArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            onClicked: {
-                                if (row.isSect) view.toggleSect(row.key, row.expanded);
-                                else { view.selKey = row.key; view.selPids = row.pids; }
+                // barra de estado: como estão as GPUs (qual está ativa)
+                RowLayout {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 22
+                    spacing: 18
+                    Repeater {
+                        model: view.ctrl ? view.ctrl.gpus : []
+                        delegate: Row {
+                            required property var modelData
+                            required property int index
+                            spacing: 6
+                            Rectangle {
+                                width: 8; height: 8; radius: 4
+                                anchors.verticalCenter: parent.verticalCenter
+                                color: modelData.state === "active" && modelData.util !== null && modelData.util > 1
+                                       ? Theme.color2 : Theme.withAlpha(Theme.subtext, 0.5)
                             }
-                            onDoubleClicked: if (row.canExpand) view.toggleExpanded(row.key)
-                        }
-
-                        RowLayout {
-                            anchors.fill: parent
-                            anchors.leftMargin: 10
-                            spacing: 0
-
-                            // seta (abre os subprocessos) + ícone + nome
-                            Item {
-                                Layout.fillWidth: true
-                                Layout.fillHeight: true
-
-                                Row {
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    anchors.left: parent.left
-                                    anchors.leftMargin: row.depth * 24
-                                    spacing: 8
-                                    width: parent.width - row.depth * 24
-
-                                    Item {
-                                        width: 20; height: 24
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        Text {
-                                            anchors.centerIn: parent
-                                            visible: row.canExpand || row.isSect
-                                            text: Theme.icons.chevronRight
-                                            rotation: row.expanded ? 90 : 0
-                                            font.family: Theme.iconFontFamily
-                                            font.pixelSize: 15
-                                            color: Theme.subtext
-                                            Behavior on rotation { NumberAnimation { duration: Theme.ms(120) } }
-                                        }
-                                        MouseArea {
-                                            anchors.fill: parent
-                                            enabled: row.canExpand
-                                            cursorShape: Qt.PointingHandCursor
-                                            onClicked: view.toggleExpanded(row.key)
-                                        }
-                                    }
-                                    Item {
-                                        width: 22; height: 22
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        visible: row.kind === "grp"
-                                        Image {
-                                            anchors.fill: parent
-                                            visible: row.icon !== ""
-                                            source: row.icon
-                                            sourceSize: Qt.size(44, 44)
-                                            fillMode: Image.PreserveAspectFit
-                                            asynchronous: true
-                                        }
-                                        Text {
-                                            anchors.centerIn: parent
-                                            visible: row.icon === ""
-                                            text: Theme.icons.chip
-                                            font.family: Theme.iconFontFamily
-                                            font.pixelSize: 15
-                                            color: Theme.withAlpha(Theme.subtext, 0.6)
-                                        }
-                                    }
-                                    Text {
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        width: Math.min(implicitWidth, parent.width - 120)
-                                        text: row.isSect ? row.label + " (" + row.sub + ")" : row.label
-                                        elide: Text.ElideRight
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: row.isSect ? 13 : 14
-                                        font.weight: row.isSect ? Font.Medium : Font.Normal
-                                        color: row.isSect ? Theme.primary : (row.depth > 0 ? Theme.subtext : Theme.textColor)
-                                    }
-                                    Text {
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        visible: !row.isSect && row.sub !== ""
-                                        text: row.sub
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: 12
-                                        color: Theme.withAlpha(Theme.subtext, 0.8)
-                                    }
-                                }
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: "GPU " + index + "  " + modelData.name + "  ·  "
+                                      + (modelData.state === "suspended" ? view.tr("taskman.gpu_rest_short", "Em repouso")
+                                         : (modelData.state === "off" ? view.tr("taskman.gpu_off_short", "Leitura desligada")
+                                            : (modelData.util === null ? "—" : view.ctrl.fmtPct(modelData.util))))
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 12
+                                color: Theme.subtext
                             }
-
-                            Repeater {
-                                model: row.isSect ? [] : view.activeCols
-                                delegate: Rectangle {
-                                    id: mc
-                                    required property var modelData
-                                    readonly property real v: row[mc.modelData.id]
-                                    Layout.preferredWidth: mc.modelData.w
-                                    Layout.fillHeight: true
-                                    color: view.heat(mc.modelData.id, mc.v)
-                                    Column {
-                                        anchors.right: parent.right
-                                        anchors.rightMargin: 10
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        Text {
-                                            anchors.right: parent.right
-                                            text: view.cell(mc.modelData.id, mc.v)
-                                            font.family: Theme.fontFamily
-                                            font.pixelSize: 13
-                                            color: mc.v > 0 ? Theme.textColor : Theme.subtext
-                                        }
-                                        Text {
-                                            anchors.right: parent.right
-                                            visible: mc.modelData.id === "gpu" && row.gdev !== "" && mc.v > 0
-                                            text: row.gdev === "nvidia" ? "NVIDIA" : "Intel"
-                                            font.family: Theme.fontFamily
-                                            font.pixelSize: 10
-                                            color: Theme.subtext
-                                        }
-                                    }
-                                }
-                            }
-                            Item { Layout.preferredWidth: 12 }
                         }
+                    }
+                    Item { Layout.fillWidth: true }
+                    Text {
+                        text: view.tr("taskman.hint", "Clique direito: mais ações  ·  seta: subprocessos")
+                        visible: view.tab === "processes"
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 11
+                        color: Theme.withAlpha(Theme.subtext, 0.75)
                     }
                 }
             }
@@ -737,13 +603,12 @@ Item {
             // ====================== Desempenho
             RowLayout {
                 anchors.fill: parent
-                anchors.margins: 20
-                spacing: 20
+                anchors.margins: 22
+                spacing: 22
                 visible: view.tab === "performance"
 
-                // blocos dos recursos
                 Flickable {
-                    Layout.preferredWidth: 270
+                    Layout.preferredWidth: 280
                     Layout.fillHeight: true
                     contentHeight: resCol.implicitHeight
                     clip: true
@@ -755,31 +620,28 @@ Item {
                         spacing: 6
 
                         Repeater {
-                            model: view.ctrl ? view.ctrl.resKeys : []
+                            model: view.ctrl ? view.ctrl.visibleResKeys : []
                             delegate: Rectangle {
                                 id: tile
                                 required property string modelData
                                 readonly property var info: view.ctrl.resInfo(tile.modelData, view.ctrl.dataRev)
                                 readonly property bool on: view.selRes === tile.modelData
                                 width: resCol.width
-                                height: 76
-                                radius: 10
+                                height: 78
+                                radius: 12
                                 color: tile.on ? Theme.withAlpha(tile.info.color, 0.16)
-                                               : (tileArea.containsMouse ? Theme.withAlpha(Theme.tile, 0.8) : Theme.withAlpha(Theme.tile, 0.4))
-                                Rectangle {
-                                    visible: tile.on
-                                    width: 3; height: parent.height - 24; radius: 2
-                                    anchors.left: parent.left
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    color: tile.info.color
-                                }
+                                               : (tileArea.containsMouse ? Theme.withAlpha(Theme.tile, 0.85) : Theme.withAlpha(Theme.tile, 0.45))
+                                border.width: tile.on ? 1 : 0
+                                border.color: Theme.withAlpha(tile.info.color, 0.7)
                                 TaskGraph {
                                     id: mini
                                     anchors.left: parent.left
-                                    anchors.leftMargin: 14
+                                    anchors.leftMargin: 12
                                     anchors.verticalCenter: parent.verticalCenter
-                                    width: 78; height: 50
+                                    width: 80; height: 52
+                                    compact: true
                                     values: tile.info.series
+                                    points: tile.info.points
                                     maxValue: tile.info.max
                                     color: tile.info.color
                                 }
@@ -819,67 +681,129 @@ Item {
                     }
                 }
 
-                // detalhe
-                ColumnLayout {
-                    id: detail
+                // detalhe do recurso escolhido
+                Flickable {
+                    id: detailScroll
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    spacing: 10
-                    readonly property var info: view.ctrl ? view.ctrl.resInfo(view.selRes, view.ctrl.dataRev)
-                                                          : ({ title: "", sub: "", color: Theme.primary, series: [], max: 100, unit: "", stats: [] })
+                    contentHeight: detail.implicitHeight
+                    clip: true
+                    boundsBehavior: Flickable.StopAtBounds
 
-                    RowLayout {
-                        Layout.fillWidth: true
-                        Text {
-                            text: detail.info.title
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 24
-                            font.weight: Font.Medium
-                            color: Theme.textColor
+                    ColumnLayout {
+                        id: detail
+                        width: detailScroll.width
+                        spacing: 12
+                        readonly property var info: view.ctrl ? view.ctrl.resInfo(view.selRes, view.ctrl.dataRev)
+                                                              : ({ title: "", sub: "", color: Theme.primary, series: [], points: 60,
+                                                                   max: 100, unit: "", stats: [], users: [] })
+                        readonly property real seriesMax: {
+                            let m = 0;
+                            for (const x of detail.info.series) if (x > m) m = x;
+                            return m * 1.15;
                         }
-                        Item { Layout.fillWidth: true }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Text {
+                                text: detail.info.title
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 26
+                                font.weight: Font.Medium
+                                color: Theme.textColor
+                            }
+                            Item { Layout.fillWidth: true }
+                            Text {
+                                Layout.maximumWidth: detail.width * 0.6
+                                text: detail.info.sub
+                                elide: Text.ElideRight
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 14
+                                color: Theme.subtext
+                            }
+                        }
                         Text {
-                            Layout.maximumWidth: detail.width * 0.6
-                            text: detail.info.sub
-                            elide: Text.ElideRight
+                            text: detail.info.unit
                             font.family: Theme.fontFamily
-                            font.pixelSize: 14
+                            font.pixelSize: 12
                             color: Theme.subtext
                         }
-                    }
-                    Text {
-                        text: detail.info.unit
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 12
-                        color: Theme.subtext
-                    }
-                    TaskGraph {
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
-                        Layout.minimumHeight: 140
-                        values: detail.info.series
-                        maxValue: detail.info.max
-                        color: detail.info.color
-                    }
-                    Flow {
-                        Layout.fillWidth: true
-                        spacing: 28
-                        Repeater {
-                            model: detail.info.stats
-                            delegate: Column {
-                                required property var modelData
-                                spacing: 2
-                                Text {
-                                    text: modelData.k
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: 12
-                                    color: Theme.subtext
+                        TaskGraph {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: Math.max(170, detailScroll.height * 0.42)
+                            values: detail.info.series
+                            points: detail.info.points
+                            maxValue: detail.info.max
+                            color: detail.info.color
+                            topLabel: detail.info.max === 100 ? "100 %" : (view.ctrl ? view.ctrl.fmtRate(detail.seriesMax) : "")
+                            bottomLeftLabel: view.ctrl ? view.ctrl.settings.graphWindow + " s" : ""
+                            bottomRightLabel: "0"
+                        }
+                        Flow {
+                            Layout.fillWidth: true
+                            Layout.topMargin: 6
+                            spacing: 30
+                            Repeater {
+                                model: detail.info.stats
+                                delegate: Column {
+                                    required property var modelData
+                                    spacing: 2
+                                    Text {
+                                        text: modelData.k
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 12
+                                        color: Theme.subtext
+                                    }
+                                    Text {
+                                        text: modelData.v
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 19
+                                        color: Theme.textColor
+                                    }
                                 }
-                                Text {
-                                    text: modelData.v
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: 18
-                                    color: Theme.textColor
+                            }
+                        }
+
+                        // quem está usando esta GPU
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            Layout.topMargin: 8
+                            spacing: 2
+                            visible: !!detail.info.users && detail.info.users.length > 0
+                            Text {
+                                text: view.tr("taskman.gpu_users", "Aplicativos usando esta GPU")
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 12
+                                font.weight: Font.Medium
+                                color: Theme.primary
+                            }
+                            Repeater {
+                                model: detail.info.users || []
+                                delegate: RowLayout {
+                                    required property var modelData
+                                    Layout.fillWidth: true
+                                    Text {
+                                        Layout.fillWidth: true
+                                        text: modelData.name
+                                        elide: Text.ElideRight
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 13
+                                        color: Theme.textColor
+                                    }
+                                    Text {
+                                        text: modelData.vram > 0 ? view.ctrl.fmtBytes(modelData.vram) : ""
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 12
+                                        color: Theme.subtext
+                                    }
+                                    Text {
+                                        Layout.preferredWidth: 64
+                                        horizontalAlignment: Text.AlignRight
+                                        text: view.ctrl.fmtPct(modelData.pct)
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 13
+                                        color: modelData.pct > 0 ? Theme.textColor : Theme.subtext
+                                    }
                                 }
                             }
                         }
@@ -889,100 +813,162 @@ Item {
 
             // ====================== Configurações
             Flickable {
+                id: setScroll
                 anchors.fill: parent
-                anchors.margins: 20
-                contentHeight: settingsCol.implicitHeight
+                anchors.margins: 22
+                contentHeight: settingsCol.implicitHeight + 20
                 clip: true
                 boundsBehavior: Flickable.StopAtBounds
                 visible: view.tab === "settings"
 
                 ColumnLayout {
                     id: settingsCol
-                    width: Math.min(parent.width, 640)
-                    spacing: 16
+                    width: Math.min(setScroll.width, 700)
+                    spacing: 12
 
                     Text {
-                        text: Theme.t("taskman.nav_settings", "Configurações")
+                        text: view.tr("taskman.nav_settings", "Configurações")
                         font.family: Theme.fontFamily
                         font.pixelSize: 22
                         font.weight: Font.Medium
                         color: Theme.textColor
                     }
 
+                    // ---- aparência
+                    SectionLabel { text: view.tr("taskman.set_look", "Aparência") }
+                    FieldLabel { text: view.tr("taskman.set_density", "Densidade das linhas") }
+                    Seg {
+                        options: [{ v: "compact", t: view.tr("taskman.d_compact", "Compacta") },
+                                  { v: "normal", t: view.tr("taskman.d_normal", "Normal") },
+                                  { v: "comfortable", t: view.tr("taskman.d_comfortable", "Confortável") }]
+                        current: view.ctrl ? view.ctrl.settings.density : "normal"
+                        onPicked: (v) => view.ctrl.setSetting("density", v)
+                    }
+                    FieldLabel { text: view.tr("taskman.set_fontsize", "Tamanho do texto da tabela") }
+                    Seg {
+                        options: [{ v: "small", t: view.tr("taskman.f_small", "Pequeno") },
+                                  { v: "normal", t: view.tr("taskman.f_normal", "Normal") },
+                                  { v: "large", t: view.tr("taskman.f_large", "Grande") }]
+                        current: view.ctrl ? view.ctrl.settings.fontSize : "normal"
+                        onPicked: (v) => view.ctrl.setSetting("fontSize", v)
+                    }
+                    SettingRow {
+                        title: view.tr("taskman.set_heat", "Realçar células pelo uso")
+                        desc: view.tr("taskman.set_heat_desc", "A cor da célula acompanha o peso do processo, como no Windows.")
+                        checked: view.ctrl ? view.ctrl.settings.heat !== false : true
+                        onToggled: (v) => view.ctrl.setSetting("heat", v)
+                    }
+
+                    // ---- colunas
+                    SectionLabel { text: view.tr("taskman.set_cols", "Colunas") }
                     Text {
-                        text: Theme.t("taskman.set_cols", "Colunas da lista de processos")
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
+                        text: view.tr("taskman.set_cols_hint", "Use as setas para mudar a ordem. Na tabela, arraste a borda esquerda do cabeçalho para ajustar a largura e clique com o botão direito no cabeçalho para escolher colunas.")
                         font.family: Theme.fontFamily
                         font.pixelSize: 12
                         color: Theme.subtext
                     }
                     Repeater {
-                        model: view.colSpecs
+                        model: view.ctrl ? view.ctrl.settings.colOrder : []
+                        delegate: RowLayout {
+                            id: cr
+                            required property string modelData
+                            required property int index
+                            Layout.fillWidth: true
+                            spacing: 12
+                            Switch {
+                                checked: view.ctrl ? !!view.ctrl.settings.cols[cr.modelData] : false
+                                onToggled: (v) => view.ctrl.setCol(cr.modelData, v)
+                            }
+                            Text {
+                                Layout.fillWidth: true
+                                text: view.ctrl ? view.ctrl.colTitle(cr.modelData) : ""
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 14
+                                color: Theme.textColor
+                            }
+                            Text {
+                                text: {
+                                    if (!view.ctrl) return "";
+                                    const m = view.ctrl.colDef(cr.modelData).modes;
+                                    return m.length === 2 ? view.tr("taskman.in_both", "Processos e Detalhes")
+                                         : (m[0] === "flat" ? view.tr("taskman.nav_details", "Detalhes")
+                                                            : view.tr("taskman.nav_procs", "Processos"));
+                                }
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 12
+                                color: Theme.subtext
+                            }
+                            SmallBtn { text: "↑"; enabledBtn: cr.index > 0; onClicked: view.ctrl.moveCol(cr.modelData, -1) }
+                            SmallBtn {
+                                text: "↓"
+                                enabledBtn: view.ctrl && cr.index < view.ctrl.settings.colOrder.length - 1
+                                onClicked: view.ctrl.moveCol(cr.modelData, 1)
+                            }
+                        }
+                    }
+                    SmallBtn {
+                        text: view.tr("taskman.set_reset", "Restaurar colunas padrão")
+                        onClicked: view.ctrl.resetCols()
+                    }
+
+                    // ---- desempenho
+                    SectionLabel { text: view.tr("taskman.nav_perf", "Desempenho") }
+                    FieldLabel { text: view.tr("taskman.set_window", "Janela de tempo do gráfico") }
+                    Seg {
+                        options: [{ v: 30, t: "30 s" }, { v: 60, t: "60 s" }, { v: 120, t: "120 s" }]
+                        current: view.ctrl ? view.ctrl.settings.graphWindow : 60
+                        onPicked: (v) => view.ctrl.setSetting("graphWindow", v)
+                    }
+                    FieldLabel { text: view.tr("taskman.set_resources", "Recursos mostrados") }
+                    Repeater {
+                        model: view.ctrl ? view.ctrl.resKeys : []
                         delegate: SettingRow {
-                            required property var modelData
-                            title: view.colTitle(modelData.id)
-                            checked: view.ctrl ? !!view.ctrl.settings.cols[modelData.id] : false
-                            onToggled: (v) => { view.ctrl.setCol(modelData.id, v); view.rebuild(); }
+                            required property string modelData
+                            title: view.ctrl ? view.ctrl.resInfo(modelData, view.ctrl.dataRev).title : modelData
+                            checked: view.ctrl ? view.ctrl.settings.resHidden.indexOf(modelData) < 0 : true
+                            onToggled: (v) => view.ctrl.toggleRes(modelData, v)
                         }
                     }
 
-                    Text {
-                        Layout.topMargin: 8
-                        text: Theme.t("taskman.set_general", "Geral")
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 12
-                        color: Theme.subtext
+                    // ---- geral
+                    SectionLabel { text: view.tr("taskman.set_general", "Geral") }
+                    FieldLabel { text: view.tr("taskman.set_starttab", "Aba inicial") }
+                    Seg {
+                        options: [{ v: "processes", t: view.tr("taskman.nav_procs", "Processos") },
+                                  { v: "performance", t: view.tr("taskman.nav_perf", "Desempenho") },
+                                  { v: "details", t: view.tr("taskman.nav_details", "Detalhes") }]
+                        current: view.ctrl ? view.ctrl.settings.startTab : "processes"
+                        onPicked: (v) => view.ctrl.setSetting("startTab", v)
                     }
                     SettingRow {
-                        title: Theme.t("taskman.set_bg", "Abrir \"Processos em segundo plano\" ao iniciar")
+                        title: view.tr("taskman.set_bg", "Abrir \"Processos em segundo plano\" ao iniciar")
                         checked: view.ctrl ? !!view.ctrl.settings.bgOpen : false
-                        onToggled: (v) => { view.ctrl.setSetting("bgOpen", v); view.collapsed = ({}); view.rebuild(); }
+                        onToggled: (v) => { view.ctrl.setSetting("bgOpen", v); table.collapsed = ({}); table.rebuild(); }
                     }
                     SettingRow {
-                        title: Theme.t("taskman.set_nvidia", "Ler a GPU NVIDIA")
-                        desc: Theme.t("taskman.set_nvidia_desc", "Só quando ela já está ativa: a placa em repouso nunca é acordada para a leitura.")
+                        title: view.tr("taskman.set_nvidia", "Ler a GPU NVIDIA")
+                        desc: view.tr("taskman.set_nvidia_desc", "Só quando ela já está ativa: a placa em repouso nunca é acordada para a leitura.")
                         checked: view.ctrl ? !!view.ctrl.settings.nvidia : true
                         onToggled: (v) => view.ctrl.setSetting("nvidia", v)
                     }
-
-                    Text {
-                        Layout.topMargin: 8
-                        text: Theme.t("taskman.set_interval", "Atualização")
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 12
-                        color: Theme.subtext
-                    }
-                    Row {
-                        spacing: 8
-                        Repeater {
-                            model: [1, 2, 5]
-                            delegate: Rectangle {
-                                id: iv
-                                required property int modelData
-                                readonly property bool on: view.ctrl && view.ctrl.settings.interval === iv.modelData
-                                width: 72; height: 34; radius: 10
-                                color: iv.on ? Theme.withAlpha(Theme.primary, 0.2)
-                                             : (ivArea.containsMouse ? Theme.tileHigh : Theme.withAlpha(Theme.tile, 0.8))
-                                border.width: iv.on ? 1 : 0
-                                border.color: Theme.primary
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: iv.modelData + " s"
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: 13
-                                    color: iv.on ? Theme.textColor : Theme.subtext
-                                }
-                                MouseArea {
-                                    id: ivArea
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: view.ctrl.setSetting("interval", iv.modelData)
-                                }
-                            }
-                        }
+                    FieldLabel { text: view.tr("taskman.set_interval", "Atualização") }
+                    Seg {
+                        options: [{ v: 1, t: "1 s" }, { v: 2, t: "2 s" }, { v: 5, t: "5 s" }]
+                        current: view.ctrl ? view.ctrl.settings.interval : 2
+                        onPicked: (v) => view.ctrl.setSetting("interval", v)
                     }
                 }
             }
         }
+    }
+
+    // ---------------------------------------------------------- menus e diálogos
+    TaskMenu { id: ctxMenu; onChosen: (id) => view.onRowAction(id) }
+    TaskMenu { id: headerMenu; onChosen: (id) => view.onHeaderAction(id) }
+    TaskProps {
+        id: props
+        onCopyCommand: if (view.menuRow) view.ctrl.copyText(view.menuRow.cmd)
     }
 }

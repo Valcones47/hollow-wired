@@ -18,12 +18,65 @@ Scope {
     property bool dropOpen: false
     readonly property bool anyOpen: ctl.appOpen || ctl.dropOpen
 
+    // ---------------------------------------------------------- colunas
+    // modes: onde a coluna existe (grouped = Processos, flat = Detalhes).
+    readonly property var colDefs: [
+        { id: "pid",     w: 72,  right: true,  modes: ["flat"] },
+        { id: "status",  w: 96, right: false, modes: ["grouped", "flat"] },
+        { id: "n",       w: 84,  right: true,  modes: ["grouped"] },
+        { id: "threads", w: 80,  right: true,  modes: ["grouped", "flat"] },
+        { id: "cpu",     w: 84, right: true,  modes: ["grouped", "flat"] },
+        { id: "mem",     w: 96, right: true,  modes: ["grouped", "flat"] },
+        { id: "swap",    w: 88, right: true,  modes: ["grouped", "flat"] },
+        { id: "disk",    w: 100, right: true,  modes: ["grouped", "flat"] },
+        { id: "gpu",     w: 76,  right: true,  modes: ["grouped", "flat"] },
+        { id: "gpuused", w: 130, right: false, modes: ["grouped", "flat"] },
+        { id: "vram",    w: 104, right: true,  modes: ["grouped", "flat"] },
+        { id: "cmd",     w: 360, right: false, modes: ["flat"] }
+    ]
+    function colDef(id) {
+        for (const c of ctl.colDefs) if (c.id === id) return c;
+        return { id: id, w: 100, right: true, modes: [] };
+    }
+    function colWidth(id) {
+        const w = ctl.settings.colWidths ? ctl.settings.colWidths[id] : undefined;
+        return w > 40 ? w : ctl.colDef(id).w;
+    }
+    function colTitle(id) {
+        const T = (k, f) => Theme.t(k, f);
+        switch (id) {
+        case "pid": return "PID";
+        case "status": return T("taskman.col_status", "Status");
+        case "n": return T("taskman.col_n", "Processos");
+        case "threads": return "Threads";
+        case "cpu": return T("taskman.col_cpu", "CPU");
+        case "mem": return T("taskman.col_mem", "Memória");
+        case "swap": return "Swap";
+        case "disk": return T("taskman.col_disk", "Disco");
+        case "gpu": return "GPU";
+        case "gpuused": return T("taskman.col_gpuused", "GPU usada");
+        case "vram": return T("taskman.col_vram", "Mem. de vídeo");
+        case "cmd": return T("taskman.col_cmd", "Linha de comando");
+        }
+        return id;
+    }
+
     // ---------------------------------------------------------- preferências
     // ~/.config/hollow-wired/task-manager.json (estado do usuário).
-    property var settings: ({
-        cols: { cpu: true, mem: true, swap: false, disk: true, gpu: true, vram: false },
+    readonly property var defaultSettings: ({
+        cols: { pid: true, status: false, n: true, threads: false, cpu: true, mem: true, swap: false,
+                disk: true, gpu: true, gpuused: true, vram: false, cmd: true },
+        colOrder: ["pid", "status", "n", "threads", "cpu", "mem", "swap", "disk", "gpu", "gpuused", "vram", "cmd"],
+        colWidths: {},
+        density: "normal",       // compact | normal | comfortable
+        fontSize: "normal",      // small | normal | large
+        heat: true,
+        startTab: "processes",
+        graphWindow: 60,
+        resHidden: [],
         interval: 2, bgOpen: false, nvidia: true
     })
+    property var settings: ctl.defaultSettings
     readonly property string cfgPath: Quickshell.env("HOME") + "/.config/hollow-wired/task-manager.json"
     FileView {
         id: cfgFile
@@ -32,24 +85,62 @@ Scope {
         onLoaded: {
             try {
                 const j = JSON.parse(text());
-                const s = Object.assign({}, ctl.settings);
+                const s = Object.assign({}, ctl.defaultSettings);
                 if (j.cols) s.cols = Object.assign({}, s.cols, j.cols);
-                for (const k of ["interval", "bgOpen", "nvidia"]) if (j[k] !== undefined) s[k] = j[k];
+                if (j.colWidths) s.colWidths = Object.assign({}, j.colWidths);
+                if (Array.isArray(j.colOrder)) {
+                    const known = ctl.defaultSettings.colOrder;
+                    const o = j.colOrder.filter(x => known.indexOf(x) >= 0);
+                    for (const k of known) if (o.indexOf(k) < 0) o.push(k);
+                    s.colOrder = o;
+                }
+                for (const k of ["density", "fontSize", "heat", "startTab", "graphWindow", "resHidden",
+                                 "interval", "bgOpen", "nvidia"])
+                    if (j[k] !== undefined) s[k] = j[k];
                 ctl.settings = s;
             } catch (e) {}
         }
     }
+    function _save() { cfgFile.setText(JSON.stringify(ctl.settings, null, 2) + "\n"); }
     function setSetting(k, v) {
         const s = Object.assign({}, ctl.settings);
         s[k] = v;
         ctl.settings = s;
-        cfgFile.setText(JSON.stringify(s, null, 2) + "\n");
+        ctl._save();
         if (k === "interval" || k === "nvidia") ctl.restartFeed();
     }
     function setCol(id, on) {
         const c = Object.assign({}, ctl.settings.cols);
         c[id] = on;
         ctl.setSetting("cols", c);
+    }
+    function setColWidth(id, w, persist) {
+        const m = Object.assign({}, ctl.settings.colWidths);
+        m[id] = Math.max(52, Math.round(w));
+        const s = Object.assign({}, ctl.settings);
+        s.colWidths = m;
+        ctl.settings = s;
+        if (persist) ctl._save();
+    }
+    function moveCol(id, dir) {
+        const o = ctl.settings.colOrder.slice();
+        const i = o.indexOf(id), j = i + dir;
+        if (i < 0 || j < 0 || j >= o.length) return;
+        o[i] = o[j]; o[j] = id;
+        ctl.setSetting("colOrder", o);
+    }
+    function resetCols() {
+        const s = Object.assign({}, ctl.settings);
+        s.cols = Object.assign({}, ctl.defaultSettings.cols);
+        s.colOrder = ctl.defaultSettings.colOrder.slice();
+        s.colWidths = {};
+        ctl.settings = s;
+        ctl._save();
+    }
+    function toggleRes(key, on) {
+        const h = ctl.settings.resHidden.filter(x => x !== key);
+        if (!on) h.push(key);
+        ctl.setSetting("resHidden", h);
     }
 
     // ---------------------------------------------------------- dados
@@ -78,7 +169,7 @@ Scope {
     function _push(h, key, v) {
         let a = h[key] || [];
         a = a.concat([v === null || v === undefined ? 0 : v]);
-        if (a.length > 60) a = a.slice(a.length - 60);
+        if (a.length > 240) a = a.slice(a.length - 240);
         h[key] = a;
     }
 
@@ -129,6 +220,33 @@ Scope {
         ctl.asked = a;
     }
 
+    function sendSignal(sig, pids) {
+        Quickshell.execDetached(["rice-procs", "kill", sig].concat(pids.map(String)));
+    }
+    function setNice(value, pids) {
+        Quickshell.execDetached(["rice-procs", "nice", String(value)].concat(pids.map(String)));
+    }
+    function focusWindow(addr) {
+        if (!addr) return;
+        Quickshell.execDetached(["hyprctl", "dispatch", "hl.dsp.focus({ window = \"address:" + addr + "\" })"]);
+    }
+    function openFolder(path) {
+        const i = path.lastIndexOf("/");
+        if (i > 0) Quickshell.execDetached(["xdg-open", path.slice(0, i)]);
+    }
+    function copyText(t) { Quickshell.execDetached(["wl-copy", t]); }
+    // O processo e todos os descendentes dele (pelo pid pai).
+    function descendants(pid) {
+        const kids = {};
+        for (const g of ctl.groups) for (const p of g.procs) (kids[p[13]] = kids[p[13]] || []).push(p[0]);
+        const out = [pid], todo = [pid];
+        while (todo.length) {
+            const c = todo.pop();
+            for (const k of (kids[c] || [])) if (out.indexOf(k) < 0) { out.push(k); todo.push(k); }
+        }
+        return out;
+    }
+
     // ---------------------------------------------------------- formatação
     function _pt() { return String(Theme.locale || "").indexOf("pt") === 0; }
     function _n(v) { const s = String(v); return ctl._pt() ? s.replace(".", ",") : s; }
@@ -161,6 +279,8 @@ Scope {
     // A lista de chaves só muda quando surge ou some um dispositivo: assim o
     // Repeater não recria os blocos a cada leitura.
     property var resKeys: ["cpu", "mem"]
+    readonly property var visibleResKeys: ctl.resKeys.filter(k => ctl.settings.resHidden.indexOf(k) < 0)
+    readonly property int graphPoints: Math.max(10, Math.round(ctl.settings.graphWindow / ctl.settings.interval))
     onDataRevChanged: {
         const k = ["cpu", "mem"];
         for (const x of ctl.disks) k.push("disk:" + x.name);
@@ -169,18 +289,20 @@ Scope {
         if (k.join("|") !== ctl.resKeys.join("|")) ctl.resKeys = k;
     }
 
+    function _devHas(csv, v) { return ("," + (csv || "") + ",").indexOf("," + v + ",") >= 0; }
     function _find(arr, f) { for (const x of arr) if (f(x)) return x; return null; }
 
     // Dados de um recurso para o bloco da esquerda e o detalhe da direita.
     // `rev` só existe para o binding reavaliar a cada leitura.
     function resInfo(key, rev) {
-        const H = ctl.hist[key] || [];
+        const H = (ctl.hist[key] || []).slice(-ctl.graphPoints);
+        const pts = ctl.graphPoints;
         const T = (k, f) => Theme.t(k, f);
         if (key === "cpu") {
             const s = ctl.sys;
             return { title: T("taskman.res_cpu", "CPU"), sub: s.model, color: Theme.primary,
                 value: ctl.fmtPct(s.cpu) + (s.freq ? "  " + ctl.fmtFreq(s.freq) : ""),
-                series: H, max: 100, unit: T("taskman.util60", "Utilização em % nos últimos 60 segundos"),
+                series: H, points: pts, max: 100, unit: T("taskman.util_pct", "Utilização em %"),
                 stats: [
                     { k: T("taskman.s_util", "Utilização"), v: ctl.fmtPct(s.cpu) },
                     { k: T("taskman.s_speed", "Velocidade"), v: ctl.fmtFreq(s.freq) },
@@ -196,7 +318,7 @@ Scope {
             const pct = m.total > 0 ? m.used * 100 / m.total : 0;
             return { title: T("taskman.res_mem", "Memória"), sub: ctl.fmtBytes(m.total), color: Theme.tertiary,
                 value: ctl.fmtBytes(m.used) + " (" + ctl.fmtPct(pct) + ")",
-                series: H, max: 100, unit: T("taskman.mem60", "Uso da memória em % nos últimos 60 segundos"),
+                series: H, points: pts, max: 100, unit: T("taskman.mem_pct", "Uso da memória em %"),
                 stats: [
                     { k: T("taskman.s_inuse", "Em uso"), v: ctl.fmtBytes(m.used) },
                     { k: T("taskman.s_avail", "Disponível"), v: ctl.fmtBytes(m.avail) },
@@ -209,8 +331,8 @@ Scope {
             const n = key.slice(5);
             const d = ctl._find(ctl.disks, x => x.name === n) || { name: n, model: "", size: 0, read: 0, write: 0, busy: 0 };
             return { title: T("taskman.res_disk", "Disco") + " " + n, sub: d.model, color: Theme.color12,
-                value: ctl.fmtPct(d.busy), series: H, max: 100,
-                unit: T("taskman.disk60", "Tempo ativo em % nos últimos 60 segundos"),
+                value: ctl.fmtPct(d.busy), series: H, points: pts, max: 100,
+                unit: T("taskman.disk_pct", "Tempo ativo em %"),
                 stats: [
                     { k: T("taskman.s_active", "Tempo ativo"), v: ctl.fmtPct(d.busy) },
                     { k: T("taskman.s_read", "Leitura"), v: ctl.fmtRate(d.read) },
@@ -223,7 +345,7 @@ Scope {
             const d = ctl._find(ctl.nets, x => x.name === n) || { name: n, rx: 0, tx: 0 };
             return { title: T("taskman.res_net", "Rede") + " " + n, sub: "", color: Theme.color6,
                 value: "↓ " + ctl.fmtRate(d.rx) + "  ↑ " + ctl.fmtRate(d.tx),
-                series: H, max: 0, unit: T("taskman.net60", "Tráfego nos últimos 60 segundos"),
+                series: H, points: pts, max: 0, unit: T("taskman.net_traffic", "Tráfego (recebido + enviado)"),
                 stats: [
                     { k: T("taskman.s_recv", "Recebido"), v: ctl.fmtRate(d.rx) },
                     { k: T("taskman.s_sent", "Enviado"), v: ctl.fmtRate(d.tx) }
@@ -250,9 +372,17 @@ Scope {
                 if (g.vendor === "nvidia" && g.util === null)
                     stats.push({ k: T("taskman.s_state", "Estado"), v: T("taskman.gpu_noread", "Sem leitura (o driver pede reinício)") });
             }
-            return { title: "GPU " + idx, sub: g.name, color: Theme.color2,
+            const users = [];
+            for (const gr of ctl.groups) {
+                if (ctl._devHas(gr.devs, g.vendor)) {
+                    let name = gr.kind === "app" ? ctl.appLabel(gr) : gr.name;
+                    users.push({ name: name, pct: gr.gpu, vram: gr.vram, key: gr.key });
+                }
+            }
+            users.sort((a, b) => (b.pct - a.pct) || (b.vram - a.vram));
+            return { title: "GPU " + idx, sub: g.name, color: Theme.color2, users: users.slice(0, 8),
                 value: resting ? T("taskman.gpu_rest_short", "Em repouso") : ctl.fmtPct(g.util),
-                series: H, max: 100, unit: T("taskman.gpu60", "Utilização em % nos últimos 60 segundos"), stats: stats };
+                series: H, points: pts, max: 100, unit: T("taskman.util_pct", "Utilização em %"), stats: stats };
         }
         return { title: key, sub: "", color: Theme.primary, value: "", series: [], max: 100, unit: "", stats: [] };
     }
@@ -263,8 +393,8 @@ Scope {
         visible: ctl.appOpen
         title: Theme.t("taskman.title", "Gerenciador de Tarefas")
         color: Theme.background
-        implicitWidth: 1100
-        implicitHeight: 720
+        implicitWidth: 1280
+        implicitHeight: 760
         minimumSize: Qt.size(760, 480)
         // Fechar pelo botão do compositor: acompanha o estado.
         onVisibleChanged: if (!visible && ctl.appOpen) ctl.appOpen = false

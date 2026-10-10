@@ -80,5 +80,8 @@ Updater 1.0 Updater.qml
 TaskManager 1.0 TaskManager.qml
 TaskManagerView 1.0 TaskManagerView.qml
 TaskGraph 1.0 TaskGraph.qml
+TaskTable 1.0 TaskTable.qml
+TaskProps 1.0 TaskProps.qml
+TaskMenu 1.0 TaskMenu.qml
 ThemePalette 1.0 ThemePalette.qml
 DisplayMode 1.0 DisplayMode.qml
