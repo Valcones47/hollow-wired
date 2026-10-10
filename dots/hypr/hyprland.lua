@@ -448,6 +448,9 @@ fi']])
     -- Perfil "mínimo": papel de parede animado congelado. O Waywallen sobe
     -- retomando o último wallpaper; depois de uns segundos, pausa (se o perfil pede).
     hl.exec_cmd("sh -c 'command -v rice-wallpaper-freeze >/dev/null && setsid -f rice-wallpaper-freeze auto 25 >/dev/null 2>&1'")
+    -- Botão Xbox do controle: toque abre o Big Picture, segurar desconecta
+    -- (rice-gamepad-guide; preferências em ~/.config/hollow-wired/gamepad.json).
+    hl.exec_cmd("sh -c 'command -v rice-gamepad-guide >/dev/null && setsid -f rice-gamepad-guide >/dev/null 2>&1'")
 end)
 
 -----------------------------

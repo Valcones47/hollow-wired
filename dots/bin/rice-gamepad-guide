@@ -1,0 +1,169 @@
+#!/usr/bin/env python3
+"""rice-gamepad-guide — o botão Xbox (Guia) do controle.
+
+  toque rápido    (até 0,8 s) abre o Steam Big Picture, se ainda não estiver aberto
+  segurar         pelo tempo configurado, desconecta o controle do Bluetooth
+  entre os dois   não faz nada (soltou antes da hora: foi engano ou desistência)
+
+O Steam trata o botão Guia por conta própria e abre o Big Picture assim que
+ele é apertado, sem saber se é toque ou segurar. Para isso funcionar, desligue
+nas configurações do Steam (Controle): "Botão Guia coloca Steam em 1º plano".
+Este serviço só LÊ o controle (não captura nada), então jogos e Steam Input
+seguem recebendo tudo normalmente.
+
+Preferências em ~/.config/hollow-wired/gamepad.json (lidas a cada toque, sem
+reiniciar):
+  hold_seconds            tempo segurando para desconectar (padrão 2.5)
+  hold_disconnects        true/false
+  tap_opens_bigpicture    true/false
+
+Uso:
+  rice-gamepad-guide          # fica rodando (autostart do Hyprland)
+Variável RICE_GAMEPAD_DRY=1: só imprime as ações, sem executá-las (teste).
+"""
+import asyncio
+import json
+import os
+import re
+import subprocess
+import sys
+
+import evdev
+from evdev import ecodes
+
+CFG = os.path.expanduser("~/.config/hollow-wired/gamepad.json")
+DEFAULTS = {"hold_seconds": 2.5, "hold_disconnects": True, "tap_opens_bigpicture": True}
+DRY = os.environ.get("RICE_GAMEPAD_DRY") == "1"
+MAC = re.compile(r"^([0-9a-f]{2}:){5}[0-9a-f]{2}$")
+
+
+def cfg():
+    c = dict(DEFAULTS)
+    try:
+        with open(CFG, encoding="utf-8") as f:
+            j = json.load(f)
+        for k, default in DEFAULTS.items():
+            v = j.get(k)
+            if isinstance(default, bool):
+                if isinstance(v, bool):
+                    c[k] = v
+            elif isinstance(v, (int, float)) and not isinstance(v, bool):
+                c[k] = float(v)
+    except (OSError, ValueError):
+        pass
+    c["hold_seconds"] = max(0.8, min(10.0, float(c["hold_seconds"])))
+    return c
+
+
+def log(msg):
+    print(msg, flush=True)
+
+
+async def run(*args):
+    if DRY:
+        log("DRY: " + " ".join(args))
+        return 0, ""
+    try:
+        p = await asyncio.create_subprocess_exec(
+            *args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
+        out, _ = await p.communicate()
+        return p.returncode, out.decode(errors="replace")
+    except OSError:
+        return 1, ""
+
+
+async def bigpicture_open():
+    rc, out = await run("hyprctl", "clients", "-j")
+    try:
+        return any("big picture" in (c.get("title") or "").lower() for c in json.loads(out))
+    except ValueError:
+        return False
+
+
+async def on_tap():
+    if not cfg()["tap_opens_bigpicture"]:
+        return
+    if await bigpicture_open():
+        return  # dentro do Big Picture o próprio Steam trata o botão
+    log("toque: abrindo o Big Picture")
+    await run("steam", "steam://open/bigpicture")
+
+
+async def on_hold(dev):
+    if not cfg()["hold_disconnects"]:
+        return
+    mac = (dev.uniq or "").lower()
+    if not MAC.match(mac):
+        log("segurar: %s não é Bluetooth, nada a desconectar" % dev.name)
+        return
+    log("segurar: desconectando %s (%s)" % (dev.name, mac))
+    await run("bluetoothctl", "disconnect", mac.upper())
+    await run("notify-send", "-a", "Controle", "-t", "2500", "Controle desconectado", dev.name)
+
+
+async def hold_timer(dev):
+    await asyncio.sleep(cfg()["hold_seconds"])
+    await on_hold(dev)
+
+
+TAP_MAX = 0.8   # segundos; entre isso e o tempo de segurar não acontece nada
+
+
+async def watch(dev):
+    hold = None
+    t_press = 0.0
+    try:
+        async for ev in dev.async_read_loop():
+            if ev.type != ecodes.EV_KEY or ev.code != ecodes.BTN_MODE:
+                continue
+            if ev.value == 1:
+                if hold:
+                    hold.cancel()
+                t_press = asyncio.get_running_loop().time()
+                hold = asyncio.create_task(hold_timer(dev))
+            elif ev.value == 0:
+                if hold and not hold.done():
+                    hold.cancel()
+                    if asyncio.get_running_loop().time() - t_press <= TAP_MAX:
+                        await on_tap()
+                hold = None
+    except OSError:
+        pass  # controle saiu
+    finally:
+        if hold:
+            hold.cancel()
+
+
+def is_pad(dev):
+    caps = dev.capabilities()
+    return (ecodes.BTN_MODE in caps.get(ecodes.EV_KEY, [])
+            and ecodes.EV_ABS in caps
+            and "keyboard" not in dev.name.lower() and "mouse" not in dev.name.lower())
+
+
+async def main():
+    tasks = {}
+    while True:
+        for path in evdev.list_devices():
+            t = tasks.get(path)
+            if t and not t.done():
+                continue
+            try:
+                dev = evdev.InputDevice(path)
+                if not is_pad(dev):
+                    dev.close()
+                    continue
+            except OSError:
+                continue
+            log("observando %s (%s)" % (dev.name, path))
+            tasks[path] = asyncio.create_task(watch(dev))
+        for path in [p for p, t in tasks.items() if t.done()]:
+            del tasks[path]
+        await asyncio.sleep(3)
+
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        sys.exit(0)
