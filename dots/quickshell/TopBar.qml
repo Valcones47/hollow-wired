@@ -157,7 +157,15 @@ PanelWindow {
         && (n.properties["media.class"] || "") === "Stream/Output/Audio"
         // Fluxos virtuais (loopback, saída do equalizador) não são apps.
         && String(n.properties["node.virtual"] || "") !== "true")
-    PwObjectTracker { objects: [bar.sink, bar.source].concat(bar.sinks, bar.sources, bar.streams) }
+    // Os fluxos (apps tocando som) só são vinculados com o popup de áudio ou o
+    // mixer abertos. Vinculá-los o tempo todo fazia o Quickshell cair ao abrir
+    // jogos: o Proton cria e destrói fluxos em rajada, o PipeWire responde "no
+    // global N any more" para o vínculo que chegou tarde e o proxy quebrado
+    // derrubava o processo em pw_proxy_destroy (coredumps de 2026-10-10).
+    PwObjectTracker {
+        objects: [bar.sink, bar.source].concat(bar.sinks, bar.sources,
+                                               (bar.pop === "mixer" || bar.pop === "audio") ? bar.streams : [])
+    }
 
     function nodeName(n) {
         if (!n) return "";

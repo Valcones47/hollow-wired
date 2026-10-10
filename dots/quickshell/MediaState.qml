@@ -165,7 +165,8 @@ Singleton {
     // (`alsa_playback.sonora`) além das propriedades. Stream de reprodução tem
     // isSink = true no Quickshell (recebe o áudio do app).
     readonly property var playbackStreams: Pipewire.nodes.values.filter(n => n.audio && n.isStream && n.isSink)
-    property PwObjectTracker tracker: PwObjectTracker { objects: root.playbackStreams }
+    // Sem player não há volume a ajustar: não vincula os fluxos (ver TopBar.qml).
+    property PwObjectTracker tracker: PwObjectTracker { objects: root.player ? root.playbackStreams : [] }
     readonly property var streams: playbackStreams.filter(n => root.matches(n))
 
     readonly property bool mprisVolume: player !== null && player.volumeSupported && player.canControl

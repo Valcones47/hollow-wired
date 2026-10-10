@@ -103,7 +103,8 @@ PanelWindow {
     // Fora ficam o equalizador e os loopbacks do próprio rice.
     readonly property var streams: Pipewire.nodes.values.filter(n => n.audio && n.isStream && n.isSink
         && n.name !== "hollow_eq_out" && !String(n.name).startsWith("output.loopback"))
-    PwObjectTracker { objects: [cc.sink, cc.source].concat(cc.sinks, cc.streams) }
+    // Fluxos só com o painel aberto (ver o comentário em TopBar.qml).
+    PwObjectTracker { objects: [cc.sink, cc.source].concat(cc.sinks, cc.open ? cc.streams : []) }
     function nodeName(n) {
         if (!n) return "";
         return n.properties["application.name"] || n.description || n.nickname || n.name;
