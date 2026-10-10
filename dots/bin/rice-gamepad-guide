@@ -5,6 +5,13 @@
   segurar         pelo tempo configurado, desconecta o controle do Bluetooth
   entre os dois   não faz nada (soltou antes da hora: foi engano ou desistência)
 
+Requisito do driver (xpadneo): por padrão ele guarda o botão Xbox como "shift" e
+só o repassa, já como toque instantâneo, QUANDO SOLTA — então segurar nunca é
+visto. Com o modo shift desligado o botão chega no momento em que é apertado:
+  echo 1 | sudo tee /sys/module/hid_xpadneo/parameters/disable_shift_mode
+  # permanente: options hid_xpadneo disable_shift_mode=1 em /etc/modprobe.d/
+(custo: some a troca de perfil do xpadneo, Xbox + A/B/X/Y).
+
 O Steam trata o botão Guia por conta própria e abre o Big Picture assim que
 ele é apertado, sem saber se é toque ou segurar. Para isso funcionar, desligue
 nas configurações do Steam (Controle): "Botão Guia coloca Steam em 1º plano".
@@ -141,7 +148,19 @@ def is_pad(dev):
             and "keyboard" not in dev.name.lower() and "mouse" not in dev.name.lower())
 
 
+def check_driver():
+    p = "/sys/module/hid_xpadneo/parameters/disable_shift_mode"
+    try:
+        with open(p) as f:
+            if f.read().strip() in ("N", "0"):
+                log("AVISO: xpadneo em modo shift: o botão Xbox só chega ao soltar e "
+                    "segurar não funciona. Rode: echo 1 | sudo tee " + p)
+    except OSError:
+        pass
+
+
 async def main():
+    check_driver()
     tasks = {}
     while True:
         for path in evdev.list_devices():
