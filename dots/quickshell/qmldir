@@ -78,5 +78,7 @@ KeyCombo 1.0 KeyCombo.qml
 TrayIcon 1.0 TrayIcon.qml
 Updater 1.0 Updater.qml
 TaskManager 1.0 TaskManager.qml
+TaskManagerView 1.0 TaskManagerView.qml
+TaskGraph 1.0 TaskGraph.qml
 ThemePalette 1.0 ThemePalette.qml
 DisplayMode 1.0 DisplayMode.qml

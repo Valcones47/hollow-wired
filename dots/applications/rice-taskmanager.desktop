@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Gerenciador de Tarefas
+Name[en]=Task Manager
+Comment=Aplicativos, processos e desempenho do sistema
+Comment[en]=Applications, processes and system performance
+Exec=rice-task-manager
+Icon=utilities-system-monitor
+StartupWMClass=org.quickshell
+Categories=System;Monitor;
+Terminal=false

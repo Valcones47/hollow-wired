@@ -7,20 +7,24 @@ janela (renderizadores do navegador, helpers do Electron...). O que não
 pertence a nenhuma janela fica em "segundo plano", agrupado pelo nome.
 
 Uso:
-  rice-procs watch [seg]               # uma linha JSON a cada [seg] s (padrão 2)
-  rice-procs once                      # uma linha e sai
-  rice-procs kill <TERM|KILL> <pid>... # encerra; recusa o compositor e o shell
+  rice-procs watch [seg] [--no-nvidia]  # uma linha JSON a cada [seg] s (padrão 2)
+  rice-procs once                       # uma linha e sai
+  rice-procs kill <TERM|KILL> <pid>...  # encerra; recusa o compositor e o shell
 
-Memória = páginas residentes menos as compartilhadas (evita contar duas vezes
-a biblioteca que o navegador e os helpers dividem). CPU em % da máquina toda.
-GPU não é lida de propósito: o nvidia-smi acorda a placa e gasta bateria.
+Por processo: CPU (% da máquina toda), memória (residente − compartilhada),
+swap (VmSwap), disco (leitura+escrita em B/s) e GPU.
+GPU Intel: tempo de engine do fdinfo do kernel (sem root). GPU NVIDIA: só é
+consultada (nvidia-smi) quando o runtime PM diz "active" — a placa suspensa
+nunca é acordada por este script.
 """
 import glob
 import json
 import os
+import re
 import signal
 import subprocess
 import sys
+import threading
 import time
 
 CLK = os.sysconf("SC_CLK_TCK")
@@ -43,8 +47,137 @@ def read(path):
         return ""
 
 
+def lspci_name(slot):
+    try:
+        r = subprocess.run(["lspci", "-mm", "-s", slot], capture_output=True, text=True, timeout=3)
+        parts = re.findall(r'"([^"]*)"', r.stdout)
+        if len(parts) >= 3:
+            vendor = parts[1].replace("Corporation", "").replace("[AMD/ATI]", "AMD").strip()
+            dev = re.sub(r".*\[(.*)\].*", r"\1", parts[2]) if "[" in parts[2] else parts[2]
+            return (vendor + " " + dev).strip()
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return ""
+
+
+# ----------------------------------------------------------------- GPUs
+class Gpus:
+    """Placas de vídeo: Intel/AMD pelo kernel, NVIDIA só quando já está ativa."""
+
+    def __init__(self, want_nvidia):
+        self.want_nvidia = want_nvidia
+        self.cards = []  # {"id","slot","vendor","name","card"}
+        for d in sorted(glob.glob("/sys/class/drm/card[0-9]")):
+            dev = os.path.realpath(d + "/device")
+            slot = os.path.basename(dev)
+            vid = read(dev + "/vendor").strip()
+            kind = {"0x8086": "intel", "0x10de": "nvidia", "0x1002": "amd"}.get(vid)
+            if not kind:
+                continue
+            n = sum(1 for c in self.cards if c["vendor"] == kind)
+            self.cards.append({"id": "%s%d" % (kind, n), "slot": slot, "vendor": kind,
+                               "name": lspci_name(slot) or kind.capitalize(), "card": d, "dev": dev})
+        # Intel/AMD antes da NVIDIA: "GPU 0" é a que desenha a tela, como no Windows.
+        order = {"intel": 0, "amd": 1, "nvidia": 2}
+        self.cards.sort(key=lambda c: order.get(c["vendor"], 9))
+        self.nv = {"gpu": None, "procs": {}}
+        self._nv_busy = False
+        self._nv_t = 0.0
+
+    def nvidia_card(self):
+        return next((c for c in self.cards if c["vendor"] == "nvidia"), None)
+
+    def _poll_nvidia(self, card):
+        try:
+            q = subprocess.run(
+                ["nvidia-smi", "--query-gpu=name,utilization.gpu,memory.used,memory.total,"
+                 "temperature.gpu,power.draw,clocks.gr", "--format=csv,noheader,nounits"],
+                capture_output=True, text=True, timeout=4)
+            f = [x.strip() for x in q.stdout.strip().split(",")]
+            gpu = None
+            if len(f) >= 7:
+                num = lambda s: float(s) if re.fullmatch(r"[\d.]+", s) else None
+                gpu = {"name": f[0], "util": num(f[1]), "mem_used": (num(f[2]) or 0) * 1048576,
+                       "mem_total": (num(f[3]) or 0) * 1048576, "temp": num(f[4]),
+                       "power": num(f[5]), "freq": num(f[6])}
+            procs = {}
+            p = subprocess.run(["nvidia-smi", "pmon", "-c", "1", "-s", "um"],
+                               capture_output=True, text=True, timeout=4)
+            cols = None
+            for line in p.stdout.splitlines():
+                if line.startswith("#"):
+                    t = line.lstrip("# ").split()
+                    if "pid" in t:
+                        cols = t
+                    continue
+                if not cols:
+                    continue
+                t = line.split()
+                if len(t) < len(cols) - 1:
+                    continue
+                row = dict(zip(cols, t))
+                try:
+                    pid = int(row["pid"])
+                except (KeyError, ValueError):
+                    continue
+                sm = row.get("sm", "-")
+                fb = row.get("fb", "-")
+                procs[pid] = (float(sm) if sm.replace(".", "").isdigit() else 0.0,
+                              (float(fb) if fb.replace(".", "").isdigit() else 0.0) * 1048576)
+            self.nv = {"gpu": gpu, "procs": procs}
+        except (OSError, subprocess.SubprocessError, ValueError):
+            pass
+        finally:
+            self._nv_busy = False
+
+    def tick(self):
+        c = self.nvidia_card()
+        if not (self.want_nvidia and c):
+            return
+        active = read(c["dev"] + "/power/runtime_status").strip() == "active"
+        if not active:
+            self.nv = {"gpu": None, "procs": {}}
+            return
+        now = time.monotonic()
+        if not self._nv_busy and now - self._nv_t >= 2.0:
+            self._nv_busy = True
+            self._nv_t = now
+            threading.Thread(target=self._poll_nvidia, args=(c,), daemon=True).start()
+
+    def intel_freq(self, c):
+        for p in (c["card"] + "/gt_cur_freq_mhz", c["card"] + "/gt/gt0/rps_cur_freq_mhz",
+                  c["dev"] + "/drm/" + os.path.basename(c["card"]) + "/gt_cur_freq_mhz"):
+            v = read(p).strip()
+            if v.isdigit():
+                return int(v)
+        return None
+
+    def describe(self, intel_util):
+        out = []
+        for c in self.cards:
+            g = {"id": c["id"], "vendor": c["vendor"], "name": c["name"], "util": None, "freq": None,
+                 "mem_used": None, "mem_total": None, "temp": None, "power": None, "state": "active"}
+            if c["vendor"] == "nvidia":
+                active = read(c["dev"] + "/power/runtime_status").strip() == "active"
+                g["state"] = "active" if active else "suspended"
+                nv = self.nv.get("gpu")
+                if active and nv:
+                    g.update({k: nv[k] for k in ("util", "freq", "mem_used", "mem_total", "temp", "power")})
+                    if nv.get("name"):
+                        g["name"] = nv["name"]
+                if not self.want_nvidia:
+                    g["state"] = "off"
+            else:
+                g["freq"] = self.intel_freq(c)
+                g["util"] = intel_util.get(c["slot"])
+            out.append(g)
+        return out
+
+
+# ----------------------------------------------------------------- processos
 def scan():
     procs = {}
+    threads = 0
     for name in os.listdir("/proc"):
         if not name.isdigit():
             continue
@@ -59,6 +192,8 @@ def scan():
             if rest[0] == "Z":
                 continue
             sm = read("/proc/%d/statm" % pid).split()
+            nthr = int(rest[17]) if len(rest) > 17 else 1
+            threads += nthr
             procs[pid] = {
                 "ppid": int(rest[1]),
                 "ticks": int(rest[11]) + int(rest[12]),
@@ -67,7 +202,37 @@ def scan():
             }
         except (OSError, ValueError, IndexError):
             continue
-    return procs
+    return procs, threads
+
+
+def proc_swap(pid):
+    for line in read("/proc/%d/status" % pid).splitlines():
+        if line.startswith("VmSwap:"):
+            try:
+                return int(line.split()[1]) * 1024
+            except (IndexError, ValueError):
+                return 0
+    return 0
+
+
+def proc_io(pid):
+    r = w = 0
+    for line in read("/proc/%d/io" % pid).splitlines():
+        if line.startswith("read_bytes:"):
+            r = int(line.split()[1])
+        elif line.startswith("write_bytes:"):
+            w = int(line.split()[1])
+    return r + w
+
+
+def proc_label(pid, comm):
+    parts = read("/proc/%d/cmdline" % pid).split("\0")
+    t = next((a.split("=", 1)[1] for a in parts if a.startswith("--type=")), "")
+    if comm.lower() in WRAPPERS:
+        for a in parts[1:]:
+            if a and not a.startswith("-"):
+                return os.path.basename(a)
+    return comm + (" · " + t if t else "")
 
 
 def friendly(pid, comm):
@@ -88,17 +253,81 @@ def hypr_clients():
         return []
 
 
+class DrmScan:
+    """Tempo de engine de GPU por processo (fdinfo do DRM), com cache dos fds."""
+
+    def __init__(self):
+        self.fds = {}      # pid -> (tick_visto, [caminhos fdinfo])
+        self.tick = 0
+
+    def _find(self, pid):
+        out = []
+        base = "/proc/%d/fd" % pid
+        try:
+            for fd in os.listdir(base):
+                try:
+                    if os.readlink(base + "/" + fd).startswith("/dev/dri/"):
+                        out.append("/proc/%d/fdinfo/%s" % (pid, fd))
+                except OSError:
+                    continue
+        except OSError:
+            pass
+        return out
+
+    def read(self, pids):
+        self.tick += 1
+        res = {}   # pid -> {slot: ns}
+        for pid in pids:
+            ent = self.fds.get(pid)
+            if ent is None or (self.tick - ent[0] > 30 and pid % 30 == self.tick % 30) or \
+                    (ent[1] and self.tick - ent[0] > 10):
+                ent = (self.tick, self._find(pid))
+                self.fds[pid] = ent
+            if not ent[1]:
+                continue
+            seen = {}
+            for p in ent[1]:
+                txt = read(p)
+                if "drm-driver" not in txt:
+                    continue
+                cid = None
+                slot = ""
+                ns = 0
+                for line in txt.splitlines():
+                    if line.startswith("drm-client-id:"):
+                        cid = line.split()[1]
+                    elif line.startswith("drm-pdev:"):
+                        slot = line.split()[1]
+                    elif line.startswith("drm-engine-") and "capacity" not in line:
+                        m = re.search(r"(\d+)\s*ns", line)
+                        if m:
+                            ns += int(m.group(1))
+                if cid is not None and cid not in seen:
+                    seen[cid] = (slot, ns)
+            for slot, ns in seen.values():
+                d = res.setdefault(pid, {})
+                d[slot] = d.get(slot, 0) + ns
+        for pid in list(self.fds):
+            if pid not in pids:
+                del self.fds[pid]
+        return res
+
+
+# ----------------------------------------------------------------- sistema
 def cpu_times():
     f = read("/proc/stat").splitlines()[0].split()[1:]
     v = [int(x) for x in f]
-    return sum(v), v[3] + (v[4] if len(v) > 4 else 0)  # total, ocioso (idle+iowait)
+    return sum(v), v[3] + (v[4] if len(v) > 4 else 0)
 
 
 def meminfo():
     m = {}
     for line in read("/proc/meminfo").splitlines():
         k, _, v = line.partition(":")
-        m[k] = int(v.split()[0]) * 1024
+        try:
+            m[k] = int(v.split()[0]) * 1024
+        except (IndexError, ValueError):
+            pass
     return m
 
 
@@ -123,21 +352,80 @@ def cpu_temp():
         return None
 
 
+def cpu_model():
+    for line in read("/proc/cpuinfo").splitlines():
+        if line.startswith("model name"):
+            return re.sub(r"\s+", " ", line.split(":", 1)[1]).strip()
+    return ""
+
+
+def cpu_freq():
+    vals = []
+    for p in glob.glob("/sys/devices/system/cpu/cpu[0-9]*/cpufreq/scaling_cur_freq"):
+        v = read(p).strip()
+        if v.isdigit():
+            vals.append(int(v) / 1000)
+    return round(sum(vals) / len(vals)) if vals else None
+
+
+def disk_devices():
+    out = []
+    for d in sorted(os.listdir("/sys/block")):
+        if re.fullmatch(r"nvme\d+n\d+|sd[a-z]|vd[a-z]|mmcblk\d+", d):
+            model = read("/sys/block/%s/device/model" % d).strip()
+            size = int(read("/sys/block/%s/size" % d).strip() or 0) * 512
+            out.append({"name": d, "model": model, "size": size})
+    return out
+
+
+def disk_counters():
+    r = {}
+    for line in read("/proc/diskstats").splitlines():
+        t = line.split()
+        if len(t) > 12:
+            r[t[2]] = (int(t[5]) * 512, int(t[9]) * 512, int(t[12]))
+    return r
+
+
+def net_counters():
+    r = {}
+    for line in read("/proc/net/dev").splitlines()[2:]:
+        name, _, rest = line.partition(":")
+        name = name.strip()
+        if name == "lo" or re.match(r"(veth|docker|br-|virbr|tailscale|tun|warp)", name):
+            continue
+        t = rest.split()
+        if len(t) >= 9:
+            r[name] = (int(t[0]), int(t[8]))
+    return r
+
+
 class Sampler:
-    def __init__(self):
+    def __init__(self, want_nvidia):
         self.prev = {}
+        self.prev_io = {}
+        self.prev_drm = {}
         self.prev_t = None
         self.prev_cpu = cpu_times()
+        self.prev_disk = disk_counters()
+        self.prev_net = net_counters()
+        self.gpus = Gpus(want_nvidia)
+        self.drm = DrmScan()
+        self.model = cpu_model()
+        self.disks = disk_devices()
 
     def sample(self):
         now = time.monotonic()
-        procs = scan()
+        procs, nthreads = scan()
         clients = hypr_clients()
         dt = (now - self.prev_t) if self.prev_t else None
+        self.gpus.tick()
+        nv = self.gpus.nv
+        drm = self.drm.read(set(procs))
+        slot_nv = (self.gpus.nvidia_card() or {}).get("slot")
+        intel_total = {}
 
-        roots = {}  # pid da janela -> classe
-        titles = {}
-        wins = {}
+        roots, titles, wins = {}, {}, {}
         for c in clients:
             cls = c.get("class") or c.get("initialClass") or ""
             pid = c.get("pid")
@@ -148,6 +436,7 @@ class Sampler:
             wins[cls] = wins.get(cls, 0) + 1
 
         groups = {}
+        new_prev, new_io, new_drm = {}, {}, {}
         for pid, p in procs.items():
             if pid == ME:
                 continue
@@ -163,17 +452,49 @@ class Sampler:
             else:
                 nm = friendly(pid, p["comm"])
                 key, kind, name = "bg:" + nm, "bg", nm
-            g = groups.setdefault(key, {"key": key, "kind": kind, "name": name, "cls": name if kind == "app" else "",
-                                        "title": titles.get(name, "") if kind == "app" else "",
-                                        "wins": wins.get(name, 0) if kind == "app" else 0,
-                                        "pids": [], "mem": 0, "cpu": 0.0})
-            g["pids"].append(pid)
-            g["mem"] += p["mem"]
-            if dt and pid in self.prev:
-                g["cpu"] += max(0, p["ticks"] - self.prev[pid]) / CLK / dt / NCPU * 100
+            g = groups.setdefault(key, {
+                "key": key, "kind": kind, "name": name, "cls": name if kind == "app" else "",
+                "title": titles.get(name, "") if kind == "app" else "",
+                "wins": wins.get(name, 0) if kind == "app" else 0,
+                "procs": [], "mem": 0, "cpu": 0.0, "swap": 0, "disk": 0.0, "gpu": 0.0, "vram": 0.0})
 
-        self.prev = {pid: p["ticks"] for pid, p in procs.items()}
-        self.prev_t = now
+            cpu = 0.0
+            if dt and pid in self.prev:
+                cpu = max(0, p["ticks"] - self.prev[pid]) / CLK / dt / NCPU * 100
+            io = proc_io(pid)
+            disk = 0.0
+            if dt and pid in self.prev_io:
+                disk = max(0, io - self.prev_io[pid]) / dt
+            swap = proc_swap(pid)
+
+            gpu, vram, gdev = 0.0, 0.0, ""
+            for slot, ns in drm.get(pid, {}).items():
+                new_drm[(pid, slot)] = ns
+                if dt and (pid, slot) in self.prev_drm:
+                    pct = min(100.0, max(0, ns - self.prev_drm[(pid, slot)]) / (dt * 1e9) * 100)
+                    intel_total[slot] = intel_total.get(slot, 0.0) + pct
+                    if pct > gpu:
+                        gpu, gdev = pct, "intel"
+            if pid in nv["procs"]:
+                sm, fb = nv["procs"][pid]
+                vram = fb
+                if sm >= gpu:
+                    gpu, gdev = sm, "nvidia"
+                elif fb > 0 and not gdev:
+                    gdev = "nvidia"
+
+            new_prev[pid] = p["ticks"]
+            new_io[pid] = io
+            g["procs"].append([pid, proc_label(pid, p["comm"]) if kind == "app" else p["comm"],
+                               round(cpu, 1), p["mem"], swap, round(disk), round(gpu, 1), round(vram), gdev])
+            g["mem"] += p["mem"]
+            g["cpu"] += cpu
+            g["swap"] += swap
+            g["disk"] += disk
+            g["gpu"] = min(100.0, g["gpu"] + gpu)
+            g["vram"] += vram
+
+        self.prev, self.prev_io, self.prev_drm, self.prev_t = new_prev, new_io, new_drm, now
 
         tot, idle = cpu_times()
         d_tot, d_idle = tot - self.prev_cpu[0], idle - self.prev_cpu[1]
@@ -181,25 +502,56 @@ class Sampler:
         cpu = round(100 * (d_tot - d_idle) / d_tot, 1) if d_tot > 0 else 0.0
 
         mi = meminfo()
-        out_groups = []
+        dc = disk_counters()
+        disks = []
+        for d in self.disks:
+            a, b = self.prev_disk.get(d["name"]), dc.get(d["name"])
+            r = w = busy = 0
+            if a and b and dt:
+                r, w = (b[0] - a[0]) / dt, (b[1] - a[1]) / dt
+                busy = min(100.0, (b[2] - a[2]) / (dt * 1000) * 100)
+            disks.append({"name": d["name"], "model": d["model"], "size": d["size"],
+                          "read": round(r), "write": round(w), "busy": round(busy, 1)})
+        self.prev_disk = dc
+        nc = net_counters()
+        nets = []
+        for name, (rx, tx) in nc.items():
+            a = self.prev_net.get(name)
+            if a and dt:
+                nets.append({"name": name, "rx": round((rx - a[0]) / dt), "tx": round((tx - a[1]) / dt)})
+        self.prev_net = nc
+
         for g in groups.values():
             g["cpu"] = round(g["cpu"], 1)
-            g["n"] = len(g["pids"])
-            g["pids"] = ",".join(str(x) for x in g["pids"])
-            out_groups.append(g)
+            g["gpu"] = round(g["gpu"], 1)
+            g["disk"] = round(g["disk"])
+            g["vram"] = round(g["vram"])
+            g["n"] = len(g["procs"])
+
+        up = read("/proc/uptime").split()
+        la = read("/proc/loadavg").split()
+        total_threads = 0
+        if len(la) >= 4 and "/" in la[3]:
+            total_threads = int(la[3].split("/")[1])
         return {
-            "cpu": cpu,
-            "temp": cpu_temp(),
-            "mem_total": mi.get("MemTotal", 0),
-            "mem_used": mi.get("MemTotal", 0) - mi.get("MemAvailable", 0),
-            "swap_total": mi.get("SwapTotal", 0),
-            "swap_used": mi.get("SwapTotal", 0) - mi.get("SwapFree", 0),
-            "groups": out_groups,
+            "sys": {"cpu": cpu, "temp": cpu_temp(), "model": self.model, "cores": NCPU,
+                    "freq": cpu_freq(), "procs": len(procs), "threads": nthreads or total_threads,
+                    "uptime": int(float(up[0])) if up else 0},
+            "mem": {"total": mi.get("MemTotal", 0),
+                    "used": mi.get("MemTotal", 0) - mi.get("MemAvailable", 0),
+                    "avail": mi.get("MemAvailable", 0),
+                    "cached": mi.get("Cached", 0) + mi.get("Buffers", 0),
+                    "swap_total": mi.get("SwapTotal", 0),
+                    "swap_used": mi.get("SwapTotal", 0) - mi.get("SwapFree", 0)},
+            "disks": disks,
+            "nets": nets,
+            "gpus": self.gpus.describe({s: round(v, 1) for s, v in intel_total.items()}),
+            "groups": list(groups.values()),
         }
 
 
-def watch(interval, once=False):
-    s = Sampler()
+def watch(interval, want_nvidia=True, once=False):
+    s = Sampler(want_nvidia)
     s.sample()
     time.sleep(0.5)  # primeira linha já com CPU
     while True:
@@ -243,10 +595,12 @@ def main():
     if not a:
         print(__doc__.strip(), file=sys.stderr)
         return 1
+    nvidia = "--no-nvidia" not in a
+    a = [x for x in a if x != "--no-nvidia"]
     if a[0] == "watch":
-        return watch(float(a[1]) if len(a) > 1 else 2.0)
+        return watch(float(a[1]) if len(a) > 1 else 2.0, nvidia)
     if a[0] == "once":
-        return watch(0, once=True)
+        return watch(0, nvidia, once=True)
     if a[0] == "kill" and len(a) > 2:
         return kill(a[1], a[2:])
     print(__doc__.strip(), file=sys.stderr)

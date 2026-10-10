@@ -1163,7 +1163,7 @@ rice_windows_rule = hl.window_rule({
 -- Definida antes das regras do dropterm e do PiP para que elas, vindo
 -- depois, continuem valendo sobre o "centralizar".
 -- Janelas com regra própria de posição: não mexer ao trocar de modo.
-local keepAsIs = { dropterm = true }
+local keepAsIs = { dropterm = true, ["org.quickshell"] = true }
 
 -- Barra de título (plugin hyprbars, opcional: pacote
 -- hyprland-plugin-hyprbars). Só no modo Windows, e só nas janelas que não
@@ -1348,6 +1348,18 @@ hl.window_rule({
     float     = true,
     size      = "monitor_w*0.7 monitor_h*0.55",
     move      = "monitor_w*0.15 50",
+})
+
+-- Gerenciador de Tarefas do rice (TaskManager.qml, janela de aplicativo do
+-- Quickshell): flutuante e centralizado em qualquer modo. A classe é a do
+-- próprio Quickshell, então a regra casa também pelo título.
+hl.window_rule({
+    name  = "taskmanager",
+    match = { class = "^org\\.quickshell$", title = "^(Gerenciador de Tarefas|Task Manager)$" },
+
+    float  = true,
+    size   = "1100 720",
+    center = true,
 })
 
 -- Picture-in-picture do navegador: flutua, fica por cima de tudo (pin) e
