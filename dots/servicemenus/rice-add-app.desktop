@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Service
+ServiceTypes=KonqPopupMenu/Plugin
+MimeType=application/vnd.appimage;application/x-iso9660-appimage;application/x-executable;application/x-sharedlib;application/x-shellscript;application/x-ms-dos-executable;application/vnd.microsoft.portable-executable;application/x-msdownload;application/x-msi;
+Actions=riceAddApp
+X-KDE-Priority=TopLevel
+
+[Desktop Action riceAddApp]
+Name=Add to applications
+Name[pt_BR]=Adicionar aos aplicativos
+Icon=list-add
+Exec=rice-add-app %F

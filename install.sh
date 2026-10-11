@@ -489,6 +489,12 @@ if [ -d "$SCRIPT_DIR/dots/dbus-services" ]; then
     mkdir -p "$HOME/.local/share/dbus-1/services"
     cp -a "$SCRIPT_DIR/dots/dbus-services/"*.service "$HOME/.local/share/dbus-1/services/" 2>/dev/null || true
 fi
+# Menu de contexto do Dolphin "Adicionar aos aplicativos" (AppImage, executável, .exe).
+if [ -d "$SCRIPT_DIR/dots/servicemenus" ]; then
+    mkdir -p "$HOME/.local/share/kio/servicemenus"
+    cp -a "$SCRIPT_DIR/dots/servicemenus/rice-add-app.desktop" "$HOME/.local/share/kio/servicemenus/" 2>/dev/null || true
+    chmod +x "$HOME/.local/share/kio/servicemenus/rice-add-app.desktop" 2>/dev/null || true
+fi
 cp -a --remove-destination "$SCRIPT_DIR/dots/bin/"* "$HOME/.local/bin/"
 chmod +x "$HOME/.local/bin/"*
 

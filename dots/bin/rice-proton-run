@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# rice-proton-run — abre um .exe com o Proton padrão escolhido no Steam (Configurações →
+# Compatibilidade). Usa um prefixo próprio, compartilhado por todos os .exe abertos por aqui.
+set -u
+exe="${1:-}"
+[ -f "$exe" ] || { echo "uso: rice-proton-run <arquivo.exe>" >&2; exit 1; }
+
+STEAM="$HOME/.local/share/Steam"
+vdf="$STEAM/config/config.vdf"
+
+fail() { command -v notify-send >/dev/null 2>&1 && notify-send -a "rice" -u critical "Proton" "$1"; echo "$1" >&2; exit 1; }
+
+# A entrada "0" de CompatToolMapping é a ferramenta padrão do Steam.
+tool=""
+[ -f "$vdf" ] && tool="$(awk -F'"' '/"CompatToolMapping"/{m=1} m && $0 ~ /^[ \t]*"0"[ \t]*$/{g=1} g && $2=="name"{print $4; exit}' "$vdf")"
+
+find_tool() {
+    local n="$1" d
+    for d in "$STEAM/compatibilitytools.d/$n" "/usr/share/steam/compatibilitytools.d/$n" "$STEAM/steamapps/common/$n"; do
+        [ -x "$d/proton" ] && { echo "$d"; return 0; }
+    done
+    # Ferramentas oficiais: o Steam grava "proton_experimental"; a pasta é "Proton - Experimental".
+    for d in "$STEAM/steamapps/common"/Proton*; do
+        [ -x "$d/proton" ] || continue
+        [ "$(basename "$d" | tr '[:upper:]' '[:lower:]' | sed -E 's/ - /_/; s/ /_/g')" = "$(printf '%s' "$n" | tr '[:upper:]' '[:lower:]')" ] && { echo "$d"; return 0; }
+    done
+    return 1
+}
+
+dir=""
+[ -n "$tool" ] && dir="$(find_tool "$tool")"
+if [ -z "$dir" ]; then
+    dir="$STEAM/steamapps/common/Proton - Experimental"
+    [ -x "$dir/proton" ] || fail "Nenhum Proton encontrado (padrão do Steam: ${tool:-não definido})."
+fi
+
+export STEAM_COMPAT_CLIENT_INSTALL_PATH="$STEAM"
+export STEAM_COMPAT_DATA_PATH="$HOME/.local/share/rice-proton"
+mkdir -p "$STEAM_COMPAT_DATA_PATH"
+cd "$(dirname -- "$exe")" || exit 1
+exec "$dir/proton" waitforexitandrun "$exe"

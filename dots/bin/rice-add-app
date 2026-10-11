@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# rice-add-app — coloca um AppImage, executável, script ou .exe entre os aplicativos
+# (cria um .desktop em ~/.local/share/applications). Chamado pelo menu de contexto do
+# Dolphin ("Adicionar aos aplicativos"); aceita vários arquivos.
+set -u
+APPS="$HOME/.local/share/applications"
+RUNNER="$HOME/.local/bin/rice-proton-run"
+
+say() { command -v notify-send >/dev/null 2>&1 && notify-send -a "rice" -i application-x-executable "$1" "${2:-}"; echo "$1${2:+ — $2}"; }
+
+[ $# -gt 0 ] || { echo "uso: rice-add-app <arquivo>..." >&2; exit 1; }
+mkdir -p "$APPS"
+
+for f in "$@"; do
+    f="$(realpath -- "$f" 2>/dev/null)" || continue
+    [ -f "$f" ] || { say "Não é um arquivo" "$f"; continue; }
+    # Exec do .desktop não escapa estes caracteres de forma portátil.
+    case "$f" in *'"'*|*'$'*|*'`'*|*'\'*) say "Caminho com caractere não suportado" "$f"; continue ;; esac
+
+    base="$(basename -- "$f")"
+    name="${base%.*}"
+    slug="$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+|-+$//g')"
+    [ -n "$slug" ] || slug="app"
+    out="$APPS/rice-app-$slug.desktop"
+    if [ -e "$out" ]; then say "Já está nos aplicativos" "$name"; continue; fi
+
+    case "${base,,}" in
+        *.exe|*.msi|*.bat)
+            [ -x "$RUNNER" ] || { say "rice-proton-run não encontrado" "$RUNNER"; continue; }
+            exec_line="\"$RUNNER\" \"$f\"" ;;
+        *)
+            chmod +x -- "$f" 2>/dev/null
+            exec_line="\"$f\"" ;;
+    esac
+
+    cat > "$out" <<DESK
+[Desktop Entry]
+Type=Application
+Name=$name
+Exec=$exec_line
+Path=$(dirname -- "$f")
+Icon=application-x-executable
+Terminal=false
+Categories=Utility;
+X-Rice-Added=true
+DESK
+    command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$APPS" 2>/dev/null
+    say "Adicionado aos aplicativos" "$name"
+done
