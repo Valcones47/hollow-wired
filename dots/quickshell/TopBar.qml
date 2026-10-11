@@ -162,9 +162,12 @@ PanelWindow {
     // jogos: o Proton cria e destrói fluxos em rajada, o PipeWire responde "no
     // global N any more" para o vínculo que chegou tarde e o proxy quebrado
     // derrubava o processo em pw_proxy_destroy (coredumps de 2026-10-10).
+    // Candidatos sem depender de `properties` (que só chegam depois do
+    // vínculo): filtrar por media.class aqui deixava a lista sempre vazia.
+    readonly property var streamCandidates: Pipewire.nodes.values.filter(n => n.audio && n.isStream && n.isSink)
     PwObjectTracker {
         objects: [bar.sink, bar.source].concat(bar.sinks, bar.sources,
-                                               (bar.pop === "mixer" || bar.pop === "audio") ? bar.streams : [])
+                                               (bar.pop === "mixer" || bar.pop === "audio") ? bar.streamCandidates : [])
     }
 
     function nodeName(n) {
@@ -385,6 +388,7 @@ PanelWindow {
                 if (!mod.dragging) return;
                 mod.dragging = false;
                 bar.dragItem = null;
+                bar.dropX = -1;
                 const order = bar.dragOrder;
                 bar.dragOrder = null;
                 ShellLayout.setBarItems(order);
@@ -394,7 +398,7 @@ PanelWindow {
                 mod.dragging = false;
                 bar.dragItem = null;
                 bar.dragOrder = null;
-                bar.applyBarOrder();
+                bar.dropX = -1;
             }
             onClicked: mouse => {
                 if (mod.editable) {
@@ -444,6 +448,12 @@ PanelWindow {
     // Arrastar: a zona sai de onde o ponteiro está (terço esquerdo, meio ou
     // terço direito da barra); dentro dela, a posição é contada pelos vizinhos
     // cujo meio fica à esquerda do ponteiro.
+    //
+    // Nada muda de lugar enquanto arrasta: reparentar o item que está com o
+    // clique fazia o Qt perder o arraste (o item "travava" ao cruzar um vizinho).
+    // Só a ordem nova (dragOrder) e a linha de destino (dropX) andam; a troca
+    // de verdade acontece ao soltar.
+    property real dropX: -1
     function dragModuleTo(key, x) {
         const items = bar.barModuleItems();
         const cur = bar.dragOrder;
@@ -452,21 +462,26 @@ PanelWindow {
         const ci = order.indexOf("::center"), ri = order.indexOf("::right");
         const start = zone === 0 ? 0 : zone === 1 ? ci + 1 : ri + 1;
         const end = zone === 0 ? ci : zone === 1 ? ri : order.length;
+        const vis = (k) => { const it = items[k]; return it && it.visible && it !== bar.dragItem ? it : null; };
         let pos = start;
         for (let i = start; i < end; i++) {
-            const it = items[order[i]];
-            if (!it || !it.visible) { pos = i + 1; continue; }
-            const mid = it.mapToItem(root, it.width / 2, 0).x;
-            if (mid < x) pos = i + 1;
+            const it = vis(order[i]);
+            if (!it) continue;
+            if (it.mapToItem(root, it.width / 2, 0).x < x) pos = i + 1;
         }
+        // linha de destino: antes do próximo visível da zona, ou depois do anterior
+        let next = null, prev = null;
+        for (let i = pos; i < end && !next; i++) next = vis(order[i]);
+        for (let i = pos - 1; i >= start && !prev; i--) prev = vis(order[i]);
+        bar.dropX = next ? next.mapToItem(root, 0, 0).x - 4
+                  : prev ? prev.mapToItem(root, prev.width, 0).x + 4
+                  : (zone === 0 ? 24 : zone === 1 ? root.width / 2 : root.width - 24);
         order.splice(pos, 0, key);
-        if (JSON.stringify(order) === JSON.stringify(cur)) return;
-        bar.dragOrder = order;
-        bar.applyBarOrder();
+        if (JSON.stringify(order) !== JSON.stringify(cur)) bar.dragOrder = order;
     }
     Connections {
         target: ShellLayout
-        function onBarItemsChanged() { if (!bar.dragOrder) bar.applyBarOrder(); }
+        function onBarItemsChanged() { if (!bar.dragOrder) Qt.callLater(bar.applyBarOrder); }
     }
     Item { id: orderParking; visible: false }
 
@@ -583,6 +598,17 @@ PanelWindow {
                 }
             }
 
+            // onde o item vai cair
+            Rectangle {
+                z: 49
+                visible: bar.dragItem !== null && bar.dropX >= 0
+                x: bar.dropX - 1.5
+                width: 3
+                height: bar.barH - 12
+                anchors.verticalCenter: parent.verticalCenter
+                radius: 2
+                color: Theme.primary
+            }
             ShaderEffectSource {
                 id: dragGhost
                 z: 50
@@ -1689,45 +1715,19 @@ PanelWindow {
                 }
 
                 // ---------- mixer (volume por app) ----------
+                // Saídas, entradas e apps no AppMixer (mesmo da barra lateral).
                 ColumnLayout {
                     id: mixerPop
                     visible: popContent.current === mixerPop
-                    width: 320
+                    width: 400
                     spacing: 6
-                    property bool dragging: false
+                    property bool dragging: mixerView.dragging
 
-                    PopTitle { text: Theme.t("mixer.title", "Volume dos apps") }
-                    PopText {
-                        visible: bar.streams.length === 0
-                        text: Theme.t("mixer.empty", "Nenhum app tocando som agora")
-                    }
-                    Repeater {
-                        model: bar.streams
-                        delegate: PopSlider {
-                            required property var modelData
-                            max: AudioPrefs.maxVolume
-                            icon: bar.volIcon(modelData)
-                            label: bar.nodeName(modelData)
-                            value: modelData.audio ? modelData.audio.volume : 0
-                            dimmed: modelData.audio ? modelData.audio.muted : true
-                            onDraggingChanged: mixerPop.dragging = dragging
-                            onMoved: v => { if (modelData.audio) modelData.audio.volume = v; }
-                            onIconClicked: if (modelData.audio) modelData.audio.muted = !modelData.audio.muted
-                        }
-                    }
-                    // Mesmo interruptor da aba Áudio das configurações (AudioPrefs).
-                    PopAction {
-                        Layout.topMargin: 4
-                        icon: Theme.icons.volHigh
-                        label: Theme.t("mixer.boost", "Permitir até 150%")
-                        detail: Theme.t("mixer.boost_sub", "Pode distorcer o som")
-                        selected: AudioPrefs.maxVolume > 1
-                        onActivated: {
-                            const on = AudioPrefs.maxVolume <= 1;
-                            AudioPrefs.setMax(on ? 150 : 100);
-                            if (!on) for (const n of bar.streams.concat([bar.sink]))
-                                if (n && n.audio && n.audio.volume > 1) n.audio.volume = 1;
-                        }
+                    AppMixer {
+                        id: mixerView
+                        Layout.fillWidth: true
+                        pal: bar.pal
+                        active: mixerPop.visible
                     }
                 }
 

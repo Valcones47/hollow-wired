@@ -272,6 +272,7 @@ PanelWindow {
                 if (!bb.dragging) return;
                 bb.dragging = false;
                 vbar.dragItem = null;
+                vbar.dropY = -1;
                 const order = vbar.dragOrder;
                 vbar.dragOrder = null;
                 ShellLayout.setBarItems(order);
@@ -281,7 +282,7 @@ PanelWindow {
                 bb.dragging = false;
                 vbar.dragItem = null;
                 vbar.dragOrder = null;
-                vbar.applyBarOrder();
+                vbar.dropY = -1;
             }
             onClicked: mouse => {
                 if (bb.editable) {
@@ -307,7 +308,7 @@ PanelWindow {
     function barModuleItems() {
         return { notifications: vNotif, network: vNet, control: vCtl, tray: vTray, updates: vUpd,
                  night: vNight, caffeine: vCaf, record: vRec, screenshot: vShot, clipboard: vClip,
-                 picker: vPick, gpu: vGpu, lock: vLock, settings: vSet, power: vPower };
+                 picker: vPick, gpu: vGpu, lock: vLock, settings: vSet, power: vPower, mixer: vMix };
     }
     function applyBarOrder() {
         const items = vbar.barModuleItems();
@@ -318,27 +319,32 @@ PanelWindow {
             it.parent = mainCol;
         }
     }
+    // Nada muda de lugar enquanto arrasta (reparentar o item que está com o
+    // clique fazia o Qt perder o arraste): só a ordem nova e a linha de destino
+    // (dropY) andam; a troca acontece ao soltar.
+    property real dropY: -1
     function dragModuleTo(key, y) {
         const items = vbar.barModuleItems();
-        const order = vbar.dragOrder;
-        const from = order.indexOf(key);
+        const cur = vbar.dragOrder;
+        const order = cur.filter(k => k !== key);
+        const vis = (k) => { const it = items[k]; return it && it.visible && it !== vbar.dragItem ? it : null; };
+        let pos = 0;
         for (let i = 0; i < order.length; i++) {
-            const it = items[order[i]];
-            if (i === from || !it || !it.visible) continue;
-            const mid = it.y + it.height / 2;
-            if ((i > from && y > mid) || (i < from && y < mid)) {
-                const next = order.slice();
-                next.splice(from, 1);
-                next.splice(i, 0, key);
-                vbar.dragOrder = next;
-                vbar.applyBarOrder();
-                return;
-            }
+            const it = vis(order[i]);
+            if (!it) continue;
+            if (it.mapToItem(mainCol, 0, it.height / 2).y < y) pos = i + 1;
         }
+        let next = null, prev = null;
+        for (let i = pos; i < order.length && !next; i++) next = vis(order[i]);
+        for (let i = pos - 1; i >= 0 && !prev; i--) prev = vis(order[i]);
+        vbar.dropY = next ? next.mapToItem(mainCol, 0, 0).y - 4
+                   : prev ? prev.mapToItem(mainCol, 0, prev.height).y + 4 : y;
+        order.splice(pos, 0, key);
+        if (JSON.stringify(order) !== JSON.stringify(cur)) vbar.dragOrder = order;
     }
     Connections {
         target: ShellLayout
-        function onBarItemsChanged() { if (!vbar.dragOrder) vbar.applyBarOrder(); }
+        function onBarItemsChanged() { if (!vbar.dragOrder) Qt.callLater(vbar.applyBarOrder); }
     }
     Item { id: orderParking; visible: false }
 
@@ -378,6 +384,16 @@ PanelWindow {
                 onClicked: ShellLayout.editing = !ShellLayout.editing
             }
 
+            Rectangle {
+                z: 49
+                visible: vbar.dragItem !== null && vbar.dropY >= 0
+                anchors.horizontalCenter: parent.horizontalCenter
+                y: mainCol.y + vbar.dropY - 1.5
+                width: 28
+                height: 3
+                radius: 2
+                color: vbar.pal.primary
+            }
             ShaderEffectSource {
                 z: 50
                 visible: vbar.dragItem !== null
@@ -579,12 +595,18 @@ PanelWindow {
                             if (!vTray.dragging && Math.abs(y - vTray.pressY) > 8) {
                                 vTray.dragging = true;
                                 vbar.dragOrder = ShellLayout.barItems.slice();
+                                vbar.dragItem = vTray;
                             }
-                            if (vTray.dragging) vbar.dragModuleTo("tray", y);
+                            if (vTray.dragging) {
+                                vbar.dragY = y;
+                                vbar.dragModuleTo("tray", y);
+                            }
                         }
                         onReleased: {
                             if (!vTray.dragging) return;
                             vTray.dragging = false;
+                            vbar.dragItem = null;
+                            vbar.dropY = -1;
                             const order = vbar.dragOrder;
                             vbar.dragOrder = null;
                             ShellLayout.setBarItems(order);
@@ -643,6 +665,16 @@ PanelWindow {
                         ? (NotifService.unreadCount > 99 ? "99+" : String(NotifService.unreadCount)) : ""
                     onActivated: vbar.pop === "notifs" ? vbar.pop = "" : vbar.showPop("notifs", vNotif)
                     onSecondary: NotifService.toggleDnd()
+                }
+
+                // Volume por app (AppMixer no popup).
+                BarButton {
+                    id: vMix
+                    editKey: "mixer"
+                    visible: ShellLayout.barHas("mixer")
+                    icon: Theme.icons.mixer
+                    popKind: "mixer"
+                    onActivated: vbar.pop === "mixer" ? vbar.pop = "" : vbar.showPop("mixer", vMix)
                 }
 
                 BarButton {
@@ -718,12 +750,18 @@ PanelWindow {
                             if (!vCtl.dragging && Math.abs(y - vCtl.pressY) > 8) {
                                 vCtl.dragging = true;
                                 vbar.dragOrder = ShellLayout.barItems.slice();
+                                vbar.dragItem = vCtl;
                             }
-                            if (vCtl.dragging) vbar.dragModuleTo("control", y);
+                            if (vCtl.dragging) {
+                                vbar.dragY = y;
+                                vbar.dragModuleTo("control", y);
+                            }
                         }
                         onReleased: {
                             if (!vCtl.dragging) return;
                             vCtl.dragging = false;
+                            vbar.dragItem = null;
+                            vbar.dropY = -1;
                             const order = vbar.dragOrder;
                             vbar.dragOrder = null;
                             ShellLayout.setBarItems(order);
@@ -845,11 +883,11 @@ PanelWindow {
     // ================= popup lateral =================
     Rectangle {
         id: popBox
-        readonly property bool busy: mediaVol.dragging
+        readonly property bool busy: mediaVol.dragging || vMixer.dragging
         readonly property real gap: 10
         // Largura fixa: medir pelo implicitWidth do ColumnLayout (que conta ~0
         // para linhas com fillWidth) deixava o conteúdo vazar da caixa.
-        width: vbar.popMaxW - 30
+        width: vbar.pop === "mixer" ? 420 : vbar.popMaxW - 30
         height: popCol.implicitHeight + 24
         x: vbar.onLeft ? vbar.stripW + gap - (vbar.pop !== "" ? 0 : 8)
                        : vbar.width - vbar.stripW - gap - width + (vbar.pop !== "" ? 0 : 8)
@@ -973,6 +1011,15 @@ PanelWindow {
                 item: vbar.pop === "tray" ? vbar.popTray : null
                 maxWidth: popBox.width - 28
                 onTriggered: vbar.pop = ""
+            }
+
+            // ---- volume por app ----
+            AppMixer {
+                id: vMixer
+                visible: vbar.pop === "mixer"
+                Layout.fillWidth: true
+                pal: vbar.pal
+                active: visible
             }
 
             // ---- notificações ----

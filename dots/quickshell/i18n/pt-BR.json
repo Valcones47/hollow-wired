@@ -2105,5 +2105,14 @@
   "taskman.in_both": "Processos e Detalhes",
   "taskman.set_window": "Janela de tempo do gráfico",
   "taskman.set_resources": "Recursos mostrados",
-  "taskman.set_starttab": "Aba inicial"
+  "taskman.set_starttab": "Aba inicial",
+  "mixer.unknown_app": "App desconhecido",
+  "mixer.streams_n": "%1 fluxos",
+  "mixer.no_output": "Sem saída de áudio",
+  "mixer.main_volume": "Volume da saída principal",
+  "mixer.tab_out": "Saídas",
+  "mixer.tab_in": "Entradas",
+  "mixer.tab_apps": "Apps",
+  "mixer.default": "Padrão",
+  "mixer.no_inputs": "Nenhuma entrada de áudio"
 }

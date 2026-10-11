@@ -2105,5 +2105,14 @@
   "taskman.in_both": "Processes and Details",
   "taskman.set_window": "Graph time window",
   "taskman.set_resources": "Resources shown",
-  "taskman.set_starttab": "Start tab"
+  "taskman.set_starttab": "Start tab",
+  "mixer.unknown_app": "Unknown app",
+  "mixer.streams_n": "%1 streams",
+  "mixer.no_output": "No audio output",
+  "mixer.main_volume": "Main output volume",
+  "mixer.tab_out": "Outputs",
+  "mixer.tab_in": "Inputs",
+  "mixer.tab_apps": "Apps",
+  "mixer.default": "Default",
+  "mixer.no_inputs": "No audio input"
 }

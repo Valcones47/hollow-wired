@@ -85,3 +85,4 @@ TaskProps 1.0 TaskProps.qml
 TaskMenu 1.0 TaskMenu.qml
 ThemePalette 1.0 ThemePalette.qml
 DisplayMode 1.0 DisplayMode.qml
+AppMixer 1.0 AppMixer.qml
