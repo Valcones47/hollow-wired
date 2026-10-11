@@ -260,12 +260,34 @@ QtObject {
             m[wanted] = /^\d+$/.test(found) ? found : "";
             root.classSteamId = m;
             if (m[wanted]) root._askSteamIcon(m[wanted]);
+            else root._retryClass(wanted);
             found = "";
             if (root._classQueue.length) {
                 wanted = root._classQueue.shift();
                 running = true;
             }
         }
+    }
+    // "Não veio do Steam" não fica gravado de primeira: a consulta corre quando
+    // a janela aparece e às vezes o Hyprland ainda não a lista (ou o jogo troca
+    // de janela, como o SMAPI do Stardew). Tenta de novo algumas vezes.
+    property var _classMiss: ({})
+    property var _classRetry: []
+    property Timer classRetryTimer: Timer {
+        interval: 4000
+        onTriggered: {
+            const m = Object.assign({}, root.classSteamId);
+            for (const c of root._classRetry) delete m[c];
+            root._classRetry = [];
+            root.classSteamId = m;   // as ligações pedem de novo
+        }
+    }
+    function _retryClass(cls) {
+        const n = (root._classMiss[cls] || 0) + 1;
+        root._classMiss[cls] = n;
+        if (n > 4 || root._classRetry.indexOf(cls) !== -1) return;
+        root._classRetry = root._classRetry.concat([cls]);
+        classRetryTimer.restart();
     }
     function _askClassSteamId(cls) {
         if (root.classSteamId[cls] !== undefined || root._classQueue.indexOf(cls) !== -1 || classSteamProc.wanted === cls && classSteamProc.running) return;
