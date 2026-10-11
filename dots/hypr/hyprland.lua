@@ -346,6 +346,12 @@ hl.env("EDITOR", io.open("/usr/bin/micro", "r") and "micro" or "nano")
 hl.env("VISUAL", "kate")
 hl.env("BROWSER", "zen-browser")
 
+-- Loaders de mod (BepInEx, MelonLoader) entram por uma DLL "proxy" na pasta do jogo
+-- (winhttp.dll, version.dll). O Proton usa a DLL do Wine no lugar dela, então o mod
+-- nunca carregava sem a opção de inicialização por jogo. Com "n,b" ele tenta a da
+-- pasta primeiro e cai na do Wine; jogo sem a DLL não muda nada.
+hl.env("WINEDLLOVERRIDES", "winhttp=n,b;version=n,b")
+
 -----------------
 ---- AUTOSTART --
 -----------------
