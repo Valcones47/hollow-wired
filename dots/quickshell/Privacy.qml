@@ -48,5 +48,17 @@ Singleton {
     }
 
     // O nome do app (application.name) só vem com o nó rastreado.
-    PwObjectTracker { objects: root.groups.map(g => g.target).filter(t => t && t.isStream) }
+    // Vínculo só depois de 1,5 s sem mudança nos links: ao abrir jogo, o Proton
+    // cria e destrói fluxos em milissegundos; vincular um deles na hora fazia o
+    // PipeWire responder "no global N any more" e o Quickshell cair em
+    // pw_proxy_destroy (coredumps de 2026-10-11 e 2026-10-12).
+    property var stableTargets: []
+    onGroupsChanged: settle.restart()
+    Component.onCompleted: settle.start()
+    Timer {
+        id: settle
+        interval: 1500
+        onTriggered: root.stableTargets = root.groups.map(g => g.target).filter(t => t && t.isStream)
+    }
+    PwObjectTracker { objects: root.stableTargets }
 }
