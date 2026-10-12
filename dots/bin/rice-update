@@ -178,7 +178,7 @@ make_backup() {
     cp "$SYNC_MARKER" "$dest/VERSION" 2>/dev/null || true
 }
 
-# Arquivos de estado do usuário (mesma lista do AGENTS.md): o rollback volta
+# Arquivos de estado do usuário (mesma lista do PROJETO.md): o rollback volta
 # o código do rice, não as escolhas feitas depois do backup.
 # Pausa o recarregamento automático do Hyprland enquanto a pasta hypr é
 # copiada. O `cp --remove-destination` apaga e reescreve o hyprland.lua; o
