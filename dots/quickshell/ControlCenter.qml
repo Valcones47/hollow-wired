@@ -105,6 +105,7 @@ PanelWindow {
         && n.name !== "hollow_eq_out" && !String(n.name).startsWith("output.loopback"))
     // Fluxos só com o painel aberto (ver o comentário em TopBar.qml).
     PwObjectTracker { objects: [cc.sink, cc.source].concat(cc.sinks, cc.open ? cc.streams : []) }
+    Binding { target: MediaState; property: "wantCc"; value: cc.open }
     function nodeName(n) {
         if (!n) return "";
         return n.properties["application.name"] || n.description || n.nickname || n.name;

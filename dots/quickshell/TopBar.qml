@@ -169,6 +169,7 @@ PanelWindow {
         objects: [bar.sink, bar.source].concat(bar.sinks, bar.sources,
                                                (bar.pop === "mixer" || bar.pop === "audio") ? bar.streamCandidates : [])
     }
+    Binding { target: MediaState; property: "wantTop"; value: bar.pop === "media" }
 
     function nodeName(n) {
         if (!n) return "";

@@ -109,6 +109,7 @@ PanelWindow {
     readonly property PwNode sink: Pipewire.defaultAudioSink
     readonly property PwNode source: Pipewire.defaultAudioSource
     PwObjectTracker { objects: [vbar.sink, vbar.source] }
+    Binding { target: MediaState; property: "wantVert"; value: vbar.pop === "media" }
 
     // Mídia: estado e comandos no MediaState (compartilhado com a TopBar e a
     // central; lá está o porquê do playerctl).
